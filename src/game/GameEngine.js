@@ -31,6 +31,8 @@ import {
   itemValue,
   makeItem,
   makePotion,
+  rollNamedItem,
+  rollUniqueItem,
 } from "./world.js";
 import {
   clamp,
@@ -49,6 +51,8 @@ const TERRAIN_LAYER_PAD_BOTTOM = 88;
 const SAVE_VERSION = 1;
 const SAVE_STORAGE_KEY = `runebound-depths-save-v${SAVE_VERSION}`;
 const AUTOSAVE_INTERVAL_SECONDS = 1.5;
+const MAX_POTION_STACK = 5;
+const MAX_ELITE_MONSTERS_PER_REGION = 6;
 
 export class GameEngine {
   constructor(canvas, onSnapshot) {
@@ -79,7 +83,10 @@ export class GameEngine {
     this.pointer = { x: 0, y: 0, worldX: this.region.start.x, worldY: this.region.start.y, down: false };
     this.hoverMonsterId = null;
     this.player = this.createPlayer();
+    this.regionStartPlayerLevel = this.player.level;
+    this.eliteMonsterCount = 0;
     this.loadProgress();
+    this.regionStartPlayerLevel = this.player.level;
     if (!isRegionPointPlayable(this.region, this.player.x, this.player.y, this.player.radius)) {
       this.placePlayerAtRegionStart();
     }
@@ -207,6 +214,7 @@ export class GameEngine {
       this.updateDeath(dt, stats);
     } else {
       this.updatePlayer(dt, stats);
+      this.updateChests(dt);
       this.updateMonsters(dt, stats);
       this.updateProjectiles(dt);
       this.updateLoot(dt);
@@ -325,6 +333,7 @@ export class GameEngine {
   updateMonsters(dt) {
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      this.scaleMonsterToHeroLevel(monster);
       monster.attackCooldown = Math.max(0, monster.attackCooldown - dt);
       monster.attackAnim = Math.max(0, monster.attackAnim - dt);
       monster.hurt = Math.max(0, monster.hurt - dt);
@@ -408,8 +417,7 @@ export class GameEngine {
           this.player.gold += loot.amount;
           this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
           this.loots.splice(i, 1);
-        } else if (this.player.inventory.length < MAX_INVENTORY) {
-          this.player.inventory.push(loot.item);
+        } else if (this.addInventoryItem(loot.item)) {
           this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
           this.addToast(loot.item.name);
           this.loots.splice(i, 1);
@@ -420,6 +428,78 @@ export class GameEngine {
         }
       }
     }
+  }
+
+  updateChests(dt) {
+    const animationSeconds = 6 / 6;
+    for (const chunk of this.nearbyChunks(1)) {
+      for (let i = chunk.objects.length - 1; i >= 0; i -= 1) {
+        const object = chunk.objects[i];
+        if (object.type !== "chest") continue;
+
+        if (object.opening) {
+          object.openTime = (object.openTime ?? 0) + dt;
+          if (object.openTime >= animationSeconds) {
+            this.dropChestLoot(object);
+            this.region.chestOpened = true;
+            chunk.objects.splice(i, 1);
+          }
+          continue;
+        }
+
+        if (distance(this.player, object) <= this.player.radius + object.radius + 0.45) {
+          object.opening = true;
+          object.openTime = 0;
+          object.blocking = false;
+          this.player.target = null;
+        }
+      }
+    }
+  }
+
+  dropChestLoot(chest) {
+    let item = rollUniqueItem(Math.max(1, this.player.level), {
+      source: "chest",
+      biomeId: this.region.biomeId,
+      chance: 0.08,
+    }) ?? rollNamedItem(Math.max(1, this.player.level), {
+      source: "chest",
+      biomeId: this.region.biomeId,
+      chanceMult: 3,
+    });
+
+    for (let i = 0; i < 12; i += 1) {
+      if (item) break;
+      const candidate = makeItem(Math.max(1, this.player.level), Math.random());
+      if (candidate.rarity !== "poor") {
+        item = candidate;
+        break;
+      }
+      item = candidate;
+    }
+
+    if (item?.rarity === "poor") {
+      const poorPrefix = PREFIXES.poor.find((prefix) => item.name.startsWith(`${prefix} `));
+      if (poorPrefix) {
+        item.name = item.name.replace(`${poorPrefix} `, `${PREFIXES.normal[Math.floor(Math.random() * PREFIXES.normal.length)]} `);
+      }
+      item.rarity = "normal";
+      item.rarityLabel = "Normal";
+      item.rarityColor = "#f5f3ea";
+      item.value = itemValue(item);
+    }
+
+    this.loots.push({
+      id: createId(),
+      type: "item",
+      item,
+      x: chest.x + 0.16,
+      y: chest.y - 0.16,
+      bob: Math.random() * Math.PI * 2,
+      pickupDelay: 0.35,
+    });
+    this.addParticles(chest.x, chest.y, "#ffd85d", 18, 0.12);
+    this.addFloater(chest.x, chest.y, item.name, item.rarityColor, 1.05);
   }
 
   updateEffects(dt) {
@@ -527,6 +607,8 @@ export class GameEngine {
     this.particles = [];
     this.floaters = [];
     this.hoverMonsterId = null;
+    this.regionStartPlayerLevel = this.player.level;
+    this.eliteMonsterCount = 0;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.placePlayerAtRegionStart();
@@ -638,36 +720,75 @@ export class GameEngine {
   }
 
   dropLoot(monster) {
-    const gold = Math.floor((4 + Math.random() * 9) * (1 + monster.level * 0.28));
-    this.loots.push({
-      id: createId(),
-      type: "gold",
-      amount: gold,
-      x: monster.x + (Math.random() - 0.5) * 0.5,
-      y: monster.y + (Math.random() - 0.5) * 0.5,
-      bob: Math.random() * Math.PI * 2,
-    });
-
-    if (Math.random() < clamp(0.25 + monster.level * 0.02, 0.25, 0.58)) {
-      const item = makeItem(monster.level, Math.random());
+    const profile = monsterLootProfile(monster.typeName);
+    const lootLevel = monster.lootLevel ?? monster.level;
+    if (Math.random() < profile.goldChance) {
+      const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult);
       this.loots.push({
         id: createId(),
-        type: "item",
-        item,
-        x: monster.x + (Math.random() - 0.5) * 0.65,
-        y: monster.y + (Math.random() - 0.5) * 0.65,
+        type: "gold",
+        amount: gold,
+        x: monster.x + (Math.random() - 0.5) * 0.5,
+        y: monster.y + (Math.random() - 0.5) * 0.5,
         bob: Math.random() * Math.PI * 2,
       });
     }
 
-    if (Math.random() < 0.22) {
-      const potion = makePotion(Math.random() < 0.55 ? "health" : "mana", monster.level);
+    const unique = rollUniqueItem(lootLevel, {
+      source: "monster",
+      biomeId: this.region.biomeId,
+      chance: 0.0015,
+    });
+    if (unique) {
+      this.loots.push({
+        id: createId(),
+        type: "item",
+        item: unique,
+        x: monster.x + (Math.random() - 0.5) * 0.7,
+        y: monster.y + (Math.random() - 0.5) * 0.7,
+        bob: Math.random() * Math.PI * 2,
+      });
+    }
+
+    const named = rollNamedItem(lootLevel, {
+      source: "monster",
+      biomeId: this.region.biomeId,
+      chanceMult: namedItemChanceMultiplier(monster),
+    });
+    if (named) {
+      this.loots.push({
+        id: createId(),
+        type: "item",
+        item: named,
+        x: monster.x + (Math.random() - 0.5) * 0.7,
+        y: monster.y + (Math.random() - 0.5) * 0.7,
+        bob: Math.random() * Math.PI * 2,
+      });
+    }
+
+    const category = rollLootCategory(profile.weights);
+    if (!category || category === "none") return;
+
+    const item = category === "health" || category === "mana"
+      ? makePotion(category, lootLevel)
+      : makeItem(lootLevel, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
+    this.loots.push({
+      id: createId(),
+      type: "item",
+      item,
+      x: monster.x + (Math.random() - 0.5) * 0.7,
+      y: monster.y + (Math.random() - 0.5) * 0.7,
+      bob: Math.random() * Math.PI * 2,
+    });
+
+    if (category === "all" && Math.random() < clamp(0.08 + monster.level * 0.01, 0.08, 0.24)) {
+      const potion = makePotion(Math.random() < 0.5 ? "health" : "mana", lootLevel);
       this.loots.push({
         id: createId(),
         type: "item",
         item: potion,
-        x: monster.x + (Math.random() - 0.5) * 0.7,
-        y: monster.y + (Math.random() - 0.5) * 0.7,
+        x: monster.x + (Math.random() - 0.5) * 0.85,
+        y: monster.y + (Math.random() - 0.5) * 0.85,
         bob: Math.random() * Math.PI * 2,
       });
     }
@@ -703,7 +824,7 @@ export class GameEngine {
     const old = this.player.equipment[slotId];
     this.player.equipment[slotId] = item;
     this.player.inventory.splice(index, 1);
-    if (old) this.player.inventory.push(old);
+    if (old) this.addInventoryItem(old);
 
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
@@ -729,7 +850,8 @@ export class GameEngine {
       this.player.mana = clamp(this.player.mana + stats.maxMana * pct, 0, stats.maxMana);
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * pct)} mana`, "#58bfff", 0.95);
     }
-    this.player.inventory.splice(index, 1);
+    item.count = Math.max(0, Math.floor(Number(item.count) || 1) - 1);
+    if (item.count <= 0) this.player.inventory.splice(index, 1);
     this.potionCooldown = 0.5;
     this.publishSnapshot();
   }
@@ -798,13 +920,14 @@ export class GameEngine {
     const currentRarity = RARITIES.find((entry) => entry.id === base.rarity) ?? RARITIES[1];
     const ratio = rarity.mult / currentRarity.mult;
     const prefix = PREFIXES[rarity.id]?.[0] ?? rarity.label;
-    const merged = {
-      ...base,
-      id: createId(),
-      name: `${prefix} ${base.baseName}`,
-      rarity: rarity.id,
-      rarityLabel: rarity.label,
-      rarityColor: rarity.color,
+  const merged = {
+    ...base,
+    id: createId(),
+    name: `${prefix} ${base.baseName}`,
+    level: Math.max(...items.map((item) => Math.max(1, Math.floor(Number(item.level) || 1)))),
+    rarity: rarity.id,
+    rarityLabel: rarity.label,
+    rarityColor: rarity.color,
       damageMin: Math.max(base.damageMin ? base.damageMin + 1 : 0, Math.floor((base.damageMin || 0) * ratio)),
       damageMax: Math.max(base.damageMax ? base.damageMax + 1 : 0, Math.floor((base.damageMax || 0) * ratio)),
       armor: Math.floor((base.armor || 0) * ratio),
@@ -817,6 +940,45 @@ export class GameEngine {
     };
     merged.value = itemValue(merged);
     return merged;
+  }
+
+  addInventoryItem(item) {
+    if (!item) return false;
+    if (item.mode === "potion") {
+      let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+      for (const stack of this.player.inventory) {
+        if (stack.mode !== "potion" || stack.potionType !== item.potionType) continue;
+        const current = Math.max(1, Math.floor(Number(stack.count) || 1));
+        const room = MAX_POTION_STACK - current;
+        if (room <= 0) continue;
+        const moved = Math.min(room, remaining);
+        stack.count = current + moved;
+        remaining -= moved;
+        if (remaining <= 0) return true;
+      }
+      while (remaining > 0) {
+        if (this.player.inventory.length >= MAX_INVENTORY) {
+          item.count = remaining;
+          return false;
+        }
+        const count = Math.min(MAX_POTION_STACK, remaining);
+        this.player.inventory.push({ ...item, id: createId(), count });
+        remaining -= count;
+      }
+      return true;
+    }
+    if (this.player.inventory.length >= MAX_INVENTORY) return false;
+    this.player.inventory.push(item);
+    return true;
+  }
+
+  compactPotionStacks() {
+    const equipment = this.player.inventory.filter((item) => item.mode !== "potion");
+    const potions = this.player.inventory.filter((item) => item.mode === "potion");
+    this.player.inventory = equipment;
+    for (const potion of potions) {
+      this.addInventoryItem(potion);
+    }
   }
 
   rollDamage(min, max) {
@@ -964,6 +1126,11 @@ export class GameEngine {
       rarity: String(item.rarity ?? "normal"),
       rarityLabel: String(item.rarityLabel ?? "Normal"),
       rarityColor: String(item.rarityColor ?? "#f5f3ea"),
+      unique: Boolean(item.unique),
+      uniqueId: item.uniqueId ? String(item.uniqueId) : undefined,
+      named: Boolean(item.named),
+      namedId: item.namedId ? String(item.namedId) : undefined,
+      iconUrl: item.iconUrl ? String(item.iconUrl) : undefined,
       slot: String(item.slot ?? "weapon"),
       mode: String(item.mode ?? "melee"),
       level: Math.max(1, Math.floor(Number(item.level) || 1)),
@@ -978,6 +1145,7 @@ export class GameEngine {
       magic: Math.floor(Number(item.magic) || 0),
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,
+      count: item.mode === "potion" ? clamp(Math.floor(Number(item.count) || 1), 1, MAX_POTION_STACK) : undefined,
     };
     normalized.value = Math.max(1, Math.floor(Number(item.value) || itemValue(normalized)));
     return normalized;
@@ -1016,6 +1184,7 @@ export class GameEngine {
         .map((item) => this.normalizeSavedItem(item))
         .filter(Boolean)
         .slice(0, MAX_INVENTORY);
+      this.compactPotionStacks();
     }
 
     const nextEquipment = createEquipment();
@@ -1124,10 +1293,85 @@ export class GameEngine {
       const chunk = createChunk(cx, cy, this.region);
       this.chunks.set(key, chunk);
       for (const monster of chunk.monsters) {
+        this.scaleMonsterToHeroLevel(monster);
+        this.assignEliteVariant(monster);
         this.monsters.set(monster.id, monster);
       }
     }
     return this.chunks.get(key);
+  }
+
+  scaleMonsterToHeroLevel(monster) {
+    const heroLevel = Math.max(1, Math.floor(this.player.level || this.regionStartPlayerLevel || 1));
+    const currentLevel = Math.max(1, Math.floor(Number(monster.level) || 1));
+    const runawayElite = monster.elite && (!Number.isFinite(Number(monster.maxHp)) || currentLevel > heroLevel * 4);
+    const naturalLevel = runawayElite
+      ? Math.max(1, Math.floor(heroLevel * 0.82))
+      : Math.max(1, Math.floor(Number(monster.baseLevel) || currentLevel));
+    monster.baseLevel = naturalLevel;
+
+    const baseTargetLevel = Math.max(naturalLevel, Math.floor(heroLevel * 0.82));
+    const eliteLevelPct = eliteVariantLevelPct(monster.elite);
+    const eliteBonusLevel = eliteLevelPct > 0 ? Math.max(1, Math.floor(heroLevel * eliteLevelPct)) : 0;
+    const targetLevel = baseTargetLevel + eliteBonusLevel;
+    if (runawayElite) {
+      this.resetMonsterToLevel(monster, targetLevel);
+      return;
+    }
+
+    const levelBoost = targetLevel - currentLevel;
+    if (levelBoost <= 0) {
+      monster.lootLevel = monster.level;
+      return;
+    }
+
+    const hpPct = monster.maxHp > 0 ? clamp(monster.hp / monster.maxHp, 0.01, 1) : 1;
+    monster.level = targetLevel;
+    monster.lootLevel = targetLevel;
+    monster.maxHp = Math.floor(monster.maxHp * (1 + levelBoost * 0.2));
+    monster.hp = Math.max(1, Math.floor(monster.maxHp * hpPct));
+    monster.damage = Math.floor(monster.damage * (1 + levelBoost * 0.17));
+    monster.speed *= 1 + Math.min(0.2, levelBoost * 0.012);
+    monster.xp = Math.floor(monster.xp * (1 + levelBoost * 0.12));
+  }
+
+  resetMonsterToLevel(monster, level) {
+    const base = MONSTER_STATS[monster.typeName];
+    if (!base) return;
+    const hpPct = Number.isFinite(Number(monster.maxHp)) && monster.maxHp > 0
+      ? clamp(monster.hp / monster.maxHp, 0.01, 1)
+      : 1;
+    monster.level = level;
+    monster.lootLevel = level;
+    monster.maxHp = Math.floor(base.hp * (1 + level * 0.18));
+    monster.hp = Math.max(1, Math.floor(monster.maxHp * hpPct));
+    monster.damage = Math.floor(base.damage * (1 + level * 0.16));
+    monster.speed = base.speed * (1 + Math.min(0.32, level * 0.025));
+    monster.xp = Math.floor(base.xp * (1 + level * 0.15));
+  }
+
+  assignEliteVariant(monster) {
+    if (this.eliteMonsterCount >= MAX_ELITE_MONSTERS_PER_REGION) return;
+    const variant = rollEliteVariant();
+    if (!variant) return;
+
+    this.eliteMonsterCount += 1;
+    const bonusLevel = Math.max(1, Math.floor(this.regionStartPlayerLevel * variant.levelPct));
+    monster.elite = {
+      id: variant.id,
+      label: variant.label,
+      color: variant.color,
+      tintAlpha: variant.tintAlpha,
+      levelPct: variant.levelPct,
+    };
+    monster.level += bonusLevel;
+    monster.lootLevel = monster.level;
+    monster.maxHp = Math.floor(monster.maxHp * (1 + bonusLevel * 0.18));
+    monster.hp = monster.maxHp;
+    monster.damage = Math.floor(monster.damage * (1 + bonusLevel * 0.16));
+    monster.speed *= 1 + Math.min(0.18, bonusLevel * 0.015);
+    monster.xp = Math.floor(monster.xp * (1.2 + variant.levelPct));
+    monster.visualScale = (monster.visualScale || 1) * variant.sizeMult;
   }
 
   get assetsReady() {
@@ -1496,6 +1740,14 @@ export class GameEngine {
       event.preventDefault();
       this.primaryAttack();
     }
+    if (key === "1") {
+      event.preventDefault();
+      this.usePotion("health");
+    }
+    if (key === "2") {
+      event.preventDefault();
+      this.usePotion("mana");
+    }
     if (key === "q") {
       const target = this.nearestMonster(7);
       this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY);
@@ -1530,8 +1782,12 @@ export class GameEngine {
     const stats = this.calcStats();
     const chunk = this.currentChunk();
     const hoverMonster = this.hoverMonsterId ? this.monsters.get(this.hoverMonsterId) : null;
-    const healthPotions = this.player.inventory.filter((item) => item.mode === "potion" && item.potionType === "health").length;
-    const manaPotions = this.player.inventory.filter((item) => item.mode === "potion" && item.potionType === "mana").length;
+    const healthPotions = this.player.inventory
+      .filter((item) => item.mode === "potion" && item.potionType === "health")
+      .reduce((sum, item) => sum + Math.max(1, Math.floor(Number(item.count) || 1)), 0);
+    const manaPotions = this.player.inventory
+      .filter((item) => item.mode === "potion" && item.potionType === "mana")
+      .reduce((sum, item) => sum + Math.max(1, Math.floor(Number(item.count) || 1)), 0);
     this.onSnapshot({
       player: {
         level: this.player.level,
@@ -1575,12 +1831,12 @@ export class GameEngine {
         const item = this.player.equipment[slot.id];
         return {
           ...slot,
-          item: item ? { ...item, summary: this.itemSummary(item) } : null,
+          item: item ? { ...item, summary: this.itemSummary(item), iconIndex: itemIconIndex(item), iconSheet: itemIconSheet(item) } : null,
         };
       }),
       hoverMonster: hoverMonster && !hoverMonster.dead ? {
         id: hoverMonster.id,
-        name: hoverMonster.typeName,
+        name: hoverMonster.elite ? `${hoverMonster.elite.label} ${hoverMonster.typeName}` : hoverMonster.typeName,
         level: hoverMonster.level,
         hp: Math.max(0, Math.ceil(hoverMonster.hp)),
         maxHp: hoverMonster.maxHp,
@@ -1637,12 +1893,104 @@ function preventDefault(event) {
   event.preventDefault();
 }
 
+const LOOT_PROFILES = {
+  Spider: {
+    goldChance: 0.42,
+    goldMult: 0.75,
+    weights: { health: 28, mana: 28, weapon: 2, armor: 2, none: 40 },
+  },
+  Skeleton: {
+    goldChance: 0.65,
+    goldMult: 1,
+    weights: { weapon: 31, armor: 31, health: 3, mana: 3, none: 32 },
+  },
+  Demon: {
+    goldChance: 0.72,
+    goldMult: 1.15,
+    weights: { health: 28, armor: 24, weapon: 4, mana: 2, none: 42 },
+  },
+  Ghost: {
+    goldChance: 0.95,
+    goldMult: 3.8,
+    weights: { mana: 34, health: 2, weapon: 2, armor: 2, none: 60 },
+  },
+  Snake: {
+    goldChance: 0.16,
+    goldMult: 0.7,
+    weights: { health: 4, mana: 4, weapon: 3, armor: 3, none: 86 },
+  },
+  Wolf: {
+    goldChance: 0.22,
+    goldMult: 0.7,
+    weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 },
+  },
+  Scorpion: {
+    goldChance: 0.7,
+    goldMult: 1,
+    weights: { all: 18, health: 12, mana: 12, weapon: 14, armor: 14, none: 30 },
+  },
+};
+
+const ELITE_VARIANTS = [
+  null,
+  { id: "enforced", label: "Enforced", weight: 4, levelPct: 0.25, color: "#58d96d", tintAlpha: 0.22, sizeMult: 1.025 },
+  { id: "rage", label: "Rage", weight: 3, levelPct: 0.5, color: "#ffd85d", tintAlpha: 0.24, sizeMult: 1.045 },
+  { id: "lieutenant", label: "Loejtnant", weight: 2, levelPct: 1, color: "#b579ff", tintAlpha: 0.26, sizeMult: 1.065 },
+];
+
+function rollEliteVariant() {
+  const entries = [
+    { variant: null, weight: 10 },
+    ...ELITE_VARIANTS.filter(Boolean).map((variant) => ({ variant, weight: variant.weight })),
+  ];
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.variant;
+  }
+  return null;
+}
+
+function eliteVariantLevelPct(elite) {
+  if (!elite) return 0;
+  if (Number.isFinite(Number(elite.levelPct))) return Number(elite.levelPct);
+  return ELITE_VARIANTS.find((variant) => variant?.id === elite.id)?.levelPct ?? 0;
+}
+
+function namedItemChanceMultiplier(monster) {
+  const levelPct = eliteVariantLevelPct(monster?.elite);
+  if (levelPct >= 1) return 8;
+  if (levelPct >= 0.5) return 4;
+  if (levelPct > 0) return 2.25;
+  return 1;
+}
+
+function monsterLootProfile(typeName) {
+  return LOOT_PROFILES[typeName] ?? {
+    goldChance: 0.55,
+    goldMult: 1,
+    weights: { health: 8, mana: 8, weapon: 8, armor: 8, none: 68 },
+  };
+}
+
+function rollLootCategory(weights) {
+  const entries = Object.entries(weights);
+  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let roll = Math.random() * total;
+  for (const [category, weight] of entries) {
+    roll -= weight;
+    if (roll <= 0) return category;
+  }
+  return "none";
+}
+
 function itemsCanMerge(a, b) {
   if (!a || !b) return false;
   if (a.mode === "potion" || b.mode === "potion") return false;
+  if (a.unique || b.unique || a.named || b.named) return false;
   return a.baseName === b.baseName
     && a.rarity === b.rarity
-    && a.level === b.level
     && a.slot === b.slot
     && a.mode === b.mode;
 }
@@ -1718,19 +2066,6 @@ function drawTerrainDecal(ctx, decal, x, y) {
       ctx.beginPath();
       ctx.ellipse(0, -6 * s, 7 * s, 4 * s, 0, Math.PI, Math.PI * 2);
       ctx.fill();
-      break;
-    case "blue-glow":
-    case "rune":
-      ctx.globalAlpha = 0.55;
-      ctx.strokeStyle = decal.type === "rune" ? "#a994ff" : "#7fdcff";
-      ctx.lineWidth = 1.5 * s;
-      ctx.beginPath();
-      ctx.moveTo(-8 * s, -2 * s);
-      ctx.lineTo(0, -8 * s);
-      ctx.lineTo(8 * s, -2 * s);
-      ctx.lineTo(0, 6 * s);
-      ctx.closePath();
-      ctx.stroke();
       break;
     case "bone":
       ctx.strokeStyle = "rgba(224, 213, 190, 0.72)";

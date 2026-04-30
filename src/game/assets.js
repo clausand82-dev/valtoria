@@ -77,6 +77,62 @@ const MONSTER_SHEETS = [
     shadowW: 26, shadowH: 8, shadowAlpha: 0.22,
     yOffset: 38,
   },
+  {
+    id: "scorpion",
+    url: "/assets/generated/scorpion_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.44,
+    shadowW: 28, shadowH: 9, shadowAlpha: 0.34,
+    yOffset: 38,
+  },
+  {
+    id: "snake",
+    url: "/assets/generated/snake_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.42,
+    shadowW: 26, shadowH: 8, shadowAlpha: 0.3,
+    yOffset: 37,
+  },
+  {
+    id: "spider",
+    url: "/assets/generated/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.43,
+    shadowW: 30, shadowH: 10, shadowAlpha: 0.34,
+    yOffset: 38,
+  },
+  {
+    id: "wolf",
+    url: "/assets/generated/wolf_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.48,
+    shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
+    yOffset: 39,
+  },
 ];
 
 const OBJECT_FRAME = {
@@ -111,6 +167,51 @@ const TREE_SHEETS = {
   desert: "tree_sand_sheet.png",
 };
 
+const OBJECT_SHEETS = {
+  building: {
+    mainland: { fileName: "building_normal_sheet.png", rows: 4, cols: 4 },
+    snow: { fileName: "building_snow_sheet.png", rows: 4, cols: 4 },
+  },
+  ruin: {
+    mainland: { fileName: "ruin_normal_sheet.png", rows: 4, cols: 4 },
+    jungle: { fileName: "ruin_jungle_sheet.png", rows: 4, cols: 4 },
+    desert: { fileName: "ruin_sand_sheet.png", rows: 4, cols: 4 },
+    snow: { fileName: "ruin_snow_sheet.png", rows: 4, cols: 4 },
+  },
+  crystal: {
+    lava: { fileName: "crystal_normal_sheet.png", rows: 4, cols: 4 },
+    rock: { fileName: "crystal_normal_sheet.png", rows: 4, cols: 4 },
+    snow: { fileName: "crystal_snow_sheet.png", rows: 4, cols: 4 },
+  },
+  chest: {
+    mainland: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
+    jungle: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
+    snow: { fileName: "chest_snow_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
+  },
+  firebeacon: {
+    snow: {
+      frameFiles: [
+        "firebeacon_snow_animated_001.png",
+        "firebeacon_snow_animated_002.png",
+        "firebeacon_snow_animated_003.png",
+        "firebeacon_snow_animated_004.png",
+        "firebeacon_snow_animated_005.png",
+        "firebeacon_snow_animated_006.png",
+        "firebeacon_snow_animated_007.png",
+        "firebeacon_snow_animated_008.png",
+      ],
+      animated: true,
+      keyEdgeBlack: true,
+      keyEdgeHalo: true,
+      renderScale: 0.29,
+    },
+  },
+  fireplace: {
+    mainland: { frameFiles: ["fireplace_normal_01.png", "fireplace_normal_02.png", "fireplace_normal_03.png", "fireplace_normal_04.png"], animated: true },
+    jungle: { frameFiles: ["fireplace_normal_01.png", "fireplace_normal_02.png", "fireplace_normal_03.png", "fireplace_normal_04.png"], animated: true },
+  },
+};
+
 export function loadGeneratedAtlas() {
   return Promise.all([
     loadChromaImage("/assets/generated/runebound-atlas-source.png"),
@@ -119,7 +220,8 @@ export function loadGeneratedAtlas() {
     loadFoliageSheet(),
     loadItemSheet(),
     loadArmorSheet(),
-  ]).then(([canvas, groundSheets, treeSheets, foliageSheet, itemSheet, armorSheet]) => ({
+    loadObjectSheets(),
+  ]).then(([canvas, groundSheets, treeSheets, foliageSheet, itemSheet, armorSheet, objectSheets]) => ({
     canvas,
     frames: ATLAS_FRAMES,
     sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
@@ -128,6 +230,7 @@ export function loadGeneratedAtlas() {
     foliageSheet,
     itemSheet,
     armorSheet,
+    objectSheets,
   }));
 }
 
@@ -164,7 +267,7 @@ export function loadAnimationSheets() {
   });
 }
 
-function loadChromaImage(src) {
+function loadChromaImage(src, options = {}) {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
@@ -189,11 +292,106 @@ function loadChromaImage(src) {
       }
 
       ctx.putImageData(imageData, 0, 0);
+      if (options.keyEdgeBlack) {
+        removeEdgeBlackBackground(canvas, options.blackThreshold ?? 24);
+      }
+      if (options.keyEdgeHalo) {
+        removeEdgeHalo(canvas);
+      }
       resolve(canvas);
     };
     image.onerror = () => reject(new Error(`Image load failed: ${src}`));
     image.src = src;
   });
+}
+
+function removeEdgeBlackBackground(canvas, threshold = 24) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  const { width, height } = canvas;
+  const visited = new Uint8Array(width * height);
+  const queue = [];
+
+  const enqueue = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    const index = y * width + x;
+    if (visited[index]) return;
+    const dataIndex = index * 4;
+    const isBlack = data[dataIndex + 3] > 0
+      && data[dataIndex] <= threshold
+      && data[dataIndex + 1] <= threshold
+      && data[dataIndex + 2] <= threshold;
+    if (!isBlack) return;
+    visited[index] = 1;
+    queue.push(index);
+  };
+
+  for (let x = 0; x < width; x += 1) {
+    enqueue(x, 0);
+    enqueue(x, height - 1);
+  }
+  for (let y = 1; y < height - 1; y += 1) {
+    enqueue(0, y);
+    enqueue(width - 1, y);
+  }
+
+  for (let i = 0; i < queue.length; i += 1) {
+    const index = queue[i];
+    const x = index % width;
+    const y = Math.floor(index / width);
+    data[index * 4 + 3] = 0;
+    enqueue(x + 1, y);
+    enqueue(x - 1, y);
+    enqueue(x, y + 1);
+    enqueue(x, y - 1);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function removeEdgeHalo(canvas) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  const { width, height } = canvas;
+  const remove = [];
+
+  const isTransparent = (x, y) => {
+    if (x < 0 || y < 0 || x >= width || y >= height) return true;
+    return data[(y * width + x) * 4 + 3] < 16;
+  };
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const alpha = data[index + 3];
+      if (alpha < 16) continue;
+      const r = data[index];
+      const g = data[index + 1];
+      const b = data[index + 2];
+      const greenCyanHalo = r < 125 && g > 95 && b > 65 && g > r * 1.18 && b > r * 1.04;
+      if (!greenCyanHalo) continue;
+      if (
+        isTransparent(x + 1, y)
+        || isTransparent(x - 1, y)
+        || isTransparent(x, y + 1)
+        || isTransparent(x, y - 1)
+        || isTransparent(x + 1, y + 1)
+        || isTransparent(x - 1, y - 1)
+        || isTransparent(x + 1, y - 1)
+        || isTransparent(x - 1, y + 1)
+      ) {
+        remove.push(index);
+      }
+    }
+  }
+
+  for (const index of remove) {
+    data[index + 3] = 0;
+  }
+
+  ctx.putImageData(imageData, 0, 0);
 }
 
 function loadRawImage(src) {
@@ -291,6 +489,80 @@ function loadArmorSheet() {
     .then((canvas) => makeItemSheet(canvas, 3, 4))
     .catch((error) => {
       console.warn("Armor sheet load failed: armor001_sheet.png", error);
+      return null;
+    });
+}
+
+function loadObjectSheets() {
+  const urlMap = new Map();
+  for (const biomeSheets of Object.values(OBJECT_SHEETS)) {
+    for (const config of Object.values(biomeSheets)) {
+      const key = getObjectSheetConfigKey(config);
+      if (!urlMap.has(key)) {
+        urlMap.set(key, loadObjectSheetConfig(config));
+      }
+    }
+  }
+
+  const entries = [];
+  for (const [type, biomeSheets] of Object.entries(OBJECT_SHEETS)) {
+    for (const [biomeId, config] of Object.entries(biomeSheets)) {
+      const key = getObjectSheetConfigKey(config);
+      entries.push(
+        urlMap.get(key).then((sheet) => [type, biomeId, sheet, config]),
+      );
+    }
+  }
+
+  return Promise.all(entries).then((loaded) => {
+    const sheets = {};
+    for (const [type, biomeId, sheet, config] of loaded) {
+      if (!sheets[type]) sheets[type] = {};
+      if (sheet) {
+        sheets[type][biomeId] = {
+          ...sheet,
+          animated: config.animated ?? false,
+          frameOffsets: config.frameOffsets,
+          renderScale: config.renderScale,
+        };
+      }
+    }
+    return sheets;
+  });
+}
+
+function getObjectSheetConfigKey(config) {
+  if (config.frameFiles) {
+    return `frames:${config.frameFiles.join("|")}`;
+  }
+  return `${config.fileName}:${config.rows}x${config.cols}`;
+}
+
+function loadObjectSheetConfig(config) {
+  if (config.frameFiles) {
+    return Promise.all(config.frameFiles.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`, {
+      keyEdgeBlack: config.keyEdgeBlack ?? false,
+      keyEdgeHalo: config.keyEdgeHalo ?? false,
+      blackThreshold: config.blackThreshold,
+    })))
+      .then((frames) => makeObjectFrameSheet(frames, {
+        animated: config.animated ?? false,
+        normalizeAnimation: config.normalizeAnimation ?? true,
+      }))
+      .catch((error) => {
+        console.warn(`Object frame sequence load failed: ${config.frameFiles.join(", ")}`, error);
+        return null;
+      });
+  }
+
+  return loadChromaImage(`/assets/generated/${config.fileName}`)
+    .then((canvas) => makeObjectSheet(canvas, config.rows, config.cols, {
+      animated: config.animated ?? false,
+      frameCount: config.frameCount,
+      normalizeAnimation: config.normalizeAnimation ?? true,
+    }))
+    .catch((error) => {
+      console.warn(`Object sheet load failed: ${config.fileName}`, error);
       return null;
     });
 }
@@ -468,6 +740,210 @@ function makeItemSheet(canvas, rows, cols) {
   }
 
   return { canvas, rows, cols, cells };
+}
+
+function makeObjectSheet(canvas, rows, cols, options = {}) {
+  const cells = [];
+  const frameCount = options.frameCount ?? rows * cols;
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      if (cells.length >= frameCount) break;
+      const x = Math.round((col * canvas.width) / cols);
+      const y = Math.round((row * canvas.height) / rows);
+      const nextX = Math.round(((col + 1) * canvas.width) / cols);
+      const nextY = Math.round(((row + 1) * canvas.height) / rows);
+      if (options.animated) {
+        const sprite = document.createElement("canvas");
+        sprite.width = nextX - x;
+        sprite.height = nextY - y;
+        const ctx = sprite.getContext("2d");
+        ctx.drawImage(canvas, x, y, sprite.width, sprite.height, 0, 0, sprite.width, sprite.height);
+        cells.push({
+          sprite,
+          index: row * cols + col,
+        });
+        continue;
+      }
+
+      const sprite = isolateSprite(canvas, {
+        x,
+        y,
+        w: nextX - x,
+        h: nextY - y,
+      }, {
+        minArea: 120,
+        keepNearby: true,
+        nearbyRadiusMult: 1.15,
+        nearbyRatio: 0.025,
+      });
+      cells.push({
+        sprite: normalizeObjectSprite(sprite),
+        index: row * cols + col,
+      });
+    }
+    if (cells.length >= frameCount) break;
+  }
+
+  if (options.animated && options.normalizeAnimation !== false) normalizeRawObjectAnimationCells(cells);
+  return { canvas, rows, cols, cells };
+}
+
+function makeObjectFrameSheet(frames, options = {}) {
+  const rows = 1;
+  const cols = frames.length;
+  const cellW = Math.max(...frames.map((frame) => frame.width));
+  const cellH = Math.max(...frames.map((frame) => frame.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = cellW * cols;
+  canvas.height = cellH;
+  const ctx = canvas.getContext("2d");
+  const cells = frames.map((frame, index) => {
+    const sprite = document.createElement("canvas");
+    sprite.width = cellW;
+    sprite.height = cellH;
+    const sctx = sprite.getContext("2d");
+    const x = Math.round((cellW - frame.width) * 0.5);
+    const y = cellH - frame.height;
+    sctx.drawImage(frame, x, y);
+    ctx.drawImage(sprite, index * cellW, 0);
+    return { sprite, index };
+  });
+
+  if (options.animated && options.normalizeAnimation !== false) normalizeRawObjectAnimationCells(cells);
+  return { canvas, rows, cols, cells };
+}
+
+function normalizeRawObjectAnimationCells(cells) {
+  if (!cells.length) return;
+  const pad = 8;
+  const frameData = cells.map((cell) => ({
+    cell,
+    anchor: detectObjectBaseAnchorFromCanvas(cell.sprite),
+  }));
+  let maxLeft = 0;
+  let maxRight = 0;
+  let maxTop = 0;
+  let maxBottom = 0;
+
+  for (const { cell, anchor } of frameData) {
+    maxLeft = Math.max(maxLeft, anchor.x);
+    maxRight = Math.max(maxRight, cell.sprite.width - anchor.x);
+    maxTop = Math.max(maxTop, anchor.y);
+    maxBottom = Math.max(maxBottom, cell.sprite.height - anchor.y);
+  }
+
+  const halfW = Math.ceil(Math.max(maxLeft, maxRight)) + pad;
+  const width = halfW * 2;
+  const height = Math.ceil(maxTop + maxBottom) + pad * 2;
+  const target = { x: halfW, y: Math.ceil(maxTop) + pad };
+
+  for (const { cell, anchor } of frameData) {
+    const normalized = document.createElement("canvas");
+    normalized.width = width;
+    normalized.height = height;
+    const ctx = normalized.getContext("2d");
+    ctx.drawImage(cell.sprite, target.x - anchor.x, target.y - anchor.y);
+    cell.sprite = normalized;
+  }
+}
+
+function detectObjectBaseAnchorFromCanvas(canvas) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  let startY = Math.floor(canvas.height * 0.58);
+  const xs = [];
+  let maxY = -1;
+
+  for (let y = startY; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const alpha = data[(y * canvas.width + x) * 4 + 3];
+      if (alpha <= 80) continue;
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (maxY < 0) {
+    startY = 0;
+    for (let y = startY; y < canvas.height; y += 1) {
+      for (let x = 0; x < canvas.width; x += 1) {
+        const alpha = data[(y * canvas.width + x) * 4 + 3];
+        if (alpha <= 80) continue;
+        maxY = Math.max(maxY, y);
+      }
+    }
+  }
+
+  if (maxY < 0) return { x: canvas.width / 2, y: canvas.height };
+
+  const bandTop = Math.max(startY, maxY - Math.max(10, Math.floor(canvas.height * 0.08)));
+  for (let y = bandTop; y <= maxY; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      const alpha = data[(y * canvas.width + x) * 4 + 3];
+      if (alpha > 80) xs.push(x);
+    }
+  }
+
+  if (xs.length < 16) {
+    return { x: canvas.width / 2, y: canvas.height };
+  }
+
+  return {
+    x: trimmedMean(xs, 0.2, 0.8),
+    y: maxY,
+  };
+}
+
+function normalizeObjectAnimationCells(cells) {
+  if (!cells.length) return;
+  const padX = 10;
+  const padTop = 10;
+  const padBottom = 4;
+  let maxContentWidth = 0;
+  let maxContentHeight = 0;
+  const frameData = [];
+
+  for (const cell of cells) {
+    const ctx = cell.sprite.getContext("2d", { willReadFrequently: true });
+    const { data } = ctx.getImageData(0, 0, cell.sprite.width, cell.sprite.height);
+    const bounds = alphaBoundsFromCanvasData(data, cell.sprite.width, cell.sprite.height);
+    frameData.push({ cell, bounds });
+    maxContentWidth = Math.max(maxContentWidth, bounds.w);
+    maxContentHeight = Math.max(maxContentHeight, bounds.h);
+  }
+
+  const width = maxContentWidth + padX * 2;
+  const height = maxContentHeight + padTop + padBottom;
+  for (const { cell, bounds } of frameData) {
+    const normalized = document.createElement("canvas");
+    normalized.width = width;
+    normalized.height = height;
+    const ctx = normalized.getContext("2d");
+    ctx.drawImage(
+      cell.sprite,
+      bounds.x,
+      bounds.y,
+      bounds.w,
+      bounds.h,
+      padX,
+      height - padBottom - maxContentHeight,
+      maxContentWidth,
+      maxContentHeight,
+    );
+    cell.sprite = normalized;
+  }
+}
+
+function normalizeObjectSprite(sprite) {
+  const padX = 18;
+  const padTop = 20;
+  const padBottom = 8;
+  const canvas = document.createElement("canvas");
+  canvas.width = sprite.width + padX * 2;
+  canvas.height = sprite.height + padTop + padBottom;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(sprite, padX, padTop);
+  return canvas;
 }
 
 function normalizeTreeSprite(sprite) {
@@ -1629,6 +2105,10 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
     return drawTreeObject(ctx, object, screen, biome, atlas, time);
   }
 
+  if (object.type === "building" || object.type === "ruin" || object.type === "crystal" || object.type === "chest" || object.type === "firebeacon" || object.type === "fireplace") {
+    return drawSheetObject(ctx, object, screen, biome, atlas, time);
+  }
+
   const frame = OBJECT_FRAME[object.type];
   if (!frame) return;
   const baseScale = object.type === "house" ? 0.56 : object.type === "old-oak" ? 0.44 : object.type === "pine" ? 0.5 : 0.58;
@@ -1653,6 +2133,121 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
       ctx.restore();
     }
   }
+}
+
+function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
+  const sheetsByBiome = atlas?.objectSheets?.[object.type];
+  const sheet = sheetsByBiome?.[biome?.id] ?? sheetsByBiome?.mainland;
+  const cells = sheet?.cells;
+  if (!cells?.length) return false;
+
+  const animFrame = object.type === "chest" && object.opening
+    ? (object.openTime ?? 0) * 6
+    : time * 6 + (object.animSeed ?? 0);
+  const rawFrameIndex = Math.floor(animFrame);
+  const frameT = animFrame - rawFrameIndex;
+  const frameIndex = object.type === "chest" && !object.opening
+    ? 0
+    : sheet.animated
+      ? (object.type === "chest" ? Math.min(rawFrameIndex, cells.length - 1) : rawFrameIndex % cells.length)
+    : Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length;
+  const cell = cells[frameIndex];
+  const sprite = cell?.sprite;
+  if (!sprite) return false;
+  const frameOffset = sheet.frameOffsets?.[frameIndex] ?? { x: 0, y: 0 };
+
+  const baseScale = object.type === "building" ? 0.58
+    : object.type === "ruin" ? 0.54
+    : object.type === "crystal" ? 0.46
+    : object.type === "chest" ? 0.28
+    : object.type === "firebeacon" ? 0.44
+    : 0.4;
+  const scale = baseScale * object.size * (object.visualScale ?? 1) * (sheet.renderScale ?? 1);
+  const width = sprite.width * scale;
+  const height = sprite.height * scale;
+  const bob = object.type === "crystal" ? Math.sin(time * 2.6 + object.animSeed) * 1.2 : 0;
+  const glow = object.type === "crystal" ? 0.92 + Math.sin(time * 3 + object.animSeed) * 0.04 : 1;
+
+  if (object.type === "crystal" || object.type === "chest" || object.type === "firebeacon" || object.type === "fireplace") {
+    drawShadow(ctx, screen.x, screen.y + 12, width * 0.18, Math.max(6, width * 0.055), 0.22);
+  }
+
+  ctx.save();
+  ctx.translate(screen.x, screen.y + 12 + bob);
+  ctx.scale(object.flip ? -1 : 1, 1);
+  ctx.globalAlpha *= object.alpha ?? 1;
+  if (object.type === "crystal") {
+    ctx.globalAlpha *= glow;
+  }
+  const drawX = -width * 0.5 + frameOffset.x * scale;
+  const drawY = -height + 24 * scale + frameOffset.y * scale;
+  ctx.drawImage(sprite, drawX, drawY, width, height);
+  ctx.restore();
+
+  if (object.type === "chest" && object.opening) {
+    drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, cells.length, time, {
+      x: screen.x + drawX,
+      y: screen.y + 12 + bob + drawY,
+      width,
+      height,
+    });
+  }
+
+  if (object.type === "crystal") {
+    ctx.save();
+    ctx.globalAlpha = 0.12 + Math.sin(time * 3 + object.animSeed) * 0.035;
+    ctx.fillStyle = biome?.id === "snow" ? "#bfe3f2" : "#7fdcff";
+    ctx.beginPath();
+    ctx.ellipse(screen.x, screen.y - 26, 38 * object.size, 52 * object.size, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  return true;
+}
+
+function drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, frameCount, time, rect) {
+  if (frameCount < 2 || frameIndex < frameCount - 2) return;
+
+  const progress = Math.min(1, Math.max(0, (frameIndex - (frameCount - 2) + frameT) / 2));
+  const pulse = Math.sin(progress * Math.PI);
+  const sparkleAlpha = Math.max(0, 1 - progress) * 0.65 + pulse * 0.28;
+  const scale = object.size * (object.visualScale ?? 1);
+  const cx = rect.x + rect.width * 0.5;
+  const cy = rect.y + rect.height * 0.48;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+
+  const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, 62 * scale);
+  glow.addColorStop(0, `rgba(255, 236, 144, ${0.42 * pulse})`);
+  glow.addColorStop(0.42, `rgba(255, 154, 50, ${0.18 * pulse})`);
+  glow.addColorStop(1, "rgba(255, 154, 50, 0)");
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, 70 * scale, 48 * scale, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 238, 158, ${0.32 * pulse})`;
+  ctx.lineWidth = Math.max(1, 2 * scale);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 6 * scale, 28 * scale * (1 + progress * 0.45), 9 * scale * (1 + progress * 0.3), 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = `rgba(255, 246, 184, ${sparkleAlpha})`;
+  for (let i = 0; i < 8; i += 1) {
+    const angle = i * 2.399 + object.animSeed;
+    const drift = progress * (18 + (i % 3) * 6);
+    const flicker = 0.72 + Math.sin(time * 9 + i * 1.7) * 0.28;
+    const x = cx + Math.cos(angle) * (16 + drift) * scale;
+    const y = cy + Math.sin(angle) * (10 + drift * 0.55) * scale - progress * 16 * scale;
+    const r = Math.max(1.2, (2.4 + (i % 2)) * flicker * scale);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 export function drawFoliageSprite(ctx, object, screen, atlas, time = 0) {

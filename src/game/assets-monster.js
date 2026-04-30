@@ -1,15 +1,24 @@
 ﻿import { drawShadow } from "./assets-ground.js";
 
+const tintCache = new WeakMap();
+
 export function drawMonster(ctx, screen, monster, atlas, time = 0, sheets) {
 	if (drawAnimatedMonsterSheet(ctx, screen, monster, time, sheets?.monsters)) {
-		drawMonsterHealth(ctx, screen, monster, 52);
+		drawMonsterHealth(ctx, screen, monster, monster.elite ? 58 : 52);
 	}
 }
 
 function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 	if (!monsters) return false;
 
-	const monsterId = monster.typeName.includes("Bone") ? "skeleton"
+	const monsterId = monster.typeName === "Scorpion" ? "scorpion"
+		: monster.typeName === "Snake" ? "snake"
+		: monster.typeName === "Spider" ? "spider"
+		: monster.typeName === "Wolf" ? "wolf"
+		: monster.typeName === "Skeleton" ? "skeleton"
+		: monster.typeName === "Ghost" ? "ghost"
+		: monster.typeName === "Demon" ? "demon"
+		: monster.typeName.includes("Bone") ? "skeleton"
 		: monster.typeName.includes("Shade") ? "ghost"
 		: "demon";
 	const entry = monsters[monsterId];
@@ -49,6 +58,8 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 		scale,
 		flipX,
 		alpha: ghost ? 0.86 + Math.sin(time * 3 + monster.animSeed) * 0.08 : 1,
+		tint: monster.elite?.color,
+		tintAlpha: monster.elite?.tintAlpha,
 		stabilize: true,
 		rawCell: false,
 		anchor: sheet.sequenceAnchors?.[seq.row]?.[0],
@@ -89,8 +100,35 @@ function drawSheetFrame(ctx, sheet, row, col, x, y, options = {}) {
 	ctx.scale((options.flipX ? -1 : 1) * (options.scaleX ?? 1), options.scaleY ?? 1);
 	if (options.alpha !== undefined) ctx.globalAlpha *= options.alpha;
 	ctx.drawImage(source, sx, sy, sw, sh, dx, dy, width, height);
+	if (options.tint && options.tintAlpha > 0) {
+		const overlay = getTintOverlay(source, sx, sy, sw, sh, options.tint);
+		ctx.globalAlpha *= options.tintAlpha;
+		ctx.drawImage(overlay, dx, dy, width, height);
+	}
 	ctx.restore();
 	return true;
+}
+
+function getTintOverlay(source, sx, sy, sw, sh, color) {
+	let sourceCache = tintCache.get(source);
+	if (!sourceCache) {
+		sourceCache = new Map();
+		tintCache.set(source, sourceCache);
+	}
+	const key = `${sx},${sy},${sw},${sh},${color}`;
+	const cached = sourceCache.get(key);
+	if (cached) return cached;
+
+	const canvas = document.createElement("canvas");
+	canvas.width = Math.max(1, Math.ceil(sw));
+	canvas.height = Math.max(1, Math.ceil(sh));
+	const ctx = canvas.getContext("2d");
+	ctx.drawImage(source, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+	ctx.globalCompositeOperation = "source-atop";
+	ctx.fillStyle = color;
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	sourceCache.set(key, canvas);
+	return canvas;
 }
 
 function drawClawSwipe(ctx, x, y, facingX) {

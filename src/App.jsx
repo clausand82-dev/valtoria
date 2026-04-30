@@ -48,7 +48,7 @@ export default function App() {
   useEffect(() => {
     const handleKey = (event) => {
       const key = event.key.toLowerCase();
-      if (key === "i" || key === "b") setInventoryOpen((value) => !value);
+      if (key === "i") setInventoryOpen((value) => !value);
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
@@ -59,12 +59,15 @@ export default function App() {
   }, [snapshot]);
 
   useEffect(() => {
-    if (!inventoryOpen) setDestroyConfirmItem(null);
+    if (!inventoryOpen) {
+      setDestroyConfirmItem(null);
+      setSelectedItem(null);
+    }
   }, [inventoryOpen]);
 
   const selectedDetails = useMemo(() => {
     if (!selectedItem) {
-      return <span>Vaelg et item for detaljer. Klik paa et item i rygsaekken for at udstyre det.</span>;
+      return null;
     }
 
     const comparisonItem = findEquippedComparison(selectedItem, snapshot.equipment);
@@ -73,6 +76,7 @@ export default function App() {
     return (
       <div className="item-detail">
         <b className={selectedItem.rarity}>{selectedItem.name}</b>
+        {selectedItem.mode === "potion" && selectedItem.count > 1 && <em>Stack: {selectedItem.count} / 5</em>}
         <span>{selectedItem.summary}</span>
         {comparisonItem && diffs.length > 0 && (
           <div className="comparison-list">
@@ -96,7 +100,7 @@ export default function App() {
     ? Math.max(0, Math.min(100, (hoverMonster.hp / hoverMonster.maxHp) * 100))
     : 0;
   const destroyItem = (item) => {
-    if (item.rarity === "legendary") {
+    if (item.rarity === "legendary" || item.rarity === "unique") {
       setDestroyConfirmItem(item);
       return;
     }
@@ -190,7 +194,7 @@ export default function App() {
       </section>
 
       {inventoryOpen && (
-        <aside className="inventory-panel">
+        <aside className="inventory-panel" onMouseLeave={() => setSelectedItem(null)}>
           <header>
             <div>
               <h1>Rygsaek</h1>
@@ -207,13 +211,21 @@ export default function App() {
             {snapshot.equipment.map((slot) => (
               <button
                 type="button"
-                className="equipment-slot"
+                className={`equipment-slot equipment-${slot.id} ${slot.item ? "equipped" : "empty"}`}
+                style={{ "--item-quality": slot.item?.rarityColor ?? "rgba(255,255,255,0.16)" }}
                 key={slot.id}
                 onMouseEnter={() => setSelectedItem(slot.item)}
                 onFocus={() => setSelectedItem(slot.item)}
               >
-                <span>{slot.label}</span>
-                <b className={slot.item?.rarity ?? ""}>{slot.item?.name ?? "-"}</b>
+                <span className="equipment-icon" aria-hidden="true">
+                  {slot.item ? (
+                    <InventoryIcon iconIndex={slot.item.iconIndex} iconSheet={slot.item.iconSheet} iconUrl={slot.item.iconUrl} />
+                  ) : (
+                    <i />
+                  )}
+                </span>
+                <span className="equipment-label">{slot.label}</span>
+                <b className={slot.item?.rarity ?? ""}>{slot.item?.name ?? "Empty"}</b>
               </button>
             ))}
           </div>
@@ -251,7 +263,8 @@ export default function App() {
                 >
                   X
                 </button>
-                <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} />
+                <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
+                {item.mode === "potion" && item.count > 1 && <b className="stack-count">{item.count}</b>}
                 <span>
                   {item.rarityLabel} | L{item.level} | {item.value}g
                 </span>
@@ -272,7 +285,12 @@ export default function App() {
             ))}
           </div>
 
-          <footer>{selectedDetails}</footer>
+        </aside>
+      )}
+
+      {inventoryOpen && selectedDetails && (
+        <aside className="item-hover-panel" aria-live="polite">
+          {selectedDetails}
         </aside>
       )}
 
@@ -340,12 +358,12 @@ function ResourceBar({ type, value, label }) {
 
 const iconSheetPromises = new Map();
 
-function InventoryIcon({ iconIndex, iconSheet = "items" }) {
+function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
-    const source = iconSheet === "armor" ? "/assets/generated/armor001_sheet.png" : "/assets/generated/items001_sheet.png";
+    const source = iconUrl || (iconSheet === "armor" ? "/assets/generated/armor001_sheet.png" : "/assets/generated/items001_sheet.png");
     if (!iconSheetPromises.has(source)) {
       iconSheetPromises.set(source, new Promise((resolve, reject) => {
         const image = new Image();
@@ -357,15 +375,28 @@ function InventoryIcon({ iconIndex, iconSheet = "items" }) {
 
     iconSheetPromises.get(source).then((image) => {
       if (cancelled || !canvasRef.current) return;
-      drawInventoryIcon(canvasRef.current, image, iconIndex);
+      if (iconUrl) {
+        drawCustomInventoryIcon(canvasRef.current, image);
+      } else {
+        drawInventoryIcon(canvasRef.current, image, iconIndex);
+      }
     }).catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, [iconIndex, iconSheet]);
+  }, [iconIndex, iconSheet, iconUrl]);
 
   return <canvas ref={canvasRef} className="inventory-icon" width="52" height="52" aria-hidden="true" />;
+}
+
+function drawCustomInventoryIcon(canvas, image) {
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const scale = Math.min((canvas.width - 8) / image.naturalWidth, (canvas.height - 8) / image.naturalHeight);
+  const width = image.naturalWidth * scale;
+  const height = image.naturalHeight * scale;
+  ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
 }
 
 function drawInventoryIcon(canvas, image, iconIndex) {

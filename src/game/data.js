@@ -8,10 +8,17 @@ export const RARITIES = [
   { id: "poor", label: "Poor", color: "#9a9a9a", mult: 0.75, weight: 34 },
   { id: "normal", label: "Normal", color: "#f5f3ea", mult: 1, weight: 32 },
   { id: "upgraded", label: "Upgraded", color: "#58d96d", mult: 1.34, weight: 19 },
-  { id: "rare", label: "Good", color: "#ffd85d", mult: 1.72, weight: 9 },
+  { id: "rare", label: "Good", color: "#ffd85d", mult: 1.72, weight: 6 },
   { id: "epic", label: "Great", color: "#b579ff", mult: 2.25, weight: 4 },
   { id: "legendary", label: "Legendary", color: "#ff5757", mult: 3.05, weight: 2 },
 ];
+
+export const UNIQUE_RARITY = {
+  id: "unique",
+  label: "Unique",
+  color: "#ff9f1c",
+  mult: 6.5,
+};
 
 export const BIOMES = {
   mainland: {
@@ -23,8 +30,8 @@ export const BIOMES = {
     tile: ["#4b5d31", "#526338", "#3f4e2c", "#5c6a3d"],
     path: "rgba(118, 91, 50, 0.28)",
     accent: "#8ba65d",
-    objects: ["pine", "old-oak", "boulder"],
-    monsters: ["Fallen", "Thorn Husk", "Mire Brute"],
+    objects: ["pine", "old-oak", "boulder", "building", "ruin", "firebeacon", "fireplace"],
+    monsters: ["Wolf", "Spider"],
   },
   desert: {
     id: "desert",
@@ -35,8 +42,8 @@ export const BIOMES = {
     tile: ["#b58b4e", "#c49a5d", "#9e7441", "#d3ad73"],
     path: "rgba(93, 62, 35, 0.22)",
     accent: "#d8b66e",
-    objects: ["pine", "old-oak", "stone", "rubble", "pillar", "broken-wall"],
-    monsters: ["Raider", "Ashbound", "Gate Warden"],
+    objects: ["pine", "old-oak", "stone", "rubble", "pillar", "ruin"],
+    monsters: ["Snake", "Demon", "Scorpion"],
   },
   snow: {
     id: "snow",
@@ -47,8 +54,8 @@ export const BIOMES = {
     tile: ["#c9d7d8", "#dce8e8", "#aebfc2", "#eef4f2"],
     path: "rgba(107, 114, 112, 0.22)",
     accent: "#bfe3f2",
-    objects: ["pine", "stone", "pillar", "crystal"],
-    monsters: ["Hollow", "Bone Warden", "Iron Revenant"],
+    objects: ["pine", "stone", "pillar", "building", "ruin", "crystal", "firebeacon", "fireplace"],
+    monsters: ["Skeleton"],
   },
   rock: {
     id: "rock",
@@ -59,8 +66,8 @@ export const BIOMES = {
     tile: ["#62675e", "#74766d", "#4f564f", "#858272"],
     path: "rgba(74, 65, 49, 0.2)",
     accent: "#bdb48f",
-    objects: ["boulder", "stone", "rubble", "obelisk", "broken-wall"],
-    monsters: ["Shard Crawler", "Deep Guard", "Iron Revenant"],
+    objects: ["boulder", "stone", "rubble", "obelisk", "crystal"],
+    monsters: ["Ghost", "Skeleton"],
   },
   lava: {
     id: "lava",
@@ -72,7 +79,7 @@ export const BIOMES = {
     path: "rgba(39, 30, 27, 0.2)",
     accent: "#ff8a42",
     objects: ["pine", "old-oak", "boulder", "stone", "crystal", "pillar"],
-    monsters: ["Ashbound", "Gate Warden", "Rune Shade"],
+    monsters: ["Demon", "Ghost", "Scorpion", "Skeleton"],
   },
   jungle: {
     id: "jungle",
@@ -83,8 +90,8 @@ export const BIOMES = {
     tile: ["#2f7b45", "#3f8f4f", "#246338", "#5d9a46"],
     path: "rgba(74, 61, 37, 0.23)",
     accent: "#6fc15d",
-    objects: ["old-oak", "pine", "boulder", "crystal"],
-    monsters: ["Thorn Husk", "Mire Brute", "Rune Shade"],
+    objects: ["old-oak", "pine", "boulder", "ruin", "firebeacon", "fireplace"],
+    monsters: ["Wolf", "Spider", "Ghost"],
   },
 };
 
@@ -103,6 +110,13 @@ export const MONSTER_STATS = {
   "Bone Warden": { hp: 60, damage: 11, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
   "Rune Shade": { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
   "Iron Revenant": { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
+  Demon: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30 },
+  Ghost: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32 },
+  Skeleton: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26 },
+  Scorpion: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
+  Snake: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
+  Spider: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22 },
+  Wolf: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
 };
 
 export const EQUIPMENT_SLOTS = [
@@ -152,3 +166,51 @@ export const PREFIXES = {
   epic: ["Voidmarked", "Moonlit", "Warborn"],
   legendary: ["Dragonwake", "Bloodstar", "Eternal"],
 };
+
+export const UNIQUE_ITEMS = [
+  {
+    id: "frostheart",
+    name: "Frostheart",
+    baseName: "Sword",
+    rarity: "unique",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    iconUrl: "/assets/generated/uniqueitem_frostheart.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 72,
+      damageMax: 112,
+      range: 1.38,
+      cooldown: 0.42,
+      magic: 24,
+      maxMana: 30,
+    },
+  },
+];
+
+export const NAMED_ITEM_TEMPLATES = [
+  {
+    id: "nethrendor_soldier_sword",
+    name: "Nethrendor Soldier Sword",
+    baseName: "Sword",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 3,
+    sources: ["monster", "chest"],
+    biomes: ["mainland", "rock", "snow"],
+    dropChance: 0.012,
+    rarityIds: ["poor", "normal", "upgraded", "rare", "epic", "legendary"],
+    iconUrl: null,
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 9,
+      damageMax: 16,
+      range: 1.22,
+      cooldown: 0.54,
+      armor: 2,
+    },
+  },
+];

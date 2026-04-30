@@ -5,8 +5,11 @@ import {
   CHUNK_SIZE,
   EQUIPMENT_SLOTS,
   MONSTER_STATS,
+  NAMED_ITEM_TEMPLATES,
   PREFIXES,
   RARITIES,
+  UNIQUE_RARITY,
+  UNIQUE_ITEMS,
   WEAPON_BASES,
   WORLD_SEED,
 } from "./data.js";
@@ -110,7 +113,9 @@ export function getRarity(level) {
 
 export function itemValue(item) {
   if (!item) return 0;
-  const rarity = RARITIES.find((entry) => entry.id === item.rarity) ?? RARITIES[1];
+  const rarity = item.rarity === UNIQUE_RARITY.id
+    ? UNIQUE_RARITY
+    : RARITIES.find((entry) => entry.id === item.rarity) ?? RARITIES[1];
   const level = Math.max(1, Math.floor(Number(item.level) || 1));
   const power =
     (Number(item.damageMin) || 0) +
@@ -179,6 +184,116 @@ export function makeItem(level, weaponBias = Math.random()) {
     speed: Number(((base.speed || 0) * multiplier).toFixed(2)),
     magic: Math.floor((base.magic || 0) * multiplier),
   });
+}
+
+export function rollUniqueItem(level, context = {}) {
+  const chance = Number(context.chance) || 0;
+  if (chance <= 0 || Math.random() >= chance) return null;
+
+  const source = context.source ?? "monster";
+  const biomeId = context.biomeId ?? "mainland";
+  const candidates = UNIQUE_ITEMS.filter((item) => (
+    level >= (item.levelMin ?? 1)
+    && (!item.sources || item.sources.includes(source))
+    && (!item.biomes || item.biomes.includes(biomeId))
+  ));
+  if (!candidates.length) return null;
+
+  return makeUniqueItem(candidates[Math.floor(Math.random() * candidates.length)], level);
+}
+
+export function makeUniqueItem(definition, level = 1) {
+  const rarity = definition.rarity === UNIQUE_RARITY.id
+    ? UNIQUE_RARITY
+    : RARITIES.find((entry) => entry.id === definition.rarity) ?? RARITIES[3];
+  const itemLevel = Math.max(definition.levelMin ?? 1, Math.floor(Number(level) || 1));
+  const scale = definition.scaleWithLevel ? 1 + itemLevel * 0.1 : 1;
+  const stats = definition.stats ?? {};
+  const item = {
+    id: createId(),
+    unique: true,
+    uniqueId: definition.id,
+    name: definition.name,
+    baseName: definition.baseName,
+    rarity: rarity.id,
+    rarityLabel: rarity.label,
+    rarityColor: rarity.color,
+    slot: definition.slot,
+    mode: definition.mode,
+    level: itemLevel,
+    damageMin: Math.max(0, Math.floor((stats.damageMin ?? 0) * scale)),
+    damageMax: Math.max(0, Math.floor((stats.damageMax ?? 0) * scale)),
+    range: Number(stats.range ?? 0),
+    cooldown: Number(stats.cooldown ?? 0),
+    armor: Math.floor((stats.armor ?? 0) * scale),
+    maxHp: Math.floor((stats.maxHp ?? 0) * scale),
+    maxMana: Math.floor((stats.maxMana ?? 0) * scale),
+    speed: Number(((stats.speed ?? 0) * scale).toFixed(2)),
+    magic: Math.floor((stats.magic ?? 0) * scale),
+    iconUrl: definition.iconUrl || undefined,
+  };
+  return withItemValue(item);
+}
+
+export function rollNamedItem(level, context = {}) {
+  const chanceMult = Number(context.chanceMult) || 1;
+  if (chanceMult <= 0) return null;
+
+  const source = context.source ?? "monster";
+  const biomeId = context.biomeId ?? "mainland";
+  const candidates = NAMED_ITEM_TEMPLATES.filter((item) => (
+    level >= (item.levelMin ?? 1)
+    && Math.random() < (item.dropChance ?? 0) * chanceMult
+    && (!item.sources || item.sources.includes(source))
+    && (!item.biomes || item.biomes.includes(biomeId))
+  ));
+  if (!candidates.length) return null;
+
+  return makeNamedItem(candidates[Math.floor(Math.random() * candidates.length)], level);
+}
+
+export function makeNamedItem(definition, level = 1) {
+  const allowedRarities = definition.rarityIds?.length
+    ? RARITIES.filter((rarity) => definition.rarityIds.includes(rarity.id))
+    : RARITIES;
+  const rarity = rollRarityFromList(allowedRarities, level);
+  const itemLevel = Math.max(definition.levelMin ?? 1, Math.floor(Number(level) || 1));
+  const scale = definition.scaleWithLevel ? 1 + itemLevel * 0.12 : 1;
+  const rarityScale = rarity.mult;
+  const stats = definition.stats ?? {};
+  const item = {
+    id: createId(),
+    named: true,
+    namedId: definition.id,
+    name: definition.name,
+    baseName: definition.baseName,
+    rarity: rarity.id,
+    rarityLabel: rarity.label,
+    rarityColor: rarity.color,
+    slot: definition.slot,
+    mode: definition.mode,
+    level: itemLevel,
+    damageMin: Math.max(0, Math.floor((stats.damageMin ?? 0) * scale * rarityScale)),
+    damageMax: Math.max(0, Math.floor((stats.damageMax ?? 0) * scale * rarityScale + itemLevel * 0.5)),
+    range: Number(stats.range ?? 0),
+    cooldown: Number(stats.cooldown ?? 0),
+    armor: Math.floor((stats.armor ?? 0) * scale * rarityScale),
+    maxHp: Math.floor((stats.maxHp ?? 0) * scale * rarityScale),
+    maxMana: Math.floor((stats.maxMana ?? 0) * scale * rarityScale),
+    speed: Number(((stats.speed ?? 0) * scale * rarityScale).toFixed(2)),
+    magic: Math.floor((stats.magic ?? 0) * scale * rarityScale),
+    iconUrl: definition.iconUrl || undefined,
+  };
+  return withItemValue(item);
+}
+
+function rollRarityFromList(rarities, level) {
+  const allowed = rarities.length ? rarities : RARITIES;
+  const shifted = allowed.map((rarity) => ({
+    ...rarity,
+    weight: rarity.weight + (RARITIES.findIndex((entry) => entry.id === rarity.id) > 1 ? Math.min(10, level * 0.7) : 0),
+  }));
+  return pickWeighted(shifted);
 }
 
 export function makePotion(type = Math.random() < 0.5 ? "health" : "mana", level = 1) {
@@ -336,7 +451,6 @@ export function createChunk(cx, cy, region = null) {
   if (!chunk.tiles.length) return chunk;
   addObjects(chunk, safeChunk);
   addFoliage(chunk, safeChunk);
-  addDecals(chunk, safeChunk);
   addMonsters(chunk, safeChunk);
   return chunk;
 }
@@ -371,10 +485,15 @@ function addObjects(chunk, safeChunk) {
     let radius = 0.4;
     let size = 1;
 
-    if (type === "house") {
-      type = "house";
+    if (type === "building") {
       radius = 1.15;
-      size = 1.5 + rand01(chunk.cx, chunk.cy, 330 + i) * 0.55;
+      size = 1.2 + rand01(chunk.cx, chunk.cy, 330 + i) * 0.32;
+    } else if (type === "ruin") {
+      radius = 0.82;
+      size = 1.08 + rand01(chunk.cx, chunk.cy, 335 + i) * 0.28;
+    } else if (type === "firebeacon" || type === "fireplace") {
+      radius = 0.42;
+      size = 0.88 + rand01(chunk.cx, chunk.cy, 338 + i) * 0.18;
     } else if (type === "broken-wall") {
       radius = 0.72;
       size = 1.25;
@@ -402,6 +521,56 @@ function addObjects(chunk, safeChunk) {
       blocking: true,
     });
   }
+
+  addRegionChest(chunk);
+}
+
+function addRegionChest(chunk) {
+  if (!chunk.region) return;
+  if (chunk.region.chestOpened) return;
+  const { end } = chunk.region;
+  if (chunkCoords(end.x, end.y).cx !== chunk.cx || chunkCoords(end.x, end.y).cy !== chunk.cy) return;
+
+  const candidates = [
+    { x: end.x - 2.8, y: end.y + 1.2 },
+    { x: end.x - 3.4, y: end.y },
+    { x: end.x - 2.3, y: end.y - 1.5 },
+    { x: end.x - 1.4, y: end.y + 2.0 },
+    { x: end.x, y: end.y + 2.4 },
+    { x: end.x - 4.1, y: end.y + 1.8 },
+    { x: end.x - 3.2, y: end.y - 2.2 },
+  ];
+  const radius = 0.42;
+  const position = candidates.find((candidate) => (
+    chunkCoords(candidate.x, candidate.y).cx === chunk.cx
+    && chunkCoords(candidate.x, candidate.y).cy === chunk.cy
+    && isRegionPointPlayable(chunk.region, candidate.x, candidate.y, radius)
+    && !collidesWithBlockingObject(chunk, candidate.x, candidate.y, radius)
+  ));
+  if (!position) return;
+
+  chunk.objects.push({
+    id: createId(),
+    type: "chest",
+    x: position.x,
+    y: position.y,
+    radius,
+    size: 1,
+    rotation: 0,
+    colorShift: 0,
+    flip: false,
+    treeVariant: 0,
+    animSeed: 0,
+    visualScale: 1,
+    blocking: true,
+  });
+}
+
+function collidesWithBlockingObject(chunk, x, y, radius) {
+  return chunk.objects.some((object) => (
+    object.blocking
+    && Math.hypot(object.x - x, object.y - y) < object.radius + radius + 0.12
+  ));
 }
 
 function addFoliage(chunk, safeChunk) {
@@ -447,10 +616,10 @@ function addDecals(chunk, safeChunk) {
   const decalSets = {
     mainland: ["pebble", "rubble"],
     desert: ["pebble", "pebble", "bone", "crack", "rubble"],
-    snow: ["pebble", "bone", "blue-glow", "crack"],
+    snow: ["pebble", "bone", "crack"],
     rock: ["rubble", "rubble", "pebble", "crack", "bone"],
-    lava: ["crack", "rubble", "rune", "blue-glow"],
-    jungle: ["rubble", "pebble", "rune"],
+    lava: ["crack", "rubble"],
+    jungle: ["rubble", "pebble"],
   };
   const set = decalSets[chunk.biome.id] || decalSets.mainland;
 
@@ -506,6 +675,7 @@ function addMonsters(chunk, safeChunk) {
       vx: 0,
       vy: 0,
       radius: base.radius,
+      baseLevel: level,
       level,
       maxHp: hp,
       hp,

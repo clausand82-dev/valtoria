@@ -2,6 +2,8 @@ import { drawObject } from "./assets.js";
 
 const OVERLAY_TYPES = new Set([
   "house",
+  "building",
+  "ruin",
   "broken-wall",
   "pillar",
   "obelisk",
@@ -11,6 +13,9 @@ const OVERLAY_TYPES = new Set([
   "stone",
   "rubble",
   "crystal",
+  "chest",
+  "firebeacon",
+  "fireplace",
 ]);
 
 export function isOverlayType(type) {

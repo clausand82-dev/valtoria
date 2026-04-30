@@ -1,5 +1,7 @@
 import { drawAtlasFrame, drawShadow } from "./assets-ground.js";
 
+const customItemImageCache = new Map();
+
 const ITEM_FRAME_BY_BASE = {
   Sword: 0,
   Spear: 1,
@@ -49,14 +51,15 @@ export function drawLoot(ctx, screen, loot, atlas) {
 }
 
 function drawItemLoot(ctx, screen, loot, atlas) {
+  const customImage = getCustomItemImage(loot.item?.iconUrl);
   const useArmorSheet = Object.hasOwn(ARMOR_FRAME_BY_BASE, loot.item?.baseName);
   const cells = (useArmorSheet ? atlas?.armorSheet : atlas?.itemSheet)?.cells;
-  if (!cells?.length || !loot.item) return false;
+  if (!customImage && (!cells?.length || !loot.item)) return false;
   const index = useArmorSheet
     ? ARMOR_FRAME_BY_BASE[loot.item.baseName]
     : ITEM_FRAME_BY_BASE[loot.item.baseName] ?? (loot.item.slot === "ring" ? 6 : loot.item.slot === "weapon" ? 0 : 11);
   const cell = cells[Math.abs(index) % cells.length];
-  const sprite = cell?.sprite;
+  const sprite = customImage ?? cell?.sprite;
   if (!sprite) return false;
 
   const bob = Math.sin(loot.bob) * 3;
@@ -91,6 +94,25 @@ function drawItemLoot(ctx, screen, loot, atlas) {
   ctx.drawImage(sprite, -width * 0.5, -height * 0.72, width, height);
   ctx.restore();
   return true;
+}
+
+function getCustomItemImage(iconUrl) {
+  if (!iconUrl) return null;
+  const cached = customItemImageCache.get(iconUrl);
+  if (cached?.loaded) return cached.image;
+  if (cached) return null;
+
+  const image = new Image();
+  image.onload = () => {
+    const entry = customItemImageCache.get(iconUrl);
+    if (entry) entry.loaded = true;
+  };
+  image.onerror = () => {
+    customItemImageCache.delete(iconUrl);
+  };
+  image.src = iconUrl;
+  customItemImageCache.set(iconUrl, { image, loaded: false });
+  return null;
 }
 
 export function drawProjectile(ctx, screen, projectile, atlas) {

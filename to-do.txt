@@ -1,0 +1,33 @@
+Ting at få gjort
+
+- decay tid på drops - måske to min
+- en by med npc
+- world map der styre historien (og som nemt kan udvides med dlc/updates)
+- flere unique items
+- flere named items
+- fikse animation
+- flere mobs
+- bosses
+- quest items og quest givers (eller måske items, der kan ligge på jorden og kan aktivere quest - både items men også npc's - random/non random)
+- større maps jo højere lvl
+- flere biodomes
+- resources (jern, krystal, junk osv) - måske reosurcer er ligesom guld
+- resourcer som meat, recipes/bøger, clean water osv --> til ens by
+- reosurcer (glowstone, coal, diamant, gemstone fragment)
+- bygge bygninger i ens by (kræver resourcer)
+- befri indbyggere til ens by/lejr
+- destroy weapons kan enten give resourcer eller også skal det være selvstændig
+- Navngivet hero til Kealand
+- mulighed for at smadre krystaller, crates, huse (gennemsøge), klipper osv
+- fjerne greenspill fra alle grafik elementer
+- fjerne animation af krystal
+- blue items???
+- area damage
+- skill tree
+- forskellige udstyr til at klare forskellige opgaver
+- bedre mobs IQ (pathfinding)
+- reputation og fractions (grupper)
+- grafik til start og stop
+- vand områder/flod områder
+- biodome grafik elementer kan indeholde større flader (broer over flod osv)
+- mere biodome speficik foalige
