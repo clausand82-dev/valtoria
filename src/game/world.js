@@ -13,12 +13,14 @@ import {
   WEAPON_BASES,
   WORLD_SEED,
 } from "./data.js";
+import { DECAL_SETS_BY_BIOME, OBJECT_SPAWN_TUNING, SPAWN_CONFIG } from "./config/spawn-config.js";
+import { DESTRUCTIBLE_OBJECTS } from "./config/resource-config.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
 const REGION_W = 72;
 const REGION_H = 52;
-const START_SAFE_CENTER = { x: 3.2, y: 3.1 };
+const START_SAFE_CENTER = SPAWN_CONFIG.safeCenter;
 const BIOME_FIELDS = BIOME_IDS.map((id, index) => ({
   id,
   index,
@@ -465,12 +467,9 @@ function regionEdgeMask(region, x, y) {
 }
 
 function addObjects(chunk, safeChunk) {
-  const objectCount = chunk.biome.id === "mainland" || chunk.biome.id === "jungle"
-    ? 18
-    : chunk.biome.id === "desert" || chunk.biome.id === "lava"
-      ? 12
-      : 15;
-  const center = { x: 3.2, y: 3.1 };
+  const objectCount = SPAWN_CONFIG.objectCountsByBiome[chunk.biome.id]
+    ?? SPAWN_CONFIG.objectCountsByBiome.default;
+  const center = SPAWN_CONFIG.safeCenter;
 
   for (let i = 0; i < objectCount; i += 1) {
     const localX = 1 + rand01(chunk.cx, chunk.cy, 100 + i) * (CHUNK_SIZE - 2);
@@ -478,33 +477,18 @@ function addObjects(chunk, safeChunk) {
     const x = chunk.x + localX;
     const y = chunk.y + localY;
     if (chunk.region && !isRegionPointPlayable(chunk.region, x, y, 0.7)) continue;
-    if (chunk.region && (Math.hypot(x - chunk.region.start.x, y - chunk.region.start.y) < 4.2 || Math.hypot(x - chunk.region.end.x, y - chunk.region.end.y) < 3.4)) continue;
-    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < 4.2) continue;
+    if (chunk.region && (
+      Math.hypot(x - chunk.region.start.x, y - chunk.region.start.y) < SPAWN_CONFIG.regionStartClearRadius
+      || Math.hypot(x - chunk.region.end.x, y - chunk.region.end.y) < SPAWN_CONFIG.regionEndClearRadius
+    )) continue;
+    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.objectSafeRadius) continue;
 
-    let type = chunk.biome.objects[Math.floor(rand01(chunk.cx, chunk.cy, 300 + i) * chunk.biome.objects.length)];
-    let radius = 0.4;
-    let size = 1;
+    const type = chunk.biome.objects[Math.floor(rand01(chunk.cx, chunk.cy, 300 + i) * chunk.biome.objects.length)];
+    const tuning = OBJECT_SPAWN_TUNING[type] ?? OBJECT_SPAWN_TUNING.default;
+    const radius = tuning.radius;
+    const size = tuning.sizeBase + (tuning.sizeRange ? rand01(chunk.cx, chunk.cy, tuning.sizeSalt + i) * tuning.sizeRange : 0);
 
-    if (type === "building") {
-      radius = 1.15;
-      size = 1.2 + rand01(chunk.cx, chunk.cy, 330 + i) * 0.32;
-    } else if (type === "ruin") {
-      radius = 0.82;
-      size = 1.08 + rand01(chunk.cx, chunk.cy, 335 + i) * 0.28;
-    } else if (type === "firebeacon" || type === "fireplace") {
-      radius = 0.42;
-      size = 0.88 + rand01(chunk.cx, chunk.cy, 338 + i) * 0.18;
-    } else if (type === "broken-wall") {
-      radius = 0.72;
-      size = 1.25;
-    } else if (type === "old-oak" || type === "pine" || type === "pillar" || type === "obelisk") {
-      radius = 0.5;
-      size = 1.15;
-    } else if (type === "crystal") {
-      radius = 0.34;
-      size = 0.9;
-    }
-
+    const destructible = DESTRUCTIBLE_OBJECTS[type];
     chunk.objects.push({
       id: createId(),
       type,
@@ -519,6 +503,8 @@ function addObjects(chunk, safeChunk) {
       animSeed: rand01(chunk.cx, chunk.cy, 560 + i) * Math.PI * 2,
       visualScale: 0.92 + rand01(chunk.cx, chunk.cy, 590 + i) * 0.18,
       blocking: true,
+      maxHp: destructible?.hp,
+      hp: destructible?.hp,
     });
   }
 
@@ -574,22 +560,15 @@ function collidesWithBlockingObject(chunk, x, y, radius) {
 }
 
 function addFoliage(chunk, safeChunk) {
-  const countByBiome = {
-    mainland: 42,
-    jungle: 56,
-    snow: 20,
-    desert: 16,
-    rock: 22,
-    lava: 12,
-  };
-  const count = countByBiome[chunk.biome.id] ?? 28;
-  const center = { x: 3.2, y: 3.1 };
+  const count = SPAWN_CONFIG.foliageCountsByBiome[chunk.biome.id]
+    ?? SPAWN_CONFIG.foliageCountsByBiome.default;
+  const center = SPAWN_CONFIG.safeCenter;
 
   for (let i = 0; i < count; i += 1) {
     const localX = -0.15 + rand01(chunk.cx, chunk.cy, 6100 + i) * (CHUNK_SIZE + 0.3);
     const localY = -0.15 + rand01(chunk.cx, chunk.cy, 6200 + i) * (CHUNK_SIZE + 0.3);
     if (chunk.region && !isRegionPointPlayable(chunk.region, chunk.x + localX, chunk.y + localY, 0.2)) continue;
-    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < 2.2) continue;
+    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.foliageSafeRadius) continue;
 
     chunk.objects.push({
       id: createId(),
@@ -602,6 +581,7 @@ function addFoliage(chunk, safeChunk) {
       colorShift: rand01(chunk.cx, chunk.cy, 6500 + i),
       flip: rand01(chunk.cx, chunk.cy, 6600 + i) > 0.5,
       foliageVariant: Math.floor(rand01(chunk.cx, chunk.cy, 6700 + i) * 64),
+      foliageSheet: rand01(chunk.cx, chunk.cy, 6750 + i) < SPAWN_CONFIG.foliageBonesChance ? "bones" : chunk.biome.id,
       animSeed: rand01(chunk.cx, chunk.cy, 6800 + i) * Math.PI * 2,
       visualScale: 0.84 + rand01(chunk.cx, chunk.cy, 6900 + i) * 0.38,
       wind: rand01(chunk.cx, chunk.cy, 7000 + i) * 0.5,
@@ -611,23 +591,16 @@ function addFoliage(chunk, safeChunk) {
 }
 
 function addDecals(chunk, safeChunk) {
-  const count = chunk.biome.id === "mainland" || chunk.biome.id === "jungle" ? 20 : 24;
-  const center = { x: 3.2, y: 3.1 };
-  const decalSets = {
-    mainland: ["pebble", "rubble"],
-    desert: ["pebble", "pebble", "bone", "crack", "rubble"],
-    snow: ["pebble", "bone", "crack"],
-    rock: ["rubble", "rubble", "pebble", "crack", "bone"],
-    lava: ["crack", "rubble"],
-    jungle: ["rubble", "pebble"],
-  };
-  const set = decalSets[chunk.biome.id] || decalSets.mainland;
+  const count = SPAWN_CONFIG.decalCountsByBiome[chunk.biome.id]
+    ?? SPAWN_CONFIG.decalCountsByBiome.default;
+  const center = SPAWN_CONFIG.safeCenter;
+  const set = DECAL_SETS_BY_BIOME[chunk.biome.id] || DECAL_SETS_BY_BIOME.mainland;
 
   for (let i = 0; i < count; i += 1) {
     const localX = 0.35 + rand01(chunk.cx, chunk.cy, 1200 + i) * (CHUNK_SIZE - 0.7);
     const localY = 0.35 + rand01(chunk.cx, chunk.cy, 1300 + i) * (CHUNK_SIZE - 0.7);
     if (chunk.region && !isRegionPointPlayable(chunk.region, chunk.x + localX, chunk.y + localY, 0.2)) continue;
-    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < 2.8) continue;
+    if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.decalSafeRadius) continue;
     chunk.decals.push({
       id: createId(),
       type: set[Math.floor(rand01(chunk.cx, chunk.cy, 1400 + i) * set.length)],

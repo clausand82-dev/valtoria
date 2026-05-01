@@ -1,5 +1,12 @@
 ﻿import { TILE_H, TILE_W } from "./data.js";
 
+import {
+  FOLIAGE_SHEETS,
+  GROUND_SHEETS,
+  OBJECT_SHEETS,
+  TREE_SHEETS,
+} from "./config/asset-config.js";
+
 export const ATLAS_FRAMES = {
   grassTile: { x: 8, y: 24, w: 296, h: 174 },
   pathTile: { x: 326, y: 42, w: 286, h: 164 },
@@ -150,68 +157,6 @@ const OBJECT_FRAME = {
   crate: "crate",
 };
 
-const GROUND_SHEETS = {
-  mainland: { fileName: "grass_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  desert: { fileName: "sand_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  snow: { fileName: "snow_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  rock: { fileName: "rock_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  lava: { fileName: "lava_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  jungle: { fileName: "jungle_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-};
-
-const TREE_SHEETS = {
-  mainland: "tree_normal_sheet.png",
-  jungle: "tree_jungle_sheet.png",
-  snow: "tree_snow_sheet.png",
-  lava: "tree_dead_sheet.png",
-  desert: "tree_sand_sheet.png",
-};
-
-const OBJECT_SHEETS = {
-  building: {
-    mainland: { fileName: "building_normal_sheet.png", rows: 4, cols: 4 },
-    snow: { fileName: "building_snow_sheet.png", rows: 4, cols: 4 },
-  },
-  ruin: {
-    mainland: { fileName: "ruin_normal_sheet.png", rows: 4, cols: 4 },
-    jungle: { fileName: "ruin_jungle_sheet.png", rows: 4, cols: 4 },
-    desert: { fileName: "ruin_sand_sheet.png", rows: 4, cols: 4 },
-    snow: { fileName: "ruin_snow_sheet.png", rows: 4, cols: 4 },
-  },
-  crystal: {
-    lava: { fileName: "crystal_normal_sheet.png", rows: 4, cols: 4 },
-    rock: { fileName: "crystal_normal_sheet.png", rows: 4, cols: 4 },
-    snow: { fileName: "crystal_snow_sheet.png", rows: 4, cols: 4 },
-  },
-  chest: {
-    mainland: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-    jungle: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-    snow: { fileName: "chest_snow_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-  },
-  firebeacon: {
-    snow: {
-      frameFiles: [
-        "firebeacon_snow_animated_001.png",
-        "firebeacon_snow_animated_002.png",
-        "firebeacon_snow_animated_003.png",
-        "firebeacon_snow_animated_004.png",
-        "firebeacon_snow_animated_005.png",
-        "firebeacon_snow_animated_006.png",
-        "firebeacon_snow_animated_007.png",
-        "firebeacon_snow_animated_008.png",
-      ],
-      animated: true,
-      keyEdgeBlack: true,
-      keyEdgeHalo: true,
-      renderScale: 0.29,
-    },
-  },
-  fireplace: {
-    mainland: { frameFiles: ["fireplace_normal_01.png", "fireplace_normal_02.png", "fireplace_normal_03.png", "fireplace_normal_04.png"], animated: true },
-    jungle: { frameFiles: ["fireplace_normal_01.png", "fireplace_normal_02.png", "fireplace_normal_03.png", "fireplace_normal_04.png"], animated: true },
-  },
-};
-
 export function loadGeneratedAtlas() {
   return Promise.all([
     loadChromaImage("/assets/generated/runebound-atlas-source.png"),
@@ -219,9 +164,10 @@ export function loadGeneratedAtlas() {
     loadTreeSheets(),
     loadFoliageSheet(),
     loadItemSheet(),
+    loadResourceSheet(),
     loadArmorSheet(),
     loadObjectSheets(),
-  ]).then(([canvas, groundSheets, treeSheets, foliageSheet, itemSheet, armorSheet, objectSheets]) => ({
+  ]).then(([canvas, groundSheets, treeSheets, foliageSheet, itemSheet, resourceSheet, armorSheet, objectSheets]) => ({
     canvas,
     frames: ATLAS_FRAMES,
     sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
@@ -229,6 +175,7 @@ export function loadGeneratedAtlas() {
     treeSheets,
     foliageSheet,
     itemSheet,
+    resourceSheet,
     armorSheet,
     objectSheets,
   }));
@@ -467,12 +414,27 @@ function loadTreeSheets() {
 }
 
 function loadFoliageSheet() {
-  return loadChromaImage("/assets/generated/foliage01_sheet.png")
-    .then(makeFoliageSheet)
-    .catch((error) => {
-      console.warn("Foliage sheet load failed: foliage01_sheet.png", error);
-      return null;
-    });
+  return Promise.all(
+    Object.entries(FOLIAGE_SHEETS).map(([id, fileName]) => (
+      loadChromaImage(`/assets/generated/${fileName}`)
+        .then(makeFoliageSheet)
+        .then((sheet) => [id, sheet])
+        .catch((error) => {
+          console.warn(`Foliage sheet load failed for ${id}: ${fileName}`, error);
+          return [id, null];
+        })
+    )),
+  ).then((entries) => {
+    const sheets = Object.fromEntries(entries);
+    const fallback = sheets.mainland ?? Object.values(sheets).find(Boolean) ?? null;
+    for (const id of Object.keys(FOLIAGE_SHEETS)) {
+      if (!sheets[id]) sheets[id] = fallback;
+    }
+    return {
+      sheets,
+      cells: fallback?.cells ?? [],
+    };
+  });
 }
 
 function loadItemSheet() {
@@ -482,6 +444,23 @@ function loadItemSheet() {
       console.warn("Item sheet load failed: items001_sheet.png", error);
       return null;
     });
+}
+
+function loadResourceSheet() {
+  return Promise.all([
+    loadChromaImage("/assets/generated/res_sheet_001.png")
+      .then((canvas) => ["resources", makeItemSheet(canvas, 3, 4)])
+      .catch((error) => {
+        console.warn("Resource sheet load failed: res_sheet_001.png", error);
+        return ["resources", null];
+      }),
+    loadChromaImage("/assets/generated/res_sheet_002.png")
+      .then((canvas) => ["gemstones", makeItemSheet(canvas, 3, 4)])
+      .catch((error) => {
+        console.warn("Resource sheet load failed: res_sheet_002.png", error);
+        return ["gemstones", null];
+      }),
+  ]).then((entries) => Object.fromEntries(entries));
 }
 
 function loadArmorSheet() {
@@ -1938,9 +1917,9 @@ export function drawAtlasFrame(ctx, atlas, key, x, y, options = {}) {
   if (options.alpha !== undefined) ctx.globalAlpha *= options.alpha;
   if (options.blur) ctx.filter = `blur(${options.blur}px)`;
   if (sprite) {
-    ctx.drawImage(sprite, dx, dy, width, height);
+    drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, dx, dy, width, height, options.damageObject);
   } else {
-    ctx.drawImage(atlas.canvas, frame.x, frame.y, frame.w, frame.h, dx, dy, width, height);
+    drawImageMaybeDamaged(ctx, atlas.canvas, frame.x, frame.y, frame.w, frame.h, dx, dy, width, height, options.damageObject);
   }
   ctx.restore();
   return true;
@@ -2122,6 +2101,7 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
     rotation: wind,
     scaleX: glow,
     scaleY: object.type === "crystal" ? 1 + Math.sin(time * 3 + object.animSeed) * 0.025 : 1,
+    damageObject: object,
   })) {
     if (object.type === "crystal") {
       ctx.save();
@@ -2181,7 +2161,7 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   }
   const drawX = -width * 0.5 + frameOffset.x * scale;
   const drawY = -height + 24 * scale + frameOffset.y * scale;
-  ctx.drawImage(sprite, drawX, drawY, width, height);
+  drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, drawX, drawY, width, height, object);
   ctx.restore();
 
   if (object.type === "chest" && object.opening) {
@@ -2250,8 +2230,77 @@ function drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, frameCou
   ctx.restore();
 }
 
-export function drawFoliageSprite(ctx, object, screen, atlas, time = 0) {
-  const cells = atlas?.foliageSheet?.cells;
+function drawDamageCracks(ctx, object, x, y, width, height) {
+  if (!object?.maxHp || object.hp >= object.maxHp) return;
+  const missing = Math.max(0, Math.min(1, 1 - object.hp / object.maxHp));
+  const stage = missing > 0.72 ? 3 : missing > 0.42 ? 2 : 1;
+  const tree = object.type === "pine" || object.type === "old-oak";
+  const region = tree
+    ? { x: x + width * 0.36, y: y + height * 0.5, w: width * 0.28, h: height * 0.42 }
+    : { x: x + width * 0.16, y: y + height * 0.18, w: width * 0.68, h: height * 0.68 };
+
+  ctx.save();
+  ctx.globalCompositeOperation = "source-atop";
+  ctx.globalAlpha = 0.38 + stage * 0.12;
+  ctx.strokeStyle = object.type === "crystal" ? "rgba(18, 54, 72, 0.9)" : "rgba(34, 24, 17, 0.86)";
+  ctx.lineWidth = Math.max(1.1, Math.min(width, height) * 0.018);
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  const cx = region.x + region.w * 0.5;
+  const cy = region.y + region.h * 0.45;
+  drawCrackLine(ctx, [
+    [cx, region.y + region.h * 0.06],
+    [cx - region.w * 0.1, cy],
+    [cx + region.w * 0.05, region.y + region.h * 0.88],
+  ]);
+  if (stage >= 2) {
+    drawCrackLine(ctx, [
+      [cx - region.w * 0.08, cy],
+      [region.x + region.w * 0.18, region.y + region.h * 0.36],
+      [region.x + region.w * 0.04, region.y + region.h * 0.58],
+    ]);
+  }
+  if (stage >= 3) {
+    drawCrackLine(ctx, [
+      [cx + region.w * 0.04, cy + region.h * 0.08],
+      [region.x + region.w * 0.78, region.y + region.h * 0.34],
+      [region.x + region.w * 0.92, region.y + region.h * 0.52],
+    ]);
+  }
+  ctx.restore();
+}
+
+function drawImageMaybeDamaged(ctx, image, sx, sy, sw, sh, dx, dy, dw, dh, object) {
+  if (!object?.maxHp || object.hp >= object.maxHp) {
+    ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
+  }
+
+  const temp = document.createElement("canvas");
+  temp.width = Math.max(1, Math.ceil(dw));
+  temp.height = Math.max(1, Math.ceil(dh));
+  const tctx = temp.getContext("2d");
+  tctx.drawImage(image, sx, sy, sw, sh, 0, 0, temp.width, temp.height);
+  drawDamageCracks(tctx, object, 0, 0, temp.width, temp.height);
+  ctx.drawImage(temp, dx, dy, dw, dh);
+}
+
+function drawCrackLine(ctx, points) {
+  ctx.beginPath();
+  points.forEach(([x, y], index) => {
+    if (index === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+
+export function drawFoliageSprite(ctx, object, screen, biome, atlas, time = 0) {
+  const sheetId = object.foliageSheet ?? biome?.id ?? "mainland";
+  const sheet = atlas?.foliageSheet?.sheets?.[sheetId]
+    ?? atlas?.foliageSheet?.sheets?.mainland
+    ?? atlas?.foliageSheet;
+  const cells = sheet?.cells;
   if (!cells?.length) return false;
   const variant = object.foliageVariant ?? object.treeVariant ?? 0;
   const cell = cells[Math.abs(Math.floor(variant)) % cells.length];
@@ -2295,7 +2344,7 @@ function drawTreeObject(ctx, object, screen, biome, atlas, time = 0) {
   ctx.translate(screen.x, screen.y + 14);
   ctx.rotate(wind);
   ctx.scale(object.flip ? -1 : 1, 1);
-  ctx.drawImage(sprite, dx, dy, width, height);
+  drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, dx, dy, width, height, object);
   ctx.restore();
   return true;
 }

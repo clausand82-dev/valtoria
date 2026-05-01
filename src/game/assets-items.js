@@ -53,17 +53,20 @@ export function drawLoot(ctx, screen, loot, atlas) {
 function drawItemLoot(ctx, screen, loot, atlas) {
   const customImage = getCustomItemImage(loot.item?.iconUrl);
   const useArmorSheet = Object.hasOwn(ARMOR_FRAME_BY_BASE, loot.item?.baseName);
-  const cells = (useArmorSheet ? atlas?.armorSheet : atlas?.itemSheet)?.cells;
+  const useResourceSheet = loot.item?.mode === "resource";
+  const cells = (useResourceSheet ? atlas?.resourceSheet?.[loot.item?.iconSheet ?? "resources"] : useArmorSheet ? atlas?.armorSheet : atlas?.itemSheet)?.cells;
   if (!customImage && (!cells?.length || !loot.item)) return false;
   const index = useArmorSheet
     ? ARMOR_FRAME_BY_BASE[loot.item.baseName]
+    : useResourceSheet
+      ? loot.item.iconIndex ?? 0
     : ITEM_FRAME_BY_BASE[loot.item.baseName] ?? (loot.item.slot === "ring" ? 6 : loot.item.slot === "weapon" ? 0 : 11);
   const cell = cells[Math.abs(index) % cells.length];
   const sprite = customImage ?? cell?.sprite;
   if (!sprite) return false;
 
   const bob = Math.sin(loot.bob) * 3;
-  const scale = loot.item.slot === "weapon" ? 0.18 : 0.16;
+  const scale = loot.item.mode === "resource" ? 0.18 : loot.item.slot === "weapon" ? 0.18 : 0.16;
   const width = sprite.width * scale;
   const height = sprite.height * scale;
   const x = screen.x;

@@ -45,13 +45,22 @@ import {
   worldToIso,
   worldToScreen,
 } from "./iso.js";
+import {
+  DESTRUCTIBLE_OBJECTS,
+  DESTROYED_ITEM_RESOURCE_DROPS,
+  MONSTER_RESOURCE_DROPS,
+  RESOURCE_DEFS,
+  RESOURCE_MERGE_RECIPES,
+  RESOURCE_RARITY_COLOR,
+} from "./config/resource-config.js";
+import { POPULARITY_CONFIG } from "./config/popularity-config.js";
 
 const TERRAIN_LAYER_PAD_TOP = 56;
 const TERRAIN_LAYER_PAD_BOTTOM = 88;
 const SAVE_VERSION = 1;
 const SAVE_STORAGE_KEY = `runebound-depths-save-v${SAVE_VERSION}`;
 const AUTOSAVE_INTERVAL_SECONDS = 1.5;
-const MAX_POTION_STACK = 5;
+const MAX_POTION_STACK = 10;
 const MAX_ELITE_MONSTERS_PER_REGION = 6;
 
 export class GameEngine {
@@ -82,6 +91,8 @@ export class GameEngine {
     this.camera = { offsetX: 0, offsetY: 0, targetOffsetX: 0, targetOffsetY: 0, shake: 0 };
     this.pointer = { x: 0, y: 0, worldX: this.region.start.x, worldY: this.region.start.y, down: false };
     this.hoverMonsterId = null;
+    this.inputLocked = false;
+    this.paused = false;
     this.player = this.createPlayer();
     this.regionStartPlayerLevel = this.player.level;
     this.eliteMonsterCount = 0;
@@ -116,13 +127,16 @@ export class GameEngine {
       radius: 0.28,
       target: null,
       attackTargetId: null,
+      attackObjectId: null,
       facingX: 1,
       facingY: 0,
       level: 1,
       xp: 0,
       gold: 0,
+      popularity: 0,
       hp: 120,
       mana: 64,
+      potions: { health: 0, mana: 0 },
       attackCooldown: 0,
       spellCooldown: 0,
       hurtCooldown: 0,
@@ -189,12 +203,22 @@ export class GameEngine {
   }
 
   loop(now) {
+    if (this.paused) {
+      this.lastTime = now;
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
     const dt = Math.min(0.034, (now - this.lastTime) / 1000);
     this.lastTime = now;
     this.frame += 1;
     this.update(dt);
     this.render();
     this.raf = requestAnimationFrame(this.loop);
+  }
+
+  setPaused(paused) {
+    this.paused = Boolean(paused);
+    if (!this.paused) this.lastTime = performance.now();
   }
 
   update(dt) {
@@ -301,15 +325,19 @@ export class GameEngine {
       }
     }
 
-    if (this.pointer.down && this.player.attackCooldown <= 0) {
-      const pointedMonster = this.monsterAtScreen(this.pointer.x, this.pointer.y);
-      if (pointedMonster) {
-        this.player.attackTargetId = pointedMonster.id;
-        if (distance(this.player, pointedMonster) <= stats.range + pointedMonster.radius) {
-          this.primaryAttack(pointedMonster);
-        }
+    const attackObject = this.findObjectById(this.player.attackObjectId);
+    if (!attackObject || !isDestructibleObject(attackObject)) {
+      this.player.attackObjectId = null;
+    } else if (!this.player.attackTargetId) {
+      const d = distance(this.player, attackObject);
+      if (d > stats.range * 0.78) {
+        this.player.target = { x: attackObject.x, y: attackObject.y };
+      }
+      if (d <= stats.range + attackObject.radius && this.player.attackCooldown <= 0) {
+        this.primaryAttack(attackObject);
       }
     }
+
   }
 
   readMovementInput() {
@@ -416,15 +444,30 @@ export class GameEngine {
         if (loot.type === "gold") {
           this.player.gold += loot.amount;
           this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
+          this.addToast(`+${loot.amount} guld`);
           this.loots.splice(i, 1);
-        } else if (this.addInventoryItem(loot.item)) {
+        } else if (loot.item?.mode === "potion") {
+          const before = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
+          if (this.addPotionLoot(loot.item)) {
+            const after = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
+            const picked = Math.max(1, after - before);
+            this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
+            this.addToast(pickupStatusText(loot.item, picked));
+            this.loots.splice(i, 1);
+            this.publishSnapshot();
+          } else if (!loot.warned) {
+            loot.warned = true;
+            this.addToast("Potion stack er fuld");
+          }
+        } else if (loot.item?.mode !== "potion" && this.addInventoryItem(loot.item)) {
+          const picked = loot.item.mode === "resource" ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
           this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
-          this.addToast(loot.item.name);
+          this.addToast(pickupStatusText(loot.item, picked));
           this.loots.splice(i, 1);
           this.publishSnapshot();
         } else if (!loot.warned) {
           loot.warned = true;
-          this.addToast("Rygsaekken er fuld");
+          this.addToast(loot.item?.mode === "potion" ? "Potion stack er fuld" : "Rygsaekken er fuld");
         }
       }
     }
@@ -629,7 +672,7 @@ export class GameEngine {
 
   primaryAttack(target = null) {
     const stats = this.calcStats();
-    target = target || this.nearestMonster(stats.range + 0.5);
+    target = target || this.nearestMonster(stats.range + 0.5) || this.nearestDestructibleObject(stats.range + 0.5);
     if (!target || target.dead) return;
     const d = distance(this.player, target);
     if (d > stats.range + target.radius) return;
@@ -641,9 +684,15 @@ export class GameEngine {
 
     if (stats.mode === "melee") {
       const damage = this.rollDamage(stats.damageMin, stats.damageMax);
-      this.damageMonster(target, damage, "melee");
-      this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
+      if (isDestructibleObject(target)) {
+        this.damageObject(target, damage);
+      } else {
+        this.damageMonster(target, damage, "melee");
+        this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
+      }
       this.camera.shake = Math.max(this.camera.shake, 3);
+      this.player.attackTargetId = null;
+      this.player.attackObjectId = null;
       return;
     }
 
@@ -709,19 +758,66 @@ export class GameEngine {
     if (monster.hp <= 0) this.killMonster(monster);
   }
 
+  damageObject(object, amount) {
+    const def = DESTRUCTIBLE_OBJECTS[object?.type];
+    if (!def) return;
+    if (!Number.isFinite(Number(object.maxHp))) {
+      object.maxHp = def.hp;
+      object.hp = def.hp;
+    }
+    const stages = Math.max(1, Math.floor(Number(def.damageStages) || 3));
+    object.harvestHits = Math.min(stages, Math.floor(Number(object.harvestHits) || 0) + 1);
+    const remainingStages = Math.max(0, stages - object.harvestHits);
+    object.hp = Math.max(0, Math.ceil(object.maxHp * (remainingStages / stages)));
+    object.hurt = 0.18;
+    this.addFloater(object.x, object.y, `-${object.harvestHits}/${stages}`, "#f1d08d", 0.72);
+    this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 8, 0.08);
+    if (object.harvestHits >= stages || object.hp <= 0) this.destroyObject(object, def);
+  }
+
+  destroyObject(object, def) {
+    const { cx, cy } = chunkCoords(object.x, object.y);
+    const chunk = this.getChunk(cx, cy);
+    const index = chunk.objects.findIndex((entry) => entry.id === object.id);
+    if (index < 0) return;
+    chunk.objects.splice(index, 1);
+    this.player.attackObjectId = null;
+    this.player.target = null;
+    this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
+    this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
+    if (object.type === "building") {
+      this.changePopularity(housePopularityDelta(this.region.index), object.x, object.y);
+    }
+  }
+
   killMonster(monster) {
     if (monster.dead) return;
     monster.dead = true;
     this.player.xp += monster.xp;
     this.addFloater(monster.x, monster.y, `+${monster.xp} xp`, "#e0aa3f", 0.95);
+    this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
     this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
     this.dropLoot(monster);
     this.levelUpIfNeeded();
   }
 
+  changePopularity(amount, x = this.player.x, y = this.player.y) {
+    const delta = Number(amount) || 0;
+    if (!delta) return;
+    const before = clamp(Number(this.player.popularity) || 0, POPULARITY_CONFIG.min, POPULARITY_CONFIG.max);
+    const after = clamp(before + delta, POPULARITY_CONFIG.min, POPULARITY_CONFIG.max);
+    const actual = after - before;
+    this.player.popularity = after;
+    if (Math.abs(actual) < 0.05) return;
+    const decimals = Math.abs(actual) >= 10 || Number.isInteger(actual) ? 0 : 1;
+    const text = `${actual > 0 ? "+" : ""}${actual.toFixed(decimals)} pop`;
+    this.addFloater(x, y, text, actual > 0 ? "#8be9ff" : "#ff7272", 0.95);
+  }
+
   dropLoot(monster) {
     const profile = monsterLootProfile(monster.typeName);
     const lootLevel = monster.lootLevel ?? monster.level;
+    this.dropResourceLoot(monster.x, monster.y, monsterResourceDrops(monster));
     if (Math.random() < profile.goldChance) {
       const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult);
       this.loots.push({
@@ -794,6 +890,24 @@ export class GameEngine {
     }
   }
 
+  dropResourceLoot(x, y, entries = []) {
+    for (const entry of entries) {
+      if (!entry?.resource || Math.random() > (entry.chance ?? 1)) continue;
+      const amount = randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1);
+      const item = makeResourceItem(entry.resource, amount);
+      if (!item) continue;
+      this.loots.push({
+        id: createId(),
+        type: "item",
+        item,
+        x: x + (Math.random() - 0.5) * 0.65,
+        y: y + (Math.random() - 0.5) * 0.65,
+        bob: Math.random() * Math.PI * 2,
+        pickupDelay: 0.35,
+      });
+    }
+  }
+
   levelUpIfNeeded() {
     let needed = this.xpForNextLevel();
     while (this.player.xp >= needed) {
@@ -812,6 +926,7 @@ export class GameEngine {
   equipItem(index) {
     const item = this.player.inventory[index];
     if (!item) return;
+    if (item.mode === "resource") return;
     if (item.mode === "potion") {
       this.usePotion(item.potionType, index);
       return;
@@ -835,14 +950,11 @@ export class GameEngine {
 
   usePotion(type, preferredIndex = -1) {
     if (this.potionCooldown > 0) return;
-    const index = preferredIndex >= 0
-      ? preferredIndex
-      : this.player.inventory.findIndex((item) => item.mode === "potion" && item.potionType === type);
-    const item = this.player.inventory[index];
-    if (!item || item.mode !== "potion" || item.potionType !== type) return;
+    const count = Math.max(0, Math.floor(Number(this.player.potions?.[type]) || 0));
+    if (count <= 0) return;
 
     const stats = this.calcStats();
-    const pct = Number(item.restorePct) || 0.25;
+    const pct = 0.25;
     if (type === "health") {
       this.player.hp = clamp(this.player.hp + stats.maxHp * pct, 0, stats.maxHp);
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxHp * pct)} liv`, "#58d96d", 0.95);
@@ -850,8 +962,7 @@ export class GameEngine {
       this.player.mana = clamp(this.player.mana + stats.maxMana * pct, 0, stats.maxMana);
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * pct)} mana`, "#58bfff", 0.95);
     }
-    item.count = Math.max(0, Math.floor(Number(item.count) || 1) - 1);
-    if (item.count <= 0) this.player.inventory.splice(index, 1);
+    this.player.potions[type] = Math.max(0, count - 1);
     this.potionCooldown = 0.5;
     this.publishSnapshot();
   }
@@ -873,6 +984,43 @@ export class GameEngine {
     this.publishSnapshot();
   }
 
+  takeInventoryItem(index) {
+    const item = this.player.inventory[index];
+    if (!item) return null;
+    this.player.inventory.splice(index, 1);
+    this.publishSnapshot();
+    return item;
+  }
+
+  returnInventoryItem(item) {
+    const accepted = this.addInventoryItem(item);
+    if (accepted) this.publishSnapshot();
+    return accepted;
+  }
+
+  consumeResource(resourceId, amount) {
+    const count = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!resourceId || count <= 0) return 0;
+    const available = resourceCount(this.player.inventory, resourceId);
+    const used = Math.min(available, count);
+    if (used <= 0) return 0;
+    consumeResourceInputs(this.player.inventory, { [resourceId]: used });
+    this.addToast(`Used ${used}x ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`);
+    this.publishSnapshot();
+    return used;
+  }
+
+  consumeGold(amount) {
+    const count = Math.max(0, Math.floor(Number(amount) || 0));
+    if (count <= 0) return 0;
+    const used = Math.min(Math.max(0, Math.floor(Number(this.player.gold) || 0)), count);
+    if (used <= 0) return 0;
+    this.player.gold -= used;
+    this.addToast(`Used ${used} gold`);
+    this.publishSnapshot();
+    return used;
+  }
+
   destroyInventoryItem(index, force = false) {
     const item = this.player.inventory[index];
     if (!item) return;
@@ -881,18 +1029,63 @@ export class GameEngine {
       return;
     }
     this.player.inventory.splice(index, 1);
+    this.dropDestroyedItemResources(item);
     this.addToast(`Destrueret: ${item.name}`);
     this.publishSnapshot();
   }
 
+  dropDestroyedItemResources(item) {
+    const profile = DESTROYED_ITEM_RESOURCE_DROPS[item.unique ? "unique" : item.rarity] ?? DESTROYED_ITEM_RESOURCE_DROPS.normal;
+    const entries = [
+      ...(profile.guaranteed ?? []).map((entry) => ({ ...entry, chance: 1 })),
+      ...(profile.rare ?? []),
+    ];
+    for (const entry of entries) {
+      if (Math.random() > (entry.chance ?? 1)) continue;
+      const resource = makeResourceItem(entry.resource, randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1));
+      if (!resource) continue;
+      if (this.addInventoryItem(resource)) continue;
+      this.loots.push({
+        id: createId(),
+        type: "item",
+        item: resource,
+        x: this.player.x + this.player.facingX * 0.72 + (Math.random() - 0.5) * 0.35,
+        y: this.player.y + this.player.facingY * 0.72 + (Math.random() - 0.5) * 0.35,
+        bob: Math.random() * Math.PI * 2,
+        pickupDelay: 0.75,
+      });
+    }
+  }
+
   mergeInventoryItem(index) {
     const item = this.player.inventory[index];
-    if (!item) return;
+    if (!item) return null;
+    if (item.mode === "resource") {
+      const recipes = resourceMergeRecipesFor(item, this.player.inventory).filter((recipe) => !recipe.requiresFire || this.isNearFireSource());
+      if (recipes.length > 1) {
+        return {
+          type: "resource-choice",
+          index,
+          itemId: item.id,
+          options: recipes.map((recipe) => resourceMergeOption(recipe)),
+        };
+      }
+      const recipe = recipes[0] ?? resourceMergeRecipeFor(item, this.player.inventory);
+      if (!recipe) {
+        this.addToast("Ikke nok resources til merge");
+        return null;
+      }
+      if (recipe.requiresFire && !this.isNearFireSource()) {
+        this.addToast("Kraever fire eller fire beacon");
+        return null;
+      }
+      return this.mergeInventoryResourceWithRecipe(index, recipe.output);
+    }
     const currentRarityIndex = RARITIES.findIndex((rarity) => rarity.id === item.rarity);
     const nextRarity = RARITIES[currentRarityIndex + 1];
     if (currentRarityIndex < 0 || !nextRarity) {
       this.addToast("Kan ikke merges hoejere");
-      return;
+      return null;
     }
 
     const matches = [];
@@ -903,7 +1096,7 @@ export class GameEngine {
 
     if (matches.length < 3) {
       this.addToast("Kraever 3 ens items");
-      return;
+      return null;
     }
 
     const merged = this.makeMergedItem(matches.map((matchIndex) => this.player.inventory[matchIndex]), nextRarity);
@@ -913,6 +1106,45 @@ export class GameEngine {
     this.player.inventory.push(merged);
     this.addToast(`Merged: ${merged.name}`);
     this.publishSnapshot();
+    return null;
+  }
+
+  mergeInventoryResourceWithRecipe(index, outputResourceId) {
+    const item = this.player.inventory[index];
+    if (!item || item.mode !== "resource") return false;
+    const recipe = resourceMergeRecipesFor(item, this.player.inventory).find((entry) => entry.output === outputResourceId);
+    if (!recipe) {
+      this.addToast("Ikke nok resources til merge");
+      return false;
+    }
+    if (recipe.requiresFire && !this.isNearFireSource()) {
+      this.addToast("Kraever fire eller fire beacon");
+      return false;
+    }
+    const output = makeResourceItem(recipe.output, recipe.count ?? 1);
+    if (!output) return false;
+    if (!resourceOutputCanFitAfterMerge(this.player.inventory, recipe, output)) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    consumeResourceInputs(this.player.inventory, recipe.inputs);
+    if (!this.addInventoryItem(output)) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    this.addToast(`Merged: ${output.name}`);
+    this.publishSnapshot();
+    return true;
+  }
+
+  isNearFireSource() {
+    for (const chunk of this.nearbyChunks(1)) {
+      for (const object of chunk.objects) {
+        if (object.type !== "fireplace" && object.type !== "firebeacon") continue;
+        if (distance(this.player, object) <= this.player.radius + object.radius + 1.2) return true;
+      }
+    }
+    return false;
   }
 
   makeMergedItem(items, rarity) {
@@ -942,14 +1174,25 @@ export class GameEngine {
     return merged;
   }
 
+  addPotionLoot(item) {
+    const type = item?.potionType;
+    if (type !== "health" && type !== "mana") return false;
+    if (!this.player.potions) this.player.potions = { health: 0, mana: 0 };
+    const current = Math.max(0, Math.floor(Number(this.player.potions[type]) || 0));
+    if (current >= MAX_POTION_STACK) return false;
+    this.player.potions[type] = Math.min(MAX_POTION_STACK, current + Math.max(1, Math.floor(Number(item.count) || 1)));
+    return true;
+  }
+
   addInventoryItem(item) {
     if (!item) return false;
-    if (item.mode === "potion") {
+    if (item.mode === "resource") {
       let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+      const stackMax = resourceStackMax(item.resourceId);
       for (const stack of this.player.inventory) {
-        if (stack.mode !== "potion" || stack.potionType !== item.potionType) continue;
+        if (stack.mode !== "resource" || stack.resourceId !== item.resourceId) continue;
         const current = Math.max(1, Math.floor(Number(stack.count) || 1));
-        const room = MAX_POTION_STACK - current;
+        const room = stackMax - current;
         if (room <= 0) continue;
         const moved = Math.min(room, remaining);
         stack.count = current + moved;
@@ -961,11 +1204,14 @@ export class GameEngine {
           item.count = remaining;
           return false;
         }
-        const count = Math.min(MAX_POTION_STACK, remaining);
+        const count = Math.min(stackMax, remaining);
         this.player.inventory.push({ ...item, id: createId(), count });
         remaining -= count;
       }
       return true;
+    }
+    if (item.mode === "potion") {
+      return this.addPotionLoot(item);
     }
     if (this.player.inventory.length >= MAX_INVENTORY) return false;
     this.player.inventory.push(item);
@@ -977,7 +1223,7 @@ export class GameEngine {
     const potions = this.player.inventory.filter((item) => item.mode === "potion");
     this.player.inventory = equipment;
     for (const potion of potions) {
-      this.addInventoryItem(potion);
+      this.addPotionLoot(potion);
     }
   }
 
@@ -1043,6 +1289,31 @@ export class GameEngine {
     return best;
   }
 
+  nearestDestructibleObject(maxRange) {
+    let best = null;
+    let bestD = maxRange;
+    for (const chunk of this.nearbyChunks(1)) {
+      for (const object of chunk.objects) {
+        if (!isDestructibleObject(object)) continue;
+        const d = distance(this.player, object);
+        if (d < bestD) {
+          best = object;
+          bestD = d;
+        }
+      }
+    }
+    return best;
+  }
+
+  findObjectById(id) {
+    if (!id) return null;
+    for (const chunk of this.nearbyChunks(2)) {
+      const object = chunk.objects.find((entry) => entry.id === id);
+      if (object) return object;
+    }
+    return null;
+  }
+
   monsterAtScreen(x, y) {
     let best = null;
     let bestD = 999;
@@ -1053,6 +1324,23 @@ export class GameEngine {
       if (d < 34 + monster.radius * 28 && d < bestD) {
         best = monster;
         bestD = d;
+      }
+    }
+    return best;
+  }
+
+  objectAtScreen(x, y) {
+    let best = null;
+    let bestD = 999;
+    for (const chunk of this.nearbyChunks(2)) {
+      for (const object of chunk.objects) {
+        if (!isDestructibleObject(object)) continue;
+        const screen = worldToScreen(object.x, object.y, 0, this.camera);
+        const d = Math.hypot(screen.x - x, screen.y - 24 - y);
+        if (d < 30 + object.radius * 36 && d < bestD) {
+          best = object;
+          bestD = d;
+        }
       }
     }
     return best;
@@ -1119,6 +1407,7 @@ export class GameEngine {
     if (!item || typeof item !== "object") return null;
     const id = Number(item.id);
     if (!Number.isFinite(id)) return null;
+    const savedResourceId = normalizeResourceId(item.resourceId);
     const normalized = {
       id,
       name: String(item.name ?? "Unknown"),
@@ -1145,8 +1434,26 @@ export class GameEngine {
       magic: Math.floor(Number(item.magic) || 0),
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,
-      count: item.mode === "potion" ? clamp(Math.floor(Number(item.count) || 1), 1, MAX_POTION_STACK) : undefined,
+      resourceId: savedResourceId,
+      iconIndex: Number.isFinite(Number(item.iconIndex)) ? Math.floor(Number(item.iconIndex)) : undefined,
+      stackMax: item.mode === "resource" ? resourceStackMax(savedResourceId) : undefined,
+      count: item.mode === "potion"
+        ? clamp(Math.floor(Number(item.count) || 1), 1, MAX_POTION_STACK)
+        : item.mode === "resource"
+          ? clamp(Math.floor(Number(item.count) || 1), 1, resourceStackMax(savedResourceId))
+          : undefined,
     };
+    if (normalized.mode === "resource") {
+      const def = RESOURCE_DEFS[normalized.resourceId];
+      normalized.name = def?.name ?? normalized.name;
+      normalized.baseName = def?.name ?? normalized.baseName;
+      normalized.rarityLabel = "Resource";
+      normalized.rarityColor = RESOURCE_RARITY_COLOR;
+      normalized.resourceColor = def?.color;
+      normalized.iconIndex = def?.iconIndex ?? normalized.iconIndex;
+      normalized.iconSheet = def?.sheet ?? normalized.iconSheet;
+      normalized.stackMax = def?.stackMax ?? normalized.stackMax;
+    }
     normalized.value = Math.max(1, Math.floor(Number(item.value) || itemValue(normalized)));
     return normalized;
   }
@@ -1165,8 +1472,13 @@ export class GameEngine {
     this.player.level = Math.max(1, Math.floor(Number(savedPlayer.level) || this.player.level));
     this.player.xp = Math.max(0, Math.floor(Number(savedPlayer.xp) || 0));
     this.player.gold = Math.max(0, Math.floor(Number(savedPlayer.gold) || 0));
+    this.player.popularity = clamp(Number(savedPlayer.popularity) || 0, POPULARITY_CONFIG.min, POPULARITY_CONFIG.max);
     this.player.hp = Math.max(0, Number(savedPlayer.hp) || this.player.hp);
     this.player.mana = Math.max(0, Number(savedPlayer.mana) || this.player.mana);
+    this.player.potions = {
+      health: clamp(Math.floor(Number(savedPlayer.potions?.health) || 0), 0, MAX_POTION_STACK),
+      mana: clamp(Math.floor(Number(savedPlayer.potions?.mana) || 0), 0, MAX_POTION_STACK),
+    };
     this.player.attackCooldown = Math.max(0, Number(savedPlayer.attackCooldown) || 0);
     this.player.spellCooldown = Math.max(0, Number(savedPlayer.spellCooldown) || 0);
     this.player.hurtCooldown = Math.max(0, Number(savedPlayer.hurtCooldown) || 0);
@@ -1180,11 +1492,15 @@ export class GameEngine {
     this.player.attackTargetId = null;
 
     if (Array.isArray(savedPlayer.inventory)) {
-      this.player.inventory = savedPlayer.inventory
+      const normalizedInventory = savedPlayer.inventory
         .map((item) => this.normalizeSavedItem(item))
-        .filter(Boolean)
+        .filter(Boolean);
+      for (const item of normalizedInventory) {
+        if (item.mode === "potion") this.addPotionLoot(item);
+      }
+      this.player.inventory = normalizedInventory
+        .filter((item) => item.mode !== "potion")
         .slice(0, MAX_INVENTORY);
-      this.compactPotionStacks();
     }
 
     const nextEquipment = createEquipment();
@@ -1234,6 +1550,8 @@ export class GameEngine {
         level: this.player.level,
         xp: this.player.xp,
         gold: this.player.gold,
+        popularity: this.player.popularity,
+        potions: { ...this.player.potions },
         hp: this.player.hp,
         mana: this.player.mana,
         attackCooldown: this.player.attackCooldown,
@@ -1555,6 +1873,7 @@ export class GameEngine {
         const drawn = drawFoliageObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time)
           || drawOverlayObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time);
         if (!drawn) drawObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time);
+        this.drawObjectHealthBar(ctx, item.object, item.screen);
       }
       if (item.type === "loot") drawLoot(ctx, item.screen, item.loot, this.atlas);
       if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas);
@@ -1575,6 +1894,30 @@ export class GameEngine {
         }, this.atlas, this.animationSheets);
       }
     }
+  }
+
+  drawObjectHealthBar(ctx, object, screen) {
+    if (!isDestructibleObject(object) || !object.maxHp || object.hp >= object.maxHp) return;
+    const pct = clamp(object.hp / object.maxHp, 0, 1);
+    const width = Math.max(24, Math.min(48, 28 + object.radius * 26));
+    const yOffset = object.type === "pine" || object.type === "old-oak"
+      ? 92 * (object.size ?? 1)
+      : object.type === "crystal"
+        ? 72 * (object.size ?? 1)
+        : object.type === "building"
+          ? 110 * (object.size ?? 1)
+          : 42 * (object.size ?? 1);
+    const x = screen.x - width / 2;
+    const y = screen.y - yOffset;
+    ctx.save();
+    ctx.fillStyle = "rgba(20, 18, 15, 0.58)";
+    ctx.fillRect(x, y, width, 5);
+    ctx.fillStyle = pct > 0.5 ? "#58d96d" : pct > 0.25 ? "#ffd85d" : "#ff7272";
+    ctx.fillRect(x, y, width * pct, 5);
+    ctx.strokeStyle = "rgba(255, 245, 220, 0.45)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 0.5, y - 0.5, width + 1, 6);
+    ctx.restore();
   }
 
   drawParticles(ctx) {
@@ -1685,7 +2028,18 @@ export class GameEngine {
     return this.getChunk(cx, cy);
   }
 
+  setInputLocked(locked) {
+    this.inputLocked = Boolean(locked);
+    if (!this.inputLocked) return;
+    this.keys.clear();
+    this.pointer.down = false;
+    this.player.target = null;
+    this.player.attackTargetId = null;
+    this.player.attackObjectId = null;
+  }
+
   handlePointerMove(event) {
+    if (this.inputLocked) return;
     const rect = this.canvas.getBoundingClientRect();
     this.pointer.x = event.clientX - rect.left;
     this.pointer.y = event.clientY - rect.top;
@@ -1701,12 +2055,14 @@ export class GameEngine {
   }
 
   handlePointerLeave() {
+    if (this.inputLocked) return;
     if (!this.hoverMonsterId) return;
     this.hoverMonsterId = null;
     this.publishSnapshot();
   }
 
   handlePointerDown(event) {
+    if (this.inputLocked) return;
     this.handlePointerMove(event);
     if (event.button === 2) {
       event.preventDefault();
@@ -1717,6 +2073,7 @@ export class GameEngine {
     const monster = this.monsterAtScreen(this.pointer.x, this.pointer.y);
     if (monster) {
       this.player.attackTargetId = monster.id;
+      this.player.attackObjectId = null;
       const stats = this.calcStats();
       if (distance(this.player, monster) <= stats.range + monster.radius) {
         this.primaryAttack(monster);
@@ -1725,15 +2082,30 @@ export class GameEngine {
       }
       return;
     }
+    const object = this.objectAtScreen(this.pointer.x, this.pointer.y);
+    if (object) {
+      this.player.attackTargetId = null;
+      this.player.attackObjectId = object.id;
+      const stats = this.calcStats();
+      if (distance(this.player, object) <= stats.range + object.radius) {
+        this.primaryAttack(object);
+      } else {
+        this.player.target = { x: object.x, y: object.y };
+      }
+      return;
+    }
     this.player.attackTargetId = null;
+    this.player.attackObjectId = null;
     this.player.target = { x: this.pointer.worldX, y: this.pointer.worldY };
   }
 
   handlePointerUp() {
+    if (this.inputLocked) return;
     this.pointer.down = false;
   }
 
   handleKeyDown(event) {
+    if (this.inputLocked) return;
     const key = event.key.toLowerCase();
     this.keys.add(key);
     if (key === " ") {
@@ -1755,12 +2127,15 @@ export class GameEngine {
   }
 
   handleKeyUp(event) {
+    if (this.inputLocked) return;
     this.keys.delete(event.key.toLowerCase());
   }
 
   itemSummary(item) {
     const parts = [];
-    if (item.mode === "potion") {
+    if (item.mode === "resource") {
+      parts.push(`Resource stack ${item.count ?? 1} / ${resourceStackMax(item.resourceId)}`);
+    } else if (item.mode === "potion") {
       parts.push(item.potionType === "health" ? "Giver 25% liv" : "Giver 25% mana");
     } else if (item.slot === "weapon") {
       parts.push(`${item.damageMin}-${item.damageMax} skade`);
@@ -1782,12 +2157,8 @@ export class GameEngine {
     const stats = this.calcStats();
     const chunk = this.currentChunk();
     const hoverMonster = this.hoverMonsterId ? this.monsters.get(this.hoverMonsterId) : null;
-    const healthPotions = this.player.inventory
-      .filter((item) => item.mode === "potion" && item.potionType === "health")
-      .reduce((sum, item) => sum + Math.max(1, Math.floor(Number(item.count) || 1)), 0);
-    const manaPotions = this.player.inventory
-      .filter((item) => item.mode === "potion" && item.potionType === "mana")
-      .reduce((sum, item) => sum + Math.max(1, Math.floor(Number(item.count) || 1)), 0);
+    const healthPotions = Math.max(0, Math.floor(Number(this.player.potions?.health) || 0));
+    const manaPotions = Math.max(0, Math.floor(Number(this.player.potions?.mana) || 0));
     this.onSnapshot({
       player: {
         level: this.player.level,
@@ -1798,6 +2169,7 @@ export class GameEngine {
         xp: this.player.xp,
         nextXp: this.xpForNextLevel(),
         gold: this.player.gold,
+        popularity: Math.round(clamp(Number(this.player.popularity) || 0, POPULARITY_CONFIG.min, POPULARITY_CONFIG.max)),
         damage: `${stats.damageMin}-${stats.damageMax}`,
         armor: stats.armor,
         mode: stats.mode,
@@ -1823,7 +2195,9 @@ export class GameEngine {
           iconSheet: itemIconSheet(item),
           index,
           mergeCount,
-          canMerge: item.mode !== "potion" && mergeCount >= 3 && rarityIndex >= 0 && rarityIndex < RARITIES.length - 1,
+          canMerge: item.mode === "resource"
+            ? Boolean(resourceMergeRecipeFor(item, this.player.inventory))
+            : item.mode !== "potion" && mergeCount >= 3 && rarityIndex >= 0 && rarityIndex < RARITIES.length - 1,
           summary: this.itemSummary(item),
         };
       }),
@@ -1966,6 +2340,28 @@ function namedItemChanceMultiplier(monster) {
   return 1;
 }
 
+function monsterPopularityDelta(monster, playerLevel) {
+  const rule = POPULARITY_CONFIG.monsterRules[monster?.typeName];
+  const base = Number(rule?.change ?? POPULARITY_CONFIG.defaultMonsterChange) || 0;
+  if (!base) return 0;
+  const levelDelta = Math.floor(Number(monster?.level) || 1) - Math.floor(Number(playerLevel) || 1);
+  const levelMultiplier = clamp(
+    1 + levelDelta * POPULARITY_CONFIG.monsterLevelScalePerLevel,
+    POPULARITY_CONFIG.minMonsterLevelMultiplier,
+    POPULARITY_CONFIG.maxMonsterLevelMultiplier,
+  );
+  const eliteMultiplier = monster?.elite
+    ? 1 + eliteVariantLevelPct(monster.elite) * POPULARITY_CONFIG.eliteMultiplier
+    : 1;
+  return base * levelMultiplier * eliteMultiplier;
+}
+
+function housePopularityDelta(regionLevel) {
+  const house = POPULARITY_CONFIG.houseDestroy;
+  const level = Math.max(1, Math.floor(Number(regionLevel) || 1));
+  return house.baseCost * (1 + (level - 1) * house.regionLevelScale);
+}
+
 function monsterLootProfile(typeName) {
   return LOOT_PROFILES[typeName] ?? {
     goldChance: 0.55,
@@ -1988,6 +2384,7 @@ function rollLootCategory(weights) {
 function itemsCanMerge(a, b) {
   if (!a || !b) return false;
   if (a.mode === "potion" || b.mode === "potion") return false;
+  if (a.mode === "resource" || b.mode === "resource") return false;
   if (a.unique || b.unique || a.named || b.named) return false;
   return a.baseName === b.baseName
     && a.rarity === b.rarity
@@ -1996,6 +2393,7 @@ function itemsCanMerge(a, b) {
 }
 
 function itemIconIndex(item) {
+  if (item?.mode === "resource") return item.iconIndex ?? RESOURCE_DEFS[item.resourceId]?.iconIndex ?? 0;
   if (itemIconSheet(item) === "armor") {
     const armorMap = {
       Helm: 0,
@@ -2036,8 +2434,141 @@ function itemIconIndex(item) {
 }
 
 function itemIconSheet(item) {
+  if (item?.mode === "resource") return RESOURCE_DEFS[item.resourceId]?.sheet ?? "resources";
   const armorBases = new Set(["Helm", "Gorget", "Chestplate", "Vambraces", "Greaves", "Bracelet", "Boots", "Gloves"]);
   return armorBases.has(item?.baseName) ? "armor" : "items";
+}
+
+function makeResourceItem(resourceId, count = 1) {
+  const def = RESOURCE_DEFS[resourceId];
+  if (!def) return null;
+  return {
+    id: createId(),
+    name: def.name,
+    baseName: def.name,
+    resourceId,
+    rarity: "normal",
+    rarityLabel: "Resource",
+    rarityColor: RESOURCE_RARITY_COLOR,
+    resourceColor: def.color,
+    slot: "resource",
+    mode: "resource",
+    level: 1,
+    count: clamp(Math.floor(Number(count) || 1), 1, def.stackMax),
+    stackMax: def.stackMax,
+    iconIndex: def.iconIndex,
+    iconSheet: def.sheet ?? "resources",
+    value: def.value,
+  };
+}
+
+function pickupStatusText(item, count = 1) {
+  const amount = Math.max(1, Math.floor(Number(count) || 1));
+  return `+${amount}x ${item?.name ?? "Item"}`;
+}
+
+function resourceMergeRecipeFor(item, inventory) {
+  if (!item?.resourceId) return null;
+  return resourceMergeRecipesFor(item, inventory)[0] ?? null;
+}
+
+function resourceMergeRecipesFor(item, inventory) {
+  if (!item?.resourceId) return [];
+  return RESOURCE_MERGE_RECIPES.filter((recipe) => (
+    Object.hasOwn(recipe.inputs, item.resourceId)
+    && hasResourceInputs(inventory, recipe.inputs)
+  ));
+}
+
+function resourceMergeOption(recipe) {
+  const output = RESOURCE_DEFS[recipe.output];
+  return {
+    output: recipe.output,
+    name: output?.name ?? recipe.output,
+    count: recipe.count ?? 1,
+    iconIndex: output?.iconIndex ?? 0,
+    iconSheet: output?.sheet ?? "resources",
+    inputs: recipe.inputs,
+  };
+}
+
+function hasResourceInputs(inventory, inputs) {
+  return Object.entries(inputs).every(([resourceId, needed]) => resourceCount(inventory, resourceId) >= needed);
+}
+
+function resourceCount(inventory, resourceId) {
+  return inventory.reduce((sum, item) => (
+    item.mode === "resource" && item.resourceId === resourceId
+      ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+      : sum
+  ), 0);
+}
+
+function consumeResourceInputs(inventory, inputs) {
+  for (const [resourceId, neededRaw] of Object.entries(inputs)) {
+    let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
+    for (let i = inventory.length - 1; i >= 0 && needed > 0; i -= 1) {
+      const item = inventory[i];
+      if (item.mode !== "resource" || item.resourceId !== resourceId) continue;
+      const count = Math.max(1, Math.floor(Number(item.count) || 1));
+      const used = Math.min(count, needed);
+      item.count = count - used;
+      needed -= used;
+      if (item.count <= 0) inventory.splice(i, 1);
+    }
+  }
+}
+
+function resourceOutputCanFitAfterMerge(inventory, recipe, output) {
+  const outputMax = resourceStackMax(output.resourceId);
+  if (inventory.some((item) => (
+    item.mode === "resource"
+    && item.resourceId === output.resourceId
+    && Math.max(1, Math.floor(Number(item.count) || 1)) < outputMax
+  ))) return true;
+
+  let freedSlots = 0;
+  for (const [resourceId, neededRaw] of Object.entries(recipe.inputs)) {
+    let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
+    for (const item of inventory) {
+      if (item.mode !== "resource" || item.resourceId !== resourceId || needed <= 0) continue;
+      const count = Math.max(1, Math.floor(Number(item.count) || 1));
+      const used = Math.min(count, needed);
+      if (count - used <= 0) freedSlots += 1;
+      needed -= used;
+    }
+  }
+  return inventory.length - freedSlots < MAX_INVENTORY;
+}
+
+function resourceStackMax(resourceId) {
+  return RESOURCE_DEFS[resourceId]?.stackMax ?? 99;
+}
+
+function normalizeResourceId(resourceId) {
+  const id = resourceId ? String(resourceId) : undefined;
+  if (id === "iron_ore") return "iron_piece";
+  if (id === "small_rock") return "stone_brick";
+  return id;
+}
+
+function randomInt(min, max) {
+  const lo = Math.floor(Number(min) || 1);
+  const hi = Math.max(lo, Math.floor(Number(max) || lo));
+  return lo + Math.floor(Math.random() * (hi - lo + 1));
+}
+
+function isDestructibleObject(object) {
+  return Boolean(object && DESTRUCTIBLE_OBJECTS[object.type] && (object.hp === undefined || object.hp > 0));
+}
+
+function monsterResourceDrops(monster) {
+  return [
+    ...(MONSTER_RESOURCE_DROPS.default?.loot ?? []),
+    ...(MONSTER_RESOURCE_DROPS.default?.rareLoot ?? []),
+    ...(MONSTER_RESOURCE_DROPS[monster?.typeName]?.loot ?? []),
+    ...(MONSTER_RESOURCE_DROPS[monster?.typeName]?.rareLoot ?? []),
+  ];
 }
 
 function drawTerrainDecal(ctx, decal, x, y) {
