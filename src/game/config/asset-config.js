@@ -26,12 +26,12 @@ export const GROUND_SHEETS = {
   // visualScale: Visuel opskalering af ground-texturen. 1.18 gør at den fylder
   //   lidt mere end selve isometric tile-fladen.
   // baseAlpha: Hvor meget fallback/base-farven blandes ind under teksturen.
-  mainland: { fileName: "grass_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  desert: { fileName: "sand_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  snow: { fileName: "snow_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  rock: { fileName: "rock_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  lava: { fileName: "lava_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
-  jungle: { fileName: "jungle_test.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  mainland: { fileName: "tileset/tileset_grass.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  desert: { fileName: "tileset/tileset_sand.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  snow: { fileName: "tileset/tileset_snow.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  rock: { fileName: "tileset/tileset_rock.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  lava: { fileName: "tileset/tileset_lava.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
+  jungle: { fileName: "tileset/tileset_jungle.png", sourceInset: 0.025, edgeFeather: 0.12, textureAlpha: 1, visualScale: 1.18, baseAlpha: 0.18 },
 };
 
 export const TREE_SHEETS = {
@@ -54,13 +54,13 @@ export const FOLIAGE_SHEETS = {
   //
   // Bemærk stavningen: flere filer hedder "foilage_*" i assets-mappen. Ret kun
   // filnavnene her, hvis de faktiske PNG-filer bliver omdøbt.
-  mainland: "foliage_mainland_001.png",
-  snow: "foilage_snow_001.png",
-  lava: "foilage_lava_001.png",
-  rock: "foilage_rock_001.png",
-  jungle: "foilage_jungle_001.png",
-  desert: "foilage_sand_001.png",
-  bones: "foilage_bones_001.png",
+  mainland: "foilage/foliage_mainland_001.png",
+  snow: "foilage/foilage_snow_001.png",
+  lava: "foilage/foilage_lava_001.png",
+  rock: "foilage/foilage_rock_001.png",
+  jungle: "foilage/foilage_jungle_001.png",
+  desert: "foilage/foilage_sand_001.png",
+  bones: "foilage/foilage_bones_001.png",
 };
 
 export const OBJECT_SHEETS = {

@@ -51,7 +51,7 @@ button {
 
 .hud {
   position: fixed;
-  z-index: 5;
+  z-index: 32;
   pointer-events: none;
   user-select: none;
 }
@@ -187,11 +187,64 @@ button {
 .monster-hover-card,
 .combat-card,
 .inventory-panel,
+.quest-tracker,
 .skillbar {
   border: 1px solid var(--line);
   background: var(--panel);
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(8px);
+}
+
+.quest-tracker {
+  position: fixed;
+  z-index: 5;
+  right: 16px;
+  top: 246px;
+  display: grid;
+  width: min(310px, calc(100vw - 32px));
+  gap: 6px;
+  padding: 9px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+/* Allow the quest tracker to grow but remain scrollable if many quests are active */
+ .quest-tracker {
+   max-height: calc(100vh - 280px);
+   overflow-y: auto;
+   padding-right: 6px; /* give space for scrollbar */
+ }
+
+.quest-track-row {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+
+  /* Allow clicking the individual quest rows even though the tracker
+     container avoids pointer events to let the world canvas receive clicks. */
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.quest-track-row b {
+  color: #f4da96;
+  font-size: 12px;
+}
+
+.quest-track-row span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quest-track-row.complete {
+  border-color: rgba(88, 217, 109, 0.38);
+  background: rgba(88, 217, 109, 0.1);
+}
+
+.item-card.quest-related {
+  box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.65) inset, 0 14px 28px rgba(0,0,0,0.36);
 }
 
 .monster-hover-card {
@@ -362,7 +415,7 @@ button {
 
 .skillbar {
   position: fixed;
-  z-index: 6;
+  z-index: 31;
   left: 50%;
   bottom: 18px;
   display: flex;
@@ -400,10 +453,45 @@ button {
   cursor: pointer;
 }
 
-.quick-potion:disabled {
+.quick-potion:disabled,
+.skill:disabled {
   cursor: default;
   filter: grayscale(1);
   opacity: 0.42;
+}
+
+/* Custom tooltip for disabled quickbar buttons */
+.skillbar span[title] {
+  position: relative;
+  display: inline-block;
+}
+.skillbar span[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 68px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(16,18,20,0.95);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 40;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+.skillbar span[title]:hover::before {
+  content: "";
+  position: absolute;
+  bottom: 58px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: rgba(16,18,20,0.95);
+  z-index: 40;
+  pointer-events: none;
 }
 
 .quick-potion b {
@@ -420,77 +508,36 @@ button {
   font-size: 10px;
 }
 
+.hotkey-badge {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  z-index: 2;
+  color: #f4efe3;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 4px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
 .skill:hover,
 .quick-potion:not(:disabled):hover,
 .skill.active {
   border-color: rgba(226, 174, 79, 0.72);
 }
 
-.sword-icon,
-.spell-icon,
-.bag-icon {
-  position: relative;
-  display: block;
-  width: 31px;
-  height: 31px;
-}
-
-.sword-icon::before {
-  content: "";
-  position: absolute;
-  left: 13px;
-  top: 0;
-  width: 5px;
-  height: 30px;
-  border-radius: 4px 4px 1px 1px;
-  background: linear-gradient(#f2f5f5, #8f99a5);
-  transform: rotate(38deg);
-}
-
-.sword-icon::after {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: 19px;
-  width: 22px;
-  height: 5px;
-  border-radius: 2px;
-  background: #8b5a2b;
-  transform: rotate(38deg);
-}
-
-.spell-icon {
-  border-radius: 50%;
-  background:
-    radial-gradient(circle, #c9f6ff 0 17%, transparent 20%),
-    conic-gradient(from 20deg, #315dd8, #8e50f1, #35c4ff, #315dd8);
-  box-shadow: 0 0 18px rgba(88, 190, 255, 0.55);
-}
-
-.bag-icon {
-  width: 28px;
-  height: 24px;
-  margin-top: 5px;
-  border: 3px solid #c39145;
-  border-radius: 4px 4px 7px 7px;
-  background: #6a4429;
-}
-
-.bag-icon::before {
-  content: "";
-  position: absolute;
-  left: 7px;
-  top: -8px;
-  width: 12px;
-  height: 10px;
-  border: 3px solid #c39145;
-  border-bottom: 0;
-  border-radius: 9px 9px 0 0;
+.hud-image-icon {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
 }
 
 .inventory-panel {
   position: fixed;
-  z-index: 8;
+  z-index: 32;
   left: 50%;
   top: 50%;
   width: min(760px, calc(100vw - 36px));
@@ -905,7 +952,7 @@ button {
   position: fixed;
   right: 18px;
   bottom: 18px;
-  z-index: 10;
+  z-index: 32;
   width: min(360px, calc(100vw - 36px));
   min-height: 92px;
   padding: 14px;
@@ -941,7 +988,7 @@ button {
 .confirm-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 32;
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, 0.48);
@@ -1149,6 +1196,36 @@ button {
   color: #f4da96;
 }
 
+.wilderness-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 96px;
+  z-index: 8;
+  transform: translateX(-50%);
+}
+
+.quest-offer-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.quest-offer-header {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.quest-offer-header img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.quest-offer-header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .city-popup-backdrop {
   position: fixed;
   inset: 0;
@@ -1249,6 +1326,537 @@ button {
   overflow: auto;
   padding: 16px 18px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quest-popup {
+  width: min(540px, calc(100vw - 32px));
+}
+
+.quest-npc-summary {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 14px;
+}
+
+.quest-npc-summary img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.quest-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.quest-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quest-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quest-card b {
+  color: #f4da96;
+}
+
+.quest-card span,
+.quest-card p,
+.quest-npc-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.quest-card button {
+  justify-self: start;
+  padding: 8px 11px;
+  border: 1px solid rgba(244, 218, 150, 0.35);
+  border-radius: 6px;
+  background: rgba(244, 218, 150, 0.14);
+  cursor: pointer;
+}
+
+.quest-card button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.quest-card.complete {
+  border-color: rgba(88, 217, 109, 0.36);
+}
+
+.map-dialog,
+.hero-dialog {
+  width: min(760px, calc(100vw - 32px));
+  height: min(680px, calc(100vh - 32px));
+  overflow: hidden;
+}
+
+.map-dialog {
+  position: relative;
+  width: min(1280px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+}
+
+.world-map-dialog {
+  width: min(1280px, calc(100vw - 16px));
+  height: auto;
+  max-height: calc(100vh - 16px);
+}
+
+.map-dialog,
+.hero-dialog {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.58);
+}
+
+.map-dialog {
+  width: min(1220px, calc(100vw - 32px));
+}
+
+.map-dialog header,
+.hero-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.map-dialog h2,
+.hero-dialog h2 {
+  margin: 0;
+}
+
+.map-dialog span,
+.hero-dialog span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.map-dialog > canvas {
+  display: block;
+  width: min(520px, calc(100vw - 64px));
+  height: min(520px, calc(100vw - 64px));
+  margin: 18px auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #090b0d;
+}
+
+.map-dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.map-back-button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(244, 218, 150, 0.12);
+  color: #f4da96;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.map-back-button:hover {
+  border-color: rgba(244, 218, 150, 0.58);
+}
+
+.map-viewer {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  min-height: min(calc(100vh - 128px), 760px);
+  align-content: start;
+}
+
+.map-frame {
+  position: relative;
+  width: min(var(--map-max-width), calc(100vw - 44px), calc((100vh - 170px) * var(--map-aspect-value, 1)));
+  aspect-ratio: var(--map-aspect);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: #090b0d;
+}
+
+.map-frame > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+}
+
+.world-map-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.world-map-region {
+  cursor: pointer;
+  outline: none;
+  pointer-events: auto;
+}
+
+.world-map-region polygon {
+  fill: color-mix(in srgb, var(--region-color) 14%, transparent);
+  stroke: #050505;
+  stroke-width: 0.0px;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter:
+    drop-shadow(0 0 2px color-mix(in srgb, var(--region-color) 24%, transparent))
+    blur(5.18px);
+  transition:
+    fill 130ms ease,
+    stroke 130ms ease,
+    stroke-width 130ms ease,
+    filter 130ms ease;
+}
+
+.world-map-region:hover polygon,
+.world-map-region:focus polygon,
+.world-map-region.hovered polygon {
+  fill: color-mix(in srgb, var(--region-color) 38%, transparent);
+  stroke: #050505;
+  stroke-width: 0.3px;
+  filter:
+    drop-shadow(0 0 8px color-mix(in srgb, var(--region-color) 68%, transparent))
+    blur(5.12px);
+}
+
+.world-map-region.locked polygon {
+  fill: rgba(20, 20, 20, 0.42);
+  stroke: rgba(5, 5, 5, 0.92);
+  filter:
+    drop-shadow(0 0 4px rgba(0, 0, 0, 0.72))
+    grayscale(0.75)
+    blur(5.12px);
+}
+
+.world-map-region.locked:hover polygon,
+.world-map-region.locked:focus polygon,
+.world-map-region.locked.hovered polygon {
+  fill: rgba(255, 0, 0, 0.38);
+  stroke: #ff0000;
+  filter:
+    drop-shadow(0 0 8px rgba(181, 255, 150, 0.42))
+    grayscale(0.4)
+    blur(5.12px);
+}
+
+.world-map-label {
+  position: absolute;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--region-color) 56%, rgba(255, 255, 255, 0.28));
+  border-radius: 6px;
+  background: rgba(8, 10, 12, 0.72);
+  color: #f4efe3;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.86);
+  transform: translate(-50%, -50%);
+  transition:
+    background 130ms ease,
+    border-color 130ms ease,
+    color 130ms ease,
+    transform 130ms ease;
+}
+
+.world-map-label:not(.locked):hover,
+.world-map-label:not(.locked):focus,
+.world-map-label:not(.locked).hovered {
+  border-color: rgba(255, 226, 150, 0.72);
+  background: rgba(38, 34, 27, 0.88);
+  color: #f4efe3;
+}
+
+.world-map-label.locked {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(8, 8, 8, 0.8);
+  color: #ff6f6f;
+}
+
+.world-map-label.locked:hover,
+.world-map-label.locked:focus,
+.world-map-label.locked.hovered {
+  border-color: rgba(255, 226, 150, 0.72);
+  background: rgba(38, 34, 27, 0.88);
+  color: #ff9b9b;
+}
+
+.map-lock-icon {
+  width: 12px;
+  height: 12px;
+  object-fit: contain;
+  flex: 0 0 12px;
+}
+
+.map-lock-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.36);
+}
+
+.map-lock-modal {
+  width: min(520px, 94vw);
+  max-height: min(620px, 82vh);
+  overflow: auto;
+  border: 1px solid rgba(255, 112, 112, 0.42);
+  border-radius: 8px;
+  background: rgba(12, 11, 10, 0.96);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, 0.56);
+}
+
+.map-lock-modal header,
+.map-lock-quest-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.map-lock-modal header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+}
+
+.map-lock-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.map-lock-title img {
+  width: 30px;
+  height: 34px;
+  object-fit: contain;
+  flex: 0 0 30px;
+}
+
+.map-lock-modal h3 {
+  margin: 2px 0 0;
+  color: #ffe9c4;
+  font-size: 20px;
+}
+
+.map-lock-modal p {
+  margin: 0;
+  padding: 12px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.map-lock-kicker {
+  color: #ff7373;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.map-lock-quests {
+  display: grid;
+  gap: 10px;
+  padding: 12px 16px 16px;
+}
+
+.map-lock-quest {
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.map-lock-quest-head {
+  justify-content: flex-start;
+  padding: 12px 12px 0;
+}
+
+.map-lock-quest-head img {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.map-lock-quest-head b {
+  display: block;
+  color: #f7e6c0;
+  font-size: 14px;
+}
+
+.map-lock-quest-head span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.map-lock-requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.map-lock-requirement {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+  color: #f4efe3;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.map-lock-requirement img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.world-map-label:hover,
+.world-map-label:focus,
+.world-map-label.hovered {
+  border-color: color-mix(in srgb, var(--region-color) 86%, #ffffff);
+  background: color-mix(in srgb, var(--region-color) 32%, rgba(8, 10, 12, 0.8));
+  color: #ffffff;
+  transform: translate(-50%, -50%) scale(1.04);
+  outline: none;
+}
+
+.map-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.hero-dialog-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hero-dialog-title img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.hero-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+  gap: 8px;
+  padding: 16px;
+  max-height: 500px;
+  overflow: auto;
+}
+
+.hero-stat,
+.hero-quest-section {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hero-stat {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+}
+
+.hero-stat b {
+  color: #f4da96;
+}
+
+.hero-stat em {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 0;
+}
+
+.hero-tabs button {
+  padding: 7px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--muted);
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.hero-tabs button.active {
+  border-color: rgba(244, 218, 150, 0.5);
+  color: #f4da96;
+  background: rgba(244, 218, 150, 0.12);
+}
+
+.hero-quest-section {
+  margin: 0 16px 14px;
+  padding: 12px;
+  max-height: 460px;
+  overflow: auto;
+}
+
+.hero-quest-section h3 {
+  margin: 0 0 8px;
+}
+
+.hero-quest-section p {
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .city-cost-list {

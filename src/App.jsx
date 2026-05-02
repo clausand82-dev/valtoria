@@ -4,9 +4,13 @@ import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "./game/assets-gr
 import { drawHero } from "./game/assets-hero.js";
 import { loadAnimationSheets } from "./game/assets.js";
 import { GameEngine } from "./game/GameEngine.js";
+import { ATLAS_FRAMES } from "./game/assets.js";
 import { worldToIso, worldToScreen } from "./game/iso.js";
 import { RESOURCE_DEFS } from "./game/config/resource-config.js";
 import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
+import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "./game/config/map-region-config.js";
+import { QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_NPCS } from "./game/config/quest-config.js";
+import { deriveIconKey, iconUrlFromKey, isEquippableItem } from "./game/item-system.js";
 
 const cityAssetCache = {
   promise: null,
@@ -32,11 +36,15 @@ const emptySnapshot = {
   },
   zone: { name: "Stonewake Wilds", level: 1, seed: 7341 },
   region: { name: "Stonewake Wilds", index: 1, seed: 7341 },
+  regionRun: null,
+  mapReturn: null,
+  mobs: { total: 0, alive: 0, killed: 0 },
   exitPrompt: false,
   inventory: [],
   equipment: [],
   hoverMonster: null,
   quickActions: { healthPotions: 0, manaPotions: 0, potionCooldown: 0 },
+  quests: { active: [], completed: [], cityFade: [], wildernessNpc: null, nearbyQuestgiver: null },
   toasts: [],
 };
 
@@ -53,6 +61,56 @@ const INVENTORY_FILTERS = [
   { id: "unique", label: "Unique", text: "Q", color: "#f1c657" },
 ];
 
+const QUICKBAR_HEALTH_POTION_ICON_URL = iconUrlFromKey(deriveIconKey({ mode: "potion", potionType: "health" }));
+const QUICKBAR_MANA_POTION_ICON_URL = iconUrlFromKey(deriveIconKey({ mode: "potion", potionType: "mana" }));
+const QUICKBAR_ATTACK_ICON_URL = iconUrlFromKey("common_sword");
+const QUICKBAR_CITY_ICON_URL = "/assets/generated/icon_city.png";
+const QUICKBAR_WILDERNESS_ICON_URL = "/assets/generated/icon_wilderness.png";
+const ITEM_STANDARD_ICON_URL = "/assets/generated/item/item_standard.png";
+const ITEM_GOLD_ICON_URL = "/assets/generated/item/item_gold.png";
+const ITEM_MONEY_ICON_URL = "/assets/generated/item/item_gold.png";
+const REGION_CORRUPTION_STORAGE_KEY = "runebound-depths-region-corruption-v1";
+
+function regionStatusKey(areaMapId, regionId) {
+  return `${areaMapId}:${regionId}`;
+}
+
+function loadRegionCorruption() {
+  const initial = {};
+  for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
+    if (areaMapId === WORLD_MAP.id) continue;
+    for (const region of regions) {
+      initial[regionStatusKey(areaMapId, region.id)] = region.corrupted !== false;
+    }
+  }
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(REGION_CORRUPTION_STORAGE_KEY) || "{}");
+    if (saved && typeof saved === "object") {
+      for (const key of Object.keys(initial)) {
+        if (typeof saved[key] === "boolean") initial[key] = saved[key];
+      }
+    }
+  } catch {
+    // Keep default corruption state if localStorage is unavailable or invalid.
+  }
+  return initial;
+}
+
+function saveRegionCorruption(regionCorruption) {
+  try {
+    localStorage.setItem(REGION_CORRUPTION_STORAGE_KEY, JSON.stringify(regionCorruption));
+  } catch {
+    // Ignore quota or storage-denied errors.
+  }
+}
+
+function mapRegionColor(mapId, region, regionCorruption) {
+  if (mapId === WORLD_MAP.id) return region.color;
+  const corrupted = regionCorruption[regionStatusKey(mapId, region.id)] ?? region.corrupted ?? true;
+  return corrupted ? "#d94343" : "#58d96d";
+}
+
 export default function App() {
   const canvasRef = useRef(null);
   const minimapRef = useRef(null);
@@ -60,10 +118,22 @@ export default function App() {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const [cityEnteredFromMap, setCityEnteredFromMap] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
+  const [regionMapOpen, setRegionMapOpen] = useState(true);
+  const [regionMapInitialId, setRegionMapInitialId] = useState(WORLD_MAP.id);
+  const [regionCorruption, setRegionCorruption] = useState(loadRegionCorruption);
+  const [heroOpen, setHeroOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [destroyConfirmItem, setDestroyConfirmItem] = useState(null);
   const [inventoryFilter, setInventoryFilter] = useState("all");
   const [mergeChoice, setMergeChoice] = useState(null);
+  const [questOffer, setQuestOffer] = useState(null);
+  const [acceptedQuestNpc, setAcceptedQuestNpc] = useState(null);
+  const [questRewardModal, setQuestRewardModal] = useState(null);
+  const [viewedQuest, setViewedQuest] = useState(null);
+  const snapshotRef = useRef(emptySnapshot);
+  const lastMapReturnIdRef = useRef(null);
 
   useEffect(() => {
     const engine = new GameEngine(canvasRef.current, setSnapshot);
@@ -76,18 +146,63 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+
+  useEffect(() => {
+    saveRegionCorruption(regionCorruption);
+  }, [regionCorruption]);
+
+  useEffect(() => {
+    const mapReturn = snapshot.mapReturn;
+    if (!mapReturn?.id || lastMapReturnIdRef.current === mapReturn.id) return;
+    lastMapReturnIdRef.current = mapReturn.id;
+    setRegionCorruption((current) => ({
+      ...current,
+      [regionStatusKey(mapReturn.areaMapId, mapReturn.regionId)]: !mapReturn.cleared,
+    }));
+    setRegionMapInitialId(mapReturn.areaMapId ?? WORLD_MAP.id);
+    setRegionMapOpen(true);
+    setMapOpen(false);
+    setInventoryOpen(false);
+    setHeroOpen(false);
+  }, [snapshot.mapReturn]);
+
+  useEffect(() => {
+    if (!import.meta.hot) return undefined;
+    const openWorldMapAfterHotUpdate = () => {
+      setRegionMapInitialId(WORLD_MAP.id);
+      setRegionMapOpen(true);
+      setMapOpen(false);
+      setInventoryOpen(false);
+      setHeroOpen(false);
+      setCityOpen(false);
+    };
+    import.meta.hot.on("vite:afterUpdate", openWorldMapAfterHotUpdate);
+    return () => import.meta.hot.off("vite:afterUpdate", openWorldMapAfterHotUpdate);
+  }, []);
+
+  useEffect(() => {
     const handleKey = (event) => {
-      if (cityOpen) return;
+      // Allow inventory/map/hero hotkeys while city is open; city should not
+      // block access to quickbar functionality.
       const key = event.key.toLowerCase();
       if (key === "i") setInventoryOpen((value) => !value);
+      if (key === "m") setMapOpen((value) => !value);
+      if (key === "c") setHeroOpen((value) => !value);
+      if (key === "e" && snapshotRef.current.quests?.nearbyQuestgiver) {
+        event.preventDefault();
+        setQuestOffer(snapshotRef.current.quests.nearbyQuestgiver);
+      }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [cityOpen]);
 
   useEffect(() => {
-    engineRef.current?.setInputLocked(cityOpen);
-    engineRef.current?.setPaused(cityOpen);
+    const modalOpen = cityOpen || mapOpen || regionMapOpen || heroOpen || Boolean(questOffer) || Boolean(acceptedQuestNpc);
+    engineRef.current?.setInputLocked(modalOpen);
+    engineRef.current?.setPaused(modalOpen);
     if (cityOpen) {
       setInventoryOpen(false);
       setDestroyConfirmItem(null);
@@ -97,7 +212,7 @@ export default function App() {
       engineRef.current?.setInputLocked(false);
       engineRef.current?.setPaused(false);
     };
-  }, [cityOpen]);
+  }, [cityOpen, mapOpen, regionMapOpen, heroOpen, questOffer, acceptedQuestNpc]);
 
   useEffect(() => {
     engineRef.current?.renderMinimap(minimapRef.current);
@@ -156,6 +271,31 @@ export default function App() {
     }
     engineRef.current?.destroyInventoryItem(item.index, true);
   };
+  const startPlayableMapRegion = (areaMapId, region) => {
+    if (!areaMapId || !region?.id) return;
+    const started = engineRef.current?.startMapRegion?.(areaMapId, region);
+    if (!started) return;
+    setRegionCorruption((current) => ({
+      ...current,
+      [regionStatusKey(areaMapId, region.id)]: true,
+    }));
+    setRegionMapOpen(false);
+    setMapOpen(false);
+  };
+
+  const handleOpenCityFromMap = () => {
+    setCityEnteredFromMap(true);
+    setRegionMapOpen(false);
+    setCityOpen(true);
+  };
+
+  const handleCityClose = () => {
+    setCityOpen(false);
+    if (cityEnteredFromMap) {
+      setCityEnteredFromMap(false);
+      setRegionMapOpen(true);
+    }
+  };
 
   return (
     <main className="game-shell">
@@ -173,7 +313,10 @@ export default function App() {
         </div>
         <div className="stat-chip">
           <span>Guld</span>
-          <b>{player.gold}</b>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <ImageIcon src={ITEM_MONEY_ICON_URL} />
+            <b>{player.gold}</b>
+          </div>
         </div>
       </section>
 
@@ -181,15 +324,6 @@ export default function App() {
         <div className="zone-panel">
           <div className="zone-header">
             <b>{snapshot.zone.name}</b>
-            <button
-              type="button"
-              className="city-toggle"
-              aria-label="Aaben city page"
-              title="Aaben city page"
-              onClick={() => setCityOpen(true)}
-            >
-              <span className="house-icon" />
-            </button>
           </div>
           <span>
             Seed {snapshot.zone.seed} | Omraade L{snapshot.zone.level}
@@ -212,45 +346,94 @@ export default function App() {
         <span>Skade {player.damage}</span>
         <span>Armor {player.armor}</span>
         <span>{player.mode}</span>
+        {snapshot.regionRun && snapshot.mobs?.total > 0 && (
+          <span>Mobs {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
+        )}
       </section>
 
+      {snapshot.quests?.active?.length > 0 && (
+        <section className="quest-tracker" aria-label="Aktive quests">
+          {snapshot.quests.active.slice(0, 8).map((quest) => (
+            <div
+              className={`quest-track-row ${quest.complete ? "complete" : ""}`}
+              key={quest.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setViewedQuest(quest)}
+              onKeyDown={(e) => { if (e.key === "Enter") setViewedQuest(quest); }}
+            >
+              <b>{quest.title}</b>
+              <span>{quest.progressText}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
       <section className="skillbar">
-        <button
-          type="button"
-          className="quick-potion"
-          title="Health potion"
-          disabled={!snapshot.quickActions.healthPotions || snapshot.quickActions.potionCooldown > 0}
-          onClick={() => engineRef.current?.usePotion("health")}
-        >
-          <InventoryIcon iconIndex={4} iconSheet="items" />
-          <b>{snapshot.quickActions.healthPotions}</b>
+        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
+          <button
+            type="button"
+            className="quick-potion"
+            title="Health potion"
+            disabled={cityOpen || !snapshot.quickActions.healthPotions || snapshot.quickActions.potionCooldown > 0}
+            onClick={() => engineRef.current?.usePotion("health")}
+          >
+            <InventoryIcon iconIndex={4} iconSheet="items" iconUrl={QUICKBAR_HEALTH_POTION_ICON_URL} />
+            <span className="hotkey-badge">1</span>
+            <b>{snapshot.quickActions.healthPotions}</b>
+          </button>
+        </span>
+        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
+          <button
+            type="button"
+            className="quick-potion"
+            title="Mana potion"
+            disabled={cityOpen || !snapshot.quickActions.manaPotions || snapshot.quickActions.potionCooldown > 0}
+            onClick={() => engineRef.current?.usePotion("mana")}
+          >
+            <InventoryIcon iconIndex={3} iconSheet="items" iconUrl={QUICKBAR_MANA_POTION_ICON_URL} />
+            <span className="hotkey-badge">2</span>
+            <b>{snapshot.quickActions.manaPotions}</b>
+          </button>
+        </span>
+        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
+          <button type="button" className="skill active" title="Angrib" disabled={cityOpen} onClick={() => engineRef.current?.primaryAttack()}>
+            <InventoryIcon iconIndex={0} iconSheet="items" iconUrl={QUICKBAR_ATTACK_ICON_URL} />
+          </button>
+        </span>
+        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
+          <button
+            type="button"
+            className="skill"
+            title="Kast magi"
+            disabled={cityOpen}
+            onClick={() => {
+              const engine = engineRef.current;
+              if (engine) engine.castSpellAt(engine.pointer.worldX, engine.pointer.worldY);
+            }}
+          >
+            <AtlasIcon frameName="orb" />
+          </button>
+        </span>
+        <button type="button" className="skill" title="Rygsaek" onClick={() => setInventoryOpen((value) => !value)}>
+          <ImageIcon src="/assets/generated/icon_backpack.png" />
+          <span className="hotkey-badge">I</span>
         </button>
-        <button
-          type="button"
-          className="quick-potion"
-          title="Mana potion"
-          disabled={!snapshot.quickActions.manaPotions || snapshot.quickActions.potionCooldown > 0}
-          onClick={() => engineRef.current?.usePotion("mana")}
-        >
-          <InventoryIcon iconIndex={3} iconSheet="items" />
-          <b>{snapshot.quickActions.manaPotions}</b>
+        <button type="button" className="skill" title="Map" onClick={() => setMapOpen(true)}>
+          <ImageIcon src="/assets/generated/icon_map.png" />
+          <span className="hotkey-badge">M</span>
         </button>
-        <button type="button" className="skill active" title="Angrib" onClick={() => engineRef.current?.primaryAttack()}>
-          <span className="sword-icon" />
+        <button type="button" className="skill" title="Hero" onClick={() => setHeroOpen(true)}>
+          <ImageIcon src="/assets/generated/ui_hero.png" />
+          <span className="hotkey-badge">C</span>
         </button>
         <button
           type="button"
           className="skill"
-          title="Kast magi"
-          onClick={() => {
-            const engine = engineRef.current;
-            if (engine) engine.castSpellAt(engine.pointer.worldX, engine.pointer.worldY);
-          }}
+          title={cityOpen ? "Til wilderness" : "Aaben city page"}
+          onClick={() => { if (cityOpen) { handleCityClose(); } else { setCityEnteredFromMap(false); setCityOpen(true); } }}
         >
-          <span className="spell-icon" />
-        </button>
-        <button type="button" className="skill" title="Rygsaek" onClick={() => setInventoryOpen((value) => !value)}>
-          <span className="bag-icon" />
+          <ImageIcon src={cityOpen ? QUICKBAR_WILDERNESS_ICON_URL : QUICKBAR_CITY_ICON_URL} />
         </button>
       </section>
 
@@ -315,12 +498,14 @@ export default function App() {
               const dimmed = inventoryFilter !== "all" && !itemMatchesInventoryFilter(item, inventoryFilter);
               return (
                 <article
-                  className={`item-card ${item.rarity} ${item.mode === "resource" ? "resource-item" : ""} ${dimmed ? "filter-dimmed" : ""}`}
+                  className={`item-card ${item.rarity} ${item.mode === "resource" ? "resource-item" : ""} ${dimmed ? "filter-dimmed" : ""} ${isItemRequiredByActiveQuests(item, snapshot.quests?.active) ? "quest-related" : ""}`}
                   style={{ "--item-quality": item.rarityColor ?? "rgba(255,255,255,0.16)" }}
                   key={item.id}
                   onMouseEnter={() => setSelectedItem(item)}
                   onFocus={() => setSelectedItem(item)}
-                  onClick={() => engineRef.current?.equipItem(item.index)}
+                  onClick={() => {
+                    if (isEquippableItem(item)) engineRef.current?.equipItem(item.index);
+                  }}
                   tabIndex={0}
                 >
                   <button
@@ -423,28 +608,120 @@ export default function App() {
         />
       )}
 
+      {snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
+        <div className="city-interact-prompt wilderness-prompt">
+          Press <b>E</b> to speak with {QUEST_NPCS[snapshot.quests.nearbyQuestgiver.npcId]?.name ?? "questgiver"}
+        </div>
+      )}
+
+      {questOffer && (
+        <QuestOfferDialog
+          offer={questOffer}
+          onDecline={() => {
+            engineRef.current?.declineWildernessQuest?.();
+            setQuestOffer(null);
+          }}
+          onAccept={() => {
+            engineRef.current?.acceptWildernessQuest?.({
+              npcId: questOffer.npcId,
+              quest: questOffer.quest,
+            });
+            setAcceptedQuestNpc(questOffer.npcId);
+            setQuestOffer(null);
+          }}
+        />
+      )}
+
+      {viewedQuest && (
+        <QuestDetailDialog
+          quest={viewedQuest}
+          engineRef={engineRef}
+          onClose={() => setViewedQuest(null)}
+          onQuestCompleted={(result) => setQuestRewardModal(result)}
+          cityOpen={cityOpen}
+        />
+      )}
+
+      {acceptedQuestNpc && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-city-title">
+            <h2 id="quest-city-title">Quest taget</h2>
+            <p>{QUEST_NPCS[acceptedQuestNpc]?.name ?? "Questgiver"} kan findes i byen, naar questen skal indleveres.</p>
+            <div>
+              <button type="button" onClick={() => setAcceptedQuestNpc(null)}>OK</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {questRewardModal && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-reward-title">
+            <h2 id="quest-reward-title">Quest reward</h2>
+            <p>{questRewardModal.questTitle}</p>
+            <div className="comparison-list">
+              {questRewardModal.rewards?.xp > 0 && <span className="diff-good">+ XP {questRewardModal.rewards.xp}</span>}
+              {questRewardModal.rewards?.gold > 0 && <span className="diff-good">+ Gold {questRewardModal.rewards.gold}</span>}
+              {(questRewardModal.rewards?.resources ?? []).map((entry) => (
+                <span className="diff-good" key={`res-${entry.id}`}>+ {entry.count}x {entry.name}</span>
+              ))}
+              {(questRewardModal.rewards?.items ?? []).map((entry, index) => (
+                <span className="diff-good" key={`item-${entry.id ?? index}`}>+ {entry.name}</span>
+              ))}
+            </div>
+            <div>
+              <button type="button" onClick={() => setQuestRewardModal(null)}>OK</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {snapshot.exitPrompt && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="region-exit-title">
-            <h2 id="region-exit-title">Rejs videre?</h2>
-            <p>Du har fundet udgangen fra {snapshot.region.name}. Fortsaet til naeste region?</p>
+            <h2 id="region-exit-title">{snapshot.regionRun ? "Tilbage til kortet?" : "Rejs videre?"}</h2>
+            <p>
+              {snapshot.regionRun
+                ? `Du har fundet udgangen fra ${snapshot.region.name}. Forlad regionen og vend tilbage til omraadekortet?`
+                : `Du har fundet udgangen fra ${snapshot.region.name}. Fortsaet til naeste region?`}
+            </p>
             <div>
               <button type="button" onClick={() => engineRef.current?.dismissExitPrompt()}>
                 Bliv her
               </button>
               <button type="button" onClick={() => engineRef.current?.travelToNextRegion()}>
-                Rejs videre
+                {snapshot.regionRun ? "Til kortet" : "Rejs videre"}
               </button>
             </div>
           </section>
         </div>
       )}
 
+      {mapOpen && (
+        <MinimapDialog engineRef={engineRef} snapshot={snapshot} onClose={() => setMapOpen(false)} />
+      )}
+
+      {regionMapOpen && (
+        <RegionMapDialog
+          initialMapId={regionMapInitialId}
+          regionCorruption={regionCorruption}
+          completedQuests={snapshot.quests?.completed ?? []}
+          onPlayableRegionSelected={startPlayableMapRegion}
+          onCityOpen={handleOpenCityFromMap}
+          onMapNavigation={(mapId) => setRegionMapInitialId(mapId)}
+        />
+      )}
+
+      {heroOpen && (
+        <HeroDialog snapshot={snapshot} onClose={() => setHeroOpen(false)} />
+      )}
+
       {cityOpen && (
         <CityPage
           engineRef={engineRef}
           snapshot={snapshot}
-          onClose={() => setCityOpen(false)}
+          onQuestCompleted={(result) => setQuestRewardModal(result)}
+          onClose={handleCityClose}
         />
       )}
     </main>
@@ -469,7 +746,7 @@ function MergeChoiceDialog({ choice, onCancel, onChoose }) {
         <div className="merge-choice-list">
           {choice.options.map((option) => (
             <button type="button" className="merge-choice-option" key={option.output} onClick={() => onChoose(option.output)}>
-              <InventoryIcon iconIndex={option.iconIndex} iconSheet={option.iconSheet} />
+              <InventoryIcon iconIndex={option.iconIndex} iconSheet={option.iconSheet} iconUrl={option.iconUrl} />
               <span>
                 <b>{option.name}</b>
                 <em>{formatMergeInputs(option.inputs)}</em>
@@ -491,6 +768,472 @@ function formatMergeInputs(inputs) {
     .join(" + ");
 }
 
+function QuestOfferDialog({ offer, onDecline, onAccept }) {
+  const npc = QUEST_NPCS[offer.npcId];
+  const quest = offer.quest;
+  return (
+    <div className="confirm-backdrop" role="presentation">
+      <section className="confirm-dialog quest-offer-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-offer-title">
+        <div className="quest-offer-header">
+          {npc?.imageUrl && <img src={npc.imageUrl} alt="" />}
+          <div>
+            <h2 id="quest-offer-title">{quest.title}</h2>
+            <span>{npc?.name ?? "Questgiver"} - {npc?.title ?? "Questgiver"}</span>
+          </div>
+        </div>
+        <p>{quest.story}</p>
+        <p>{quest.acceptText}</p>
+        <div>
+          <button type="button" onClick={onDecline}>Nej</button>
+          <button type="button" onClick={onAccept}>Tag quest</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, cityOpen }) {
+  const npc = QUEST_NPCS[quest.npcId];
+  if (!quest) return null;
+  const turnIn = async () => {
+    const result = engineRef.current?.completeQuest?.(quest.id);
+    if (result?.ok) {
+      onQuestCompleted?.(result);
+      onClose?.();
+    }
+  };
+
+  return (
+    <div className="city-popup-backdrop">
+      <section className="confirm-dialog quest-offer-dialog" role="dialog" aria-modal="true" aria-label={quest.title}>
+        <div className="quest-offer-header">
+          {npc?.imageUrl && <img src={npc.imageUrl} alt="" />}
+          <div>
+            <h2>{quest.title}</h2>
+            <span>{npc?.name ?? "Questgiver"} - {npc?.title ?? ""}</span>
+          </div>
+        </div>
+        <p>{quest.complete ? quest.turnInText : quest.story}</p>
+        <div className="comparison-list">
+          {(quest.rewards?.xp ?? 0) > 0 && <span className="diff-good">+ XP {quest.rewards.xp}</span>}
+          {(quest.rewards?.gold ?? 0) > 0 && <span className="diff-good">+ Gold {quest.rewards.gold}</span>}
+          {(quest.rewards?.resources ?? []).map((r) => (
+            <span className="diff-good" key={`res-${r.resource}`}>+ {r.count}x {r.resource}</span>
+          ))}
+        </div>
+        <div>
+          <button type="button" onClick={onClose}>Luk</button>
+          {cityOpen && (
+            <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function MinimapDialog({ engineRef, snapshot, onClose }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    engineRef.current?.renderMinimap(canvasRef.current);
+  }, [engineRef, snapshot]);
+  return (
+    <div className="confirm-backdrop" role="presentation">
+      <section className="map-dialog" role="dialog" aria-modal="true" aria-label="Map">
+        <header>
+          <div>
+            <h2>Map</h2>
+            <span>{snapshot.region.name} | Seed {snapshot.region.seed}</span>
+          </div>
+          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+        </header>
+        <canvas ref={canvasRef} width="520" height="520" aria-label="Current minimap" />
+      </section>
+    </div>
+  );
+}
+
+function RegionMapDialog({ initialMapId, regionCorruption, completedQuests = [], onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
+  const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
+  const [hoveredRegionId, setHoveredRegionId] = useState(null);
+  const [selectedRegion, setSelectedRegion] = useState(null);
+  const [lockedRegion, setLockedRegion] = useState(null);
+  const isWorldMap = selectedMapId === WORLD_MAP.id;
+  const activeMap = isWorldMap ? WORLD_MAP : AREA_MAPS[selectedMapId] ?? WORLD_MAP;
+  const activeRegions = MAP_REGION_SETS[selectedMapId] ?? [];
+  useEffect(() => {
+    setSelectedMapId(initialMapId ?? WORLD_MAP.id);
+    setHoveredRegionId(null);
+    setSelectedRegion(null);
+    setLockedRegion(null);
+  }, [initialMapId]);
+  const navigateToMap = (mapId) => {
+    setSelectedMapId(mapId);
+    onMapNavigation?.(mapId);
+  };
+  const selectWorldMap = () => {
+    navigateToMap(WORLD_MAP.id);
+    setHoveredRegionId(null);
+    setSelectedRegion(null);
+    setLockedRegion(null);
+  };
+  const completedQuestSet = new Set(completedQuests.map(String));
+  const activateRegion = (region) => {
+    if (!regionIsUnlocked(region, completedQuestSet)) {
+      setSelectedRegion(region);
+      setLockedRegion(region);
+      return;
+    }
+    const targetMapId = region.targetMapId ?? region.id;
+    if (isWorldMap && AREA_MAPS[targetMapId]) {
+      navigateToMap(targetMapId);
+      setHoveredRegionId(null);
+      setSelectedRegion(null);
+      return;
+    }
+    setSelectedRegion(region);
+    onPlayableRegionSelected?.(selectedMapId, region);
+  };
+  const handleRegionKeyDown = (event, region) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    activateRegion(region);
+  };
+  const mapAspectValue = useMemo(() => {
+    const rawAspect = String(activeMap?.aspect ?? "").trim();
+    const [rawWidth, rawHeight] = rawAspect.split("/").map((part) => Number.parseFloat(part.trim()));
+    if (!Number.isFinite(rawWidth) || !Number.isFinite(rawHeight) || rawHeight <= 0) return 1;
+    return rawWidth / rawHeight;
+  }, [activeMap?.aspect]);
+
+  return (
+    <div className="confirm-backdrop" role="presentation">
+      <section className="map-dialog world-map-dialog" role="dialog" aria-modal="true" aria-label="World map">
+        <header>
+          <div>
+            <h2>{activeMap.title}</h2>
+            <span>{isWorldMap ? activeMap.subtitle : `${activeMap.subtitle} | vaelg en region`}</span>
+          </div>
+          <div className="map-dialog-actions">
+            {!isWorldMap && (
+              <button type="button" className="map-back-button" onClick={selectWorldMap}>
+                World map
+              </button>
+            )}
+            {onCityOpen && (
+              <button type="button" className="map-back-button" onClick={onCityOpen}>
+                By
+              </button>
+            )}
+          </div>
+        </header>
+        <div className="map-viewer">
+          <div
+            className={`map-frame ${isWorldMap ? "interactive-map-frame" : "area-map-frame"}`}
+            style={{
+              "--map-aspect": activeMap.aspect,
+              "--map-max-width": activeMap.maxWidth,
+              "--map-aspect-value": mapAspectValue,
+            }}
+          >
+            <img src={activeMap.imageUrl} alt={activeMap.title} draggable="false" />
+            {activeRegions.length > 0 && (
+              <>
+                <svg className="world-map-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={`Klikbare omraader paa ${activeMap.title}`}>
+                  {activeRegions.map((region) => (
+                    (() => {
+                      const locked = !regionIsUnlocked(region, completedQuestSet);
+                      const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
+                      return (
+                    <g
+                      className={`world-map-region ${locked ? "locked" : ""} ${hoveredRegionId === region.id || selectedRegion?.id === region.id ? "hovered" : ""}`}
+                      style={{ "--region-color": regionColor }}
+                      key={region.id}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={locked ? `${region.label} er laast` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
+                      onClick={() => activateRegion(region)}
+                      onKeyDown={(event) => handleRegionKeyDown(event, region)}
+                      onMouseEnter={() => setHoveredRegionId(region.id)}
+                      onMouseLeave={() => setHoveredRegionId(null)}
+                      onFocus={() => setHoveredRegionId(region.id)}
+                      onBlur={() => setHoveredRegionId(null)}
+                    >
+                      <title>{region.label}</title>
+                      <polygon points={region.points} />
+                    </g>
+                      );
+                    })()
+                  ))}
+                </svg>
+                {activeRegions.map((region) => {
+                  const locked = !regionIsUnlocked(region, completedQuestSet);
+                  const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
+                  return (
+                    <button
+                      type="button"
+                      className={`world-map-label ${locked ? "locked" : ""} ${hoveredRegionId === region.id ? "hovered" : ""}`}
+                      style={{
+                        "--region-color": regionColor,
+                        left: `${region.labelX}%`,
+                        top: `${region.labelY}%`,
+                      }}
+                      key={`${region.id}-label`}
+                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet)}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
+                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet)}` : region.label}
+                      onClick={() => activateRegion(region)}
+                      onMouseEnter={() => setHoveredRegionId(region.id)}
+                      onMouseLeave={() => setHoveredRegionId(null)}
+                      onFocus={() => setHoveredRegionId(region.id)}
+                      onBlur={() => setHoveredRegionId(null)}
+                    >
+                      {locked && (
+                        <img
+                          className="map-lock-icon"
+                          src="/assets/generated/minilock.png"
+                          alt=""
+                          aria-hidden="true"
+                        />
+                      )}
+                      {region.label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+          {!isWorldMap && (
+            <p className="map-note">
+              {selectedRegion
+                ? regionIsUnlocked(selectedRegion, completedQuestSet)
+                  ? `${selectedRegion.label} | id: ${selectedRegion.id} | biodome: ${selectedRegion.biodome ?? "not set"}`
+                  : `${selectedRegion.label} er laast. ${regionUnlockText(selectedRegion, completedQuestSet)}`
+                : `${activeMap.title} er aabnet som underkort. Klik et omraade for at vaelge det.`}
+            </p>
+          )}
+          {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet) && (
+            <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet)}</p>
+          )}
+        </div>
+        {lockedRegion && (
+          <LockedRegionDialog
+            completedQuestSet={completedQuestSet}
+            region={lockedRegion}
+            onClose={() => setLockedRegion(null)}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function regionIsUnlocked(region, completedQuestSet) {
+  if (region?.unlock?.locked) return false;
+  const requiredQuests = region?.unlock?.completedQuests ?? [];
+  return requiredQuests.every((questId) => completedQuestSet.has(String(questId)));
+}
+
+function regionUnlockText(region, completedQuestSet) {
+  if (region?.unlock?.text) return region.unlock.text;
+  const missingQuests = (region?.unlock?.completedQuests ?? [])
+    .filter((questId) => !completedQuestSet.has(String(questId)));
+  if (!missingQuests.length) return "Ingen manglende krav.";
+  const questNames = missingQuests.map((questId) => QUEST_DEFS[questId]?.title ?? questId);
+  return `Kraever quest: ${questNames.join(", ")}.`;
+}
+
+function LockedRegionDialog({ region, completedQuestSet, onClose }) {
+  const missingQuestIds = (region?.unlock?.completedQuests ?? [])
+    .filter((questId) => !completedQuestSet.has(String(questId)));
+  return (
+    <div className="map-lock-modal-backdrop" role="presentation" onClick={onClose}>
+      <section className="map-lock-modal" role="dialog" aria-modal="true" aria-label={`${region.label} er laast`} onClick={(event) => event.stopPropagation()}>
+        <header>
+          <div className="map-lock-title">
+            <img src="/assets/generated/minilock.png" alt="" aria-hidden="true" />
+            <div>
+              <span className="map-lock-kicker">Laast omraade</span>
+              <h3>{region.label}</h3>
+            </div>
+          </div>
+          <button type="button" onClick={onClose}>Luk</button>
+        </header>
+        {region?.unlock?.text && <p>{region.unlock.text}</p>}
+        {missingQuestIds.length > 0 && (
+          <div className="map-lock-quests">
+            {missingQuestIds.map((questId) => (
+              <LockedQuestRequirement questId={questId} key={questId} />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function LockedQuestRequirement({ questId }) {
+  const quest = QUEST_DEFS[questId];
+  const npcId = quest?.npcIds?.[0];
+  const npc = npcId ? QUEST_NPCS[npcId] : null;
+  return (
+    <article className="map-lock-quest">
+      <div className="map-lock-quest-head">
+        {npc?.imageUrl && <img src={npc.imageUrl} alt={npc.name} />}
+        <div>
+          <b>{quest?.title ?? questId}</b>
+          <span>{npc ? `${npc.name} | ${npc.title}` : "Questgiver ikke sat"}</span>
+        </div>
+      </div>
+      {quest?.story && <p>{quest.story}</p>}
+      <div className="map-lock-requirements">
+        {questRequirementRows(quest).map((row) => (
+          <span className="map-lock-requirement" key={row.key}>
+            {row.iconUrl && <img src={row.iconUrl} alt="" aria-hidden="true" />}
+            {row.label}
+          </span>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function questRequirementRows(quest) {
+  const target = quest?.target ?? {};
+  const rows = [];
+  const addQuestItem = (entry) => {
+    const def = QUEST_ITEM_DEFS[entry.questItemId];
+    rows.push({
+      key: `quest-${entry.questItemId}`,
+      label: `${entry.count ?? 1}x ${def?.name ?? entry.questItemId}`,
+      iconUrl: def?.iconUrl,
+    });
+  };
+  if (target.questItemId) addQuestItem({ questItemId: target.questItemId, count: target.count ?? 1 });
+  for (const entry of target.questItems ?? []) addQuestItem(entry);
+  for (const entry of target.resources ?? []) {
+    const def = RESOURCE_DEFS[entry.resource];
+    rows.push({
+      key: `resource-${entry.resource}`,
+      label: `${entry.count ?? 1}x ${def?.name ?? entry.resource}`,
+      iconUrl: iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: entry.resource })),
+    });
+  }
+  for (const entry of target.items ?? []) {
+    rows.push({
+      key: `item-${entry.templateId ?? entry.namePrefix ?? entry.baseName ?? "item"}`,
+      label: `${entry.count ?? 1}x ${entry.templateId ?? entry.namePrefix ?? entry.baseName ?? "item"}`,
+      iconUrl: ITEM_STANDARD_ICON_URL,
+    });
+  }
+  return rows.length ? rows : [{ key: "quest-completion", label: "Fuldfør questen", iconUrl: null }];
+}
+
+function HeroDialog({ snapshot, onClose }) {
+  const [tab, setTab] = useState("overview");
+  const stats = snapshot.player.stats ?? {};
+  const monsterRows = Object.entries(stats.killsByMonster ?? {})
+    .sort(([a], [b]) => a.localeCompare(b));
+  const objectsDestroyed = detailEntries(stats.objectsDestroyedByType);
+  const pickedRarity = detailEntries(stats.itemsPickedByRarity);
+  const droppedRarity = detailEntries(stats.itemsDroppedByRarity);
+  const notPickedRarity = detailEntries(stats.itemsNotPickedByRarity);
+  const destroyedRarity = detailEntries(stats.itemsDestroyedByRarity);
+  return (
+    <div className="confirm-backdrop" role="presentation">
+      <section className="hero-dialog" role="dialog" aria-modal="true" aria-label="Hero">
+        <header>
+          <div className="hero-dialog-title">
+            <img src="/assets/generated/ui_hero.png" alt="" />
+            <div>
+              <h2>Hero</h2>
+              <span>Level {snapshot.player.level} | XP {snapshot.player.xp} / {snapshot.player.nextXp}</span>
+            </div>
+          </div>
+          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+        </header>
+        <div className="hero-tabs" role="tablist" aria-label="Hero tabs">
+          {["overview", "combat", "loot", "quests"].map((id) => (
+            <button type="button" className={tab === id ? "active" : ""} key={id} onClick={() => setTab(id)}>{id}</button>
+          ))}
+        </div>
+        {tab === "overview" && (
+          <div className="hero-stat-grid">
+            <HeroStat label="HP" value={`${snapshot.player.hp} / ${snapshot.player.maxHp}`} />
+            <HeroStat label="Mana" value={`${snapshot.player.mana} / ${snapshot.player.maxMana}`} />
+            <HeroStat label="Gold" value={snapshot.player.gold} />
+            <HeroStat label="Popularity" value={`${snapshot.player.popularity}%`} />
+            <HeroStat label="Damage" value={snapshot.player.damage} />
+            <HeroStat label="Armor" value={snapshot.player.armor} />
+            <HeroStat label="Mode" value={snapshot.player.mode} />
+            <HeroStat label="Deaths" value={stats.deaths ?? 0} />
+          </div>
+        )}
+        {tab === "combat" && (
+          <>
+            <div className="hero-stat-grid">
+              <HeroStat label="Damage dealt" value={stats.damageDealt ?? 0} />
+              <HeroStat label="Damage taken" value={stats.damageTaken ?? 0} />
+              <HeroStat label="Kills total" value={stats.killsTotal ?? 0} />
+              <HeroStat label="Melee attacks" value={stats.meleeAttacks ?? 0} />
+              <HeroStat label="Ranged attacks" value={stats.rangedAttacks ?? 0} />
+              <HeroStat label="Spell projectiles" value={stats.spellProjectiles ?? 0} />
+              <HeroStat label="Spells cast" value={stats.spellsCast ?? 0} />
+              <HeroStat label="Objects destroyed" value={stats.objectsDestroyed ?? 0} details={objectsDestroyed} />
+            </div>
+            <HeroDetailSection title="Kills by monster" empty="Ingen kills endnu" rows={monsterRows.map(([name, value]) => `${name}: ${value.normal ?? 0} normal | ${value.elite ?? 0} elite`)} />
+          </>
+        )}
+        {tab === "loot" && (
+          <div className="hero-stat-grid">
+            <HeroStat label="Gold earned" value={stats.goldEarned ?? 0} />
+            <HeroStat label="Gold looted" value={stats.goldLooted ?? 0} />
+            <HeroStat label="Items dropped" value={stats.itemsDropped ?? 0} details={droppedRarity} />
+            <HeroStat label="Items picked" value={stats.itemsPicked ?? 0} details={pickedRarity} />
+            <HeroStat label="Items not picked" value={stats.itemsNotPicked ?? 0} details={notPickedRarity} />
+            <HeroStat label="Items destroyed" value={stats.itemsDestroyed ?? 0} details={destroyedRarity} />
+            <HeroStat label="Resources picked" value={stats.resourcesPicked ?? 0} />
+            <HeroStat label="Health potions" value={stats.healthPotionsUsed ?? 0} />
+            <HeroStat label="Mana potions" value={stats.manaPotionsUsed ?? 0} />
+          </div>
+        )}
+        {tab === "quests" && (
+          <HeroDetailSection
+            title={`Quests completed: ${stats.questsCompleted ?? 0}`}
+            empty="Ingen aktive quests"
+            rows={(snapshot.quests?.active ?? []).map((quest) => `${quest.title}: ${quest.progressText}`)}
+          />
+        )}
+      </section>
+    </div>
+  );
+}
+
+function HeroStat({ label, value, details = [] }) {
+  return (
+    <div className="hero-stat" title={details.length ? details.join("\n") : undefined}>
+      <span>{label}</span>
+      <b>{value}</b>
+      {details.length > 0 && <em>{details.slice(0, 2).join(" | ")}</em>}
+    </div>
+  );
+}
+
+function HeroDetailSection({ title, rows, empty }) {
+  return (
+    <section className="hero-quest-section">
+      <h3>{title}</h3>
+      {rows.length ? rows.map((row) => <p key={row}>{row}</p>) : <p>{empty}</p>}
+    </section>
+  );
+}
+
+function detailEntries(record = {}) {
+  return Object.entries(record)
+    .filter(([, value]) => Number(value) > 0)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}: ${value}`);
+}
+
 function itemMatchesInventoryFilter(item, filter) {
   if (filter === "merge") return Boolean(item.canMerge);
   if (filter === "resource") return item.mode === "resource";
@@ -498,16 +1241,53 @@ function itemMatchesInventoryFilter(item, filter) {
   return item.mode !== "resource" && item.rarity === filter;
 }
 
-function CityPage({ engineRef, snapshot, onClose }) {
+function isItemRequiredByActiveQuests(item, activeQuests = []) {
+  if (!item || !activeQuests?.length) return false;
+  for (const quest of activeQuests) {
+    if (quest.type !== "collect_quest_item") continue;
+    const target = quest.target ?? {};
+    // Quest-specific quest items
+    if (target.questItemId && item.mode === "quest" && String(item.questItemId) === String(target.questItemId)) return true;
+    if (Array.isArray(target.questItems) && item.mode === "quest") {
+      for (const req of target.questItems) {
+        if (String(req.questItemId) === String(item.questItemId)) return true;
+      }
+    }
+    // Resource requirements
+    if (target.resources && item.mode === "resource") {
+      for (const req of target.resources) {
+        if (String(req.resource) === String(item.resourceId)) return true;
+      }
+    }
+    // Specific item matching rules
+    if (Array.isArray(target.items)) {
+      for (const req of target.items) {
+        let match = true;
+        if (req.templateId) match = match && (String(item.uniqueId) === String(req.templateId) || String(item.namedId) === String(req.templateId));
+        if (req.namePrefix) match = match && String(item.name || "").startsWith(`${req.namePrefix} `);
+        if (req.baseName) match = match && String(item.baseName || "") === String(req.baseName);
+        if (req.rarity) match = match && String(item.rarity || "") === String(req.rarity);
+        if (match) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function CityPage({ engineRef, snapshot, onClose, onQuestCompleted }) {
   const canvasRef = useRef(null);
   const frameRef = useRef(0);
   const keysRef = useRef(new Set());
   const selectedBuildingRef = useRef(null);
   const activeMarkerRef = useRef(null);
   const nearbyBuildingRef = useRef(null);
+  const nearbyQuestNpcRef = useRef(null);
+  const snapshotRef = useRef(snapshot);
   const [loadingCity, setLoadingCity] = useState(!cityAssetCache.assets);
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
+  const [selectedQuestNpcId, setSelectedQuestNpcId] = useState(null);
   const [nearbyBuildingId, setNearbyBuildingId] = useState(null);
+  const [nearbyQuestNpcId, setNearbyQuestNpcId] = useState(null);
   const [cityProgress, setCityProgress] = useState(loadCityProgress);
   const cityStateRef = useRef({
     layout: buildCityLayout(),
@@ -521,11 +1301,16 @@ function CityPage({ engineRef, snapshot, onClose }) {
     animationSheets: null,
     atlas: null,
     houseSprites: [],
+    npcImages: {},
     staticLayer: null,
     time: 0,
     gait: 0,
   });
   const cityProgressRef = useRef(cityProgress);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
 
   useEffect(() => {
     cityProgressRef.current = cityProgress;
@@ -538,11 +1323,12 @@ function CityPage({ engineRef, snapshot, onClose }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadCityAssets().then(({ atlas, animationSheets, houseSprites }) => {
+    loadCityAssets().then(({ atlas, animationSheets, houseSprites, npcImages }) => {
       if (cancelled) return;
       cityStateRef.current.atlas = atlas;
       cityStateRef.current.animationSheets = animationSheets;
       cityStateRef.current.houseSprites = houseSprites;
+      cityStateRef.current.npcImages = npcImages ?? {};
       cityStateRef.current.heroReady = true;
       cityStateRef.current.staticLayer = null;
       setLoadingCity(false);
@@ -557,6 +1343,11 @@ function CityPage({ engineRef, snapshot, onClose }) {
       if (key === "escape") {
         event.preventDefault();
         onClose();
+        return;
+      }
+      if (key === "e" && nearbyQuestNpcRef.current) {
+        event.preventDefault();
+        setSelectedQuestNpcId(nearbyQuestNpcRef.current);
         return;
       }
       if (key === "e" && nearbyBuildingRef.current) {
@@ -635,6 +1426,14 @@ function CityPage({ engineRef, snapshot, onClose }) {
       city.walkClock = city.time;
 
       const markerHit = findTouchedCityMarker(layout, city.heroGX, city.heroGY);
+      const questNpcHit = findTouchedCityQuestNpc(layout, snapshotRef.current.quests?.active ?? [], city.heroGX, city.heroGY);
+      if (!questNpcHit) {
+        nearbyQuestNpcRef.current = null;
+        setNearbyQuestNpcId((current) => current === null ? current : null);
+      } else {
+        nearbyQuestNpcRef.current = questNpcHit.npcId;
+        setNearbyQuestNpcId((current) => current === questNpcHit.npcId ? current : questNpcHit.npcId);
+      }
       if (!markerHit) {
         activeMarkerRef.current = null;
         nearbyBuildingRef.current = null;
@@ -645,7 +1444,7 @@ function CityPage({ engineRef, snapshot, onClose }) {
         setNearbyBuildingId((current) => current === markerHit.id ? current : markerHit.id);
       }
 
-      drawIsometricCityScene(ctx, width, height, layout, city, cityProgressRef.current, moved);
+      drawIsometricCityScene(ctx, width, height, layout, city, cityProgressRef.current, snapshotRef.current.quests ?? {}, moved);
       frameRef.current = requestAnimationFrame(loop);
     };
 
@@ -663,7 +1462,9 @@ function CityPage({ engineRef, snapshot, onClose }) {
     <section className="city-page" role="dialog" aria-modal="true" aria-label="City page">
       <header className="city-page-header">
         <h2>City</h2>
-        <button type="button" className="city-close" onClick={onClose}>Tilbage</button>
+        <button type="button" className="city-close" onClick={onClose} title="Til wilderness" aria-label="Til wilderness">
+          <ImageIcon src={QUICKBAR_WILDERNESS_ICON_URL} />
+        </button>
       </header>
       <canvas ref={canvasRef} className="city-canvas" aria-label="City" />
       {loadingCity && (
@@ -672,9 +1473,11 @@ function CityPage({ engineRef, snapshot, onClose }) {
           <span>Preparing fixed city assets...</span>
         </div>
       )}
-      {!loadingCity && nearbyBuildingId && !selectedBuildingId && (
+      {!loadingCity && (nearbyQuestNpcId || nearbyBuildingId) && !selectedBuildingId && !selectedQuestNpcId && (
         <div className="city-interact-prompt">
-          Press <b>E</b> to open {CITY_BUILDINGS.find((entry) => entry.id === nearbyBuildingId)?.title ?? "building"}
+          Press <b>E</b> to open {nearbyQuestNpcId
+            ? `${QUEST_NPCS[nearbyQuestNpcId]?.name ?? "questgiver"}`
+            : CITY_BUILDINGS.find((entry) => entry.id === nearbyBuildingId)?.title ?? "building"}
         </div>
       )}
       {!loadingCity && selectedBuildingId && (
@@ -686,6 +1489,15 @@ function CityPage({ engineRef, snapshot, onClose }) {
           houseSprites={cityStateRef.current.houseSprites}
           onChangeProgress={setCityProgress}
           onClose={() => setSelectedBuildingId(null)}
+        />
+      )}
+      {!loadingCity && selectedQuestNpcId && (
+        <CityQuestPopup
+          npcId={selectedQuestNpcId}
+          engineRef={engineRef}
+          quests={snapshot.quests?.active ?? []}
+          onQuestCompleted={onQuestCompleted}
+          onClose={() => setSelectedQuestNpcId(null)}
         />
       )}
       <p className="city-help">WASD eller piletaster: gaa rundt i isometrisk view. ESC: tilbage.</p>
@@ -700,11 +1512,17 @@ function loadCityAssets() {
       loadGeneratedAtlas(),
       loadAnimationSheets(),
       loadImage("/assets/generated/citystructure_sheet_001.png"),
-    ]).then(([atlas, animationSheets, cityImage]) => {
+      Promise.all(Object.entries(QUEST_NPCS).map(([npcId, npc]) => (
+        loadImage(npc.imageUrl)
+          .then((image) => [npcId, removeGreenScreen(image)])
+          .catch(() => [npcId, null])
+      ))),
+    ]).then(([atlas, animationSheets, cityImage, npcImageEntries]) => {
       cityAssetCache.assets = {
         atlas,
         animationSheets,
         houseSprites: buildCitySprites(cityImage),
+        npcImages: Object.fromEntries(npcImageEntries),
       };
       return cityAssetCache.assets;
     }).catch((error) => {
@@ -1016,13 +1834,14 @@ function isHouseBlockingPoint(layout, gx, gy) {
   });
 }
 
-function drawIsometricCityScene(ctx, width, height, layout, city, progress, moving) {
+function drawIsometricCityScene(ctx, width, height, layout, city, progress, quests, moving) {
   drawCityBackdrop(ctx, width, height);
   const camera = getCityCamera(width, height, city);
   const terrain = city.staticLayer ?? buildCityTerrainLayer(layout, city.atlas);
   const terrainOrigin = worldToScreen(0, 0, 0, camera);
   ctx.drawImage(terrain.canvas, terrainOrigin.x - terrain.originX, terrainOrigin.y - terrain.originY);
 
+  const activeNpcs = getActiveCityQuestNpcs(layout, quests?.active ?? [], quests?.cityFade ?? []);
   const entities = [
     ...layout.houses.map((house) => ({ type: "house", ...house, depth: house.gx + house.gy })),
     ...layout.houses.map((house) => {
@@ -1035,6 +1854,7 @@ function drawIsometricCityScene(ctx, width, height, layout, city, progress, movi
         depth: house.gx + house.gy + offset.gx + offset.gy + 0.2,
       };
     }),
+    ...activeNpcs.map((npc) => ({ type: "npc", ...npc, depth: npc.gx + npc.gy + 0.18 })),
     { type: "hero", gx: city.heroGX, gy: city.heroGY, depth: city.heroGX + city.heroGY + 0.15 },
   ].sort((a, b) => a.depth - b.depth);
 
@@ -1046,6 +1866,10 @@ function drawIsometricCityScene(ctx, width, height, layout, city, progress, movi
     }
     if (entity.type === "quest") {
       drawCityQuestMarker(ctx, entity, camera, city.walkClock);
+      continue;
+    }
+    if (entity.type === "npc") {
+      drawCityQuestNpc(ctx, entity, city.npcImages?.[entity.npcId], camera, city.walkClock);
       continue;
     }
     drawIsoHero(ctx, city, moving, camera);
@@ -1060,6 +1884,88 @@ function findTouchedCityMarker(layout, gx, gy) {
     if (Math.hypot(gx - (house.gx + offset.gx), gy - (house.gy + offset.gy)) <= 0.9) return building;
   }
   return null;
+}
+
+function findTouchedCityQuestNpc(layout, activeQuests, gx, gy) {
+  for (const npc of getActiveCityQuestNpcs(layout, activeQuests, [])) {
+    if (Math.hypot(gx - npc.gx, gy - npc.gy) <= 0.85) return npc;
+  }
+  return null;
+}
+
+function getActiveCityQuestNpcs(layout, activeQuests, cityFade = []) {
+  const byNpc = new Map();
+  for (const quest of activeQuests ?? []) {
+    if (!quest?.npcId || byNpc.has(quest.npcId)) continue;
+    byNpc.set(quest.npcId, quest);
+  }
+  for (const fade of cityFade ?? []) {
+    if (!fade?.npcId || byNpc.has(fade.npcId)) continue;
+    byNpc.set(fade.npcId, { npcId: fade.npcId, fading: true, fadeStartedAt: fade.startedAt });
+  }
+  const occupiedSpots = [];
+  return [...byNpc.values()].map((quest, index) => {
+    const npc = QUEST_NPCS[quest.npcId];
+    const preferred = cityNpcLocation(layout, npc?.cityLocation, index);
+    const base = resolveCityNpcLocation(layout, preferred, occupiedSpots);
+    occupiedSpots.push(base);
+    const fadeAge = quest.fading ? Math.max(0, Date.now() - (quest.fadeStartedAt ?? Date.now())) : 0;
+    return {
+      ...base,
+      npcId: quest.npcId,
+      quest,
+      alpha: quest.fading ? Math.max(0, 1 - fadeAge / 1200) : 1,
+    };
+  });
+}
+
+function cityNpcLocation(layout, cityLocation, index = 0) {
+  const buildingByLocation = {
+    blacksmith: 1,
+    farm: 0,
+    inn: 5,
+    mage_tower: 2,
+    library: 6,
+  };
+  const spriteIndex = buildingByLocation[cityLocation];
+  if (Number.isInteger(spriteIndex)) {
+    const house = layout.houses[spriteIndex] ?? layout.houses[0];
+    return { gx: house.gx + 1.05, gy: house.gy + 0.76 };
+  }
+  const openSpots = [
+    { gx: 9.1, gy: 10.9 },
+    { gx: 11.9, gy: 9.4 },
+    { gx: 16.2, gy: 10.9 },
+    { gx: 10.1, gy: 15.2 },
+    { gx: 4.2, gy: 10.8 },
+  ];
+  return openSpots[index % openSpots.length];
+}
+
+function resolveCityNpcLocation(layout, preferred, occupiedSpots) {
+  const candidates = [preferred, ...buildCityNpcSpotRing(preferred, 6, 0.92)];
+  for (const candidate of candidates) {
+    if (!isRoadPassable(layout, candidate.gx, candidate.gy, 0.22)) continue;
+    if (occupiedSpots.some((spot) => Math.hypot(candidate.gx - spot.gx, candidate.gy - spot.gy) < 0.75)) continue;
+    return candidate;
+  }
+  return preferred;
+}
+
+function buildCityNpcSpotRing(origin, maxRadius = 6, step = 0.92) {
+  const spots = [];
+  for (let radius = 1; radius <= maxRadius; radius += 1) {
+    for (let dx = -radius; dx <= radius; dx += 1) {
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        spots.push({
+          gx: origin.gx + dx * step,
+          gy: origin.gy + dy * step,
+        });
+      }
+    }
+  }
+  return spots;
 }
 
 function isCityBuildingOwned(progress, buildingId) {
@@ -1197,6 +2103,49 @@ function drawCityQuestMarker(ctx, marker, camera, time) {
   ctx.restore();
 }
 
+function drawCityQuestNpc(ctx, npc, image, camera, time) {
+  const screen = worldToScreen(npc.gx, npc.gy, 0, camera);
+  const bob = Math.sin(time * 3.2 + npc.gx + npc.gy) * 2;
+  const alpha = npc.alpha ?? 1;
+  drawShadow(ctx, screen.x, screen.y + 12, 18, 6, 0.22 * alpha);
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  if (image) {
+    const height = 74;
+    const width = height * (image.width / image.height);
+    ctx.drawImage(image, screen.x - width * 0.5, screen.y - height + 15 + bob, width, height);
+  } else {
+    ctx.fillStyle = "#d6c18a";
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y - 30 + bob, 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  if (!npc.quest?.fading) {
+    drawCityQuestStatusMarker(ctx, { gx: npc.gx, gy: npc.gy, phase: 0.2, complete: npc.quest?.complete }, camera, time);
+  }
+  ctx.restore();
+}
+
+function drawCityQuestStatusMarker(ctx, marker, camera, time) {
+  const screen = worldToScreen(marker.gx, marker.gy, 0, camera);
+  const bob = Math.sin(time * 4.5 + marker.phase) * 4;
+  const x = screen.x;
+  const y = screen.y - 64 + bob;
+  const complete = Boolean(marker.complete);
+  ctx.save();
+  ctx.font = "900 30px Inter, sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.shadowColor = complete ? "#ffcf32" : "#ff4d3f";
+  ctx.shadowBlur = 12;
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = "#361b08";
+  ctx.fillStyle = complete ? "#ffd94a" : "#ff4d3f";
+  ctx.strokeText(complete ? "?" : "!", x, y);
+  ctx.fillText(complete ? "?" : "!", x, y);
+  ctx.restore();
+}
+
 function drawIsoHero(ctx, city, moving, camera) {
   const screen = worldToScreen(city.heroGX, city.heroGY, 0, camera);
   if (!city.animationSheets?.hero) {
@@ -1220,6 +2169,52 @@ function drawIsoHero(ctx, city, moving, camera) {
     weaponMode: "melee",
     weaponColor: "#d9d3ca",
   }, null, city.animationSheets);
+}
+
+function CityQuestPopup({ npcId, engineRef, quests, onClose, onQuestCompleted }) {
+  const npc = QUEST_NPCS[npcId];
+  const npcQuests = quests.filter((quest) => quest.npcId === npcId).slice(0, 1);
+  if (!npc || !npcQuests.length) return null;
+
+  const turnIn = (quest) => {
+    const result = engineRef.current?.completeQuest?.(quest.id);
+    if (result?.ok) {
+      onQuestCompleted?.(result);
+      onClose();
+    }
+  };
+
+  return (
+    <div className="city-popup-backdrop">
+      <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name}>
+        <header className="city-popup-header">
+          <div>
+            <h3>{npc.name}</h3>
+            <span>{npc.title}</span>
+          </div>
+          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+        </header>
+        <div className="quest-npc-summary">
+          <img src={npc.imageUrl} alt="" />
+          <p>{npc.cityHint}</p>
+        </div>
+        <main className="quest-list">
+          {npcQuests.map((quest) => (
+            <article className={`quest-card ${quest.complete ? "complete" : ""}`} key={quest.id}>
+              <header>
+                <b>{quest.title}</b>
+                <span>{quest.progressText}</span>
+              </header>
+              <p>{quest.complete ? quest.turnInText : quest.story}</p>
+              <button type="button" disabled={!quest.complete} onClick={() => turnIn(quest)}>
+                Indlever quest
+              </button>
+            </article>
+          ))}
+        </main>
+      </section>
+    </div>
+  );
 }
 
 function CityBuildingPopup({ buildingId, engineRef, snapshot, progress, houseSprites, onChangeProgress, onClose }) {
@@ -1405,13 +2400,17 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, progress, houseSpr
 }
 
 function CityCostIcon({ resourceId }) {
-  if (resourceId === "gold") return <i className="city-cost-gold-icon" aria-hidden="true" />;
+  if (resourceId === "gold") {
+    return <InventoryIcon iconSheet="items" iconUrl={ITEM_GOLD_ICON_URL} />;
+  }
   const def = RESOURCE_DEFS[resourceId];
   if (!def) return <i className="city-cost-missing-icon" aria-hidden="true" />;
+  const iconUrl = iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }));
   return (
     <InventoryIcon
       iconIndex={def.iconIndex}
       iconSheet={def.sheet ?? "resources"}
+      iconUrl={def.iconUrl ?? iconUrl}
     />
   );
 }
@@ -1563,7 +2562,8 @@ function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
 
   useEffect(() => {
     let cancelled = false;
-    const source = iconUrl || (
+    const itemFallbackSource = ITEM_STANDARD_ICON_URL;
+    const fallbackSource = (
       iconSheet === "armor"
         ? "/assets/generated/armor001_sheet.png"
         : iconSheet === "resources"
@@ -1572,12 +2572,24 @@ function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
             ? "/assets/generated/res_sheet_002.png"
           : "/assets/generated/items001_sheet.png"
     );
+    const iconFallbackSource = itemFallbackSource;
+
+    const source = iconUrl || fallbackSource;
     if (!iconSheetPromises.has(source)) {
       iconSheetPromises.set(source, new Promise((resolve, reject) => {
         const image = new Image();
         image.onload = () => resolve(image);
         image.onerror = reject;
         image.src = source;
+      }));
+    }
+
+    if (!iconSheetPromises.has(iconFallbackSource)) {
+      iconSheetPromises.set(iconFallbackSource, new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = iconFallbackSource;
       }));
     }
 
@@ -1588,7 +2600,12 @@ function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
       } else {
         drawInventoryIcon(canvasRef.current, image, iconIndex, iconSheet);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      iconSheetPromises.get(iconFallbackSource)?.then((image) => {
+        if (cancelled || !canvasRef.current) return;
+        drawCustomInventoryIcon(canvasRef.current, image);
+      }).catch(() => {});
+    });
 
     return () => {
       cancelled = true;
@@ -1596,6 +2613,79 @@ function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
   }, [iconIndex, iconSheet, iconUrl]);
 
   return <canvas ref={canvasRef} className="inventory-icon" width="52" height="52" aria-hidden="true" />;
+}
+
+function ImageIcon({ src }) {
+  return <img className="hud-image-icon" src={src} alt="" />;
+}
+
+function AtlasIcon({ frameName }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled || !canvasRef.current) return;
+      const frame = ATLAS_FRAMES[frameName];
+      if (!frame) return;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const temp = document.createElement("canvas");
+      temp.width = frame.w;
+      temp.height = frame.h;
+      const tctx = temp.getContext("2d", { willReadFrequently: true });
+      tctx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
+      const imageData = tctx.getImageData(0, 0, temp.width, temp.height);
+      const { data } = imageData;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        if (g > 135 && g > r * 1.45 && g > b * 1.35) data[i + 3] = 0;
+      }
+      tctx.putImageData(imageData, 0, 0);
+      const bounds = expandBounds(alphaBoundsFromCanvas(temp), temp.width, temp.height, frameName === "orb" ? 18 : 3);
+      const scale = Math.min((canvas.width - 6) / bounds.w, (canvas.height - 6) / bounds.h, frameName === "orb" ? 0.34 : Infinity);
+      const width = bounds.w * scale;
+      const height = bounds.h * scale;
+      ctx.drawImage(temp, bounds.x, bounds.y, bounds.w, bounds.h, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    };
+    image.src = "/assets/generated/runebound-atlas-source.png";
+    return () => {
+      cancelled = true;
+    };
+  }, [frameName]);
+  return <canvas ref={canvasRef} className="inventory-icon" width="52" height="52" aria-hidden="true" />;
+}
+
+function alphaBoundsFromCanvas(canvas) {
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const { data } = imageData;
+  let minX = canvas.width;
+  let minY = canvas.height;
+  let maxX = 0;
+  let maxY = 0;
+  for (let y = 0; y < canvas.height; y += 1) {
+    for (let x = 0; x < canvas.width; x += 1) {
+      if (data[(y * canvas.width + x) * 4 + 3] <= 20) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+  }
+  if (maxX <= minX || maxY <= minY) return { x: 0, y: 0, w: canvas.width, h: canvas.height };
+  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+}
+
+function expandBounds(bounds, maxW, maxH, pad) {
+  const x = Math.max(0, bounds.x - pad);
+  const y = Math.max(0, bounds.y - pad);
+  const right = Math.min(maxW, bounds.x + bounds.w + pad);
+  const bottom = Math.min(maxH, bounds.y + bounds.h + pad);
+  return { x, y, w: right - x, h: bottom - y };
 }
 
 function drawCustomInventoryIcon(canvas, image) {

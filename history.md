@@ -1,5 +1,29 @@
 History over changes
 
+* V. 1.40
+- removed hero movement fra city mode - using mouse clikc instead
+- change a lot behind the scenes (rearranged files)
+- added boss system, socket system and many function to houses
+
+* V. 1.31
+- changed quest system (added quest demands)
+- NPC are now permanent placed in city
+- NPC can give more quest at a time
+- NPC data is moved to seperate NPC config file
+- added Readable items to game (spellbook, skillbook, notes and fragment for all - is all really one system)
+- removed most of old biodome and object system
+- changed label color on open region on map
+- added visualization to quests
+
+
+* V. 1.30
+- change a bit in map layout
+- locked all regions off and make my way by making quest as I'm unlocking it
+- introduced new foilage, object, decay, tileset, mapSize options on region setting (old one is still in effect but are legazy forward on)
+- introduced more options to antiDrop in region settings
+- added more new graphic (foilage, tileset, decay, object)
+- added more mobs based on spider mob (MiniSpider, MediumSpider and LargeSpider)
+
 * V. 1.20
 - added NPC and quest
 - added new icon in bottom menu
@@ -26,3 +50,8 @@ History over changes
 
 * V. 1.00
 - first working edition
+
+
+Min GameEngine.js er gigantisk (4000+ linjer) og det er alt alt for meget - jeg vil gerne have den delt op i mindre bider - jeg tænker funktions bestemt (alle funktioner der handler om quest i en fil, alle city funktioner i en anden fil osv). Måske få alle de her mindre filer ind i en GameEngine under bibliotek.
+
+Jeg vil også gerne have alle hardcodet generelle indstillinger fra gameengine over i config filer istedet. Medmindre nogle indstillinger passer ind i eksisterende config filer, så tænekr jeg det er okay at samle disse indstillinger i en config fil, hvor det bare bliver inddelt i kategorier istedet.

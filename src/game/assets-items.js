@@ -1,6 +1,8 @@
 import { drawAtlasFrame, drawShadow } from "./assets-ground.js";
 
 const customItemImageCache = new Map();
+const GOLD_ICON_URL = "/assets/generated/item/item_gold.png";
+const ITEM_STANDARD_ICON_URL = "/assets/generated/item/item_standard.png";
 
 const ITEM_FRAME_BY_BASE = {
   Sword: 0,
@@ -38,9 +40,7 @@ const ARMOR_FRAME_BY_BASE = {
 
 export function drawLoot(ctx, screen, loot, atlas) {
   if (loot.type === "gold") {
-    drawAtlasFrame(ctx, atlas, "gold", screen.x, screen.y + Math.sin(loot.bob) * 4 + 4, {
-      scale: 0.28,
-    });
+    drawGoldLoot(ctx, screen, loot);
     return;
   }
 
@@ -50,19 +50,51 @@ export function drawLoot(ctx, screen, loot, atlas) {
   });
 }
 
+function drawGoldLoot(ctx, screen, loot) {
+  const customImage = getCustomItemImage(GOLD_ICON_URL);
+  const bob = Math.sin(loot.bob) * 3;
+  const x = screen.x;
+  const y = screen.y + bob + 8;
+  drawShadow(ctx, x, screen.y + 16, 17, 6, 0.24);
+
+  if (customImage) {
+    const scale = 0.18;
+    const width = customImage.width * scale;
+    const height = customImage.height * scale;
+    ctx.save();
+    ctx.drawImage(customImage, x - width * 0.5, y - height * 0.72, width, height);
+    ctx.restore();
+    return;
+  }
+
+  // Gold should not rely on sheets. Use a simple coin as temporary fallback.
+  ctx.save();
+  ctx.fillStyle = "#f1c657";
+  ctx.beginPath();
+  ctx.ellipse(x, y - 6, 7, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#7a5c1d";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawItemLoot(ctx, screen, loot, atlas) {
+  if (!loot.item) return false;
   const customImage = getCustomItemImage(loot.item?.iconUrl);
+  const fallbackImage = getCustomItemImage(ITEM_STANDARD_ICON_URL);
   const useArmorSheet = Object.hasOwn(ARMOR_FRAME_BY_BASE, loot.item?.baseName);
   const useResourceSheet = loot.item?.mode === "resource";
   const cells = (useResourceSheet ? atlas?.resourceSheet?.[loot.item?.iconSheet ?? "resources"] : useArmorSheet ? atlas?.armorSheet : atlas?.itemSheet)?.cells;
-  if (!customImage && (!cells?.length || !loot.item)) return false;
+  const hasSheetCells = Boolean(cells?.length);
+  if (!customImage && !fallbackImage && !hasSheetCells) return false;
   const index = useArmorSheet
     ? ARMOR_FRAME_BY_BASE[loot.item.baseName]
     : useResourceSheet
       ? loot.item.iconIndex ?? 0
     : ITEM_FRAME_BY_BASE[loot.item.baseName] ?? (loot.item.slot === "ring" ? 6 : loot.item.slot === "weapon" ? 0 : 11);
-  const cell = cells[Math.abs(index) % cells.length];
-  const sprite = customImage ?? cell?.sprite;
+  const cell = hasSheetCells ? cells[Math.abs(index) % cells.length] : null;
+  const sprite = customImage ?? fallbackImage ?? cell?.sprite;
   if (!sprite) return false;
 
   const bob = Math.sin(loot.bob) * 3;
@@ -103,6 +135,7 @@ function getCustomItemImage(iconUrl) {
   if (!iconUrl) return null;
   const cached = customItemImageCache.get(iconUrl);
   if (cached?.loaded) return cached.image;
+  if (cached?.failed) return null;
   if (cached) return null;
 
   const image = new Image();
@@ -111,10 +144,10 @@ function getCustomItemImage(iconUrl) {
     if (entry) entry.loaded = true;
   };
   image.onerror = () => {
-    customItemImageCache.delete(iconUrl);
+    customItemImageCache.set(iconUrl, { image: null, loaded: false, failed: true });
   };
   image.src = iconUrl;
-  customItemImageCache.set(iconUrl, { image, loaded: false });
+  customItemImageCache.set(iconUrl, { image, loaded: false, failed: false });
   return null;
 }
 

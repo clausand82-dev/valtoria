@@ -3,14 +3,17 @@ import {
   CHUNK_SIZE,
   EQUIPMENT_SLOTS,
   MAX_INVENTORY,
+  NAMED_ITEM_TEMPLATES,
   PREFIXES,
   RARITIES,
   TILE_H,
   TILE_W,
+  UNIQUE_ITEMS,
   WORLD_SEED,
 } from "./data.js";
 import {
   drawGroundTile,
+  drawShadow,
   loadGeneratedAtlas,
 } from "./assets-ground.js";
 import { drawHero } from "./assets-hero.js";
@@ -48,12 +51,25 @@ import {
 import {
   DESTRUCTIBLE_OBJECTS,
   DESTROYED_ITEM_RESOURCE_DROPS,
-  MONSTER_RESOURCE_DROPS,
   RESOURCE_DEFS,
   RESOURCE_MERGE_RECIPES,
   RESOURCE_RARITY_COLOR,
 } from "./config/resource-config.js";
 import { POPULARITY_CONFIG } from "./config/popularity-config.js";
+import { ELITE_VARIANTS, ELITE_NO_VARIANT_WEIGHT } from "./config/elite-config.js";
+import { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_NPCS } from "./config/quest-config.js";
+import { UNIQUE_DROP_CHANCES, RESTRICTED_DROPS } from "./config/loot-config.js";
+import { monsterLootProfile, monsterResourceDrops, rollLootCategory } from "./loot.js";
+import {
+  deriveIconKey,
+  iconUrlFromKey,
+  canMergeItem,
+  isPotionItem,
+  isQuestItem,
+  isResourceItem,
+  withItemFlags,
+  withItemIcon,
+} from "./item-system.js";
 
 const TERRAIN_LAYER_PAD_TOP = 56;
 const TERRAIN_LAYER_PAD_BOTTOM = 88;
@@ -62,6 +78,9 @@ const SAVE_STORAGE_KEY = `runebound-depths-save-v${SAVE_VERSION}`;
 const AUTOSAVE_INTERVAL_SECONDS = 1.5;
 const MAX_POTION_STACK = 10;
 const MAX_ELITE_MONSTERS_PER_REGION = 6;
+const QUEST_INTERACT_RADIUS = 0.92;
+const DESTRUCTIBLE_OBJECT_ATTACK_RANGE = 1.15;
+const GROUND_LOOT_DESPAWN_SECONDS = 300;
 
 export class GameEngine {
   constructor(canvas, onSnapshot) {
@@ -86,17 +105,29 @@ export class GameEngine {
     this.potionCooldown = 0;
     this.regionIndex = 1;
     this.region = createRegion(this.regionIndex);
+    this.activeMapRegion = null;
+    this.mapReturn = null;
+    this.mapReturnSerial = 0;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.camera = { offsetX: 0, offsetY: 0, targetOffsetX: 0, targetOffsetY: 0, shake: 0 };
     this.pointer = { x: 0, y: 0, worldX: this.region.start.x, worldY: this.region.start.y, down: false };
     this.hoverMonsterId = null;
+    this.nearbyQuestgiver = null;
+    this.nearbyQuestgiver = null;
     this.inputLocked = false;
     this.paused = false;
     this.player = this.createPlayer();
     this.regionStartPlayerLevel = this.player.level;
     this.eliteMonsterCount = 0;
+    this.questState = {
+      active: [],
+      completed: [],
+      wildernessNpc: null,
+      cityFade: [],
+    };
     this.loadProgress();
+    this.prepareRegionQuestgiver();
     this.regionStartPlayerLevel = this.player.level;
     if (!isRegionPointPlayable(this.region, this.player.x, this.player.y, this.player.radius)) {
       this.placePlayerAtRegionStart();
@@ -137,6 +168,7 @@ export class GameEngine {
       hp: 120,
       mana: 64,
       potions: { health: 0, mana: 0 },
+      stats: createHeroStats(),
       attackCooldown: 0,
       spellCooldown: 0,
       hurtCooldown: 0,
@@ -238,6 +270,7 @@ export class GameEngine {
       this.updateDeath(dt, stats);
     } else {
       this.updatePlayer(dt, stats);
+      this.updateQuestgiver(dt);
       this.updateChests(dt);
       this.updateMonsters(dt, stats);
       this.updateProjectiles(dt);
@@ -330,14 +363,25 @@ export class GameEngine {
       this.player.attackObjectId = null;
     } else if (!this.player.attackTargetId) {
       const d = distance(this.player, attackObject);
-      if (d > stats.range * 0.78) {
+      if (d > DESTRUCTIBLE_OBJECT_ATTACK_RANGE * 0.78) {
         this.player.target = { x: attackObject.x, y: attackObject.y };
       }
-      if (d <= stats.range + attackObject.radius && this.player.attackCooldown <= 0) {
+      if (d <= DESTRUCTIBLE_OBJECT_ATTACK_RANGE + attackObject.radius && this.player.attackCooldown <= 0) {
         this.primaryAttack(attackObject);
       }
     }
 
+  }
+
+  updateQuestgiver() {
+    const questgiver = this.questState.wildernessNpc;
+    const nearby = questgiver && distance(this.player, questgiver) <= QUEST_INTERACT_RADIUS
+      ? questgiver
+      : null;
+    if ((nearby?.id ?? null) !== (this.nearbyQuestgiver?.id ?? null)) {
+      this.nearbyQuestgiver = nearby;
+      this.publishSnapshot();
+    }
   }
 
   readMovementInput() {
@@ -438,19 +482,30 @@ export class GameEngine {
     for (let i = this.loots.length - 1; i >= 0; i -= 1) {
       const loot = this.loots[i];
       loot.bob += dt * 4.5;
-      loot.pickupDelay = Math.max(0, (loot.pickupDelay ?? 0) - dt);
+      if (Number.isFinite(Number(loot.despawn))) {
+        loot.despawn -= dt;
+        if (loot.despawn <= 0) {
+          this.handleLootDespawn(loot);
+          this.loots.splice(i, 1);
+          continue;
+        }
+      }
+      loot.pickupDelay = Math.max(0, (loot.pickupDelay || 0) - dt);
       if (loot.pickupDelay > 0) continue;
       if (distance(this.player, loot) < 0.62) {
         if (loot.type === "gold") {
           this.player.gold += loot.amount;
+          this.player.stats.goldLooted += loot.amount;
+          this.player.stats.goldEarned += loot.amount;
           this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
           this.addToast(`+${loot.amount} guld`);
           this.loots.splice(i, 1);
-        } else if (loot.item?.mode === "potion") {
+        } else if (isPotionItem(loot.item)) {
           const before = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
           if (this.addPotionLoot(loot.item)) {
             const after = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
             const picked = Math.max(1, after - before);
+            this.trackItemPicked(loot.item);
             this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
             this.addToast(pickupStatusText(loot.item, picked));
             this.loots.splice(i, 1);
@@ -459,16 +514,38 @@ export class GameEngine {
             loot.warned = true;
             this.addToast("Potion stack er fuld");
           }
-        } else if (loot.item?.mode !== "potion" && this.addInventoryItem(loot.item)) {
-          const picked = loot.item.mode === "resource" ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
+        } else if (isQuestItem(loot.item) && this.addInventoryItem(loot.item)) {
+          this.player.stats.itemsPicked += 1;
+          this.trackItemPicked(loot.item);
+          this.applyQuestItemPickup(loot.item);
+          this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
+          this.addToast(pickupStatusText(loot.item, 1));
+          this.loots.splice(i, 1);
+          this.publishSnapshot();
+        } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item)) {
+          const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
+          if (isResourceItem(loot.item)) this.player.stats.resourcesPicked += picked;
+          else {
+            this.player.stats.itemsPicked += 1;
+            this.trackItemPicked(loot.item);
+          }
           this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
           this.addToast(pickupStatusText(loot.item, picked));
           this.loots.splice(i, 1);
           this.publishSnapshot();
         } else if (!loot.warned) {
           loot.warned = true;
-          this.addToast(loot.item?.mode === "potion" ? "Potion stack er fuld" : "Rygsaekken er fuld");
+          this.addToast(isPotionItem(loot.item) ? "Potion stack er fuld" : "Rygsaekken er fuld");
         }
+      }
+    }
+  }
+
+  handleLootDespawn(loot) {
+    if (isQuestItem(loot.item) && this.questState.active) {
+      const quest = this.questState.active.find((entry) => entry.id === loot.item.questInstanceId);
+      if (quest?.type === "collect_quest_item") {
+        quest.progress = { ...(quest.progress ?? {}), droppedItems: Math.max(0, Math.floor(Number(quest.progress?.droppedItems) || 0) - 1) };
       }
     }
   }
@@ -504,7 +581,7 @@ export class GameEngine {
     let item = rollUniqueItem(Math.max(1, this.player.level), {
       source: "chest",
       biomeId: this.region.biomeId,
-      chance: 0.08,
+      chance: UNIQUE_DROP_CHANCES.chest,
     }) ?? rollNamedItem(Math.max(1, this.player.level), {
       source: "chest",
       biomeId: this.region.biomeId,
@@ -532,6 +609,8 @@ export class GameEngine {
       item.value = itemValue(item);
     }
 
+    if (!item || this.isDropBlocked(item)) return;
+
     this.loots.push({
       id: createId(),
       type: "item",
@@ -540,7 +619,9 @@ export class GameEngine {
       y: chest.y - 0.16,
       bob: Math.random() * Math.PI * 2,
       pickupDelay: 0.35,
+      despawn: GROUND_LOOT_DESPAWN_SECONDS,
     });
+    this.trackItemDropped(item);
     this.addParticles(chest.x, chest.y, "#ffd85d", 18, 0.12);
     this.addFloater(chest.x, chest.y, item.name, item.rarityColor, 1.05);
   }
@@ -641,23 +722,101 @@ export class GameEngine {
   }
 
   travelToNextRegion() {
+    if (this.activeMapRegion) {
+      this.returnToAreaMap();
+      return;
+    }
     this.regionIndex += 1;
     this.region = createRegion(this.regionIndex);
+    this.resetRegionRuntime();
+    this.placePlayerAtRegionStart();
+    this.ensureWorldAroundPlayer();
+    this.prepareRegionQuestgiver();
+    this.addToast(`Rejst til ${this.region.biome.name}`);
+    this.publishSnapshot();
+  }
+
+  startMapRegion(areaMapId, regionConfig) {
+    if (!areaMapId || !regionConfig?.id) return false;
+    this.regionIndex += 1;
+    const seed = Math.floor(Math.random() * 1000000000);
+    this.activeMapRegion = {
+      areaMapId,
+      regionId: regionConfig.id,
+      label: regionConfig.label ?? regionConfig.id,
+    };
+    this.mapReturn = null;
+    this.region = createRegion(this.regionIndex, seed, regionConfig.biodome, {
+      ...regionConfig,
+      areaMapId,
+    });
+    this.resetRegionRuntime();
+    this.placePlayerAtRegionStart();
+    this.ensureFullRegionGenerated();
+    this.ensureWorldAroundPlayer();
+    this.prepareRegionQuestgiver();
+    // Set total spawned count for active clear_map quests targeting this region
+    for (const quest of this.questState.active) {
+      if (quest.type !== "clear_map") continue;
+      if (quest.target?.regionId !== regionConfig.id) continue;
+      const validTypes = quest.target?.monsters ?? [];
+      const total = [...this.monsters.values()].filter((m) => validTypes.includes(m.typeName)).length;
+      quest.progress = { ...(quest.progress ?? {}), total, kills: 0, cleared: false };
+    }
+    this.addToast(`${this.activeMapRegion.label} startet. Find den gyldne exit mod nordoest.`);
+    this.publishSnapshot();
+    return true;
+  }
+
+  returnToAreaMap() {
+    const active = this.activeMapRegion;
+    const cleared = this.allRegionMonstersCleared();
+    // Mark any active clear_map quest for this region as cleared if all monsters are dead
+    if (cleared) {
+      for (const quest of this.questState.active) {
+        if (quest.type !== "clear_map") continue;
+        if (quest.target?.regionId !== active.regionId) continue;
+        if (!quest.progress?.cleared) {
+          quest.progress = { ...(quest.progress ?? {}), cleared: true };
+          this.addToast(`${quest.title} klar til indlevering`);
+        }
+      }
+    }
+    this.mapReturn = {
+      id: ++this.mapReturnSerial,
+      areaMapId: active.areaMapId,
+      regionId: active.regionId,
+      label: active.label,
+      cleared,
+    };
+    this.activeMapRegion = null;
+    this.exitPromptOpen = false;
+    this.exitPromptCooldown = 0;
+    this.player.target = null;
+    this.player.attackTargetId = null;
+    this.player.attackObjectId = null;
+    this.addToast(cleared ? `${active.label} befriet` : `${active.label} er stadig corrupted`);
+    this.publishSnapshot();
+  }
+
+  resetRegionRuntime() {
     this.chunks.clear();
     this.monsters.clear();
+    // Before clearing loots, run despawn handling so quest drop counts are adjusted
+    for (const loot of this.loots) {
+      try { this.handleLootDespawn(loot); } catch (e) { /* best-effort */ }
+    }
     this.loots = [];
     this.projectiles = [];
     this.particles = [];
     this.floaters = [];
     this.hoverMonsterId = null;
+    this.nearbyQuestgiver = null;
     this.regionStartPlayerLevel = this.player.level;
     this.eliteMonsterCount = 0;
+    this.questState.wildernessNpc = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
-    this.placePlayerAtRegionStart();
-    this.ensureWorldAroundPlayer();
-    this.addToast(`Rejst til ${this.region.biome.name}`);
-    this.publishSnapshot();
   }
 
   placePlayerAtRegionStart() {
@@ -670,26 +829,54 @@ export class GameEngine {
     this.updateCamera(1);
   }
 
+  ensureFullRegionGenerated() {
+    if (!this.region) return;
+    const min = chunkCoords(0, 0);
+    const max = chunkCoords(this.region.width - 0.001, this.region.height - 0.001);
+    for (let cy = min.cy; cy <= max.cy; cy += 1) {
+      for (let cx = min.cx; cx <= max.cx; cx += 1) {
+        this.getChunk(cx, cy);
+      }
+    }
+  }
+
+  allRegionMonstersCleared() {
+    this.ensureFullRegionGenerated();
+    for (const monster of this.monsters.values()) {
+      if (!monster.dead) return false;
+    }
+    return true;
+  }
+
   primaryAttack(target = null) {
     const stats = this.calcStats();
-    target = target || this.nearestMonster(stats.range + 0.5) || this.nearestDestructibleObject(stats.range + 0.5);
+    target = target || this.nearestMonster(stats.range + 0.5) || this.nearestDestructibleObject(DESTRUCTIBLE_OBJECT_ATTACK_RANGE + 0.5);
     if (!target || target.dead) return;
+    const targetIsObject = isDestructibleObject(target);
+    const attackRange = targetIsObject ? DESTRUCTIBLE_OBJECT_ATTACK_RANGE : stats.range;
     const d = distance(this.player, target);
-    if (d > stats.range + target.radius) return;
+    if (d > attackRange + target.radius) return;
 
     const n = normalize(target.x - this.player.x, target.y - this.player.y);
     this.setFacing(n.x, n.y);
     this.player.attackCooldown = stats.cooldown;
     this.player.attackAnim = 0.24;
 
-    if (stats.mode === "melee") {
+    if (targetIsObject) {
+      this.player.stats.meleeAttacks += 1;
       const damage = this.rollDamage(stats.damageMin, stats.damageMax);
-      if (isDestructibleObject(target)) {
-        this.damageObject(target, damage);
-      } else {
-        this.damageMonster(target, damage, "melee");
-        this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
-      }
+      this.damageObject(target, damage);
+      this.camera.shake = Math.max(this.camera.shake, 3);
+      this.player.attackTargetId = null;
+      this.player.attackObjectId = null;
+      return;
+    }
+
+    if (stats.mode === "melee") {
+      this.player.stats.meleeAttacks += 1;
+      const damage = this.rollDamage(stats.damageMin, stats.damageMax);
+      this.damageMonster(target, damage, "melee");
+      this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
       this.camera.shake = Math.max(this.camera.shake, 3);
       this.player.attackTargetId = null;
       this.player.attackObjectId = null;
@@ -697,6 +884,8 @@ export class GameEngine {
     }
 
     const speed = stats.mode === "magic" ? 9.6 : 11.8;
+    if (stats.mode === "magic") this.player.stats.spellProjectiles += 1;
+    if (stats.mode === "ranged") this.player.stats.rangedAttacks += 1;
     const color = stats.mode === "magic" ? "#8bdfff" : "#e4c27a";
     this.projectiles.push({
       id: createId(),
@@ -718,6 +907,7 @@ export class GameEngine {
     const n = normalize(x - this.player.x, y - this.player.y);
     if (!n.x && !n.y) return;
     this.player.mana -= 18;
+    this.player.stats.spellsCast += 1;
     this.player.spellCooldown = 1.05;
     this.player.castAnim = 0.38;
     this.setFacing(n.x, n.y);
@@ -741,25 +931,29 @@ export class GameEngine {
     const stats = this.calcStats();
     const mitigated = Math.max(1, Math.floor(amount * (100 / (100 + stats.armor * 7))));
     this.player.hp = Math.max(0, this.player.hp - mitigated);
+    this.player.stats.damageTaken += mitigated;
     this.player.hurtCooldown = 0.2;
     this.camera.shake = Math.max(this.camera.shake, 4);
     this.addFloater(this.player.x, this.player.y, `-${mitigated}`, "#ff7272");
     this.addParticles(this.player.x, this.player.y, "#cc3c3c", 9, 0.1);
     if (this.player.hp <= 0) {
+      this.player.stats.deaths += 1;
       this.addToast(`Faldt mod ${source.typeName}`);
     }
   }
 
   damageMonster(monster, amount, sourceType) {
     const damage = Math.max(1, Math.floor(amount));
+    const beforeHp = Math.max(0, Math.floor(Number(monster.hp) || 0));
     monster.hp = Math.max(0, monster.hp - damage);
+    this.player.stats.damageDealt += Math.min(beforeHp, damage);
     monster.hurt = 0.18;
     this.addFloater(monster.x, monster.y, `-${damage}`, sourceType === "magic" ? "#9de9ff" : "#f1d08d");
     if (monster.hp <= 0) this.killMonster(monster);
   }
 
   damageObject(object, amount) {
-    const def = DESTRUCTIBLE_OBJECTS[object?.type];
+    const def = getDestructibleDef(object);
     if (!def) return;
     if (!Number.isFinite(Number(object.maxHp))) {
       object.maxHp = def.hp;
@@ -781,10 +975,13 @@ export class GameEngine {
     const index = chunk.objects.findIndex((entry) => entry.id === object.id);
     if (index < 0) return;
     chunk.objects.splice(index, 1);
+    this.player.stats.objectsDestroyed += 1;
+    incrementStatMap(this.player.stats.objectsDestroyedByType, object.type);
     this.player.attackObjectId = null;
     this.player.target = null;
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
+    this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
     if (object.type === "building") {
       this.changePopularity(housePopularityDelta(this.region.index), object.x, object.y);
     }
@@ -793,12 +990,27 @@ export class GameEngine {
   killMonster(monster) {
     if (monster.dead) return;
     monster.dead = true;
+    this.recordMonsterKill(monster);
+    if (monster.elite) {
+      // Elite killed — game UI already shows effects, no debug toast needed
+    }
     this.player.xp += monster.xp;
+    this.applyQuestKill(monster);
     this.addFloater(monster.x, monster.y, `+${monster.xp} xp`, "#e0aa3f", 0.95);
     this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
     this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
     this.dropLoot(monster);
     this.levelUpIfNeeded();
+  }
+
+  recordMonsterKill(monster) {
+    const typeName = monster?.typeName ?? "Unknown";
+    const bucket = monster?.elite ? "elite" : "normal";
+    this.player.stats.killsTotal += 1;
+    this.player.stats.killsByMonster[typeName] = {
+      normal: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.normal) || 0)) + (bucket === "normal" ? 1 : 0),
+      elite: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.elite) || 0)) + (bucket === "elite" ? 1 : 0),
+    };
   }
 
   changePopularity(amount, x = this.player.x, y = this.player.y) {
@@ -818,6 +1030,7 @@ export class GameEngine {
     const profile = monsterLootProfile(monster.typeName);
     const lootLevel = monster.lootLevel ?? monster.level;
     this.dropResourceLoot(monster.x, monster.y, monsterResourceDrops(monster));
+    this.dropQuestLoot(monster);
     if (Math.random() < profile.goldChance) {
       const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult);
       this.loots.push({
@@ -827,15 +1040,16 @@ export class GameEngine {
         x: monster.x + (Math.random() - 0.5) * 0.5,
         y: monster.y + (Math.random() - 0.5) * 0.5,
         bob: Math.random() * Math.PI * 2,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
     }
 
     const unique = rollUniqueItem(lootLevel, {
       source: "monster",
       biomeId: this.region.biomeId,
-      chance: 0.0015,
+      chance: UNIQUE_DROP_CHANCES.monster,
     });
-    if (unique) {
+    if (unique && !this.isDropBlocked(unique)) {
       this.loots.push({
         id: createId(),
         type: "item",
@@ -843,7 +1057,9 @@ export class GameEngine {
         x: monster.x + (Math.random() - 0.5) * 0.7,
         y: monster.y + (Math.random() - 0.5) * 0.7,
         bob: Math.random() * Math.PI * 2,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
+      this.trackItemDropped(unique);
     }
 
     const named = rollNamedItem(lootLevel, {
@@ -851,7 +1067,7 @@ export class GameEngine {
       biomeId: this.region.biomeId,
       chanceMult: namedItemChanceMultiplier(monster),
     });
-    if (named) {
+    if (named && !this.isDropBlocked(named)) {
       this.loots.push({
         id: createId(),
         type: "item",
@@ -859,15 +1075,19 @@ export class GameEngine {
         x: monster.x + (Math.random() - 0.5) * 0.7,
         y: monster.y + (Math.random() - 0.5) * 0.7,
         bob: Math.random() * Math.PI * 2,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
+      this.trackItemDropped(named);
     }
 
     const category = rollLootCategory(profile.weights);
     if (!category || category === "none") return;
+    if (this.isDropCategoryBlocked(category)) return;
 
     const item = category === "health" || category === "mana"
       ? makePotion(category, lootLevel)
       : makeItem(lootLevel, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
+    if (this.isDropBlocked(item)) return;
     this.loots.push({
       id: createId(),
       type: "item",
@@ -875,10 +1095,13 @@ export class GameEngine {
       x: monster.x + (Math.random() - 0.5) * 0.7,
       y: monster.y + (Math.random() - 0.5) * 0.7,
       bob: Math.random() * Math.PI * 2,
+      despawn: GROUND_LOOT_DESPAWN_SECONDS,
     });
+    this.trackItemDropped(item);
 
     if (category === "all" && Math.random() < clamp(0.08 + monster.level * 0.01, 0.08, 0.24)) {
       const potion = makePotion(Math.random() < 0.5 ? "health" : "mana", lootLevel);
+      if (this.isDropBlocked(potion)) return;
       this.loots.push({
         id: createId(),
         type: "item",
@@ -886,7 +1109,9 @@ export class GameEngine {
         x: monster.x + (Math.random() - 0.5) * 0.85,
         y: monster.y + (Math.random() - 0.5) * 0.85,
         bob: Math.random() * Math.PI * 2,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
+      this.trackItemDropped(potion);
     }
   }
 
@@ -895,7 +1120,7 @@ export class GameEngine {
       if (!entry?.resource || Math.random() > (entry.chance ?? 1)) continue;
       const amount = randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1);
       const item = makeResourceItem(entry.resource, amount);
-      if (!item) continue;
+      if (!item || this.isDropBlocked(item)) continue;
       this.loots.push({
         id: createId(),
         type: "item",
@@ -904,6 +1129,511 @@ export class GameEngine {
         y: y + (Math.random() - 0.5) * 0.65,
         bob: Math.random() * Math.PI * 2,
         pickupDelay: 0.35,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
+      });
+      this.trackItemDropped(item);
+    }
+  }
+
+  dropObjectItemLoot(x, y, entries = []) {
+    for (const entry of entries) {
+      if (!entry || Math.random() > (entry.chance ?? 0)) continue;
+      const rarity = String(entry.rarity ?? "legendary");
+      const tries = Math.max(1, Math.floor(Number(entry.tries) || 60));
+      const levelOffset = Math.floor(Number(entry.levelOffset) || 0);
+      const level = Math.max(1, this.player.level + levelOffset);
+      const item = rollItemOfRarity(level, rarity, tries);
+      if (!item || this.isDropBlocked(item)) continue;
+      this.loots.push({
+        id: createId(),
+        type: "item",
+        item,
+        x: x + (Math.random() - 0.5) * 0.65,
+        y: y + (Math.random() - 0.5) * 0.65,
+        bob: Math.random() * Math.PI * 2,
+        pickupDelay: 0.35,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
+      });
+      this.trackItemDropped(item);
+    }
+  }
+
+  // Returns true if the drop is restricted to other regions and must NOT drop here.
+  // Allow-only has first priority over antiDrops.
+  isDropRestricted(item) {
+    if (!item || !RESTRICTED_DROPS.length) return false;
+    const areaMapId = this.region?.mapRegion?.areaMapId ?? null;
+    const regionId = this.region?.mapRegion?.id ?? null;
+
+    const itemKeys = new Set([
+      item.name,
+      item.baseName,
+      item.mode,
+      item.slot,
+    ].filter(Boolean).map(String));
+
+    for (const rule of RESTRICTED_DROPS) {
+      let matches = false;
+      if (rule.resources?.length && isResourceItem(item)) matches = rule.resources.map(String).includes(String(item.resourceId));
+      if (!matches && rule.uniques?.length && item.uniqueId) matches = rule.uniques.map(String).includes(String(item.uniqueId));
+      if (!matches && rule.named?.length && item.namedId) matches = rule.named.map(String).includes(String(item.namedId));
+      if (!matches && rule.questItems?.length && item.questItemId) matches = rule.questItems.map(String).includes(String(item.questItemId));
+      if (!matches && rule.potions?.length && isPotionItem(item) && item.potionType) matches = rule.potions.map(String).includes(String(item.potionType));
+      if (!matches && rule.rarities?.length && item.rarity) matches = rule.rarities.map(String).includes(String(item.rarity));
+      if (!matches && rule.items?.length) matches = rule.items.map(String).some((key) => itemKeys.has(key));
+
+      if (!matches) continue;
+
+      // Item is restricted — check if current region is in the allowed scopes
+      const allowedByArea = rule.areaMapIds?.length && areaMapId && rule.areaMapIds.map(String).includes(String(areaMapId));
+      const allowedByRegion = rule.regionIds?.length && regionId && rule.regionIds.map(String).includes(String(regionId));
+      if (allowedByArea || allowedByRegion) return false; // allowed here
+      return true; // restricted elsewhere
+    }
+    return false;
+  }
+
+  isDropCategoryBlocked(category) {
+    if (!category) return false;
+    // Allow-only check for categories
+    if (RESTRICTED_DROPS.some((rule) => rule.categories?.length && rule.categories.map(String).includes(String(category)))) {
+      const areaMapId = this.region?.mapRegion?.areaMapId ?? null;
+      const regionId = this.region?.mapRegion?.id ?? null;
+      for (const rule of RESTRICTED_DROPS) {
+        if (!rule.categories?.map(String).includes(String(category))) continue;
+        const allowedByArea = rule.areaMapIds?.length && areaMapId && rule.areaMapIds.map(String).includes(String(areaMapId));
+        const allowedByRegion = rule.regionIds?.length && regionId && rule.regionIds.map(String).includes(String(regionId));
+        if (allowedByArea || allowedByRegion) return false;
+        return true;
+      }
+    }
+    const antiDrops = this.region?.mapRegion?.antiDrops;
+    return Boolean(antiDrops?.categories?.includes(category));
+  }
+
+  isDropBlocked(item) {
+    if (!item) return false;
+
+    // Allow-only check: first priority, overrides antiDrops
+    if (this.isDropRestricted(item)) return true;
+
+    const antiDrops = this.region?.mapRegion?.antiDrops;
+    if (!antiDrops) return false;
+
+    // Broad type exclusions
+    if (antiDrops.allResources && isResourceItem(item)) return true;
+    if (antiDrops.allPotions && isPotionItem(item)) return true;
+    if (antiDrops.allQuestItems && isQuestItem(item)) return true;
+    if (antiDrops.allUniques && item.uniqueId) return true;
+    if (antiDrops.allNamed && item.namedId) return true;
+    if (antiDrops.allItems && item.rarity && !isResourceItem(item) && !isPotionItem(item) && !isQuestItem(item)) return true;
+
+    // Rarity exclusion: block the listed rarity and everything above it
+    if (antiDrops.rarities?.length && item.rarity) {
+      const lowestBlockedIndex = antiDrops.rarities.reduce((min, id) => {
+        const idx = RARITIES.findIndex((r) => r.id === id);
+        return idx >= 0 && idx < min ? idx : min;
+      }, Infinity);
+      const itemIndex = RARITIES.findIndex((r) => r.id === item.rarity);
+      if (itemIndex >= lowestBlockedIndex) return true;
+    }
+
+    const itemKeys = [
+      item.id,
+      item.name,
+      item.baseName,
+      item.mode,
+      item.slot,
+      item.potionType,
+      item.uniqueId,
+      item.namedId,
+      item.questItemId,
+    ].filter(Boolean).map(String);
+
+    const resources = new Set((antiDrops.resources ?? []).map(String));
+    if (isResourceItem(item) && resources.has(String(item.resourceId))) return true;
+
+    const uniques = new Set((antiDrops.uniques ?? []).map(String));
+    if (item.uniqueId && uniques.has(String(item.uniqueId))) return true;
+
+    const named = new Set((antiDrops.named ?? []).map(String));
+    if (item.namedId && named.has(String(item.namedId))) return true;
+
+    const items = new Set((antiDrops.items ?? []).map(String));
+    return itemKeys.some((key) => items.has(key));
+  }
+
+  prepareRegionQuestgiver() {
+    if (this.questState.wildernessNpc) return;
+    if (!this.hasGuaranteedRegionQuestOffer() && Math.random() > QUEST_CONFIG.wildernessNpcSpawnChance) return;
+    const quest = this.rollQuestOffer();
+    if (!quest) return;
+    const position = this.findQuestgiverPosition();
+    if (!position) return;
+    this.questState.wildernessNpc = {
+      id: createId(),
+      npcId: quest.npcId,
+      quest,
+      x: position.x,
+      y: position.y,
+      radius: 0.34,
+      bob: Math.random() * Math.PI * 2,
+    };
+  }
+
+  rollQuestOffer() {
+    const candidates = [];
+    for (const def of Object.values(QUEST_DEFS)) {
+      if (!this.questDefinitionCanSpawn(def)) continue;
+      candidates.push(def);
+    }
+    if (!candidates.length) return null;
+    const currentRegionId = this.region?.mapRegion?.id;
+    const priority = candidates.filter((def) => (
+      currentRegionId
+      && (def.regionIds ?? []).map(String).includes(String(currentRegionId))
+      && Number(def.spawnChance ?? 0) >= 1
+    ));
+    const pool = priority.length ? priority : candidates;
+
+    for (let tries = 0; tries < 8; tries += 1) {
+      const def = pool[Math.floor(Math.random() * pool.length)];
+      if (Math.random() > (def.spawnChance ?? 0.1)) continue;
+      const npcId = def.npcIds[Math.floor(Math.random() * def.npcIds.length)];
+      if (!QUEST_NPCS[npcId]) continue;
+      if (this.questState.active.some((quest) => quest.npcId === npcId)) continue;
+      if (def.id === "vengeance") {
+        const monsterTypes = (this.region.mapRegion?.mobs?.length ? this.region.mapRegion.mobs : this.region.biome.monsters ?? []).filter((type) => (
+          !this.questState.active.some((quest) => quest.questId === "vengeance" && quest.target?.monster === type)
+        ));
+        if (!monsterTypes.length) continue;
+        const monster = monsterTypes[Math.floor(Math.random() * monsterTypes.length)];
+        const count = randomInt(def.target.countMin, def.target.countMax);
+        return makeQuestInstance(def, npcId, {
+          monster,
+          count,
+          regionSeed: this.region.seed,
+          regionIndex: this.region.index,
+        });
+      }
+      return makeQuestInstance(def, npcId, {
+        regionSeed: this.region.seed,
+        regionIndex: this.region.index,
+      });
+    }
+    return null;
+  }
+
+  questDefinitionCanSpawn(def) {
+    if (!def?.repeatable && this.questState.completed.includes(def.id)) return false;
+    if (!def?.repeatable && this.questState.active.some((quest) => quest.questId === def.id)) return false;
+    if ((def.npcIds ?? []).every((npcId) => this.questState.active.some((quest) => quest.npcId === npcId))) return false;
+    if (Array.isArray(def.regionIds) && def.regionIds.length > 0) {
+      const currentRegionId = this.region?.mapRegion?.id;
+      if (!currentRegionId || !def.regionIds.map(String).includes(String(currentRegionId))) return false;
+    }
+    if (def.id === "vengeance") {
+      return (this.region.biome.monsters ?? []).some((type) => (
+        !this.questState.active.some((quest) => quest.questId === "vengeance" && quest.target?.monster === type)
+      ));
+    }
+    return true;
+  }
+
+  hasGuaranteedRegionQuestOffer() {
+    const currentRegionId = this.region?.mapRegion?.id;
+    if (!currentRegionId) return false;
+    return Object.values(QUEST_DEFS).some((def) => (
+      this.questDefinitionCanSpawn(def)
+      && (def.regionIds ?? []).map(String).includes(String(currentRegionId))
+      && Number(def.spawnChance ?? 0) >= 1
+    ));
+  }
+
+  findQuestgiverPosition() {
+    const anchors = [
+      { x: this.region.start.x + 5.2, y: this.region.start.y - 1.4 },
+      { x: this.region.start.x + 7.4, y: this.region.start.y + 1.5 },
+      { x: this.region.start.x + 10.2, y: this.region.start.y - 2.8 },
+      { x: this.region.end.x - 6.2, y: this.region.end.y + 3.2 },
+      { x: this.region.end.x - 8.5, y: this.region.end.y - 1.8 },
+    ];
+    for (const anchor of anchors) {
+      if (isRegionPointPlayable(this.region, anchor.x, anchor.y, 0.45) && !this.isBlocked(anchor.x, anchor.y, 0.4)) {
+        return anchor;
+      }
+    }
+    return null;
+  }
+
+  acceptWildernessQuest(questgiver) {
+    if (!questgiver?.quest) return;
+    if (this.questState.active.some((quest) => quest.npcId === questgiver.npcId)) {
+      this.addToast(`${QUEST_NPCS[questgiver.npcId]?.name ?? "NPC"} har allerede en aktiv quest`);
+      this.publishSnapshot();
+      return;
+    }
+    const quest = {
+      ...questgiver.quest,
+      acceptedAt: Date.now(),
+      progress: { ...(questgiver.quest.progress ?? {}) },
+    };
+    this.questState.active.push(quest);
+    this.questState.wildernessNpc = null;
+    this.nearbyQuestgiver = null;
+    this.addToast(`${QUEST_NPCS[quest.npcId]?.name ?? "NPC"}: ${quest.acceptText}`);
+    this.addToast(`${QUEST_NPCS[quest.npcId]?.name ?? "NPC"} kan findes i byen, naar questen skal indleveres`);
+    this.publishSnapshot();
+  }
+
+  declineWildernessQuest() {
+    this.addToast("Quest ikke taget");
+    this.publishSnapshot();
+  }
+
+  applyQuestKill(monster) {
+    let changed = false;
+    for (const quest of this.questState.active) {
+      if (quest.type === "clear_map") {
+        const validTypes = quest.target?.monsters ?? [];
+        if (!validTypes.includes(monster.typeName)) continue;
+        const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
+        quest.progress = { ...(quest.progress ?? {}), kills: kills + 1 };
+        changed = true;
+        continue;
+      }
+      if (quest.type !== "kill_monsters") continue;
+      if (quest.target?.monster !== monster.typeName) continue;
+      const needed = Math.max(1, Math.floor(Number(quest.target.count) || 1));
+      const current = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
+      if (current >= needed) continue;
+      quest.progress = { ...(quest.progress ?? {}), kills: Math.min(needed, current + 1) };
+      changed = true;
+      if (quest.progress.kills >= needed) this.addToast(`${quest.title} klar til indlevering`);
+    }
+    if (changed) this.publishSnapshot();
+  }
+
+  dropQuestLoot(monster) {
+    
+    for (const quest of this.questState.active) {
+      if (quest.type !== "collect_quest_item") continue;
+      const questItemTargets = questItemTargetsForQuest(quest);
+      for (const target of questItemTargets) {
+        if (!target?.questItemId) continue;
+        if (!this.questItemCanDropInCurrentRegion(target)) continue;
+        const needed = Math.max(1, Math.floor(Number(target.count) || 1));
+        const picked = questItemCount(this.player.inventory, quest.id, target.questItemId);
+        if (picked >= needed) continue;
+        const activeDropped = questItemCount(this.loots.map((loot) => loot.item), quest.id, target.questItemId);
+        if (picked + activeDropped >= needed) continue;
+        if (target.source === "elite" && !monster.elite) continue;
+        const dropChance = Number(target.dropChance ?? 0.05);
+      const roll = Math.random();
+      // Debug/logging for specific rare quest item to help troubleshooting
+      
+        if (roll > dropChance) continue;
+        const item = makeQuestItem(target.questItemId, quest.id);
+        if (!item) continue;
+        this.loots.push({
+          id: createId(),
+          type: "item",
+          item,
+          x: monster.x + (Math.random() - 0.5) * 0.7,
+          y: monster.y + (Math.random() - 0.5) * 0.7,
+          bob: Math.random() * Math.PI * 2,
+          pickupDelay: 0.25,
+          despawn: GROUND_LOOT_DESPAWN_SECONDS,
+        });
+        this.trackItemDropped(item);
+        break;
+      }
+    }
+  }
+
+  questItemCanDropInCurrentRegion(target) {
+    const allowedRegions = target?.dropRegionIds ?? [];
+    if (!allowedRegions.length) return true;
+    const currentRegionId = this.region?.mapRegion?.id;
+    return Boolean(currentRegionId && allowedRegions.map(String).includes(String(currentRegionId)));
+  }
+
+  applyQuestItemPickup(item) {
+    const quest = this.questState.active.find((entry) => entry.id === item.questInstanceId);
+    if (!quest || quest.type !== "collect_quest_item") return;
+    if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
+  }
+
+  completeQuest(instanceId) {
+    const index = this.questState.active.findIndex((quest) => quest.id === instanceId);
+    if (index < 0) return false;
+    const quest = this.questState.active[index];
+    if (!isQuestComplete(quest, this.player.inventory)) {
+      this.addToast(`${quest.title} er ikke faerdig endnu`);
+      this.publishSnapshot();
+      return false;
+    }
+    if (!this.questRewardsCanFit(quest)) {
+      this.addToast("Rygsaekken er fuld. Lav plads foer questen indleveres");
+      this.publishSnapshot();
+      return false;
+    }
+
+    const rewardSummary = this.grantQuestRewards(quest);
+    if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
+    this.questState.active.splice(index, 1);
+    if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
+      this.questState.completed.push(quest.questId);
+    }
+    this.player.stats.questsCompleted += 1;
+    this.questState.cityFade.push({ npcId: quest.npcId, startedAt: Date.now() });
+    this.addToast(`${quest.title} indleveret`);
+    this.levelUpIfNeeded();
+    this.publishSnapshot();
+    this.saveProgress();
+    return {
+      ok: true,
+      questTitle: quest.title,
+      rewards: rewardSummary,
+    };
+  }
+
+  grantQuestRewards(quest) {
+    const rewards = quest.rewards ?? {};
+    const xp = Math.max(0, Math.floor(Number(rewards.xp) || ((rewards.xpPerKill ?? 0) * (quest.target?.count ?? 0))));
+    const gold = Math.max(0, Math.floor(Number(rewards.gold) || ((rewards.goldPerKill ?? 0) * (quest.target?.count ?? 0))));
+    const summary = {
+      xp,
+      gold,
+      resources: [],
+      items: [],
+    };
+    if (xp) {
+      this.player.xp += xp;
+      this.addFloater(this.player.x, this.player.y, `+${xp} xp`, "#e0aa3f", 1);
+    }
+    if (gold) {
+      this.player.gold += gold;
+      this.player.stats.goldEarned += gold;
+      this.addFloater(this.player.x, this.player.y, `+${gold} g`, "#f1c657", 1);
+    }
+    for (const reward of rewards.resources ?? []) {
+      const resource = makeResourceItem(reward.resource, reward.count ?? 1);
+      if (resource) {
+        this.addInventoryItem(resource);
+        summary.resources.push({
+          id: resource.resourceId,
+          name: resource.name,
+          count: Math.max(1, Math.floor(Number(resource.count) || 1)),
+        });
+      }
+    }
+    if (rewards.randomItem) {
+      const item = this.rollQuestRewardItem();
+      this.addInventoryItem(item);
+      summary.items.push({
+        id: item.id,
+        name: item.name,
+        rarity: item.rarity,
+      });
+    }
+    return summary;
+  }
+
+  questRewardsCanFit(quest) {
+    const simulated = this.player.inventory
+      .filter((item) => !questConsumesQuestItem(quest, item))
+      .map((item) => ({ ...item }));
+    // simulate consuming quest requirements so rewards fit check is accurate
+    if (quest.type === "collect_quest_item") {
+      if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
+        const inputs = {};
+        for (const r of quest.target.resources) inputs[r.resource] = (inputs[r.resource] || 0) + (r.count ?? 1);
+        consumeResourceInputs(simulated, inputs);
+      }
+      if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
+        for (const req of quest.target.items) {
+          let need = Math.max(1, Math.floor(Number(req.count) || 1));
+          for (let i = simulated.length - 1; i >= 0 && need > 0; i -= 1) {
+            const it = simulated[i];
+            if (!it) continue;
+            let match = true;
+            if (req.templateId) match = match && (String(it.uniqueId) === String(req.templateId) || String(it.namedId) === String(req.templateId));
+            if (req.namePrefix) match = match && String(it.name || "").startsWith(`${req.namePrefix} `);
+            if (req.baseName) match = match && String(it.baseName || "") === String(req.baseName);
+            if (req.rarity) match = match && String(it.rarity || "") === String(req.rarity);
+            if (match) {
+              simulated.splice(i, 1);
+              need -= 1;
+            }
+          }
+          if (need > 0) return false;
+        }
+      }
+    }
+    for (const reward of quest.rewards?.resources ?? []) {
+      const resource = makeResourceItem(reward.resource, reward.count ?? 1);
+      if (resource && !inventoryCanAccept(simulated, resource)) return false;
+    }
+    if (quest.rewards?.randomItem && simulated.length >= MAX_INVENTORY) return false;
+    return true;
+  }
+
+  rollQuestRewardItem() {
+    const minIndex = RARITIES.findIndex((rarity) => rarity.id === "upgraded");
+    for (let i = 0; i < 12; i += 1) {
+      const item = makeItem(this.player.level, Math.random());
+      const rarityIndex = RARITIES.findIndex((rarity) => rarity.id === item.rarity);
+      if (rarityIndex >= minIndex) return item;
+    }
+    const item = makeItem(this.player.level + 3, Math.random());
+    item.rarity = "upgraded";
+    item.rarityLabel = "Upgraded";
+    item.rarityColor = "#58d96d";
+    item.value = itemValue(item);
+    return item;
+  }
+
+  consumeQuestItems(quest) {
+    // consume resources or specific items if defined, otherwise fallback to quest items
+    if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
+      const inputs = {};
+      for (const r of quest.target.resources) inputs[r.resource] = (inputs[r.resource] || 0) + (r.count ?? 1);
+      consumeResourceInputs(this.player.inventory, inputs);
+      this.addToast("Quest resources used");
+      this.publishSnapshot();
+      return;
+    }
+    if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
+      for (const req of quest.target.items) {
+        let need = Math.max(1, Math.floor(Number(req.count) || 1));
+        for (let i = this.player.inventory.length - 1; i >= 0 && need > 0; i -= 1) {
+          const it = this.player.inventory[i];
+          if (!it) continue;
+          let match = true;
+          if (req.templateId) match = match && (String(it.uniqueId) === String(req.templateId) || String(it.namedId) === String(req.templateId));
+          if (req.namePrefix) match = match && String(it.name || "").startsWith(`${req.namePrefix} `);
+          if (req.baseName) match = match && String(it.baseName || "") === String(req.baseName);
+          if (req.rarity) match = match && String(it.rarity || "") === String(req.rarity);
+          if (match) {
+            this.player.inventory.splice(i, 1);
+            need -= 1;
+          }
+        }
+      }
+      this.addToast("Quest items consumed");
+      this.publishSnapshot();
+      return;
+    }
+
+    // legacy quest items
+    for (const target of questItemTargetsForQuest(quest)) {
+      const needed = Math.max(1, Math.floor(Number(target.count) || 1));
+      let removed = 0;
+      this.player.inventory = this.player.inventory.filter((item) => {
+        if (removed >= needed || item.mode !== "quest" || item.questItemId !== target.questItemId || item.questInstanceId !== quest.id) return true;
+        removed += 1;
+        return false;
       });
     }
   }
@@ -926,8 +1656,8 @@ export class GameEngine {
   equipItem(index) {
     const item = this.player.inventory[index];
     if (!item) return;
-    if (item.mode === "resource") return;
-    if (item.mode === "potion") {
+    if (isResourceItem(item)) return;
+    if (isPotionItem(item)) {
       this.usePotion(item.potionType, index);
       return;
     }
@@ -963,6 +1693,8 @@ export class GameEngine {
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * pct)} mana`, "#58bfff", 0.95);
     }
     this.player.potions[type] = Math.max(0, count - 1);
+    if (type === "health") this.player.stats.healthPotionsUsed += 1;
+    if (type === "mana") this.player.stats.manaPotionsUsed += 1;
     this.potionCooldown = 0.5;
     this.publishSnapshot();
   }
@@ -979,6 +1711,7 @@ export class GameEngine {
       y: this.player.y + this.player.facingY * 0.75 + (Math.random() - 0.5) * 0.22,
       bob: Math.random() * Math.PI * 2,
       pickupDelay: 0.9,
+      despawn: GROUND_LOOT_DESPAWN_SECONDS,
     });
     this.addToast(`Droppet: ${item.name}`);
     this.publishSnapshot();
@@ -1029,6 +1762,10 @@ export class GameEngine {
       return;
     }
     this.player.inventory.splice(index, 1);
+    if (!isResourceItem(item)) {
+      this.player.stats.itemsDestroyed += 1;
+      incrementStatMap(this.player.stats.itemsDestroyedByRarity, itemRarityBucket(item));
+    }
     this.dropDestroyedItemResources(item);
     this.addToast(`Destrueret: ${item.name}`);
     this.publishSnapshot();
@@ -1053,14 +1790,31 @@ export class GameEngine {
         y: this.player.y + this.player.facingY * 0.72 + (Math.random() - 0.5) * 0.35,
         bob: Math.random() * Math.PI * 2,
         pickupDelay: 0.75,
+        despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
+      this.trackItemDropped(resource);
     }
+  }
+
+  trackItemDropped(item) {
+    if (!item || isResourceItem(item)) return;
+    this.player.stats.itemsDropped += 1;
+    this.player.stats.itemsNotPicked += 1;
+    incrementStatMap(this.player.stats.itemsDroppedByRarity, itemRarityBucket(item));
+    incrementStatMap(this.player.stats.itemsNotPickedByRarity, itemRarityBucket(item));
+  }
+
+  trackItemPicked(item) {
+    if (!item || isResourceItem(item)) return;
+    incrementStatMap(this.player.stats.itemsPickedByRarity, itemRarityBucket(item));
+    this.player.stats.itemsNotPicked = Math.max(0, this.player.stats.itemsNotPicked - 1);
+    decrementStatMap(this.player.stats.itemsNotPickedByRarity, itemRarityBucket(item));
   }
 
   mergeInventoryItem(index) {
     const item = this.player.inventory[index];
     if (!item) return null;
-    if (item.mode === "resource") {
+    if (isResourceItem(item)) {
       const recipes = resourceMergeRecipesFor(item, this.player.inventory).filter((recipe) => !recipe.requiresFire || this.isNearFireSource());
       if (recipes.length > 1) {
         return {
@@ -1111,7 +1865,7 @@ export class GameEngine {
 
   mergeInventoryResourceWithRecipe(index, outputResourceId) {
     const item = this.player.inventory[index];
-    if (!item || item.mode !== "resource") return false;
+    if (!item || !isResourceItem(item)) return false;
     const recipe = resourceMergeRecipesFor(item, this.player.inventory).find((entry) => entry.output === outputResourceId);
     if (!recipe) {
       this.addToast("Ikke nok resources til merge");
@@ -1186,7 +1940,7 @@ export class GameEngine {
 
   addInventoryItem(item) {
     if (!item) return false;
-    if (item.mode === "resource") {
+    if (isResourceItem(item)) {
       let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
       const stackMax = resourceStackMax(item.resourceId);
       for (const stack of this.player.inventory) {
@@ -1210,7 +1964,7 @@ export class GameEngine {
       }
       return true;
     }
-    if (item.mode === "potion") {
+    if (isPotionItem(item)) {
       return this.addPotionLoot(item);
     }
     if (this.player.inventory.length >= MAX_INVENTORY) return false;
@@ -1219,8 +1973,8 @@ export class GameEngine {
   }
 
   compactPotionStacks() {
-    const equipment = this.player.inventory.filter((item) => item.mode !== "potion");
-    const potions = this.player.inventory.filter((item) => item.mode === "potion");
+    const equipment = this.player.inventory.filter((item) => !isPotionItem(item));
+    const potions = this.player.inventory.filter((item) => isPotionItem(item));
     this.player.inventory = equipment;
     for (const potion of potions) {
       this.addPotionLoot(potion);
@@ -1336,14 +2090,23 @@ export class GameEngine {
       for (const object of chunk.objects) {
         if (!isDestructibleObject(object)) continue;
         const screen = worldToScreen(object.x, object.y, 0, this.camera);
-        const d = Math.hypot(screen.x - x, screen.y - 24 - y);
-        if (d < 30 + object.radius * 36 && d < bestD) {
+        const hit = destructibleObjectScreenHit(object);
+        const d = Math.hypot(screen.x - x, screen.y - hit.offsetY - y);
+        if (d < hit.radius && d < bestD) {
           best = object;
           bestD = d;
         }
       }
     }
     return best;
+  }
+
+  questgiverAtScreen(x, y) {
+    const questgiver = this.questState.wildernessNpc;
+    if (!questgiver) return null;
+    const screen = worldToScreen(questgiver.x, questgiver.y, 0, this.camera);
+    const d = Math.hypot(screen.x - x, screen.y - 34 - y);
+    return d < 42 ? questgiver : null;
   }
 
   addParticles(x, y, color, count, upward = 0.08) {
@@ -1415,9 +2178,9 @@ export class GameEngine {
       rarity: String(item.rarity ?? "normal"),
       rarityLabel: String(item.rarityLabel ?? "Normal"),
       rarityColor: String(item.rarityColor ?? "#f5f3ea"),
-      unique: Boolean(item.unique),
+      unique: Boolean(item.unique || item.uniqueId),
       uniqueId: item.uniqueId ? String(item.uniqueId) : undefined,
-      named: Boolean(item.named),
+      named: Boolean(item.named || item.namedId),
       namedId: item.namedId ? String(item.namedId) : undefined,
       iconUrl: item.iconUrl ? String(item.iconUrl) : undefined,
       slot: String(item.slot ?? "weapon"),
@@ -1435,15 +2198,17 @@ export class GameEngine {
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,
       resourceId: savedResourceId,
+      questItemId: item.questItemId ? String(item.questItemId) : undefined,
+      questInstanceId: item.questInstanceId ? String(item.questInstanceId) : undefined,
       iconIndex: Number.isFinite(Number(item.iconIndex)) ? Math.floor(Number(item.iconIndex)) : undefined,
-      stackMax: item.mode === "resource" ? resourceStackMax(savedResourceId) : undefined,
-      count: item.mode === "potion"
+      stackMax: isResourceItem(item) ? resourceStackMax(savedResourceId) : undefined,
+      count: isPotionItem(item)
         ? clamp(Math.floor(Number(item.count) || 1), 1, MAX_POTION_STACK)
-        : item.mode === "resource"
+        : isResourceItem(item)
           ? clamp(Math.floor(Number(item.count) || 1), 1, resourceStackMax(savedResourceId))
           : undefined,
     };
-    if (normalized.mode === "resource") {
+    if (isResourceItem(normalized)) {
       const def = RESOURCE_DEFS[normalized.resourceId];
       normalized.name = def?.name ?? normalized.name;
       normalized.baseName = def?.name ?? normalized.baseName;
@@ -1453,9 +2218,32 @@ export class GameEngine {
       normalized.iconIndex = def?.iconIndex ?? normalized.iconIndex;
       normalized.iconSheet = def?.sheet ?? normalized.iconSheet;
       normalized.stackMax = def?.stackMax ?? normalized.stackMax;
+      normalized.iconUrl = def?.iconUrl ?? iconUrlFromKey(deriveIconKey(normalized));
+    }
+    if (isQuestItem(normalized)) {
+      const def = QUEST_ITEM_DEFS[normalized.questItemId];
+      normalized.name = def?.name ?? normalized.name;
+      normalized.baseName = def?.name ?? normalized.baseName;
+      normalized.rarity = "unique";
+      normalized.rarityLabel = "Quest";
+      normalized.rarityColor = "#ffcf5a";
+      normalized.slot = "quest";
+      normalized.iconUrl = def?.iconUrl ?? normalized.iconUrl;
+    }
+    if (normalized.uniqueId) {
+      const def = UNIQUE_ITEMS.find((entry) => entry.id === normalized.uniqueId);
+      // Always re-derive from definition — never trust the saved iconUrl for unique items.
+      normalized.iconUrl = def?.iconUrl || iconUrlFromKey(deriveIconKey({ uniqueId: normalized.uniqueId }));
+    } else if (normalized.namedId) {
+      const def = NAMED_ITEM_TEMPLATES.find((entry) => entry.id === normalized.namedId);
+      // Named items: use definition iconUrl if set, else fall through to baseName mapping.
+      normalized.iconUrl = def?.iconUrl || undefined;
+    } else if (!isResourceItem(normalized) && !isQuestItem(normalized)) {
+      // Generic gear: clear stale saved iconUrl so baseName mapping takes over.
+      normalized.iconUrl = undefined;
     }
     normalized.value = Math.max(1, Math.floor(Number(item.value) || itemValue(normalized)));
-    return normalized;
+    return withItemIcon(withItemFlags(normalized));
   }
 
   loadProgress() {
@@ -1479,6 +2267,7 @@ export class GameEngine {
       health: clamp(Math.floor(Number(savedPlayer.potions?.health) || 0), 0, MAX_POTION_STACK),
       mana: clamp(Math.floor(Number(savedPlayer.potions?.mana) || 0), 0, MAX_POTION_STACK),
     };
+    this.player.stats = normalizeHeroStats(savedPlayer.stats);
     this.player.attackCooldown = Math.max(0, Number(savedPlayer.attackCooldown) || 0);
     this.player.spellCooldown = Math.max(0, Number(savedPlayer.spellCooldown) || 0);
     this.player.hurtCooldown = Math.max(0, Number(savedPlayer.hurtCooldown) || 0);
@@ -1491,15 +2280,17 @@ export class GameEngine {
     this.player.target = null;
     this.player.attackTargetId = null;
 
+    this.questState = normalizeSavedQuestState(payload.quests);
+
     if (Array.isArray(savedPlayer.inventory)) {
       const normalizedInventory = savedPlayer.inventory
         .map((item) => this.normalizeSavedItem(item))
         .filter(Boolean);
       for (const item of normalizedInventory) {
-        if (item.mode === "potion") this.addPotionLoot(item);
+        if (isPotionItem(item)) this.addPotionLoot(item);
       }
       this.player.inventory = normalizedInventory
-        .filter((item) => item.mode !== "potion")
+        .filter((item) => !isPotionItem(item))
         .slice(0, MAX_INVENTORY);
     }
 
@@ -1514,6 +2305,11 @@ export class GameEngine {
     this.player.equipment = nextEquipment;
 
     if (Array.isArray(payload.loots)) {
+      // If we're replacing active loots during load, ensure any existing loots
+      // are processed as despawn so quest dropped counters stay consistent.
+      for (const loot of this.loots) {
+        try { this.handleLootDespawn(loot); } catch (e) {}
+      }
       this.loots = [];
     }
 
@@ -1552,6 +2348,7 @@ export class GameEngine {
         gold: this.player.gold,
         popularity: this.player.popularity,
         potions: { ...this.player.potions },
+        stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } },
         hp: this.player.hp,
         mana: this.player.mana,
         attackCooldown: this.player.attackCooldown,
@@ -1566,6 +2363,10 @@ export class GameEngine {
         equipment: Object.fromEntries(
           EQUIPMENT_SLOTS.map((slot) => [slot.id, this.player.equipment[slot.id] ? { ...this.player.equipment[slot.id] } : null]),
         ),
+      },
+      quests: {
+        active: this.questState.active.map((quest) => ({ ...quest, progress: { ...(quest.progress ?? {}) } })),
+        completed: [...this.questState.completed],
       },
       loots: [],
     };
@@ -1797,11 +2598,14 @@ export class GameEngine {
       const biome = BIOMES[tile.biomeId] ?? chunk.biome;
       const transitionTile = hasDifferentBiomeNeighbor(tile, biomeByTile);
       drawGroundTile(ctx, this.atlas, tile.biomeId, tile.variant, x, y, {
+        groundSheetId: tile.groundSheetId,
+        water: tile.water,
+        waterVariant: tile.waterVariant,
         baseColor: biome.tile[0],
-        baseAlpha: transitionTile ? 0.08 : undefined,
+        baseAlpha: tile.water ? 1 : transitionTile ? 0.08 : undefined,
         edgeFeather: transitionTile ? 0.18 : undefined,
         visualScale: transitionTile ? 1.24 : undefined,
-        path: tile.path,
+        path: !tile.water && tile.path,
         pathColor: biome.path,
       });
     }
@@ -1811,12 +2615,36 @@ export class GameEngine {
       drawRegionMarkerIfInChunk(ctx, chunk, chunk.region.end, "exit", originX, originY);
     }
 
+    if (chunk.region) {
+      const halfW = TILE_W * 0.5 + 1;
+      const halfH = TILE_H * 0.5 + 1;
+      ctx.save();
+      ctx.beginPath();
+      for (const tile of tiles) {
+        const tx = tile.x - chunk.x;
+        const ty = tile.y - chunk.y;
+        const x = originX + (tx - ty) * (TILE_W / 2);
+        const y = originY + (tx + ty) * (TILE_H / 2);
+        const centerY = y + TILE_H * 0.5;
+        ctx.moveTo(x, centerY - halfH);
+        ctx.lineTo(x + halfW, centerY);
+        ctx.lineTo(x, centerY + halfH);
+        ctx.lineTo(x - halfW, centerY);
+        ctx.closePath();
+      }
+      ctx.clip();
+    }
+
     for (const decal of chunk.decals) {
       const tx = decal.x - chunk.x;
       const ty = decal.y - chunk.y;
       const x = originX + (tx - ty) * (TILE_W / 2);
       const y = originY + (tx + ty) * (TILE_H / 2) + TILE_H * 0.52;
-      drawTerrainDecal(ctx, decal, x, y);
+      drawTerrainDecal(ctx, decal, x, y, this.atlas);
+    }
+
+    if (chunk.region) {
+      ctx.restore();
     }
 
     chunk.terrainLayer = { canvas, originX, originY, width, height };
@@ -1832,7 +2660,7 @@ export class GameEngine {
           drawables.push({
             type: "object",
             object,
-            biome: chunk.biome,
+            biome: BIOMES[object.renderBiomeId] ?? chunk.biome,
             screen,
             layer: object.type === "foliage" ? 0 : 1,
             depth: object.x + object.y + 0.1,
@@ -1863,6 +2691,14 @@ export class GameEngine {
       }
     }
 
+    const questgiver = this.questState.wildernessNpc;
+    if (questgiver) {
+      const screen = worldToScreen(questgiver.x, questgiver.y, 0, this.camera);
+      if (visibleScreenPoint(screen, this.width, this.height, 170)) {
+        drawables.push({ type: "questgiver", questgiver, screen, layer: 1, depth: questgiver.x + questgiver.y + 0.32 });
+      }
+    }
+
     const heroScreen = worldToScreen(this.player.x, this.player.y, 0, this.camera);
     drawables.push({ type: "hero", screen: heroScreen, layer: 1, depth: this.player.x + this.player.y + 0.35 });
     drawables.sort((a, b) => a.layer - b.layer || a.depth - b.depth);
@@ -1877,6 +2713,7 @@ export class GameEngine {
       }
       if (item.type === "loot") drawLoot(ctx, item.screen, item.loot, this.atlas);
       if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas);
+      if (item.type === "questgiver") drawQuestgiver(ctx, item.screen, item.questgiver, this.time);
       if (item.type === "monster") drawMonster(ctx, item.screen, item.monster, this.atlas, this.time, this.animationSheets);
       if (item.type === "hero") {
         drawHero(ctx, item.screen, {
@@ -2086,12 +2923,18 @@ export class GameEngine {
     if (object) {
       this.player.attackTargetId = null;
       this.player.attackObjectId = object.id;
-      const stats = this.calcStats();
-      if (distance(this.player, object) <= stats.range + object.radius) {
+      if (distance(this.player, object) <= DESTRUCTIBLE_OBJECT_ATTACK_RANGE + object.radius) {
         this.primaryAttack(object);
       } else {
         this.player.target = { x: object.x, y: object.y };
       }
+      return;
+    }
+    const questgiver = this.questgiverAtScreen(this.pointer.x, this.pointer.y);
+    if (questgiver) {
+      this.player.attackTargetId = null;
+      this.player.attackObjectId = null;
+      this.player.target = { x: questgiver.x, y: questgiver.y };
       return;
     }
     this.player.attackTargetId = null;
@@ -2124,6 +2967,10 @@ export class GameEngine {
       const target = this.nearestMonster(7);
       this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY);
     }
+    if (key === "e" && this.nearbyQuestgiver) {
+      event.preventDefault();
+      this.publishSnapshot();
+    }
   }
 
   handleKeyUp(event) {
@@ -2133,9 +2980,11 @@ export class GameEngine {
 
   itemSummary(item) {
     const parts = [];
-    if (item.mode === "resource") {
+    if (isResourceItem(item)) {
       parts.push(`Resource stack ${item.count ?? 1} / ${resourceStackMax(item.resourceId)}`);
-    } else if (item.mode === "potion") {
+    } else if (isQuestItem(item)) {
+      parts.push("Quest item");
+    } else if (isPotionItem(item)) {
       parts.push(item.potionType === "health" ? "Giver 25% liv" : "Giver 25% mana");
     } else if (item.slot === "weapon") {
       parts.push(`${item.damageMin}-${item.damageMax} skade`);
@@ -2173,6 +3022,7 @@ export class GameEngine {
         damage: `${stats.damageMin}-${stats.damageMax}`,
         armor: stats.armor,
         mode: stats.mode,
+        stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } },
       },
       zone: {
         name: chunk.biome.name,
@@ -2180,10 +3030,15 @@ export class GameEngine {
         seed: this.region.seed,
       },
       region: {
-        name: this.region.biome.name,
+        name: this.region.mapRegion?.label ?? this.region.biome.name,
         index: this.region.index,
         seed: this.region.seed,
+        areaMapId: this.region.mapRegion?.areaMapId ?? null,
+        regionId: this.region.mapRegion?.id ?? null,
       },
+      regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
+      mobs: this.monsterCounterSnapshot(),
+      mapReturn: this.mapReturn ? { ...this.mapReturn } : null,
       exitPrompt: this.exitPromptOpen,
       inventory: this.player.inventory.map((item, index) => {
         const rarityIndex = RARITIES.findIndex((rarity) => rarity.id === item.rarity);
@@ -2195,9 +3050,9 @@ export class GameEngine {
           iconSheet: itemIconSheet(item),
           index,
           mergeCount,
-          canMerge: item.mode === "resource"
+          canMerge: isResourceItem(item)
             ? Boolean(resourceMergeRecipeFor(item, this.player.inventory))
-            : item.mode !== "potion" && mergeCount >= 3 && rarityIndex >= 0 && rarityIndex < RARITIES.length - 1,
+            : canMergeItem(item) && !isPotionItem(item) && mergeCount >= 3 && rarityIndex >= 0 && rarityIndex < RARITIES.length - 1,
           summary: this.itemSummary(item),
         };
       }),
@@ -2220,8 +3075,33 @@ export class GameEngine {
         manaPotions,
         potionCooldown: this.potionCooldown,
       },
+      quests: {
+        active: this.questState.active.map((quest) => questSnapshot(quest, this.player.inventory)),
+        completed: [...this.questState.completed],
+        cityFade: this.questState.cityFade.filter((fade) => Date.now() - fade.startedAt < 1400),
+        wildernessNpc: this.questState.wildernessNpc ? {
+          npcId: this.questState.wildernessNpc.npcId,
+          quest: questSnapshot(this.questState.wildernessNpc.quest, this.player.inventory),
+        } : null,
+        nearbyQuestgiver: this.nearbyQuestgiver ? {
+          id: this.nearbyQuestgiver.id,
+          npcId: this.nearbyQuestgiver.npcId,
+          quest: questSnapshot(this.nearbyQuestgiver.quest, this.player.inventory),
+        } : null,
+      },
       toasts: this.toasts.map((toast) => ({ id: toast.id, text: toast.text })),
     });
+  }
+
+  monsterCounterSnapshot() {
+    const monsters = [...this.monsters.values()];
+    const total = monsters.length;
+    const alive = monsters.filter((monster) => !monster.dead).length;
+    return {
+      total,
+      alive,
+      killed: Math.max(0, total - alive),
+    };
   }
 }
 
@@ -2248,73 +3128,58 @@ function drawRegionMarkerIfInChunk(ctx, chunk, point, type, originX, originY) {
   const y = originY + (tx + ty) * (TILE_H / 2) + TILE_H * 0.52;
   ctx.save();
   ctx.translate(x, y);
-  ctx.globalAlpha = type === "exit" ? 0.82 : 0.45;
+  ctx.globalAlpha = type === "exit" ? 0.96 : 0.45;
   ctx.strokeStyle = type === "exit" ? "#f4da96" : "#8bdfff";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = type === "exit" ? 4 : 3;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 25, 12, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, type === "exit" ? 31 : 25, type === "exit" ? 15 : 12, 0, 0, Math.PI * 2);
   ctx.stroke();
   if (type === "exit") {
-    ctx.fillStyle = "rgba(244, 218, 150, 0.16)";
+    ctx.fillStyle = "rgba(244, 218, 150, 0.24)";
     ctx.beginPath();
-    ctx.ellipse(0, 0, 30, 15, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, 36, 18, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f4da96";
+    ctx.beginPath();
+    ctx.moveTo(0, -22);
+    ctx.lineTo(8, -7);
+    ctx.lineTo(-8, -7);
+    ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
+}
+
+function rollItemOfRarity(level, rarityId, tries = 60) {
+  const wanted = RARITIES.find((entry) => entry.id === rarityId);
+  if (!wanted) return null;
+
+  for (let i = 0; i < tries; i += 1) {
+    const item = makeItem(level, Math.random());
+    if (item.rarity === rarityId) return item;
+  }
+
+  // Fallback: force rarity to guarantee drop quality for configured object loot.
+  const fallback = makeItem(level, Math.random());
+  fallback.rarity = wanted.id;
+  fallback.rarityLabel = wanted.label;
+  fallback.rarityColor = wanted.color;
+  const prefixes = PREFIXES[wanted.id] ?? [];
+  if (prefixes.length > 0 && fallback.baseName) {
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    fallback.name = `${prefix} ${fallback.baseName}`;
+  }
+  fallback.value = itemValue(fallback);
+  return fallback;
 }
 
 function preventDefault(event) {
   event.preventDefault();
 }
 
-const LOOT_PROFILES = {
-  Spider: {
-    goldChance: 0.42,
-    goldMult: 0.75,
-    weights: { health: 28, mana: 28, weapon: 2, armor: 2, none: 40 },
-  },
-  Skeleton: {
-    goldChance: 0.65,
-    goldMult: 1,
-    weights: { weapon: 31, armor: 31, health: 3, mana: 3, none: 32 },
-  },
-  Demon: {
-    goldChance: 0.72,
-    goldMult: 1.15,
-    weights: { health: 28, armor: 24, weapon: 4, mana: 2, none: 42 },
-  },
-  Ghost: {
-    goldChance: 0.95,
-    goldMult: 3.8,
-    weights: { mana: 34, health: 2, weapon: 2, armor: 2, none: 60 },
-  },
-  Snake: {
-    goldChance: 0.16,
-    goldMult: 0.7,
-    weights: { health: 4, mana: 4, weapon: 3, armor: 3, none: 86 },
-  },
-  Wolf: {
-    goldChance: 0.22,
-    goldMult: 0.7,
-    weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 },
-  },
-  Scorpion: {
-    goldChance: 0.7,
-    goldMult: 1,
-    weights: { all: 18, health: 12, mana: 12, weapon: 14, armor: 14, none: 30 },
-  },
-};
-
-const ELITE_VARIANTS = [
-  null,
-  { id: "enforced", label: "Enforced", weight: 4, levelPct: 0.25, color: "#58d96d", tintAlpha: 0.22, sizeMult: 1.025 },
-  { id: "rage", label: "Rage", weight: 3, levelPct: 0.5, color: "#ffd85d", tintAlpha: 0.24, sizeMult: 1.045 },
-  { id: "lieutenant", label: "Loejtnant", weight: 2, levelPct: 1, color: "#b579ff", tintAlpha: 0.26, sizeMult: 1.065 },
-];
-
 function rollEliteVariant() {
   const entries = [
-    { variant: null, weight: 10 },
+    { variant: null, weight: ELITE_NO_VARIANT_WEIGHT },
     ...ELITE_VARIANTS.filter(Boolean).map((variant) => ({ variant, weight: variant.weight })),
   ];
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
@@ -2362,29 +3227,11 @@ function housePopularityDelta(regionLevel) {
   return house.baseCost * (1 + (level - 1) * house.regionLevelScale);
 }
 
-function monsterLootProfile(typeName) {
-  return LOOT_PROFILES[typeName] ?? {
-    goldChance: 0.55,
-    goldMult: 1,
-    weights: { health: 8, mana: 8, weapon: 8, armor: 8, none: 68 },
-  };
-}
-
-function rollLootCategory(weights) {
-  const entries = Object.entries(weights);
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  let roll = Math.random() * total;
-  for (const [category, weight] of entries) {
-    roll -= weight;
-    if (roll <= 0) return category;
-  }
-  return "none";
-}
-
 function itemsCanMerge(a, b) {
   if (!a || !b) return false;
-  if (a.mode === "potion" || b.mode === "potion") return false;
-  if (a.mode === "resource" || b.mode === "resource") return false;
+  if (isPotionItem(a) || isPotionItem(b)) return false;
+  if (isResourceItem(a) || isResourceItem(b)) return false;
+  if (!canMergeItem(a) || !canMergeItem(b)) return false;
   if (a.unique || b.unique || a.named || b.named) return false;
   return a.baseName === b.baseName
     && a.rarity === b.rarity
@@ -2393,7 +3240,7 @@ function itemsCanMerge(a, b) {
 }
 
 function itemIconIndex(item) {
-  if (item?.mode === "resource") return item.iconIndex ?? RESOURCE_DEFS[item.resourceId]?.iconIndex ?? 0;
+  if (isResourceItem(item)) return item.iconIndex ?? RESOURCE_DEFS[item.resourceId]?.iconIndex ?? 0;
   if (itemIconSheet(item) === "armor") {
     const armorMap = {
       Helm: 0,
@@ -2434,15 +3281,45 @@ function itemIconIndex(item) {
 }
 
 function itemIconSheet(item) {
-  if (item?.mode === "resource") return RESOURCE_DEFS[item.resourceId]?.sheet ?? "resources";
+  if (isQuestItem(item)) return "items";
+  if (isResourceItem(item)) return RESOURCE_DEFS[item.resourceId]?.sheet ?? "resources";
   const armorBases = new Set(["Helm", "Gorget", "Chestplate", "Vambraces", "Greaves", "Bracelet", "Boots", "Gloves"]);
   return armorBases.has(item?.baseName) ? "armor" : "items";
+}
+
+function makeQuestItem(questItemId, questInstanceId) {
+  const def = QUEST_ITEM_DEFS[questItemId];
+  if (!def) return null;
+  return withItemIcon(withItemFlags({
+    id: createId(),
+    name: def.name,
+    baseName: def.name,
+    questItemId,
+    questInstanceId,
+    rarity: "unique",
+    rarityLabel: "Quest",
+    rarityColor: "#ffcf5a",
+    slot: "quest",
+    mode: "quest",
+    level: 1,
+    damageMin: 0,
+    damageMax: 0,
+    range: 0,
+    cooldown: 0,
+    armor: 0,
+    maxHp: 0,
+    maxMana: 0,
+    speed: 0,
+    magic: 0,
+    iconUrl: def.iconUrl ?? QUEST_CONFIG.questItemIconPlaceholder,
+    value: 0,
+  }));
 }
 
 function makeResourceItem(resourceId, count = 1) {
   const def = RESOURCE_DEFS[resourceId];
   if (!def) return null;
-  return {
+  return withItemIcon(withItemFlags({
     id: createId(),
     name: def.name,
     baseName: def.name,
@@ -2459,7 +3336,7 @@ function makeResourceItem(resourceId, count = 1) {
     iconIndex: def.iconIndex,
     iconSheet: def.sheet ?? "resources",
     value: def.value,
-  };
+  }));
 }
 
 function pickupStatusText(item, count = 1) {
@@ -2482,12 +3359,18 @@ function resourceMergeRecipesFor(item, inventory) {
 
 function resourceMergeOption(recipe) {
   const output = RESOURCE_DEFS[recipe.output];
+  const previewItem = withItemIcon({
+    mode: "resource",
+    resourceId: recipe.output,
+    name: output?.name ?? recipe.output,
+  });
   return {
     output: recipe.output,
     name: output?.name ?? recipe.output,
     count: recipe.count ?? 1,
     iconIndex: output?.iconIndex ?? 0,
     iconSheet: output?.sheet ?? "resources",
+    iconUrl: output?.iconUrl ?? previewItem.iconUrl,
     inputs: recipe.inputs,
   };
 }
@@ -2498,7 +3381,7 @@ function hasResourceInputs(inventory, inputs) {
 
 function resourceCount(inventory, resourceId) {
   return inventory.reduce((sum, item) => (
-    item.mode === "resource" && item.resourceId === resourceId
+    isResourceItem(item) && item.resourceId === resourceId
       ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
       : sum
   ), 0);
@@ -2509,7 +3392,7 @@ function consumeResourceInputs(inventory, inputs) {
     let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
     for (let i = inventory.length - 1; i >= 0 && needed > 0; i -= 1) {
       const item = inventory[i];
-      if (item.mode !== "resource" || item.resourceId !== resourceId) continue;
+      if (!isResourceItem(item) || item.resourceId !== resourceId) continue;
       const count = Math.max(1, Math.floor(Number(item.count) || 1));
       const used = Math.min(count, needed);
       item.count = count - used;
@@ -2522,7 +3405,7 @@ function consumeResourceInputs(inventory, inputs) {
 function resourceOutputCanFitAfterMerge(inventory, recipe, output) {
   const outputMax = resourceStackMax(output.resourceId);
   if (inventory.some((item) => (
-    item.mode === "resource"
+    isResourceItem(item)
     && item.resourceId === output.resourceId
     && Math.max(1, Math.floor(Number(item.count) || 1)) < outputMax
   ))) return true;
@@ -2531,7 +3414,7 @@ function resourceOutputCanFitAfterMerge(inventory, recipe, output) {
   for (const [resourceId, neededRaw] of Object.entries(recipe.inputs)) {
     let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
     for (const item of inventory) {
-      if (item.mode !== "resource" || item.resourceId !== resourceId || needed <= 0) continue;
+      if (!isResourceItem(item) || item.resourceId !== resourceId || needed <= 0) continue;
       const count = Math.max(1, Math.floor(Number(item.count) || 1));
       const used = Math.min(count, needed);
       if (count - used <= 0) freedSlots += 1;
@@ -2558,21 +3441,450 @@ function randomInt(min, max) {
   return lo + Math.floor(Math.random() * (hi - lo + 1));
 }
 
-function isDestructibleObject(object) {
-  return Boolean(object && DESTRUCTIBLE_OBJECTS[object.type] && (object.hp === undefined || object.hp > 0));
+function createHeroStats() {
+  return {
+    damageDealt: 0,
+    damageTaken: 0,
+    killsTotal: 0,
+    killsByMonster: {},
+    meleeAttacks: 0,
+    rangedAttacks: 0,
+    spellProjectiles: 0,
+    spellsCast: 0,
+    questsCompleted: 0,
+    goldEarned: 0,
+    goldLooted: 0,
+    itemsPicked: 0,
+    resourcesPicked: 0,
+    healthPotionsUsed: 0,
+    manaPotionsUsed: 0,
+    deaths: 0,
+    objectsDestroyed: 0,
+    objectsDestroyedByType: {},
+    itemsDropped: 0,
+    itemsDroppedByRarity: {},
+    itemsNotPicked: 0,
+    itemsNotPickedByRarity: {},
+    itemsPickedByRarity: {},
+    itemsDestroyed: 0,
+    itemsDestroyedByRarity: {},
+  };
 }
 
-function monsterResourceDrops(monster) {
-  return [
-    ...(MONSTER_RESOURCE_DROPS.default?.loot ?? []),
-    ...(MONSTER_RESOURCE_DROPS.default?.rareLoot ?? []),
-    ...(MONSTER_RESOURCE_DROPS[monster?.typeName]?.loot ?? []),
-    ...(MONSTER_RESOURCE_DROPS[monster?.typeName]?.rareLoot ?? []),
+function normalizeHeroStats(stats) {
+  const base = createHeroStats();
+  if (!stats || typeof stats !== "object") return base;
+  const killsByMonster = {};
+  if (stats.killsByMonster && typeof stats.killsByMonster === "object") {
+    for (const [name, value] of Object.entries(stats.killsByMonster)) {
+      killsByMonster[name] = {
+        normal: Math.max(0, Math.floor(Number(value?.normal) || 0)),
+        elite: Math.max(0, Math.floor(Number(value?.elite) || 0)),
+      };
+    }
+  }
+  const mapKeys = [
+    "objectsDestroyedByType",
+    "itemsDroppedByRarity",
+    "itemsNotPickedByRarity",
+    "itemsPickedByRarity",
+    "itemsDestroyedByRarity",
   ];
+  const statMaps = Object.fromEntries(mapKeys.map((key) => [key, normalizeStatMap(stats[key])]));
+  return {
+    ...base,
+    ...Object.fromEntries(Object.keys(base)
+      .filter((key) => key !== "killsByMonster")
+      .map((key) => [key, Math.max(0, Math.floor(Number(stats[key]) || 0))])),
+    killsByMonster,
+    ...statMaps,
+  };
 }
 
-function drawTerrainDecal(ctx, decal, x, y) {
+function normalizeStatMap(record) {
+  if (!record || typeof record !== "object") return {};
+  return Object.fromEntries(Object.entries(record)
+    .map(([key, value]) => [key, Math.max(0, Math.floor(Number(value) || 0))])
+    .filter(([, value]) => value > 0));
+}
+
+function incrementStatMap(record, key, amount = 1) {
+  if (!record || !key) return;
+  record[key] = Math.max(0, Math.floor(Number(record[key]) || 0)) + Math.max(1, Math.floor(Number(amount) || 1));
+}
+
+function decrementStatMap(record, key, amount = 1) {
+  if (!record || !key) return;
+  const next = Math.max(0, Math.floor(Number(record[key]) || 0) - Math.max(1, Math.floor(Number(amount) || 1)));
+  if (next > 0) record[key] = next;
+  else delete record[key];
+}
+
+function itemRarityBucket(item) {
+  if (item?.mode === "quest") return "quest";
+  return item?.rarity ?? "normal";
+}
+
+function questItemTargetsForQuest(quest) {
+  const targets = [];
+  if (Array.isArray(quest?.target?.questItems)) {
+    targets.push(...quest.target.questItems.filter((target) => target?.questItemId));
+  }
+  if (quest?.target?.questItemId) {
+    targets.push({
+      questItemId: quest.target.questItemId,
+      count: quest.target.count ?? 1,
+      source: quest.target.source,
+      dropChance: quest.target.dropChance,
+      dropRegionIds: quest.target.dropRegionIds,
+    });
+  }
+  return targets;
+}
+
+function questItemCount(items, questInstanceId, questItemId) {
+  return (items ?? []).reduce((sum, item) => (
+    item?.mode === "quest"
+    && String(item.questInstanceId) === String(questInstanceId)
+    && String(item.questItemId) === String(questItemId)
+      ? sum + 1
+      : sum
+  ), 0);
+}
+
+function questConsumesQuestItem(quest, item) {
+  if (!item || item.mode !== "quest" || String(item.questInstanceId) !== String(quest?.id)) return false;
+  return questItemTargetsForQuest(quest).some((target) => String(target.questItemId) === String(item.questItemId));
+}
+
+function inventoryCanAccept(inventory, item) {
+  if (!item) return true;
+  if (item.mode !== "resource") return inventory.length < MAX_INVENTORY;
+  let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+  const stackMax = resourceStackMax(item.resourceId);
+  for (const stack of inventory) {
+    if (stack.mode !== "resource" || stack.resourceId !== item.resourceId) continue;
+    const room = stackMax - Math.max(1, Math.floor(Number(stack.count) || 1));
+    const moved = Math.min(room, remaining);
+    remaining -= moved;
+    stack.count = Math.max(1, Math.floor(Number(stack.count) || 1)) + moved;
+    if (remaining <= 0) return true;
+  }
+  while (remaining > 0) {
+    if (inventory.length >= MAX_INVENTORY) return false;
+    const count = Math.min(stackMax, remaining);
+    inventory.push({ ...item, count });
+    remaining -= count;
+  }
+  return true;
+}
+
+function makeQuestInstance(def, npcId, context = {}) {
+  const npc = QUEST_NPCS[npcId];
+  if (def.id === "vengeance") {
+    const monster = context.monster ?? "monstre";
+    const count = Math.max(1, Math.floor(Number(context.count) || def.target.countMin || 5));
+    return {
+      id: `${def.id}:${monster}:${context.regionSeed}:${context.regionIndex}`,
+      questId: def.id,
+      npcId,
+      title: def.titleTemplate.replace("{monster}", monster),
+      repeatable: true,
+      type: def.type,
+      story: def.storyTemplate.replace("{npcName}", npc?.name ?? "En questgiver").replace("{monster}", monster),
+      acceptText: def.acceptTextTemplate.replace("{count}", count).replace("{monster}", monster),
+      turnInText: def.turnInTextTemplate,
+      target: { monster, count, allowElite: true },
+      progress: { kills: 0 },
+      rewards: { ...def.rewards },
+    };
+  }
+
+  return {
+    id: `${def.id}:${context.regionSeed}:${context.regionIndex}`,
+    questId: def.id,
+    npcId,
+    title: def.title,
+    repeatable: Boolean(def.repeatable),
+    type: def.type,
+    story: def.story,
+    acceptText: def.acceptText,
+    turnInText: def.turnInText,
+    target: { ...def.target },
+    progress: def.type === "collect_quest_item" ? { items: 0 } : def.type === "clear_map" ? { kills: 0, total: null, cleared: false } : {},
+    rewards: { ...def.rewards },
+  };
+}
+
+function isQuestComplete(quest, inventory = []) {
+  if (quest.type === "clear_map") {
+    return quest.progress?.cleared === true;
+  }
+  if (quest.type === "kill_monsters") {
+    return Math.max(0, Math.floor(Number(quest.progress?.kills) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));
+  }
+  if (quest.type === "collect_quest_item") {
+    // legacy quest that uses quest items dropped/picked up
+    const questItemTargets = questItemTargetsForQuest(quest);
+    if (questItemTargets.length > 0) {
+      if (!questItemTargets.every((target) => (
+        questItemCount(inventory, quest.id, target.questItemId) >= Math.max(1, Math.floor(Number(target.count) || 1))
+      ))) return false;
+    }
+    // resource-based or specific-item requirements: evaluate against current inventory
+    const inv = Array.isArray(inventory) ? inventory : (quest._cachedInventory || []);
+    inventory = inv;
+    // resources
+    if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
+      if (!quest.target.resources.every((r) => resourceCount(inventory, r.resource) >= (r.count ?? 1))) return false;
+    }
+    // specific items
+    if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
+      for (const req of quest.target.items) {
+        let needed = Math.max(1, Math.floor(Number(req.count) || 1));
+        for (const item of inventory) {
+          if (needed <= 0) break;
+          if (!item) continue;
+          let match = true;
+          if (req.templateId) match = match && (String(item.uniqueId) === String(req.templateId) || String(item.namedId) === String(req.templateId));
+          if (req.namePrefix) match = match && String(item.name || "").startsWith(`${req.namePrefix} `);
+          if (req.baseName) match = match && String(item.baseName || "") === String(req.baseName);
+          if (req.rarity) match = match && String(item.rarity || "") === String(req.rarity);
+          if (match) needed -= 1;
+        }
+        if (needed > 0) return false;
+      }
+      return true;
+    }
+    return questItemTargets.length > 0 || (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0);
+  }
+  return false;
+}
+
+function questSnapshot(quest, inventory = []) {
+  if (!quest) return null;
+  const npc = QUEST_NPCS[quest.npcId];
+  // prefer provided inventory, otherwise fallback to cached inventory on quest
+  const inv = Array.isArray(inventory) && inventory.length ? inventory : (quest._cachedInventory || []);
+  const complete = isQuestComplete(quest, inv);
+  return {
+    ...quest,
+    npcName: npc?.name ?? quest.npcId,
+    npcTitle: npc?.title ?? "Questgiver",
+    npcImageUrl: npc?.imageUrl,
+    complete,
+    progressText: questProgressText(quest, inv),
+  };
+}
+
+function questProgressText(quest, inventory = []) {
+  if (quest.type === "clear_map") {
+    if (quest.progress?.cleared) return "Ryddet – klar til indlevering";
+    const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
+    const total = quest.progress?.total ?? "?";
+    return `${kills} / ${total} edderkopper`;
+  }
+  if (quest.type === "kill_monsters") {
+    return `${Math.max(0, Math.floor(Number(quest.progress?.kills) || 0))} / ${Math.max(1, Math.floor(Number(quest.target?.count) || 1))} ${quest.target?.monster ?? "kills"}`;
+  }
+  if (quest.type === "collect_quest_item") {
+    // legacy quest item progress
+    const parts = [];
+    for (const target of questItemTargetsForQuest(quest)) {
+      const item = QUEST_ITEM_DEFS[target.questItemId];
+      parts.push(`${questItemCount(inventory, quest.id, target.questItemId)} / ${Math.max(1, Math.floor(Number(target.count) || 1))} ${item?.name ?? target.questItemId}`);
+    }
+    // resources
+    if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
+      parts.push(...quest.target.resources.map((r) => `${resourceCount(inventory, r.resource)} / ${r.count ?? 1} ${r.resource}`));
+    }
+    // specific items
+    if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
+      parts.push(...quest.target.items.map((req) => {
+        // count matching items in inventory
+        let have = 0;
+        for (const item of inventory) {
+          let match = true;
+          if (req.templateId) match = match && (String(item.uniqueId) === String(req.templateId) || String(item.namedId) === String(req.templateId));
+          if (req.namePrefix) match = match && String(item.name || "").startsWith(`${req.namePrefix} `);
+          if (req.baseName) match = match && String(item.baseName || "") === String(req.baseName);
+          if (req.rarity) match = match && String(item.rarity || "") === String(req.rarity);
+          if (match) have += 1;
+        }
+        return `${have} / ${req.count ?? 1} ${req.templateId ?? req.namePrefix ?? req.baseName ?? "item"}`;
+      }));
+    }
+    return parts.join(", ");
+  }
+  return "";
+}
+
+function normalizeSavedQuestState(saved) {
+  const rawActive = Array.isArray(saved?.active)
+    ? saved.active
+      .filter((quest) => quest && typeof quest === "object" && quest.id && quest.questId && quest.npcId)
+      .map((quest) => ({
+        ...quest,
+        id: String(quest.id),
+        questId: String(quest.questId),
+        npcId: String(quest.npcId),
+        title: String(quest.title ?? quest.questId),
+        type: String(quest.type ?? QUEST_DEFS[quest.questId]?.type ?? ""),
+        repeatable: Boolean(quest.repeatable),
+        story: String(quest.story ?? ""),
+        acceptText: String(quest.acceptText ?? ""),
+        turnInText: String(quest.turnInText ?? ""),
+        target: { ...(quest.target ?? {}) },
+        progress: { ...(quest.progress ?? {}) },
+        rewards: { ...(quest.rewards ?? {}) },
+      }))
+    : [];
+  const seenNpcs = new Set();
+  const active = rawActive.filter((quest) => {
+    if (seenNpcs.has(quest.npcId)) return false;
+    seenNpcs.add(quest.npcId);
+    return true;
+  });
+  return {
+    active,
+    completed: Array.isArray(saved?.completed) ? saved.completed.map(String) : [],
+    wildernessNpc: null,
+    cityFade: [],
+  };
+}
+
+const npcImageCache = new Map();
+
+function drawQuestgiver(ctx, screen, questgiver, time) {
+  const npc = QUEST_NPCS[questgiver.npcId];
+  const image = getNpcImage(npc?.imageUrl);
+  const bob = Math.sin(time * 3.2 + questgiver.bob) * 3;
+  drawShadow(ctx, screen.x, screen.y + 13, 19, 7, 0.26);
+
+  if (image) {
+    const height = 96;
+    const width = height * (image.naturalWidth / image.naturalHeight);
+    ctx.save();
+    ctx.drawImage(image, screen.x - width * 0.5, screen.y - height + 16 + bob, width, height);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.fillStyle = "#d6c18a";
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y - 34 + bob, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawQuestMarkerPip(ctx, screen.x, screen.y - 82 + bob, time + questgiver.bob);
+}
+
+function drawQuestMarkerPip(ctx, x, y, time) {
+  const pulse = 0.9 + Math.sin(time * 5) * 0.1;
+  ctx.save();
+  ctx.shadowColor = "#ffd94a";
+  ctx.shadowBlur = 10;
+  ctx.strokeStyle = "#4a2b05";
+  ctx.lineCap = "round";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 15 * pulse);
+  ctx.lineTo(x, y - 2);
+  ctx.stroke();
+  ctx.fillStyle = "#4a2b05";
+  ctx.beginPath();
+  ctx.arc(x, y + 8, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#ffd94a";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 15 * pulse);
+  ctx.lineTo(x, y - 2);
+  ctx.stroke();
+  ctx.fillStyle = "#ffd94a";
+  ctx.beginPath();
+  ctx.arc(x, y + 8, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function getNpcImage(url) {
+  if (!url) return null;
+  const cached = npcImageCache.get(url);
+  if (cached?.loaded) return cached.image;
+  if (cached) return null;
+  const image = new Image();
+  image.onload = () => {
+    const entry = npcImageCache.get(url);
+    if (entry) entry.loaded = true;
+  };
+  image.onerror = () => npcImageCache.delete(url);
+  image.src = url;
+  npcImageCache.set(url, { image, loaded: false });
+  return null;
+}
+
+function isDestructibleObject(object) {
+  const def = getDestructibleDef(object);
+  return Boolean(def && (object.hp === undefined || object.hp > 0));
+}
+
+function getDestructibleDef(object) {
+  if (!object) return null;
+  if (object.destructible === false) return null;
+  if (object.destructibleProfile && DESTRUCTIBLE_OBJECTS[object.destructibleProfile]) {
+    return DESTRUCTIBLE_OBJECTS[object.destructibleProfile];
+  }
+  return DESTRUCTIBLE_OBJECTS[object.type] ?? null;
+}
+
+function destructibleObjectScreenHit(object) {
+  const size = Math.max(0.7, Number(object?.size) || 1);
+  const baseRadius = 30 + (Number(object?.radius) || 0.4) * 36;
+  if (object.type === "building") return { offsetY: 72 * size, radius: Math.max(baseRadius, 74 * size) };
+  if (object.type === "pine" || object.type === "old-oak") return { offsetY: 64 * size, radius: Math.max(baseRadius, 68 * size) };
+  if (object.type === "ruin") return { offsetY: 46 * size, radius: Math.max(baseRadius, 58 * size) };
+  if (object.type === "pillar") return { offsetY: 48 * size, radius: Math.max(baseRadius, 48 * size) };
+  if (object.type === "crystal") return { offsetY: 38 * size, radius: Math.max(baseRadius, 42 * size) };
+  return { offsetY: 26 * size, radius: Math.max(baseRadius, 42 * size) };
+}
+
+function drawTerrainDecal(ctx, decal, x, y, atlas) {
   const s = decal.size;
+
+  if (decal.decaySheetId && atlas?.decaySheets?.[decal.decaySheetId]) {
+    const sheet = atlas.decaySheets[decal.decaySheetId];
+    const cells = sheet?.cells ?? [];
+    const variant = Number.isInteger(decal.decayVariant)
+      ? decal.decayVariant
+      : 0;
+    const cell = cells[(Math.abs(variant) % Math.max(1, cells.length))] ?? cells[0];
+    if (cell) {
+      const source = sheet.canvas;
+      const scale = s * (Number(decal.decayRenderScale) || Number(sheet.renderScale) || 1);
+      const width = Math.max(8, TILE_W * scale);
+      const height = Math.max(4, TILE_H * scale);
+      const alpha = Math.max(0.08, Math.min(0.85, Number(decal.alpha) || 0.34));
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(decal.rotation || 0);
+      ctx.globalAlpha *= alpha;
+      ctx.drawImage(
+        source,
+        cell.x,
+        cell.y,
+        cell.w,
+        cell.h,
+        -width * 0.5,
+        -height * 0.5,
+        width,
+        height,
+      );
+      ctx.restore();
+      return;
+    }
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(decal.rotation);

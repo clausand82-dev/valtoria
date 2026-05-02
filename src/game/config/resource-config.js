@@ -29,6 +29,8 @@ export const RESOURCE_DEFS = {
   meat: { name: "Meat", stackMax: 25, value: 2, sheet: "resources", iconIndex: 8, color: "#c8786c" },
   fruit: { name: "Fruit", stackMax: 25, value: 2, sheet: "resources", iconIndex: 9, color: "#d5b84e" },
   coal: { name: "Coal", stackMax: 100, value: 2, sheet: "resources", iconIndex: 10, color: "#4d4a48" },
+  paper: { name: "Paper", stackMax: 100, value: 2, sheet: "resources", iconIndex: 8, color: "#f3f4aa" },
+  scroll: { name: "Scroll", stackMax: 20, value: 2, sheet: "resources", iconIndex: 9, color: "#ffbb00" },
   junk: { name: "Junk", stackMax: 100, value: 1, sheet: "resources", iconIndex: 11, color: "#8f887d" },
 
   // res_sheet_002 gemstones
@@ -55,6 +57,7 @@ export const GEMSTONE_RESOURCE_IDS = [
 export const RESOURCE_MERGE_RECIPES = [
   { inputs: { rock_piece: 5 }, output: "stone_brick", count: 1 },
   { inputs: { iron_piece: 3 }, output: "iron_bar", count: 1, requiresFire: true },
+  { inputs: { wood_piece: 2 }, output: "coal", count: 1, requiresFire: true },
   { inputs: { wood_piece: 10 }, output: "wood_plank", count: 1 },
   { inputs: { crystal_piece: 50 }, output: "crystal", count: 1 },
   { inputs: { red_gemstone: 1, blue_gemstone: 1, green_gemstone: 1 }, output: "purple_gemstone", count: 1 },
@@ -128,6 +131,27 @@ export const DESTRUCTIBLE_OBJECTS = {
       { resource: "diamond", min: 1, max: 1, chance: 0.0006 },
     ],
   },
+  ruin: {
+    hp: 64,
+    damageStages: 3,
+    particleColor: "#9a9488",
+    loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
+    rareLoot: [
+      { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
+      { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+    ],
+    // Very rare: random red-quality (legendary) equipment items.
+    itemLoot: [
+      { rarity: "legendary", chance: 0.0035, tries: 120 },
+    ],
+  },
+  pillar: {
+    hp: 52,
+    damageStages: 3,
+    particleColor: "#9a9488",
+    loot: [{ resource: "stone_brick", min: 1, max: 2, chance: 1 }],
+    rareLoot: [],
+  },
   crystal: {
     hp: 55,
     damageStages: 3,
@@ -171,22 +195,31 @@ export const DESTRUCTIBLE_OBJECTS = {
       { resource: "diamond", min: 1, max: 1, chance: 0.00045 },
     ],
   },
-};
-
-// Rare gemstone drop for alle mobs. Brug samme struktur senere, hvis enkelte
-// mobs skal have egne resource drops.
-export const MONSTER_RESOURCE_DROPS = {
-  default: {
+  object_woodboxes_ground: {
+    hp: 52,
+    damageStages: 3,
+    particleColor: "#c99b5d",
     loot: [
-      { resource: "meat", min: 1, max: 2, chance: 0.18 },
-      { resource: "fruit", min: 1, max: 2, chance: 0.12 },
+      { resource: "junk", min: 1, max: 3, chance: 1 },
+      { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
+      { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
     ],
-    rareLoot: GEMSTONE_RESOURCE_IDS.map((resource) => ({
-      resource,
-      min: 1,
-      max: 1,
-      chance: 0.0025,
-    })),
+    rareLoot: [
+      { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+    ],
+  },
+  object_shelfs: {
+    hp: 52,
+    damageStages: 3,
+    particleColor: "#c99b5d",
+    loot: [
+      { resource: "health", min: 1, max: 3, chance: 0.1 },
+      { resource: "paper", min: 1, max: 4, chance: 0.1 },
+      { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
+    ],
+    rareLoot: [
+      { resource: "diamond", min: 1, max: 1, chance: 0.005 },
+    ],
   },
 };
 

@@ -6,6 +6,10 @@ import {
   OBJECT_SHEETS,
   TREE_SHEETS,
 } from "./config/asset-config.js";
+import { buildDecaySheetId, DECAY_SET_DEFS } from "./config/decay-config.js";
+import { REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { MAP_REGION_SETS } from "./config/map-region-config.js";
+import { collectRegionAssetOverrides } from "./config/region-asset-config.js";
 
 export const ATLAS_FRAMES = {
   grassTile: { x: 8, y: 24, w: 296, h: 174 },
@@ -44,7 +48,7 @@ const HERO_SHEET = {
 const MONSTER_SHEETS = [
   {
     id: "demon",
-    url: "/assets/generated/demon-animated-sheet.png",
+    url: "/assets/generated/mobs/demon_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -58,7 +62,7 @@ const MONSTER_SHEETS = [
   },
   {
     id: "skeleton",
-    url: "/assets/generated/skeleton-animated-sheet.png",
+    url: "/assets/generated/mobs/skeleton_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -72,7 +76,7 @@ const MONSTER_SHEETS = [
   },
   {
     id: "ghost",
-    url: "/assets/generated/ghost-animated-sheet.png",
+    url: "/assets/generated/mobs/ghost_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -86,7 +90,7 @@ const MONSTER_SHEETS = [
   },
   {
     id: "scorpion",
-    url: "/assets/generated/scorpion_animated_sheet.png",
+    url: "/assets/generated/mobs/scorpion_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -100,7 +104,7 @@ const MONSTER_SHEETS = [
   },
   {
     id: "snake",
-    url: "/assets/generated/snake_animated_sheet.png",
+    url: "/assets/generated/mobs/snake_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -114,7 +118,7 @@ const MONSTER_SHEETS = [
   },
   {
     id: "spider",
-    url: "/assets/generated/spider_animated_sheet.png",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -123,12 +127,54 @@ const MONSTER_SHEETS = [
       { name: "attack", row: 2, frames: 4 },
     ],
     scale: 0.43,
-    shadowW: 30, shadowH: 10, shadowAlpha: 0.34,
+    shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17,
     yOffset: 38,
+  },
+    {
+    id: "minispider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.10,
+    shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4,
+    yOffset: 9,
+  },
+  {
+    id: "mediumspider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.20,
+    shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8,
+    yOffset: 18,
+  },
+  {
+    id: "largespider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: [
+      { name: "idle",   row: 0, frames: 4 },
+      { name: "walk",   row: 1, frames: 4 },
+      { name: "attack", row: 2, frames: 4 },
+    ],
+    scale: 0.55,
+    shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22,
+    yOffset: 49,
   },
   {
     id: "wolf",
-    url: "/assets/generated/wolf_animated_sheet.png",
+    url: "/assets/generated/mobs/wolf_animated_sheet.png",
     rows: 3,
     cols: 4,
     sequences: [
@@ -162,18 +208,33 @@ export function loadGeneratedAtlas() {
     loadChromaImage("/assets/generated/runebound-atlas-source.png"),
     loadGroundSheets(),
     loadTreeSheets(),
+    loadWaterSheet(),
     loadFoliageSheet(),
+    loadDecaySheets(),
     loadItemSheet(),
     loadResourceSheet(),
     loadArmorSheet(),
     loadObjectSheets(),
-  ]).then(([canvas, groundSheets, treeSheets, foliageSheet, itemSheet, resourceSheet, armorSheet, objectSheets]) => ({
+  ]).then(([
+    canvas,
+    groundSheets,
+    treeSheets,
+    waterSheet,
+    foliageSheet,
+    decaySheets,
+    itemSheet,
+    resourceSheet,
+    armorSheet,
+    objectSheets,
+  ]) => ({
     canvas,
     frames: ATLAS_FRAMES,
     sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
     groundSheets,
     treeSheets,
+    waterSheet,
     foliageSheet,
+    decaySheets,
     itemSheet,
     resourceSheet,
     armorSheet,
@@ -358,24 +419,38 @@ function loadRawImage(src) {
 }
 
 function loadGroundSheets() {
+  const regionAssetOverrides = collectRegionAssetOverrides(MAP_REGION_SETS);
+  const customGroundSpecs = regionAssetOverrides.groundSheets.map((entry) => ({
+    biomeId: entry.sheetId,
+    fileName: entry.fileName,
+    sourceInset: 0.025,
+    edgeFeather: 0.12,
+    textureAlpha: 1,
+    visualScale: 1.18,
+    baseAlpha: 0.18,
+  }));
+  const biomeGroundSpecs = Object.entries(GROUND_SHEETS).map(([biomeId, config]) => ({
+    biomeId,
+    fileName: typeof config === "string" ? config : config.fileName,
+    sourceInset: typeof config === "string" ? 0 : config.sourceInset ?? 0,
+    edgeFeather: typeof config === "string" ? 0 : config.edgeFeather ?? 0,
+    textureAlpha: typeof config === "string" ? 1 : config.textureAlpha ?? 1,
+    visualScale: typeof config === "string" ? 1 : config.visualScale ?? 1,
+    baseAlpha: typeof config === "string" ? 1 : config.baseAlpha ?? 1,
+  }));
+
   return Promise.all(
-    Object.entries(GROUND_SHEETS).map(([biomeId, config]) => {
-      const fileName = typeof config === "string" ? config : config.fileName;
-      const sourceInset = typeof config === "string" ? 0 : config.sourceInset ?? 0;
-      const edgeFeather = typeof config === "string" ? 0 : config.edgeFeather ?? 0;
-      const textureAlpha = typeof config === "string" ? 1 : config.textureAlpha ?? 1;
-      const visualScale = typeof config === "string" ? 1 : config.visualScale ?? 1;
-      const baseAlpha = typeof config === "string" ? 1 : config.baseAlpha ?? 1;
-      return loadGroundImage(`/assets/generated/${fileName}`).then((canvas) => [biomeId, makeGroundSheet(canvas, {
-        sourceInset,
-        edgeFeather,
-        textureAlpha,
-        visualScale,
-        baseAlpha,
+    [...biomeGroundSpecs, ...customGroundSpecs].map((spec) => {
+      return loadGroundImage(`/assets/generated/${spec.fileName}`).then((canvas) => [spec.biomeId, makeGroundSheet(canvas, {
+        sourceInset: spec.sourceInset,
+        edgeFeather: spec.edgeFeather,
+        textureAlpha: spec.textureAlpha,
+        visualScale: spec.visualScale,
+        baseAlpha: spec.baseAlpha,
       })])
         .catch((error) => {
-          console.warn(`Ground sheet load failed for ${biomeId}: ${fileName}`, error);
-          return [biomeId, null];
+          console.warn(`Ground sheet load failed for ${spec.biomeId}: ${spec.fileName}`, error);
+          return [spec.biomeId, null];
         });
     }),
   ).then((entries) => {
@@ -386,6 +461,15 @@ function loadGroundSheets() {
     }
     return sheets;
   });
+}
+
+function loadWaterSheet() {
+  return loadRawImage("/assets/generated/tileset/tileset_water.png")
+    .then((canvas) => makeTileSheet(canvas, 4, 4))
+    .catch((error) => {
+      console.warn("Water sheet load failed: tileset/tileset_water.png", error);
+      return null;
+    });
 }
 
 function loadTreeSheets() {
@@ -413,15 +497,41 @@ function loadTreeSheets() {
   });
 }
 
+function normalizeFoliageSheetSpec(id, config, defaultGrid = 8) {
+  if (typeof config === "string") {
+    return {
+      id,
+      fileName: config,
+      rows: defaultGrid,
+      cols: defaultGrid,
+    };
+  }
+  return {
+    id,
+    fileName: config?.fileName,
+    rows: Number(config?.rows) > 0 ? Math.floor(Number(config.rows)) : defaultGrid,
+    cols: Number(config?.cols) > 0 ? Math.floor(Number(config.cols)) : defaultGrid,
+  };
+}
+
 function loadFoliageSheet() {
+  const regionAssetOverrides = collectRegionAssetOverrides(MAP_REGION_SETS);
+  const biomeSpecs = Object.entries(FOLIAGE_SHEETS).map(([id, config]) => normalizeFoliageSheetSpec(id, config, 8));
+  const customSpecs = regionAssetOverrides.foliageSheets.map((entry) => ({
+    id: entry.sheetId,
+    fileName: entry.fileName,
+    rows: entry.rows,
+    cols: entry.cols,
+  }));
+
   return Promise.all(
-    Object.entries(FOLIAGE_SHEETS).map(([id, fileName]) => (
-      loadChromaImage(`/assets/generated/${fileName}`)
-        .then(makeFoliageSheet)
-        .then((sheet) => [id, sheet])
+    [...biomeSpecs, ...customSpecs].map((spec) => (
+      loadChromaImage(`/assets/generated/${spec.fileName}`)
+        .then((canvas) => makeFoliageSheet(canvas, { rows: spec.rows, cols: spec.cols }))
+        .then((sheet) => [spec.id, sheet])
         .catch((error) => {
-          console.warn(`Foliage sheet load failed for ${id}: ${fileName}`, error);
-          return [id, null];
+          console.warn(`Foliage sheet load failed for ${spec.id}: ${spec.fileName}`, error);
+          return [spec.id, null];
         })
     )),
   ).then((entries) => {
@@ -438,43 +548,53 @@ function loadFoliageSheet() {
 }
 
 function loadItemSheet() {
-  return loadChromaImage("/assets/generated/items001_sheet.png")
-    .then((canvas) => makeItemSheet(canvas, 3, 4))
-    .catch((error) => {
-      console.warn("Item sheet load failed: items001_sheet.png", error);
-      return null;
-    });
+  return Promise.resolve(null);
 }
 
 function loadResourceSheet() {
-  return Promise.all([
-    loadChromaImage("/assets/generated/res_sheet_001.png")
-      .then((canvas) => ["resources", makeItemSheet(canvas, 3, 4)])
-      .catch((error) => {
-        console.warn("Resource sheet load failed: res_sheet_001.png", error);
-        return ["resources", null];
-      }),
-    loadChromaImage("/assets/generated/res_sheet_002.png")
-      .then((canvas) => ["gemstones", makeItemSheet(canvas, 3, 4)])
-      .catch((error) => {
-        console.warn("Resource sheet load failed: res_sheet_002.png", error);
-        return ["gemstones", null];
-      }),
-  ]).then((entries) => Object.fromEntries(entries));
+  return Promise.resolve({
+    resources: null,
+    gemstones: null,
+  });
 }
 
 function loadArmorSheet() {
-  return loadChromaImage("/assets/generated/armor001_sheet.png")
-    .then((canvas) => makeItemSheet(canvas, 3, 4))
-    .catch((error) => {
-      console.warn("Armor sheet load failed: armor001_sheet.png", error);
-      return null;
-    });
+  return Promise.resolve(null);
+}
+
+function loadDecaySheets() {
+  const entries = Object.entries(DECAY_SET_DEFS ?? {});
+  if (!entries.length) return Promise.resolve({});
+
+  return Promise.all(entries.map(([id, def]) => {
+    const rows = Math.max(1, Math.floor(Number(def?.rows) || 4));
+    const cols = Math.max(1, Math.floor(Number(def?.cols) || 4));
+    const sheetId = buildDecaySheetId(id);
+    return loadChromaImage(`/assets/generated/${def.fileName}`)
+      .then((canvas) => [sheetId, {
+        ...makeTileSheet(canvas, rows, cols),
+        renderScale: Number.isFinite(Number(def?.renderScale)) ? Number(def.renderScale) : 1,
+      }])
+      .catch((error) => {
+        console.warn(`Decay sheet load failed: ${id} (${def.fileName})`, error);
+        return [sheetId, null];
+      });
+  })).then((loaded) => {
+    const sheets = {};
+    for (const [sheetId, sheet] of loaded) {
+      if (sheet) sheets[sheetId] = sheet;
+    }
+    return sheets;
+  });
 }
 
 function loadObjectSheets() {
+  const mergedObjectSheets = {
+    ...OBJECT_SHEETS,
+    ...REGION_OBJECT_SHEETS,
+  };
   const urlMap = new Map();
-  for (const biomeSheets of Object.values(OBJECT_SHEETS)) {
+  for (const biomeSheets of Object.values(mergedObjectSheets)) {
     for (const config of Object.values(biomeSheets)) {
       const key = getObjectSheetConfigKey(config);
       if (!urlMap.has(key)) {
@@ -484,7 +604,7 @@ function loadObjectSheets() {
   }
 
   const entries = [];
-  for (const [type, biomeSheets] of Object.entries(OBJECT_SHEETS)) {
+  for (const [type, biomeSheets] of Object.entries(mergedObjectSheets)) {
     for (const [biomeId, config] of Object.entries(biomeSheets)) {
       const key = getObjectSheetConfigKey(config);
       entries.push(
@@ -656,11 +776,15 @@ function makeTreeSheet(canvas) {
   return { canvas, rows, cols, cells };
 }
 
-function makeFoliageSheet(canvas) {
+function makeFoliageSheet(canvas, options = {}) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const rows = 8;
-  const cols = 8;
+  const rows = Math.max(1, Math.floor(Number(options.rows) || 8));
+  const cols = Math.max(1, Math.floor(Number(options.cols) || 8));
+  const gridScale = Math.min(rows, cols) / 8;
+  const renderScale = Number.isFinite(Number(options.renderScale))
+    ? Number(options.renderScale)
+    : Math.max(0.35, Math.min(1, gridScale));
   const cells = [];
 
   for (let row = 0; row < rows; row += 1) {
@@ -689,7 +813,7 @@ function makeFoliageSheet(canvas) {
     }
   }
 
-  return { canvas, rows, cols, cells };
+  return { canvas, rows, cols, cells, renderScale };
 }
 
 function makeItemSheet(canvas, rows, cols) {
@@ -721,9 +845,32 @@ function makeItemSheet(canvas, rows, cols) {
   return { canvas, rows, cols, cells };
 }
 
+function makeTileSheet(canvas, rows, cols) {
+  const cells = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const x = Math.round((col * canvas.width) / cols);
+      const y = Math.round((row * canvas.height) / rows);
+      const nextX = Math.round(((col + 1) * canvas.width) / cols);
+      const nextY = Math.round(((row + 1) * canvas.height) / rows);
+      cells.push({
+        x,
+        y,
+        w: nextX - x,
+        h: nextY - y,
+        index: row * cols + col,
+      });
+    }
+  }
+  return { canvas, rows, cols, cells };
+}
+
 function makeObjectSheet(canvas, rows, cols, options = {}) {
   const cells = [];
   const frameCount = options.frameCount ?? rows * cols;
+  const samplePadX = 8;
+  const samplePadTop = 16;
+  const samplePadBottom = 8;
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -745,16 +892,24 @@ function makeObjectSheet(canvas, rows, cols, options = {}) {
         continue;
       }
 
+      const cellW = nextX - x;
+      const cellH = nextY - y;
+      const sampleX = Math.max(0, x - samplePadX);
+      const sampleY = Math.max(0, y - samplePadTop);
+      const sampleW = Math.min(canvas.width - sampleX, cellW + samplePadX * 2);
+      const sampleH = Math.min(canvas.height - sampleY, cellH + samplePadTop + samplePadBottom);
       const sprite = isolateSprite(canvas, {
-        x,
-        y,
-        w: nextX - x,
-        h: nextY - y,
+        x: sampleX,
+        y: sampleY,
+        w: sampleW,
+        h: sampleH,
       }, {
         minArea: 120,
-        keepNearby: true,
-        nearbyRadiusMult: 1.15,
-        nearbyRatio: 0.025,
+        keepNearby: false,
+        focusX: x + cellW * 0.5 - sampleX,
+        focusY: y + cellH * 0.78 - sampleY,
+        focus2X: x + cellW * 0.5 - sampleX,
+        focus2Y: y + cellH * 0.9 - sampleY,
       });
       cells.push({
         sprite: normalizeObjectSprite(sprite),
@@ -1926,8 +2081,12 @@ export function drawAtlasFrame(ctx, atlas, key, x, y, options = {}) {
 }
 
 export function drawGroundTile(ctx, atlas, biomeId, variant, x, y, options = {}) {
+  if (options.water) {
+    return drawWaterTile(ctx, atlas, options.waterVariant ?? variant, x, y, options);
+  }
+
   const sheets = atlas?.groundSheets;
-  const sheet = sheets?.[biomeId] ?? sheets?.mainland;
+  const sheet = sheets?.[options.groundSheetId] ?? sheets?.[biomeId] ?? sheets?.mainland;
   if (!sheet) {
     return drawAtlasFrame(ctx, atlas, "grassTile", x, y + 82, {
       width: TILE_W * 1.14,
@@ -1948,6 +2107,37 @@ export function drawGroundTile(ctx, atlas, biomeId, variant, x, y, options = {})
     drawGroundPathOverlay(ctx, x, centerY, halfW, halfH, options.pathColor ?? "rgba(112, 86, 48, 0.24)");
   }
 
+  return true;
+}
+
+function drawWaterTile(ctx, atlas, variant, x, y, options = {}) {
+  const sheet = atlas?.waterSheet;
+  const frame = sheet?.cells?.[Math.abs(Math.floor(variant ?? 0)) % sheet.cells.length];
+  const halfW = TILE_W * 0.5 + 1;
+  const halfH = TILE_H * 0.5 + 1;
+  const centerY = y + TILE_H * 0.5;
+
+  drawGroundBase(ctx, x, centerY, halfW, halfH, options.baseColor ?? "#1f5f7f", options.baseAlpha ?? 1);
+  if (!sheet || !frame) {
+    drawGroundBase(ctx, x, centerY, halfW * 0.94, halfH * 0.88, "#2c86a3", 0.9);
+    return true;
+  }
+
+  ctx.save();
+  traceGroundDiamond(ctx, x, centerY, halfW, halfH);
+  ctx.clip();
+  ctx.drawImage(
+    sheet.canvas,
+    frame.x,
+    frame.y,
+    frame.w,
+    frame.h,
+    x - halfW,
+    centerY - halfH,
+    halfW * 2,
+    halfH * 2,
+  );
+  ctx.restore();
   return true;
 }
 
@@ -2084,7 +2274,13 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
     return drawTreeObject(ctx, object, screen, biome, atlas, time);
   }
 
-  if (object.type === "building" || object.type === "ruin" || object.type === "crystal" || object.type === "chest" || object.type === "firebeacon" || object.type === "fireplace") {
+  if (atlas?.objectSheets?.[object.type]
+    || object.type === "building"
+    || object.type === "ruin"
+    || object.type === "crystal"
+    || object.type === "chest"
+    || object.type === "firebeacon"
+    || object.type === "fireplace") {
     return drawSheetObject(ctx, object, screen, biome, atlas, time);
   }
 
@@ -2117,7 +2313,9 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
 
 function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const sheetsByBiome = atlas?.objectSheets?.[object.type];
-  const sheet = sheetsByBiome?.[biome?.id] ?? sheetsByBiome?.mainland;
+  const sheet = sheetsByBiome?.[biome?.id]
+    ?? sheetsByBiome?.default
+    ?? sheetsByBiome?.mainland;
   const cells = sheet?.cells;
   if (!cells?.length) return false;
 
@@ -2307,7 +2505,8 @@ export function drawFoliageSprite(ctx, object, screen, biome, atlas, time = 0) {
   const sprite = cell?.sprite;
   if (!sprite) return false;
 
-  const scale = 0.38 * object.size * (object.visualScale ?? 1);
+  const sheetScale = Number(sheet?.renderScale) || 1;
+  const scale = 0.38 * object.size * (object.visualScale ?? 1) * sheetScale;
   const width = sprite.width * scale;
   const height = sprite.height * scale;
   const bob = Math.sin(time * 1.15 + object.animSeed) * (object.wind ?? 0) * 2;

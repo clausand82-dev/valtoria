@@ -89,6 +89,7 @@ export const OBJECT_SPAWN_TUNING = {
   pillar: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
   obelisk: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
   crystal: { radius: 0.34, sizeBase: 0.9, sizeRange: 0, sizeSalt: 0 },
+  object_woodboxes_ground: { radius: 0.46, sizeBase: 0.96, sizeRange: 0.22, sizeSalt: 341 },
 };
 
 export const DECAL_SETS_BY_BIOME = {

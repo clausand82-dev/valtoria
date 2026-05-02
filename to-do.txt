@@ -15,7 +15,6 @@ Ting at få gjort
 - befri indbyggere til ens by/lejr
 - destroy weapons kan enten give resourcer eller også skal det være selvstændig
 - Navngivet hero til Kealand
-- mulighed for at smadre krystaller, crates, huse (gennemsøge), klipper osv
 - fjerne greenspill fra alle grafik elementer
 - fjerne animation af krystal
 - area damage
@@ -29,9 +28,14 @@ Ting at få gjort
 - cracks der kan lægges over ground (og så foalige ovenpå)
 - indfør durability
 
-Lørdags arbejde:
 - bosses
 - grafisk arbejde (start mål markeringer)
-- quests (npc's random on map og fast i city)
-- world map
 - ny resource (herbs - fra foalige?)
+- mulighed for at lave "scener" som kan smides i map generator (kræver det en designer eller hvordan)?
+
+- Flere NPC typer
+- NPC'er må ikke ligge oven i hinanden (måske indført - testet på sigt)
+
+
+
+

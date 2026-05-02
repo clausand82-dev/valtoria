@@ -7,8 +7,8 @@ export const MAX_INVENTORY = 30;
 export { BIOMES, BIOME_IDS } from "./config/biome-config.js";
 
 export const RARITIES = [
-  { id: "poor", label: "Poor", color: "#9a9a9a", mult: 0.75, weight: 34 },
-  { id: "normal", label: "Normal", color: "#f5f3ea", mult: 1, weight: 32 },
+  { id: "poor", label: "Poor", color: "#9a9a9a", mult: 0.75, weight: 38 },
+  { id: "normal", label: "Normal", color: "#f5f3ea", mult: 1, weight: 36 },
   { id: "upgraded", label: "Upgraded", color: "#58d96d", mult: 1.34, weight: 19 },
   { id: "rare", label: "Good", color: "#ffd85d", mult: 1.72, weight: 6 },
   { id: "epic", label: "Great", color: "#b579ff", mult: 2.25, weight: 4 },
@@ -32,7 +32,7 @@ export const MONSTER_STATS = {
   Raider: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
   Ashbound: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
   "Gate Warden": { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
-  "Bone Warden": { hp: 60, damage: 11, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
+  "Bone Warden": { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
   "Rune Shade": { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
   "Iron Revenant": { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
   Demon: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30 },
@@ -41,6 +41,9 @@ export const MONSTER_STATS = {
   Scorpion: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
   Snake: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
   Spider: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22 },
+  MiniSpider: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10 },
+  MediumSpider: { hp: 36, damage: 18, speed: 2.0, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16 },
+  LargeSpider: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32 },
   Wolf: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
 };
 
@@ -84,8 +87,8 @@ export const WEAPON_BASES = [
 ];
 
 export const PREFIXES = {
-  poor: ["Cracked", "Bent", "Frayed"],
-  normal: ["Iron", "Oaken", "Plain"],
+  poor: ["Cracked", "Bent", "Frayed", "Defect"],
+  normal: ["Iron", "Oaken", "Plain", "Common"],
   upgraded: ["Tempered", "Verdant", "Hunter"],
   rare: ["Sunforged", "Kingsguard", "Storm"],
   epic: ["Voidmarked", "Moonlit", "Warborn"],
@@ -103,7 +106,7 @@ export const UNIQUE_ITEMS = [
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
     biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
-    iconUrl: "/assets/generated/uniqueitem_frostheart.png",
+    iconUrl: "/assets/generated/item/item_unique_frostheart.png",
     scaleWithLevel: true,
     stats: {
       damageMin: 72,
@@ -128,13 +131,34 @@ export const NAMED_ITEM_TEMPLATES = [
     biomes: ["mainland", "rock", "snow"],
     dropChance: 0.012,
     rarityIds: ["poor", "normal", "upgraded", "rare", "epic", "legendary"],
-    iconUrl: null,
+    iconUrl: "/assets/generated/item/item_named_nethrendor_soldier_sword.png",
     scaleWithLevel: true,
     stats: {
       damageMin: 9,
       damageMax: 16,
       range: 1.22,
       cooldown: 0.54,
+      armor: 2,
+    },
+  },
+    {
+    id: "nethrendor_soldier_bow",
+    name: "Nethrendor Soldier Bow",
+    baseName: "Bow",
+    slot: "weapon",
+    mode: "ranged",
+    levelMin: 3,
+    sources: ["monster", "chest"],
+    biomes: ["mainland", "rock", "snow"],
+    dropChance: 0.012,
+    rarityIds: ["poor", "normal", "upgraded", "rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_nethrendor_soldier_bow.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 12,
+      damageMax: 22,
+      range: 5.8,
+      cooldown: 0.62,
       armor: 2,
     },
   },

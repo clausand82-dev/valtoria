@@ -14,11 +14,15 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 	const monsterId = monster.typeName === "Scorpion" ? "scorpion"
 		: monster.typeName === "Snake" ? "snake"
 		: monster.typeName === "Spider" ? "spider"
+		: monster.typeName === "MiniSpider" ? "minispider"
+		: monster.typeName === "MediumSpider" ? "mediumspider"
+		: monster.typeName === "LargeSpider" ? "largespider"
 		: monster.typeName === "Wolf" ? "wolf"
 		: monster.typeName === "Skeleton" ? "skeleton"
 		: monster.typeName === "Ghost" ? "ghost"
 		: monster.typeName === "Demon" ? "demon"
 		: monster.typeName.includes("Bone") ? "skeleton"
+		: monster.typeName.includes("Warden") ? "skeleton"
 		: monster.typeName.includes("Shade") ? "ghost"
 		: "demon";
 	const entry = monsters[monsterId];
@@ -53,7 +57,7 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 		: Math.sin(time * monster.breathSpeed + monster.animSeed) * 1.2;
 	const scale = cfg.scale * (monster.visualScale || 1);
 
-	drawShadow(ctx, screen.x, screen.y + 17, cfg.shadowW, cfg.shadowH, cfg.shadowAlpha);
+	drawShadow(ctx, screen.x, screen.y + (cfg.shadowY ?? 17), cfg.shadowW, cfg.shadowH, cfg.shadowAlpha);
 	drawSheetFrame(ctx, sheet, seq.row, col, screen.x, screen.y + cfg.yOffset + bob, {
 		scale,
 		flipX,
