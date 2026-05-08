@@ -2,8 +2,7 @@ import { drawFoliageSprite, drawObject } from "./assets.js";
 
 const FOLIAGE_TYPES = new Set([
   "foliage",
-  "pine",
-  "old-oak",
+  "tree",
 ]);
 
 export function isFoliageType(type) {

@@ -1,0 +1,77 @@
+export const PREFIXES = {
+  poor: ["Cracked", "Bent", "Frayed", "Defect"],
+  normal: ["Iron", "Oaken", "Plain", "Common"],
+  upgraded: ["Tempered", "Verdant", "Hunter"],
+  rare: ["Sunforged", "Kingsguard", "Storm"],
+  epic: ["Voidmarked", "Moonlit", "Warborn"],
+  legendary: ["Dragonwake", "Bloodstar", "Eternal"],
+};
+
+export const UNIQUE_ITEMS = [
+  {
+    id: "frostheart",
+    name: "Frostheart",
+    baseName: "Sword",
+    rarity: "unique",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    iconUrl: "/assets/generated/item/item_unique_frostheart.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 72,
+      damageMax: 112,
+      range: 1.38,
+      cooldown: 0.42,
+      magic: 24,
+      maxMana: 30,
+    },
+  },
+];
+
+export const NAMED_ITEM_TEMPLATES = [
+  {
+    id: "nethrendor_soldier_sword",
+    name: "Nethrendor Soldier Sword",
+    baseName: "Sword",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 3,
+    sources: ["monster", "chest"],
+    biomes: ["mainland", "rock", "snow"],
+    dropChance: 0.012,
+    rarityIds: ["poor", "normal", "upgraded", "rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_nethrendor_soldier_sword.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 9,
+      damageMax: 16,
+      range: 1.22,
+      cooldown: 0.54,
+      armor: 2,
+    },
+  },
+  {
+    id: "nethrendor_soldier_bow",
+    name: "Nethrendor Soldier Bow",
+    baseName: "Bow",
+    slot: "weapon",
+    mode: "ranged",
+    levelMin: 3,
+    sources: ["monster", "chest"],
+    biomes: ["mainland", "rock", "snow"],
+    dropChance: 0.012,
+    rarityIds: ["poor", "normal", "upgraded", "rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_nethrendor_soldier_bow.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 12,
+      damageMax: 22,
+      range: 5.8,
+      cooldown: 0.62,
+      armor: 2,
+    },
+  },
+];

@@ -34,7 +34,7 @@ export const BIOMES = {
     accent: "#8ba65d",
     // Normal fireplace hører til mainland, jungle og rock.
     // Firebeacon hører ikke til mainland.
-    objects: ["pine", "old-oak", "boulder", "building", "ruin", "fireplace"],
+    objects: ["tree", "stone", "building", "ruin", "fireplace"],
     monsters: ["Wolf", "Spider"],
   },
   desert: {
@@ -46,7 +46,7 @@ export const BIOMES = {
     tile: ["#b58b4e", "#c49a5d", "#9e7441", "#d3ad73"],
     path: "rgba(93, 62, 35, 0.22)",
     accent: "#d8b66e",
-    objects: ["pine", "old-oak", "stone", "rubble", "pillar", "ruin"],
+    objects: ["tree", "stone", "pillar", "ruin"],
     monsters: ["Snake", "Demon", "Scorpion"],
   },
   snow: {
@@ -60,7 +60,7 @@ export const BIOMES = {
     accent: "#bfe3f2",
     // Snow bruger kun firebeacon_snow som ild/lys-object.
     // Normal fireplace skal ikke være i snow.
-    objects: ["pine", "stone", "pillar", "building", "ruin", "crystal", "firebeacon"],
+    objects: ["tree", "stone", "pillar", "building", "ruin", "crystal", "firebeacon"],
     monsters: ["Skeleton"],
   },
   rock: {
@@ -73,7 +73,7 @@ export const BIOMES = {
     path: "rgba(74, 65, 49, 0.2)",
     accent: "#bdb48f",
     // Rock bruger normal fireplace, men ingen firebeacon.
-    objects: ["boulder", "stone", "rubble", "pillar", "crystal", "fireplace"],
+    objects: ["stone", "pillar", "crystal", "fireplace"],
     monsters: ["Ghost", "Skeleton"],
   },
   lava: {
@@ -85,7 +85,7 @@ export const BIOMES = {
     tile: ["#6f392c", "#8b4230", "#3d3430", "#c36532"],
     path: "rgba(39, 30, 27, 0.2)",
     accent: "#ff8a42",
-    objects: ["pine", "old-oak", "boulder", "stone", "crystal", "pillar"],
+    objects: ["tree", "stone", "crystal", "pillar"],
     monsters: ["Demon", "Ghost", "Scorpion", "Skeleton"],
   },
   jungle: {
@@ -98,7 +98,7 @@ export const BIOMES = {
     path: "rgba(74, 61, 37, 0.23)",
     accent: "#6fc15d",
     // Jungle bruger normal fireplace, men ingen firebeacon.
-    objects: ["old-oak", "pine", "boulder", "ruin", "fireplace"],
+    objects: ["tree", "stone", "ruin", "fireplace"],
     monsters: ["Wolf", "Spider", "Ghost"],
   },
 };

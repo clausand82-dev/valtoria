@@ -1,87 +1,18 @@
-export const QUEST_NPCS = {
-  blacksmith: {
-    name: "Traver",
-    title: "Blacksmith",
-    imageUrl: "/assets/generated/npc/npc_blacksmith.png",
-    cityLocation: "blacksmith",
-    cityHint: "Ved blacksmith i byen",
-    wildernessText: "Traver leder efter spor i vildmarken, fordi nogen har rodet i smedjens vigtigste vaerktoejer.",
-  },
-  farmer: {
-    name: "Willis",
-    title: "Farmer",
-    imageUrl: "/assets/generated/npc/npc_farmer.png",
-    cityLocation: "farm",
-    cityHint: "Ved farmen i byen",
-    wildernessText: "Willis gaar uden for markerne for at finde ud af, hvad der driver baesterne taettere paa byen.",
-  },
-  hunter: {
-    name: "Y'atho",
-    title: "Hunter",
-    imageUrl: "/assets/generated/npc/npc_hunter.png",
-    cityLocation: "random",
-    cityHint: "Et aabent sted i byen",
-    wildernessText: "Y'atho rejser efter friske spor og dukker op, naar jagten har brug for en haand mere.",
-  },
-  innkeeper: {
-    name: "Oliver",
-    title: "Innkeeper",
-    imageUrl: "/assets/generated/npc/npc_innkeeper.png",
-    cityLocation: "inn",
-    cityHint: "Ved inn i byen",
-    wildernessText: "Oliver samler rygter fra rejsende, men nogle historier kraever handling uden for bymuren.",
-  },
-  mage: {
-    name: "Darium",
-    title: "Mage",
-    imageUrl: "/assets/generated/npc/npc_mage.png",
-    cityLocation: "mage_tower",
-    cityHint: "Ved mage tower i byen",
-    wildernessText: "Darium foelger runeuroen ud i vildmarken, naar magien begynder at traekke i forkerte retninger.",
-  },
-  merchant: {
-    name: "Elis",
-    title: "Merchant",
-    imageUrl: "/assets/generated/npc/npc_merchant.png",
-    cityLocation: "random",
-    cityHint: "Et aabent sted i byen",
-    wildernessText: "Elis leder efter tabte varer, farlige ruter og nye grunde til at betale nogen for besvaeret.",
-  },
-  noble: {
-    name: "Turanios",
-    title: "Noble",
-    imageUrl: "/assets/generated/npc/npc_noble.png",
-    cityLocation: "random",
-    cityHint: "Et aabent sted i byen",
-    wildernessText: "Turanios rejser med for mange fine ting og for lidt respekt for farerne uden for vejene.",
-  },
-  soldier: {
-    name: "Himus",
-    title: "Soldier",
-    imageUrl: "/assets/generated/npc/npc_soldier.png",
-    cityLocation: "random",
-    cityHint: "Et aabent sted i byen",
-    wildernessText: "Himus tjener en ukendt haer og holder oeje med trusler, der endnu ikke har naaet byporten.",
-  },
-  wiseman: {
-    name: "Vitlias",
-    title: "Wiseman",
-    imageUrl: "/assets/generated/npc/npc_wiseman.png",
-    cityLocation: "library",
-    cityHint: "Ved library i byen",
-    wildernessText: "Vitlias soeger gamle tegn i landskabet og sender andre efter det, hans knogler ikke laengere kan naa.",
-  },
-  captain: {
-    name: "Kaptajn Varlo",
-    title: "Captain",
-    imageUrl: "/assets/generated/npc/npc_merchant.png",
-    cityLocation: "random",
-    cityHint: "Et aabent sted i byen",
-    wildernessText: "Kaptajn Varlo leder efter vragrester og en rute mod Tornvalhed.",
-  },
-};
+import { QUEST_NPCS } from "./npc-config.js";
+
+export { QUEST_NPCS };
 
 export const QUEST_ITEM_DEFS = {
+  lost_mug: {
+    name: "Forsvundet krus",
+    iconUrl: "/assets/generated/item/item_quest_mug.png",
+    placeholderColor: "#c4d9e0",
+  },
+  lost_beer: {
+    name: "Forsvundet øl",
+    iconUrl: "/assets/generated/item/item_quest_barrel.png",
+    placeholderColor: "#f2c94c",
+  }, 
   lost_anvil: {
     name: "Forsvunden anvil",
     iconUrl: "/assets/generated/item/item_quest_blacksmithanvil.png",
@@ -122,9 +53,20 @@ Top-level quest fields:
 - titleTemplate: Repeatable/template title. Used by "vengeance"; supports placeholders like {monster}.
 - repeatable: false means the quest can only be completed once. true means it can appear again.
 - npcIds: Array of QUEST_NPCS ids that can offer this quest.
-- regionIds: Optional array of map region ids where this wilderness NPC/quest can spawn. Omit for no region restriction.
+- regionIds: Optional array of tags for where a quest can be offered.
+  - "city" only: quest can only be offered in city.
+  - "city" + region ids: quest can be offered in city and in the listed wilderness regions.
+  - region ids without "city": quest can only be offered in those wilderness regions.
+  - Omit for no region restriction in wilderness.
 - spawnChance: Chance for this quest to be selected when rolling a wilderness quest. 1 means guaranteed if it is valid.
 - type: Supported values are "collect_quest_item" and "kill_monsters".
+- demands: Optional gate requirements before quest can be offered.
+  Supported fields:
+  - level: Minimum player level.
+  - completedQuests or requiresQuests: Array of quest ids that must already be completed.
+  - items: Array of required inventory checks. Supported filters include count, resourceId/resource, potionType,
+    readableId, questItemId, uniqueId, namedId, mode, rarity, baseName, name, slot.
+  All listed demand checks must be satisfied.
 - story: Text shown in the quest dialog before completion.
 - storyTemplate: Template version used by repeatable quests such as "vengeance"; supports {npcName} and {monster}.
 - acceptText: Text shown when accepting the quest.
@@ -133,9 +75,9 @@ Top-level quest fields:
 - turnInTextTemplate: Template version for repeatable quests.
 
 NPC behavior:
-- A quest with regionIds only appears in those regions.
+- A quest with regionIds appears according to the city/wilderness rules above.
 - If a valid region-limited quest has spawnChance: 1, it bypasses the global wilderness NPC spawn chance.
-- An NPC can only have one active quest at a time.
+- An NPC can have multiple active quests at the same time.
 
 Target shapes for collect_quest_item:
 - target.questItemId: Legacy single quest item requirement.
@@ -183,14 +125,81 @@ Important behavior:
 - Completed non-repeatable quest ids can be used by map unlocks in map-region-config.js.
 */
 export const QUEST_DEFS = {
+  clear_the_inn: {
+    id: "clear_the_inn",
+    title: "Edderkopper i Kroen",
+    repeatable: false,
+    npcIds: ["innkeeper"],
+    regionIds: ["city"],
+    spawnChance: 1,
+    type: "clear_map",
+    target: {
+      regionId: "inn-of-the-good-oak",
+      monsters: ["Spider", "MiniSpider", "MediumSpider", "LargeSpider"],
+    },
+    story: "Oliver tørrer af bordet og sukker tungt. 'Kroen er fuld af edderkopper – i kælderen, bag skabene, i loftet. Gæsterne tør ikke sove, og jeg kan ikke drive forretning sådan her. Ryd dem ud, alle sammen.'",
+    acceptText: "Dræb alle edderkopper i kroen og kom tilbage, når det er gjort.",
+    turnInText: "Endelig. Jeg har allerede sat øllet frem. Tak, eventyrer.",
+    rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }] },
+  },
+    kill_mother_spider: {
+    id: "kill_mother_spider",
+    title: "Edderkopper i Kroen",
+    repeatable: false,
+    npcIds: ["innkeeper"],
+    regionIds: ["city"],
+    demands: { completedQuests: ["clear_the_inn"] },
+    spawnChance: 1,
+    type: "clear_map",
+    target: {
+      regionId: "inn-of-the-good-oak",
+      monsters: ["MotherSpider"],
+    },
+    story: "Der er en stor grim djævel af en edderkop nede i kælderen. Dræb den. Den er der ikke altid, så måske du skal besøge kælderen flere gange.",
+    acceptText: "Dræb Moder edderkoppen i kælderen og kom tilbage, når det er gjort.",
+    turnInText: "Endelig. Nu tør jeg bruge min kælder igen. Tak, eventyrer.",
+    rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }] },
+  },
+    find_my_mug: {
+    id: "find_my_mug",
+    title: "Find Mit Krus",
+    repeatable: false,
+    npcIds: ["innkeeper"],
+    regionIds: ["city"],
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: { questItemId: "lost_mug", count: 1, source: "monster", dropChance: 0.11, dropRegionIds: ["inn-of-the-good-oak"]  },
+    story: "Jeg mangler mit ynglingskrus - når du nu er i i kælderen, så find lige mit krus for mig også",
+    acceptText: "Find mit krus i kælderen og kom tilbage, når det er gjort.",
+    turnInText: "Tusind tusind tak, det er mit yndlingskrus. Jeg har allerede sat øllet frem. Tak, eventyrer.",
+    rewards: { xp: 500},
+  },
+  find_the_beer: {
+    id: "find_the_beer",
+    title: "Find Øllet",
+    repeatable: false,
+    npcIds: ["innkeeper"],
+    regionIds: ["city"],
+    demands: { completedQuests: ["clear_the_inn"] },
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: { questItemId: "lost_beer", count: 5, source: "monster", dropChance: 0.11, dropRegionIds: ["inn-of-the-good-oak"] },
+    story: "Jeg mangler mit øl til gæsterne - de fordømte edderkopper har nok gemt det et sted i kælderen. Hvis du er dernede, så find det for mig.",
+    acceptText: "Find mit øl i kælderen og kom tilbage, når det er gjort.",
+    turnInText: "Tak, eventyrer. Så er der øl til alle!",
+    rewards: { xp: 500},
+  },
+
   lost_anvil: {
     id: "lost_anvil",
     title: "Den forsvundne anvil",
     repeatable: false,
     npcIds: ["blacksmith"],
-    spawnChance: 0.22,
+    regionIds: ["city"],
+    demands: { completedQuests: ["find_the_beer"] },
+    spawnChance: 1,
     type: "collect_quest_item",
-    target: { questItemId: "lost_anvil", count: 1, source: "monster", dropChance: 0.11 },
+    target: { questItemId: "lost_anvil", count: 1, source: "monster", dropChance: 0.11, dropRegionIds: ["barn"] },
     story: "Traver havde gemt sin gamle anvil i et rejsebur, mens han undersoegte en malmsti. Baesterne rev vognen op og sloebte metallet vaek som et blankt trofae. Find den, foer smedjen mister sit bedste arbejde.",
     acceptText: "Find min gamle anvil. Jeg kan ikke smede ordentligt uden den.",
     turnInText: "Der er ridser i kanten, men det er min. Smedjen kan arbejde igen.",
@@ -201,9 +210,11 @@ export const QUEST_DEFS = {
     title: "Den forsvundne hammer",
     repeatable: false,
     npcIds: ["blacksmith"],
-    spawnChance: 0.2,
+    regionIds: ["city"],
+    demands: { completedQuests: ["lost_anvil"] },
+    spawnChance: 1,
     type: "collect_quest_item",
-    target: { questItemId: "lost_hammer", count: 1, source: "monster", dropChance: 0.1 },
+    target: { questItemId: "lost_hammer", count: 1, source: "monster", dropChance: 0.1, dropRegionIds: ["barn"] },
     story: "Traver mistede sin runemarkerede hammer, da en flok monstre overfaldt hans forsyningskurv. Hammeren kan stadig kalde varme frem i metallet, og den maa ikke ende hos de forkerte.",
     acceptText: "Min hammer er borte. Finder du den, betaler jeg dig med mere end tak.",
     turnInText: "Haandtaget kender stadig min haand. Godt arbejde.",
@@ -228,6 +239,8 @@ export const QUEST_DEFS = {
     repeatable: false,
     npcIds: ["noble"],
     spawnChance: 0.18,
+    regionIds: ["city"],
+    demands: { completedQuests: ["lost_hammer"] },
     type: "collect_quest_item",
     target: { questItemId: "noble_watch", count: 1, source: "elite", dropChance: 0.28 },
     story: "Turanios' familieur blev taget under en kaotisk flugt gennem oede stier. Uret er ikke bare guld; det indeholder navne paa slaegten, og elitebaesterne samler paa den slags skinnende trofaeer.",
@@ -239,6 +252,7 @@ export const QUEST_DEFS = {
     id: "mage_sunforged",
     title: "Sunforged Sword",
     repeatable: false,
+    regionIds: ["city"],
     npcIds: ["mage"],
     spawnChance: 0.06,
     type: "collect_quest_item",
@@ -288,25 +302,9 @@ export const QUEST_DEFS = {
     turnInText: "Disse vil give indsigt til mine studier. Godt fundet.",
     rewards: { xp: 330, gold: 80, resources: [{ resource: "red_gemstone", count: 1 }] },
   },
-  "clear-the-inn": {
-    id: "clear-the-inn",
-    title: "Edderkopper i Kroen",
-    repeatable: false,
-    npcIds: ["innkeeper"],
-    regionIds: ["inn-of-the-good-oak"],
-    spawnChance: 1,
-    type: "clear_map",
-    target: {
-      regionId: "inn-of-the-good-oak",
-      monsters: ["Spider", "MiniSpider", "MediumSpider", "LargeSpider"],
-    },
-    story: "Oliver tørrer af bordet og sukker tungt. 'Kroen er fuld af edderkopper – i kælderen, bag skabene, i loftet. Gæsterne tør ikke sove, og jeg kan ikke drive forretning sådan her. Ryd dem ud, alle sammen.'",
-    acceptText: "Dræb alle edderkopper i kroen og kom tilbage, når det er gjort.",
-    turnInText: "Endelig. Jeg har allerede sat øllet frem. Tak, eventyrer.",
-    rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }] },
-  },
-  "sail-to-tornvalhed": {
-    id: "sail-to-tornvalhed",
+
+  sail_to_tornvalhed: {
+    id: "sail_to_tornvalhed",
     title: "Sail to Tornvalhed",
     repeatable: false,
     npcIds: ["captain"],

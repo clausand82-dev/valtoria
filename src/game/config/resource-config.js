@@ -14,7 +14,7 @@ export const RESOURCE_RARITY_COLOR = "#8be9ff";
 
 export const RESOURCE_DEFS = {
   // res_sheet_001, row 1: wood piece, iron piece, rock piece, crystal piece
-  wood_piece: { name: "Wood Piece", stackMax: 50, value: 1, sheet: "resources", iconIndex: 0, color: "#b88454" },
+  wood_piece: { name: "Wood Piece", stackMax: 50, value: 1, color: "#b88454" },
   iron_piece: { name: "Iron Piece", stackMax: 50, value: 3, sheet: "resources", iconIndex: 1, color: "#a88f78" },
   rock_piece: { name: "Rock Piece", stackMax: 50, value: 1, sheet: "resources", iconIndex: 2, color: "#9a9488" },
   crystal_piece: { name: "Crystal Piece", stackMax: 100, value: 2, sheet: "resources", iconIndex: 3, color: "#7fdcff" },
@@ -29,9 +29,14 @@ export const RESOURCE_DEFS = {
   meat: { name: "Meat", stackMax: 25, value: 2, sheet: "resources", iconIndex: 8, color: "#c8786c" },
   fruit: { name: "Fruit", stackMax: 25, value: 2, sheet: "resources", iconIndex: 9, color: "#d5b84e" },
   coal: { name: "Coal", stackMax: 100, value: 2, sheet: "resources", iconIndex: 10, color: "#4d4a48" },
+  wheat: { name: "Wheat", stackMax: 100, value: 2, sheet: "resources", iconIndex: 9, color: "#d6b85a", iconUrl: "/assets/generated/item/item_res_wheat.png" },
   paper: { name: "Paper", stackMax: 100, value: 2, sheet: "resources", iconIndex: 8, color: "#f3f4aa" },
   scroll: { name: "Scroll", stackMax: 20, value: 2, sheet: "resources", iconIndex: 9, color: "#ffbb00" },
   junk: { name: "Junk", stackMax: 100, value: 1, sheet: "resources", iconIndex: 11, color: "#8f887d" },
+  gold_ingot: { name: "Gold Ingot", stackMax: 100, value: 1000, sheet: "resources", iconIndex: 5, color: "#f1c657" },
+  gold_bar: { name: "Gold Bar", stackMax: 100, value: 1000, sheet: "resources", iconIndex: 5, color: "#f1c657", iconUrl: "/assets/generated/item/item_res_goldbar.png" },
+  magic_essence: { name: "Magic Essence", stackMax: 100, value: 45, sheet: "resources", iconIndex: 6, color: "#9f7dff", iconUrl: "/assets/generated/item/item_res_magicessens.png" },
+  food: { name: "Food Barrel", stackMax: 100, value: 120, sheet: "resources", iconIndex: 8, color: "#d49a58", iconUrl: "/assets/generated/item/item_res_food.png" },
 
   // res_sheet_002 gemstones
   red_gemstone: { name: "Red Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 0, color: "#ff6b5f" },
@@ -64,6 +69,7 @@ export const RESOURCE_MERGE_RECIPES = [
   { inputs: { red_gemstone: 1, yellow_gemstone: 1, blue_gemstone: 1 }, output: "pink_gemstone", count: 1 },
   { inputs: { red_gemstone: 1, yellow_gemstone: 1, green_gemstone: 1 }, output: "orange_gemstone", count: 1 },
   { inputs: { blue_gemstone: 1, green_gemstone: 1, yellow_gemstone: 1 }, output: "turquoise_gemstone", count: 1 },
+  { inputs: { coal: 1000 }, output: "diamond", count: 1, station: "research_lab" },
 ];
 
 // Object-typer der kan ødelægges med melee.
@@ -71,158 +77,6 @@ export const RESOURCE_MERGE_RECIPES = [
 // damageStages: Hvor mange melee-slag objectet altid kræver, uanset hero damage.
 // hp bruges kun til HP-bar procenten og sættes ned stage-for-stage.
 // particleColor: Farve på puf/fragment-effekten når det rammes/ødelægges.
-// loot: Almindelige resource drops. chance 1 betyder altid.
-// rareLoot: Sjældnere drops. Der rulles på hver entry, så flere rare drops kan
-//   principielt falde samtidig, men lave chance-værdier holder det sjældent.
-export const DESTRUCTIBLE_OBJECTS = {
-  pine: {
-    hp: 35,
-    damageStages: 3,
-    particleColor: "#b88454",
-    loot: [{ resource: "wood_piece", min: 2, max: 5, chance: 1 }],
-    rareLoot: [
-      { resource: "coal", min: 1, max: 2, chance: 0.12 },
-      { resource: "wood_plank", min: 1, max: 1, chance: 0.04 },
-    ],
-  },
-  "old-oak": {
-    hp: 48,
-    damageStages: 3,
-    particleColor: "#9f6f42",
-    loot: [{ resource: "wood_piece", min: 3, max: 7, chance: 1 }],
-    rareLoot: [
-      { resource: "coal", min: 1, max: 2, chance: 0.14 },
-      { resource: "wood_plank", min: 1, max: 1, chance: 0.06 },
-    ],
-  },
-  boulder: {
-    hp: 45,
-    damageStages: 3,
-    particleColor: "#9a9488",
-    loot: [{ resource: "rock_piece", min: 2, max: 5, chance: 1 }],
-    rareLoot: [
-      { resource: "iron_piece", min: 1, max: 2, chance: 0.13 },
-      { resource: "coal", min: 1, max: 2, chance: 0.1 },
-      { resource: "stone_brick", min: 1, max: 1, chance: 0.04 },
-      { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-    ],
-  },
-  stone: {
-    hp: 38,
-    damageStages: 3,
-    particleColor: "#9a9488",
-    loot: [{ resource: "rock_piece", min: 1, max: 4, chance: 1 }],
-    rareLoot: [
-      { resource: "iron_piece", min: 1, max: 1, chance: 0.1 },
-      { resource: "coal", min: 1, max: 1, chance: 0.09 },
-      { resource: "stone_brick", min: 1, max: 1, chance: 0.035 },
-      { resource: "diamond", min: 1, max: 1, chance: 0.0008 },
-    ],
-  },
-  rubble: {
-    hp: 32,
-    damageStages: 3,
-    particleColor: "#9a9488",
-    loot: [{ resource: "rock_piece", min: 1, max: 3, chance: 1 }],
-    rareLoot: [
-      { resource: "iron_piece", min: 1, max: 1, chance: 0.08 },
-      { resource: "coal", min: 1, max: 1, chance: 0.08 },
-      { resource: "stone_brick", min: 1, max: 1, chance: 0.03 },
-      { resource: "diamond", min: 1, max: 1, chance: 0.0006 },
-    ],
-  },
-  ruin: {
-    hp: 64,
-    damageStages: 3,
-    particleColor: "#9a9488",
-    loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
-    rareLoot: [
-      { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
-      { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
-    ],
-    // Very rare: random red-quality (legendary) equipment items.
-    itemLoot: [
-      { rarity: "legendary", chance: 0.0035, tries: 120 },
-    ],
-  },
-  pillar: {
-    hp: 52,
-    damageStages: 3,
-    particleColor: "#9a9488",
-    loot: [{ resource: "stone_brick", min: 1, max: 2, chance: 1 }],
-    rareLoot: [],
-  },
-  crystal: {
-    hp: 55,
-    damageStages: 3,
-    particleColor: "#7fdcff",
-    loot: [{ resource: "crystal_piece", min: 4, max: 9, chance: 1 }],
-    rareLoot: [
-      { resource: "crystal", min: 1, max: 1, chance: 0.08 },
-      { resource: "red_gemstone", min: 1, max: 1, chance: 0.025 },
-      { resource: "yellow_gemstone", min: 1, max: 1, chance: 0.025 },
-      { resource: "green_gemstone", min: 1, max: 1, chance: 0.025 },
-      { resource: "blue_gemstone", min: 1, max: 1, chance: 0.025 },
-      { resource: "black_gemstone", min: 1, max: 1, chance: 0.001 },
-      { resource: "white_gemstone", min: 1, max: 1, chance: 0.001 },
-    ],
-  },
-  building: {
-    hp: 70,
-    damageStages: 3,
-    particleColor: "#c99b5d",
-    loot: [
-      { resource: "junk", min: 2, max: 6, chance: 1 },
-      { resource: "wood_piece", min: 1, max: 5, chance: 0.45 },
-      { resource: "rock_piece", min: 1, max: 4, chance: 0.34 },
-      { resource: "iron_piece", min: 1, max: 2, chance: 0.12 },
-      { resource: "crystal_piece", min: 1, max: 4, chance: 0.06 },
-      { resource: "meat", min: 1, max: 2, chance: 0.05 },
-      { resource: "fruit", min: 1, max: 2, chance: 0.05 },
-      { resource: "coal", min: 1, max: 2, chance: 0.05 },
-      { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
-      { resource: "stone_brick", min: 1, max: 1, chance: 0.03 },
-      { resource: "iron_bar", min: 1, max: 1, chance: 0.018 },
-      { resource: "crystal", min: 1, max: 1, chance: 0.012 },
-    ],
-    rareLoot: [
-      { resource: "red_gemstone", min: 1, max: 1, chance: 0.004 },
-      { resource: "yellow_gemstone", min: 1, max: 1, chance: 0.004 },
-      { resource: "green_gemstone", min: 1, max: 1, chance: 0.004 },
-      { resource: "blue_gemstone", min: 1, max: 1, chance: 0.004 },
-      { resource: "black_gemstone", min: 1, max: 1, chance: 0.0007 },
-      { resource: "white_gemstone", min: 1, max: 1, chance: 0.0007 },
-      { resource: "diamond", min: 1, max: 1, chance: 0.00045 },
-    ],
-  },
-  object_woodboxes_ground: {
-    hp: 52,
-    damageStages: 3,
-    particleColor: "#c99b5d",
-    loot: [
-      { resource: "junk", min: 1, max: 3, chance: 1 },
-      { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
-      { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
-    ],
-    rareLoot: [
-      { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-    ],
-  },
-  object_shelfs: {
-    hp: 52,
-    damageStages: 3,
-    particleColor: "#c99b5d",
-    loot: [
-      { resource: "health", min: 1, max: 3, chance: 0.1 },
-      { resource: "paper", min: 1, max: 4, chance: 0.1 },
-      { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
-    ],
-    rareLoot: [
-      { resource: "diamond", min: 1, max: 1, chance: 0.005 },
-    ],
-  },
-};
-
 export const DESTROYED_ITEM_RESOURCE_DROPS = {
   poor: {
     guaranteed: [{ resource: "junk", min: 1, max: 2 }],

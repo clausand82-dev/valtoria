@@ -1,8 +1,5 @@
 Ting at få gjort
 
-- decay tid på drops - måske to min
-- en by med npc
-- world map der styre historien (og som nemt kan udvides med dlc/updates)
 - flere unique items
 - flere named items
 - fikse animation
@@ -33,8 +30,55 @@ Ting at få gjort
 - ny resource (herbs - fra foalige?)
 - mulighed for at lave "scener" som kan smides i map generator (kræver det en designer eller hvordan)?
 
-- Flere NPC typer
-- NPC'er må ikke ligge oven i hinanden (måske indført - testet på sigt)
+Nye ideer:
+QUESTTYPE:
+Runesten som skal aktiveres rundt omkring - måske gemstone skal bruges til aktiveringen.
+Runesten kan være en slags eventtag i regions para, der slå fast om region har et event (eller flere)
+eventet identificeres og klares i en vent config fil 
+Skal kunne huske om runestenen er aktiveres eller ej (localstorage)
+Skal det være meget nemt at bruge i nuværende så kan hver sten være sin egen quest
+aktivering af runesten kan koste x antal gemstone i bestemte farver
+
+STORY OBJECT:
+Behandles som et object, men kan aktiveres på maps, hvor det er på med E 
+E udløser en modal med tekst på - denne tekst kan være histori eller hjælpe hint 
+Story object kan også være et para i region som peger på et object det altid spawner på det givne map 
+Hvis story para fylder for meget, laver vi story config fil 
+
+NOTES:
+Noter kan være hele eller dele, som indeholder informationer om planter og mobs
+
+REGION OBJECT para tilføjelse:
+Måske skal et object udover object reference og x og y og weight, også have mulighed for count 
+(count bestemmer konkret antal på det map, og overrules weight hvis angivet)
+count skal kunne være en af de random 16 eller specifik x og y
+
+CITY NPC:
+Skal ikke hover, og måske de skal have en para, som beslutter hvornår de skal være synlige (region, lvl, quest, bygning)
+
+CITY BUILDINGS AND ADDONS:
+- skal bygninger kunne give quest? Hænger sammen med spørgsmål om bygnings npc skal blive en del af bygning i stedet for interaktion med den npc foregår så i bygningens modal? Kræver mere eftertanke!
+quest kan bruge bygninge navne som sted, så ligger quest inde i bygningen (! marks der er nu, kan bruges)
+
+farm
+Sales addon: her kan kød, frugt og evt senere korn og andet mad sælges (lidt bedre pris end købmand)
+Kitchen addon: her kan resources mad og øl produceres, som bruges i town hall eller inn
+
+town hall
+et eller andet med flygtninge fra området (jo flere corrupted zoner, jo flere flygtninge) - hvis man så donerer mad, så falder flygtninge presset - hvad har flygtninge presset af betydning? Måske maden skal laves via farm?
+
+sancturary
+donation af penge for at øge popularity? nuværende popularity stats skal ændres meget - måske i form af guldbare, der skal laves ved blacksmith
+
+inn
+købe sig til popularity ved at donerer mad, øl (mad og øl laves ved farm)
+
+START QUEST:
+Starte med en quest eller få start quest i city - alle regioner låst indtil den start quest er løst (snak med innkeeper, besøge inn).
+
+
+
+
 
 
 

@@ -1,0 +1,369 @@
+import { GEMSTONE_RESOURCE_IDS } from "./resource-config.js";
+
+const seq3x4 = [
+  { name: "idle", row: 0, frames: 4 },
+  { name: "walk", row: 1, frames: 4 },
+  { name: "attack", row: 2, frames: 4 },
+];
+
+export const BOSS_TINT = { color: "#d8313d", tintAlpha: 0.34 };
+
+export const DEFAULT_MONSTER_LOOT_PROFILE = {
+  goldChance: 0.55,
+  goldMult: 1,
+  weights: { health: 4, mana: 2, weapon: 8, armor: 8, none: 68 },
+};
+
+export const DEFAULT_MONSTER_RESOURCE_DROPS = {
+  loot: [
+    { resource: "meat", min: 1, max: 2, chance: 0.18 },
+    { resource: "fruit", min: 1, max: 2, chance: 0.12 },
+    { resource: "paper", min: 1, max: 2, chance: 0.12 },
+    { resource: "scroll", min: 1, max: 2, chance: 0.12 },
+  ],
+  rareLoot: GEMSTONE_RESOURCE_IDS.map((resource) => ({
+    resource,
+    min: 1,
+    max: 1,
+    chance: 0.0025,
+  })).concat([{ resource: "magic_essence", min: 1, max: 1, chance: 0.001 }]),
+};
+
+export const MONSTER_SHEETS = [
+  {
+    id: "demon",
+    url: "/assets/generated/mobs/demon_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.58,
+    shadowW: 34, shadowH: 11, shadowAlpha: 0.38,
+    yOffset: 46,
+  },
+  {
+    id: "skeleton",
+    url: "/assets/generated/mobs/skeleton_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.44,
+    shadowW: 34, shadowH: 11, shadowAlpha: 0.38,
+    yOffset: 46,
+  },
+  {
+    id: "ghost",
+    url: "/assets/generated/mobs/ghost_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.4,
+    shadowW: 26, shadowH: 8, shadowAlpha: 0.22,
+    yOffset: 38,
+  },
+  {
+    id: "scorpion",
+    url: "/assets/generated/mobs/scorpion_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.44,
+    shadowW: 28, shadowH: 9, shadowAlpha: 0.34,
+    yOffset: 38,
+  },
+  {
+    id: "snake",
+    url: "/assets/generated/mobs/snake_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.42,
+    shadowW: 26, shadowH: 8, shadowAlpha: 0.3,
+    yOffset: 37,
+  },
+  {
+    id: "spider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.43,
+    shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17,
+    yOffset: 38,
+  },
+  {
+    id: "minispider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.1,
+    shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4,
+    yOffset: 9,
+  },
+  {
+    id: "mediumspider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.2,
+    shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8,
+    yOffset: 18,
+  },
+  {
+    id: "largespider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.55,
+    shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22,
+    yOffset: 49,
+  },
+  {
+    id: "motherspider",
+    url: "/assets/generated/mobs/spider_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.75,
+    shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22,
+    yOffset: 49,
+  },
+  {
+    id: "wolf",
+    url: "/assets/generated/mobs/wolf_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.48,
+    shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
+    yOffset: 39,
+  },
+];
+
+const sheetUrl = (id) => MONSTER_SHEETS.find((sheet) => sheet.id === id)?.url ?? null;
+
+const spiderLoot = {
+  goldChance: 0.42,
+  goldMult: 0.75,
+  weights: { health: 10, mana: 10, weapon: 2, armor: 2, none: 40 },
+};
+
+const smallSpiderLoot = {
+  goldChance: 0.42,
+  goldMult: 0.75,
+  weights: { health: 5, mana: 10, weapon: 2, armor: 2, none: 40 },
+};
+
+const DEFAULT_MINION_CONFIG = {
+  cooldown: 8,
+  maxActive: 3,
+  spawnCount: 1,
+  scale: 0.45,
+  statsMult: { hp: 0.25, damage: 0.3, speed: 1.1, xp: 0.05, magic: 0.25 },
+};
+
+function normalizedMinionConfig(def) {
+  if (!def.haveMinion && !def.minions) return false;
+  const custom = typeof def.minions === "object" ? def.minions : {};
+  return {
+    ...DEFAULT_MINION_CONFIG,
+    ...custom,
+    statsMult: {
+      ...DEFAULT_MINION_CONFIG.statsMult,
+      ...(custom.statsMult ?? {}),
+    },
+  };
+}
+
+export const MONSTER_DEFS = {
+  Fallen: {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 35, damage: 7, speed: 1.62, range: 0.52, radius: 0.26, color: "#b84d43", xp: 12 },
+  },
+  "Thorn Husk": {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
+  },
+  "Mire Brute": {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
+  },
+  Hollow: {
+    sprite: "ghost",
+    spriteUrl: sheetUrl("ghost"),
+    stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
+  },
+  "Shard Crawler": {
+    sprite: "ghost",
+    spriteUrl: sheetUrl("ghost"),
+    stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24 },
+  },
+  "Deep Guard": {
+    sprite: "skeleton",
+    spriteUrl: sheetUrl("skeleton"),
+    stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
+  },
+  Raider: {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
+  },
+  Ashbound: {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
+  },
+  "Gate Warden": {
+    sprite: "skeleton",
+    spriteUrl: sheetUrl("skeleton"),
+    stats: { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
+  },
+  "Bone Warden": {
+    sprite: "skeleton",
+    spriteUrl: sheetUrl("skeleton"),
+    stats: { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
+  },
+  "Rune Shade": {
+    sprite: "ghost",
+    spriteUrl: sheetUrl("ghost"),
+    stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
+  },
+  "Iron Revenant": {
+    sprite: "skeleton",
+    spriteUrl: sheetUrl("skeleton"),
+    stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
+  },
+  Demon: {
+    sprite: "demon",
+    spriteUrl: sheetUrl("demon"),
+    stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
+    lootProfile: { goldChance: 0.72, goldMult: 1.15, weights: { health: 28, armor: 24, weapon: 4, mana: 2, none: 42 } },
+    resources: { inheritDefaultLoot: false, loot: [{ resource: "coal", min: 1, max: 3, chance: 0.2 }] },
+    popularity: { change: 1.7 },
+  },
+  Ghost: {
+    sprite: "ghost",
+    spriteUrl: sheetUrl("ghost"),
+    stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
+    lootProfile: { goldChance: 0.95, goldMult: 3.8, weights: { mana: 34, health: 2, weapon: 2, armor: 2, none: 60 } },
+    resources: { inheritDefaultLoot: false, loot: [{ resource: "crystal_piece", min: 1, max: 2, chance: 0.16 }] },
+    popularity: { change: 1.35 },
+  },
+  Skeleton: {
+    sprite: "skeleton",
+    spriteUrl: sheetUrl("skeleton"),
+    stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
+    lootProfile: { goldChance: 0.65, goldMult: 1, weights: { weapon: 31, armor: 31, health: 3, mana: 3, none: 32 } },
+    popularity: { change: 1.2 },
+  },
+  Scorpion: {
+    sprite: "scorpion",
+    spriteUrl: sheetUrl("scorpion"),
+    stats: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
+    lootProfile: { goldChance: 0.7, goldMult: 1, weights: { all: 18, health: 12, mana: 12, weapon: 14, armor: 14, none: 30 } },
+  },
+  Snake: {
+    sprite: "snake",
+    spriteUrl: sheetUrl("snake"),
+    stats: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
+    lootProfile: { goldChance: 0.16, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 3, armor: 3, none: 86 } },
+    popularity: { change: -0.3 },
+  },
+  Spider: {
+    sprite: "spider",
+    spriteUrl: sheetUrl("spider"),
+    stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22, spells: ["web_slow"] },
+    lootProfile: spiderLoot,
+    popularity: { change: 0.85 },
+  },
+  MiniSpider: {
+    sprite: "minispider",
+    spriteUrl: sheetUrl("minispider"),
+    stats: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10},
+    lootProfile: smallSpiderLoot,
+    allowElite: false,
+  },
+  MediumSpider: {
+    sprite: "mediumspider",
+    spriteUrl: sheetUrl("mediumspider"),
+    stats: { hp: 36, damage: 18, speed: 2.0, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16, spells: ["web_slow"] },
+    lootProfile: smallSpiderLoot,
+  },
+  LargeSpider: {
+    sprite: "largespider",
+    spriteUrl: sheetUrl("largespider"),
+    stats: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32, spells: ["web_slow"] },
+    lootProfile: { goldChance: 0.42, goldMult: 0.75, weights: { health: 5, mana: 5, weapon: 10, armor: 10, none: 25 } },
+  },
+  MotherSpider: {
+    sprite: "motherspider",
+    spriteUrl: sheetUrl("motherspider"),
+    stats: { hp: 120, damage: 36, speed: 1.2, range: 0.8, radius: 0.4, color: "#6d5b83", xp: 48, spells: ["web_slow", "poison_cloud"] },
+    lootProfile: { goldChance: 0.42, goldMult: 0.75, weights: { health: 5, mana: 5, weapon: 25, armor: 25, none: 25 } },
+    allowElite: false,
+    isBoss: true,
+    haveMinion: true,
+    minions: {
+      cooldown: 8,
+      maxActive: 4,
+      spawnCount: 2,
+      scale: 0.42,
+      statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 },
+    },
+  },
+  Wolf: {
+    sprite: "wolf",
+    spriteUrl: sheetUrl("wolf"),
+    stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
+    lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
+    popularity: { change: -0.35 },
+  },
+};
+
+export const MONSTER_STATS = Object.fromEntries(
+  Object.entries(MONSTER_DEFS).map(([type, def]) => [
+    type,
+    {
+      ...def.stats,
+      allowElite: def.allowElite !== false,
+      isBoss: Boolean(def.isBoss),
+      haveMinion: Boolean(def.haveMinion || def.minions),
+      minions: normalizedMinionConfig(def),
+      sprite: def.sprite,
+      spriteUrl: def.spriteUrl,
+    },
+  ])
+);
+
+export const MONSTER_LOOT_PROFILES = Object.fromEntries(
+  Object.entries(MONSTER_DEFS)
+    .filter(([, def]) => def.lootProfile)
+    .map(([type, def]) => [type, def.lootProfile])
+);
+
+export const MONSTER_RESOURCE_DROPS = {
+  default: DEFAULT_MONSTER_RESOURCE_DROPS,
+  ...Object.fromEntries(
+    Object.entries(MONSTER_DEFS)
+      .filter(([, def]) => def.resources)
+      .map(([type, def]) => [type, def.resources])
+  ),
+};
+
+export const MONSTER_POPULARITY_RULES = Object.fromEntries(
+  Object.entries(MONSTER_DEFS)
+    .filter(([, def]) => def.popularity)
+    .map(([type, def]) => [type, def.popularity])
+);
+
+export function monsterSpriteId(typeName) {
+  if (MONSTER_DEFS[typeName]?.sprite) return MONSTER_DEFS[typeName].sprite;
+  if (typeName?.includes("Bone") || typeName?.includes("Warden")) return "skeleton";
+  if (typeName?.includes("Shade")) return "ghost";
+  return "demon";
+}

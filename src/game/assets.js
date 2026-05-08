@@ -1,4 +1,4 @@
-﻿import { TILE_H, TILE_W } from "./data.js";
+import { TILE_H, TILE_W } from "./config/game-constants-config.js";
 
 import {
   FOLIAGE_SHEETS,
@@ -7,8 +7,9 @@ import {
   TREE_SHEETS,
 } from "./config/asset-config.js";
 import { buildDecaySheetId, DECAY_SET_DEFS } from "./config/decay-config.js";
-import { REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { getRegionObjectFamily, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
+import { MONSTER_SHEETS } from "./config/monster-config.js";
 import { collectRegionAssetOverrides } from "./config/region-asset-config.js";
 
 export const ATLAS_FRAMES = {
@@ -17,9 +18,8 @@ export const ATLAS_FRAMES = {
   caveTile: { x: 642, y: 12, w: 292, h: 205 },
   ruinsTile: { x: 956, y: 28, w: 276, h: 166 },
   house: { x: 0, y: 230, w: 360, h: 390 },
-  pine: { x: 305, y: 210, w: 270, h: 390 },
-  oldOak: { x: 485, y: 220, w: 500, h: 390 },
-  boulder: { x: 925, y: 275, w: 329, h: 310 },
+  tree: { x: 305, y: 210, w: 270, h: 390 },
+  stone: { x: 925, y: 275, w: 329, h: 310 },
   brokenWall: { x: 0, y: 555, w: 330, h: 300 },
   pillar: { x: 295, y: 545, w: 270, h: 305 },
   crystal: { x: 495, y: 535, w: 285, h: 305 },
@@ -41,160 +41,10 @@ const HERO_SHEET = {
   cols: 8,
 };
 
-// Per-monster sheet configurations.
-// Each entry describes one monster type's sprite sheet.
-// sequences: array of { name, row, frames } â€” maps state names to sheet rows.
-// scale, shadowW, shadowH, shadowAlpha, yOffset: visual tuning per monster.
-const MONSTER_SHEETS = [
-  {
-    id: "demon",
-    url: "/assets/generated/mobs/demon_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.58,
-    shadowW: 34, shadowH: 11, shadowAlpha: 0.38,
-    yOffset: 46,
-  },
-  {
-    id: "skeleton",
-    url: "/assets/generated/mobs/skeleton_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.44,
-    shadowW: 34, shadowH: 11, shadowAlpha: 0.38,
-    yOffset: 46,
-  },
-  {
-    id: "ghost",
-    url: "/assets/generated/mobs/ghost_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.4,
-    shadowW: 26, shadowH: 8, shadowAlpha: 0.22,
-    yOffset: 38,
-  },
-  {
-    id: "scorpion",
-    url: "/assets/generated/mobs/scorpion_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.44,
-    shadowW: 28, shadowH: 9, shadowAlpha: 0.34,
-    yOffset: 38,
-  },
-  {
-    id: "snake",
-    url: "/assets/generated/mobs/snake_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.42,
-    shadowW: 26, shadowH: 8, shadowAlpha: 0.3,
-    yOffset: 37,
-  },
-  {
-    id: "spider",
-    url: "/assets/generated/mobs/spider_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.43,
-    shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17,
-    yOffset: 38,
-  },
-    {
-    id: "minispider",
-    url: "/assets/generated/mobs/spider_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.10,
-    shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4,
-    yOffset: 9,
-  },
-  {
-    id: "mediumspider",
-    url: "/assets/generated/mobs/spider_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.20,
-    shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8,
-    yOffset: 18,
-  },
-  {
-    id: "largespider",
-    url: "/assets/generated/mobs/spider_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.55,
-    shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22,
-    yOffset: 49,
-  },
-  {
-    id: "wolf",
-    url: "/assets/generated/mobs/wolf_animated_sheet.png",
-    rows: 3,
-    cols: 4,
-    sequences: [
-      { name: "idle",   row: 0, frames: 4 },
-      { name: "walk",   row: 1, frames: 4 },
-      { name: "attack", row: 2, frames: 4 },
-    ],
-    scale: 0.48,
-    shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
-    yOffset: 39,
-  },
-];
-
 const OBJECT_FRAME = {
+  tree: "tree",
   house: "house",
-  pine: "pine",
-  "old-oak": "oldOak",
-  boulder: "boulder",
-  stone: "boulder",
-  rubble: "boulder",
+  stone: "stone",
   "broken-wall": "brokenWall",
   pillar: "pillar",
   obelisk: "pillar",
@@ -1635,9 +1485,8 @@ function normalizeSequence(sequenceCells) {
 function makeAtlasSprites(canvas, frames) {
   const objectKeys = new Set([
     "house",
-    "pine",
-    "oldOak",
-    "boulder",
+    "tree",
+    "stone",
     "brokenWall",
     "pillar",
     "crystal",
@@ -2270,10 +2119,6 @@ export function drawShadow(ctx, x, y, width, height, alpha = 0.32) {
 }
 
 export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
-  if (object.type === "pine" || object.type === "old-oak") {
-    return drawTreeObject(ctx, object, screen, biome, atlas, time);
-  }
-
   if (atlas?.objectSheets?.[object.type]
     || object.type === "building"
     || object.type === "ruin"
@@ -2284,12 +2129,16 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
     return drawSheetObject(ctx, object, screen, biome, atlas, time);
   }
 
+  if (object.type === "tree") {
+    return drawTreeObject(ctx, object, screen, biome, atlas, time);
+  }
+
   const frame = OBJECT_FRAME[object.type];
   if (!frame) return;
-  const baseScale = object.type === "house" ? 0.56 : object.type === "old-oak" ? 0.44 : object.type === "pine" ? 0.5 : 0.58;
+  const baseScale = object.type === "house" ? 0.56 : object.type === "tree" ? 0.52 : 0.58;
   const scale = baseScale * object.size * (object.visualScale ?? 1);
-  const offsetY = object.type === "house" ? 10 : object.type === "pine" || object.type === "old-oak" ? 14 : 6;
-  const wind = object.type === "pine" || object.type === "old-oak" ? Math.sin(time * 1.2 + object.animSeed) * 0.018 : 0;
+  const offsetY = object.type === "house" ? 10 : object.type === "tree" ? 14 : 6;
+  const wind = object.type === "tree" ? Math.sin(time * 1.2 + object.animSeed) * 0.018 : 0;
   const glow = object.type === "crystal" ? 0.95 + Math.sin(time * 3 + object.animSeed) * 0.05 : 1;
   if (drawAtlasFrame(ctx, atlas, frame, screen.x, screen.y + offsetY, {
     scale,
@@ -2432,7 +2281,7 @@ function drawDamageCracks(ctx, object, x, y, width, height) {
   if (!object?.maxHp || object.hp >= object.maxHp) return;
   const missing = Math.max(0, Math.min(1, 1 - object.hp / object.maxHp));
   const stage = missing > 0.72 ? 3 : missing > 0.42 ? 2 : 1;
-  const tree = object.type === "pine" || object.type === "old-oak";
+  const tree = getRegionObjectFamily(object?.type) === "tree";
   const region = tree
     ? { x: x + width * 0.36, y: y + height * 0.5, w: width * 0.28, h: height * 0.42 }
     : { x: x + width * 0.16, y: y + height * 0.18, w: width * 0.68, h: height * 0.68 };
@@ -2531,7 +2380,7 @@ function drawTreeObject(ctx, object, screen, biome, atlas, time = 0) {
   const sprite = cell?.sprite;
   if (!sprite) return false;
 
-  const baseScale = object.type === "old-oak" ? 0.48 : 0.54;
+  const baseScale = 0.52;
   const scale = baseScale * object.size * (object.visualScale ?? 1);
   const width = sprite.width * scale;
   const height = sprite.height * scale;

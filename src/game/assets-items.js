@@ -152,7 +152,19 @@ function getCustomItemImage(iconUrl) {
 }
 
 export function drawProjectile(ctx, screen, projectile, atlas) {
-  const projectileFrame = projectile.type === "magic" || projectile.type === "burst" ? "orb" : "arrow";
+  const projectileFrame = projectile.type === "magic" || projectile.type === "burst" || projectile.owner ? "orb" : "arrow";
+  if (projectile.owner) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = projectile.color ?? "#9de9ff";
+    ctx.shadowColor = projectile.color ?? "#9de9ff";
+    ctx.shadowBlur = projectile.type === "energy_beam" ? 18 : 10;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y - 8, projectile.type === "energy_beam" ? 5 : 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   drawAtlasFrame(ctx, atlas, projectileFrame, screen.x, screen.y - 8, {
     scale: projectileFrame === "orb" ? 0.18 : 0.16,
   });

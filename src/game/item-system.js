@@ -7,6 +7,7 @@ export const ITEM_FLAG_KEYS = [
   "resource",
   "potion",
   "quest",
+  "readable",
 ];
 
 const EMPTY_FLAGS = Object.freeze({
@@ -18,6 +19,7 @@ const EMPTY_FLAGS = Object.freeze({
   resource: false,
   potion: false,
   quest: false,
+  readable: false,
 });
 
 const MODE_FLAG_PRESETS = {
@@ -58,6 +60,11 @@ const MODE_FLAG_PRESETS = {
     consumable: true,
     stackable: false,
   },
+  readable: {
+    equippable: false,
+    stackable: false,
+    readable: true,
+  },
 };
 
 const COMMON_BASE_ICON_KEYS = {
@@ -92,8 +99,13 @@ const RESOURCE_ICON_KEYS = {
   stone_brick: "res_stonebrick",
   meat: "res_rawmeat",
   fruit: "res_fruit",
+  wheat: "res_wheat",
+  food: "res_food",
   coal: "res_coal",
   junk: "res_junk",
+  gold_ingot: "gold",
+  gold_bar: "res_goldbar",
+  magic_essence: "res_magicessens",
   paper: "res_paper",
   scroll: "res_scroll",
   red_gemstone: "res_redgemstone",
@@ -148,6 +160,10 @@ export function isQuestItem(item) {
   return hasItemFlag(item, "quest") || item?.mode === "quest";
 }
 
+export function isReadableItem(item) {
+  return hasItemFlag(item, "readable") || item?.mode === "readable";
+}
+
 export function isStackableItem(item) {
   return hasItemFlag(item, "stackable");
 }
@@ -179,6 +195,7 @@ export function deriveIconKey(itemLike = {}) {
     return COMMON_BASE_ICON_KEYS[itemLike.baseName];
   }
   if (itemLike.uniqueId) return slugToken(itemLike.uniqueId);
+  if (itemLike.readableId) return slugToken(itemLike.readableId);
   if (itemLike.questItemId) return slugToken(itemLike.questItemId);
   const fromBase = slugToken(itemLike.baseName);
   if (fromBase) return fromBase;
