@@ -55,7 +55,7 @@ export const SPAWN_CONFIG = {
   // Sæt til 0 for at fjerne bones helt. Sæt fx til 0.25 for mere bones.
   foliageBonesChance: 0.14,
 
-  // Decals er små jorddetaljer som pebble, crack, bone og rubble. De ligger i
+  // Decals er små jorddetaljer som pebble, crack, bone og debris. De ligger i
   // chunk.decals i stedet for chunk.objects og blocker ikke spilleren.
   decalCountsByBiome: {
     mainland: 20,
@@ -84,8 +84,8 @@ export const OBJECT_SPAWN_TUNING = {
   firebeacon: { radius: 0.42, sizeBase: 0.88, sizeRange: 0.18, sizeSalt: 338 },
   fireplace: { radius: 0.42, sizeBase: 0.88, sizeRange: 0.18, sizeSalt: 338 },
   "broken-wall": { radius: 0.72, sizeBase: 1.25, sizeRange: 0, sizeSalt: 0 },
-  "old-oak": { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
-  pine: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
+  tree: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
+  stone: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
   pillar: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
   obelisk: { radius: 0.5, sizeBase: 1.15, sizeRange: 0, sizeSalt: 0 },
   crystal: { radius: 0.34, sizeBase: 0.9, sizeRange: 0, sizeSalt: 0 },
@@ -95,14 +95,14 @@ export const OBJECT_SPAWN_TUNING = {
 export const DECAL_SETS_BY_BIOME = {
   // Hvilke decal-typer der kan placeres i hver biodome.
   // Gentagelser øger sandsynligheden. Fx har desert to "pebble", så pebble
-  // vælges oftere end bone/crack/rubble.
+  // vælges oftere end bone/crack/debris.
   //
   // Decal-typerne bliver tegnet af decal-renderingen i assets.js/world render.
   // Hvis du tilføjer en ny type her, skal rendererens decal-kode også kende den.
-  mainland: ["pebble", "rubble"],
-  desert: ["pebble", "pebble", "bone", "crack", "rubble"],
+  mainland: ["pebble", "debris"],
+  desert: ["pebble", "pebble", "bone", "crack", "debris"],
   snow: ["pebble", "bone", "crack"],
-  rock: ["rubble", "rubble", "pebble", "crack", "bone"],
-  lava: ["crack", "rubble"],
-  jungle: ["rubble", "pebble"],
+  rock: ["debris", "debris", "pebble", "crack", "bone"],
+  lava: ["crack", "debris"],
+  jungle: ["debris", "pebble"],
 };

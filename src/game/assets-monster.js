@@ -1,30 +1,19 @@
 ﻿import { drawShadow } from "./assets-ground.js";
 
+import { monsterSpriteId } from "./config/monster-config.js";
+
 const tintCache = new WeakMap();
 
 export function drawMonster(ctx, screen, monster, atlas, time = 0, sheets) {
 	if (drawAnimatedMonsterSheet(ctx, screen, monster, time, sheets?.monsters)) {
-		drawMonsterHealth(ctx, screen, monster, monster.elite ? 58 : 52);
+		drawMonsterHealth(ctx, screen, monster, monster.elite || monster.boss ? 58 : 52);
 	}
 }
 
 function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 	if (!monsters) return false;
 
-	const monsterId = monster.typeName === "Scorpion" ? "scorpion"
-		: monster.typeName === "Snake" ? "snake"
-		: monster.typeName === "Spider" ? "spider"
-		: monster.typeName === "MiniSpider" ? "minispider"
-		: monster.typeName === "MediumSpider" ? "mediumspider"
-		: monster.typeName === "LargeSpider" ? "largespider"
-		: monster.typeName === "Wolf" ? "wolf"
-		: monster.typeName === "Skeleton" ? "skeleton"
-		: monster.typeName === "Ghost" ? "ghost"
-		: monster.typeName === "Demon" ? "demon"
-		: monster.typeName.includes("Bone") ? "skeleton"
-		: monster.typeName.includes("Warden") ? "skeleton"
-		: monster.typeName.includes("Shade") ? "ghost"
-		: "demon";
+	const monsterId = monsterSpriteId(monster.typeName);
 	const entry = monsters[monsterId];
 	if (!entry) return false;
 
@@ -62,8 +51,8 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 		scale,
 		flipX,
 		alpha: ghost ? 0.86 + Math.sin(time * 3 + monster.animSeed) * 0.08 : 1,
-		tint: monster.elite?.color,
-		tintAlpha: monster.elite?.tintAlpha,
+		tint: monster.boss?.color ?? monster.elite?.color,
+		tintAlpha: monster.boss?.tintAlpha ?? monster.elite?.tintAlpha,
 		stabilize: true,
 		rawCell: false,
 		anchor: sheet.sequenceAnchors?.[seq.row]?.[0],

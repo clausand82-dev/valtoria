@@ -1,41 +1,225 @@
 Ting at få gjort
 
-- decay tid på drops - måske to min
-- en by med npc
-- world map der styre historien (og som nemt kan udvides med dlc/updates)
 - flere unique items
 - flere named items
-- fikse animation
-- flere mobs
-- bosses
-- quest items og quest givers (eller måske items, der kan ligge på jorden og kan aktivere quest - både items men også npc's - random/non random)
+- fikse animation (i work - nye ani ark lavet)
+- flere mobs (village og få nye mobs introduceret)
+- bosses (1 enkelt edderkop i kælderen)
 - større maps jo højere lvl
-- flere biodomes
-- bygge bygninger i ens by (kræver resourcer)
+
 - befri indbyggere til ens by/lejr
-- destroy weapons kan enten give resourcer eller også skal det være selvstændig
+
 - Navngivet hero til Kealand
 - fjerne greenspill fra alle grafik elementer
 - fjerne animation af krystal
 - area damage
-- skill tree
+
 - forskellige udstyr til at klare forskellige opgaver
 - bedre mobs IQ (pathfinding)
 - reputation og fractions (grupper)
 - grafik til start og stop
 - vand områder/flod områder
 - biodome grafik elementer kan indeholde større flader (broer over flod osv)
-- cracks der kan lægges over ground (og så foalige ovenpå)
+
 - indfør durability
 
 - bosses
 - grafisk arbejde (start mål markeringer)
-- ny resource (herbs - fra foalige?)
+
 - mulighed for at lave "scener" som kan smides i map generator (kræver det en designer eller hvordan)?
 
-- Flere NPC typer
-- NPC'er må ikke ligge oven i hinanden (måske indført - testet på sigt)
+STØRRE OMRÅDER:
+kan jeg bruge hele 1254x1254 (det der normalt er 16 texture), til at dække for 16, men tælle som en? Måske en region ting under tileset, med en para til tileset, der hedder bigTexture eller noget, og så ved systemet at den bruges 1 gang, og fylder for 16. (se projekt chat for detaljer og AI forslag)
+
+Nye ideer:
+QUESTTYPE:
+Runesten som skal aktiveres rundt omkring - måske gemstone skal bruges til aktiveringen.
+Runesten kan være en slags eventtag i regions para, der slå fast om region har et event (eller flere)
+eventet identificeres og klares i en vent config fil 
+Skal kunne huske om runestenen er aktiveres eller ej (localstorage)
+Skal det være meget nemt at bruge i nuværende så kan hver sten være sin egen quest
+aktivering af runesten kan koste x antal gemstone i bestemte farver
+
+STORY OBJECT:
+Behandles som et object, men kan aktiveres på maps, hvor det er på med E 
+E udløser en modal med tekst på - denne tekst kan være historie eller hjælpe hint 
+Story object kan også være et para i region som peger på et object det altid spawner på det givne map 
+Hvis story para fylder for meget, laver vi story config fil 
+måske bare object skal kunne få en para (objectType: normal (default), quest (kun hvis relaterede quest er tilgængelig), story (e prompt))
+normal = default som det er nu
+quest = kan spawne 1 entry, hvis relaterede quest betingelse er opfyldt (bruger også questens spawnrate)
+story = kan spawne 1 entry på map
+
+Måske det er region der skal have mulighed for at gøre object til quest objekt eller story object i stedet for selve object listen. Ved quest eller story, er det en random af de mulige 16 objects der bruges, medmindre x og y er sat. - hvor skal story stå? Måske story skal være config fil for sig selv, som så kan kaldes med variable/id - til alt, der bruger story.
+
+NOTES:
+Noter kan være hele eller dele, som indeholder informationer om planter og mobs
+
+REGION OBJECT para tilføjelse:
+Måske skal et object udover object reference og x og y og weight, også have mulighed for count 
+(count bestemmer konkret antal på det map, og overrules weight hvis angivet)
+count skal kunne være en af de random 16 eller specifik x og y
+
+CITY NPC:
+Skal ikke hover, og måske de skal have en para, som beslutter hvornår de skal være synlige (region, lvl, quest, bygning)
+
+CITY BUILDINGS AND ADDONS:
+- skal bygninger kunne give quest? Hænger sammen med spørgsmål om bygnings npc skal blive en del af bygning i stedet for interaktion med den npc foregår så i bygningens modal? Kræver mere eftertanke!
+quest kan bruge bygninge navne som sted, så ligger quest inde i bygningen (! marks der er nu, kan bruges)
+
+farm
+Sales addon: her kan kød, frugt og evt senere korn og andet mad sælges (lidt bedre pris end købmand)
+Kitchen addon: her kan resources mad og øl produceres, som bruges i town hall eller inn
+
+town hall
+et eller andet med flygtninge fra området (jo flere corrupted zoner, jo flere flygtninge) - hvis man så donerer mad, så falder flygtninge presset - hvad har flygtninge presset af betydning? Måske maden skal laves via farm?
+
+sancturary
+donation af penge for at øge popularity? nuværende popularity stats skal ændres meget - måske i form af guldbare, der skal laves ved blacksmith
+
+inn
+købe sig til popularity ved at donerer mad, øl (mad og øl laves ved farm)
+
+START QUEST:
+Starte med en quest eller få start quest i city - alle regioner låst indtil den start quest er løst (snak med innkeeper, besøge inn).
+
+Udfylde main quest for lidt flere regioner og så have en masse fyld quest også.
+
+Overveje om npc kun skal vises, når de har opgaver og om de evt skal ikke skal vises, men være "inde" i houses.
+
+Pænere UI til karakter
 
 
+QUEST TO ADD:
+Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
 
 
+MAGI 
+- teleport item, der konsekvensløs kan hive en ud af map og tilbage til city (kan evt være et merge item, der skal samles fra forskellige ingredienser)
+nye potion: fuld liv, magisk save (1 x rød rose, 2 x sjælden lilla blomst, 10 x magic essens = 2 magisk save). Magisk save lader en forlade et map, uden konsekvens.
+Nye potions kræver at man kan bestemme selv, hvilken potions, der skal være i hotspot ikon 1 og 2. Det betyder måske også at potions skal tilbage til at tælle med i backpack.
+
+durability
+Durability på alle våben - random drops får en random durability. Eget armor får skade i durability udfra hvor meget skade man reelt får - egne våben udfra deres reele brug.
+Blacksmith kan reperare våben for ironbar, wood_plank, coal og crystal - hvis våbnet have højere rarety end grøn, koster det også magi essens - mere jo bedre rarety
+100% durability betyder fuld funktions dygtig (helt ned til 75%) - under 75 % bliver udstyr stats gradvis dårligere - når durability når 0% bliver udstyr ubrugelgit. Desuden så skal mounted udstyr kunne tages af igen ved et klik på udstyret.
+- ny resource, skind - skind bruges til reparation af armor - skind kommer fra dyr mobs
+- måske 0% udstyr bare forsvinder - dvs man skal sørge for at holde sit udstyr repareret.
+- kmap slider lidt på udstyr - dødsfald slider meget (konsekvens af at dø)
+- måske man også skal miste 5% af sit guld ved dødsfald
+
+NYT udstyr:
+- sten og jern kan blandes for at lave slibesten - 1 x slibesten kan bruges i vildmarken til at fikse våben 5-15% durability.
+- skind og træ kan blandes for at lave repairkit - 1 x repairkit kan bruges i vildmarken til at fikse våben eller armor med 10%-25% durability
+begge disse er backpack merges - måske en ny stats kan påvirke hvor meget disse to fikser durability
+
+
+HVAD KAN JUNK BRUGES TIL
+- måske junk kan bruges "byttes" til forskellige resourcer - f.eks. 1000 junk = 2 jernbar og lignende
+- resource droprate skal nok sættes en del ned
+
+
+FOLIGAGE
+- måske skal foilage forsvinde, når man looter det?
+- indstilling til at foilage kan blive til noget andet, når man jogger over det (en rotte splatter ud til en blodklat - aka foilage skifter til et andet foilage)
+
+- Ruin udgave af houses (seperat nondestrucable object)
+- splitte høstakke og hø udstyr op (fra eksisterende object sheet)
+- Justerer unique droprate
+
+- justerer quest papir look færdigt (npc image kant skal være transparent)
+- gør booklore baggrund færdig (måske der skal tilføjes noget pages system i readable)
+- tracknings indstilling af quest skal kunne tændes/slukkes direkte i pæn quest view
+
+- fog of war mangler jeg stadig (og en stats der kan påvirke det)
+
+FRACTIONER:
+Village People (start zone)
+Eldirias Light Elfs (Elvindale skoven)
+Elvindale People
+
+Mountain Trolls
+Nethrendors Dark Elfs
+
+Fractions system: alle mobs tilhører en fraction (brug en variable til fractions navne så jeg nemmere kan ændre dem). Nogle mobs giver plus til andre fractioner (global regel sæt), andre giver minus. Som regel minus til den fraction man dræber af.
+Fractions systemet skal have konsekvens ind i handel og ind i chance for overfald af en bestemt slags (måske er der altid en chance for at fractioner man er meget dårlig stillet ved, kan angribe en i alle zoner).
+
+
+ANGREB PÅ byen
+- chance for at ske, hver gang man vender tilbage - forskellige dårlig ting i byen skal spille ind via vægte.
+- hvis man succes fuld angribes, laves et monster map, hvor størrelse, antal monster, type monster osv bestemmes af forskellige faktore
+- dør man, taber man, og byen bliver angrebet, hvilket kan ødelægge bygninger, områder og koste borgere
+- corruption skal have noget at sige i forhold til hyppighed og chance for angreb
+- brug mapping side til at lave felter, hvor hæren kan opstille (og lav så små hærfigurer, der kan placeres i en masse punkter i det felt) - alle fire hjørner.
+- ny stats der hedder handel - for hver af de fire hjørner der er blokeret, bliver handel dårligere - hvad skal handel påvirke?
+- handel påvirker???
+- bruge mobs ikoner (first idle frame) som ikoner for mobs gruppe på city map. Hp eller dm kan være repræsenteret af styrke. Hvis Nethrendor f.eks. har 50 i styrke, så placeres der mobs for tilsvarende styre i HP eller dm eller hvad jeg vælger, der skal matche.
+- Måske Nethrendor starter med en vis styrke, og mobs, der er under hans kommando reducere i den styrke (måske fraction systemet skal bruges her). Quest kan tilføje elelr fjerne nethrendor army_styrke. Når army styrke er over en vis del af ens egen army styrke, kan der måske ske de her angreb på ens by - corruption skal have noget at sige her.
+
+- marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
+- man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
+
+
+Random spawn system
+Ude i venstre side af city skal være et threatmeter - trusselsmeter. Trusselsmeter starter på 0%, men stiger hver gang man dør udfra følgende beregning: Er ens nuværende XP mindre end 25% udført, stiger trusselmeter med random 10-15. Er ens nuværende XP fra 25%-49% udført, så stiger trusselsmeter med random 5-10, er man over halvejs imod næste level i XP, så stiger trusselmeter kun med 2-5 ved dødsfald. Gennemføre man map run og når exit, falder trusselmeter udfra hvad map størrelse man var på (small giver fald fra 0-15, medium fra 0-25, large fra 0-35, giga fra 0-65).
+
+Når trusselmeter når 90%, så er der 10% chance for mobs kan spawne ind (random hvilket mulige sted hver gang, men skal overholdet path). Herefter stiger chancen for mobs spawn med 5% pr procent over de 90%.
+
+Når man kommer tilbage til byen, udregnes det om der skal spawne mobs i de særlige spawn areas. Det er områderne der er category spawn i City-areas-config filen. Mobs der findes i city mode, vises på kortet via figur i mini mappen. Indtil videre er der demon og skeleton.
+
+Jeg forestiller mig at hver gang man besøger kort, så tjekkes der imod noget, om en eller flere mobs skal dukke op og få en random placering på et af swapn arealerne. Jeg ved ikke helt hvad der skal tjekkes, men de nuværende stats mm bør kunne have afgørende effekt på det. Når en mobs først er placeret forsvinder den ikke, får man har kæmpet imod den.
+
+Kamp foregår ved at man klikker på den (hover effekt) og så spawner man ind i et random map (vælge imellem nogle få tileset, nogle få foilageset, nogle få decay set og nogle få object set), og så skal mobs matche mini mobs. Området er befriet, når alle mobs er døde (der er entry og exit, ligesom normal mobs map). Map størrelse skal være styret af mobs styrken.
+
+MOBS på city kort. Der vælges iblandt en liste med mulige mobs, vægtet. Derefter placeres det som et let monster - lvl 1 (small map). Hver gang man genbesøger city mode, rulles der (udover om der kommer nye mobs spots) også om mobs styrke stiger - stiger mobs styrke, ændres mobs til lvl 2. Level 2 city mobs er 1.5-2 gange så mange på small map. På den måde stiger lvl på mobs gruppe hele tiden. 
+Lvl 1 --> small map, normal mængde mobs
+Lvl 2 --> small map, 1.5-2 gange mængde af mobs
+Lvl 3 --> medium map, normal mængde (25% chance for at mob spreder sig)
+Lvl 4 --> medium map, 1.25 % mængde (45% større chance for mob spreder sig)
+Lvl 5 --> large map, normal mængde (85 % chance for at mob spreder sig).
+Lvl 5 er højeste city map mob lvl, men en lvl 5 spreder sig pr besøg på kortet.
+Dette tjek laves ved hvert besøg på city map
+Når en mob type spreder sig, så betyder det at en lvl 1 palceres nogenlunde tæt på der hvor den spreder sig fra.
+
+Regler for hvilke områder, der kan placeres mobs i hvornår:
+NW_SPAWN_BORDER, SW_SPAWN_BORDER, NE_SPAWN_BORDER_LOWER, SE_SPAWN_BORDER altid muligt.
+NW_SPAWN_BRIDGE kun når defence tower NW ikke er ejet og der er mobs i NW_SPAWN_BORDER
+NW_SPAWN_CLOSE kun når city wall og defence tower NW ikke er ejet og der er mob i både NW_SPAWN_BORDER og NW_SPAWN_BRIDGE
+SW_BRIDGE kun når defence tower SW ikke er ejet og der er mobs i SW_SPAWN_BORDER
+SW_SPAWN_CLOSE kun når city wall og defence tower SW ikke er ejet og der er mob i både SW_SPAWN_BORDER og SW_SPAWN_BRIDGE
+NE_SPAWN_BORDER_UPPER og NE_SPAWN_BRIDGE kun når man ikke ejer defence tower NE.
+NE_SPAWN_CLOSE kun muligt, hvis mna ikke har city wall og defence tower NE OG der er mobs i enten NE_SPAWN_BORDER_UPPER eller NE_SPAWN_BORDER_LOWER
+SE_SPAWN_BRIDGE kun muligt hvis man ikke ejer defence tower SE
+SE_SPAWN_CLOSE kun muligt hvis man ikke ejer defence tower SE og city wall
+NW_SPAWN_CORNER kun muligt, hvis der er mobs i NW_SPAWN_BORDER
+W_SPAWN_EDGE altid muligt
+SE_SPAWN_CORNER kun muligt hvis mobs i SE_SPAWN_BORDER
+
+- Mobs spreder sig i samme område, indtil der er en lvl 5, så kan den sprede sig til relateret område (se path regler)
+
+path:
+NW_SPAWN_BORDER --> NW_SPAWN_CORNER --> SLUT 
+NW_SPAWN_BORDER --> NW_SPAWN_BRIDGE --> NW_SPAWN_CLOSE 
+W_SPAWN_EDGE --> SLUT 
+SW_SPAWN_BORDER --> SW_SPAWN_BRIDGE --> SW_SPAWN_CLOSE
+NE_SPAWN_BORDER_UPPER --> NE_SPAWN_BRIDGE --> NE_SPAWN_CLOSE
+NE_SPAWN_BORDER_LOWER --> NE_SPAWN_BRIDGE --> NE_SPAWN_CLOSE
+SE_SPAWN_BORDER --> SE_SPAWN_CORNER --> slut 
+SE_SPAWN_BORDER --> SE_SPAWN_BRIDGE --> SE_SPAWN_CLOSE
+
+Spilleren kan altid kun vælge at angribe mobs på yderste del af path (modsat mobs spredning). Hvis der er mobs på NW_SPAWN_BORDER, NW_SPAWN_BRIDGE og NW_SPAWN_CLOSE, så skal alle mobs væk fra NW_SPAWN_CLOSE, får mobs på NW_SPAWN_BRIDGE kan angribes osv. Dette gælder pr gren. Eksempel: der er mobs på NW_SPAWN_BORDER, NW_SPAWN_BRIDGE og NW_SPAWN_CLOSE og mobs på NE_SPAWN_BORDER_UPPER, så er mulighederne NE_SPAWN_BORDER_UPPER eller NW_SPAWN_CLOSE.
+
+Hvis et mobs når til ejede defence tower (defence tower ligger i bridge områderne) og city wall ligger i close områderne, så angriber mobs disse ting og de mister durability (hver lvl af mobs gør 5% skade pr city besøg pr mobs i feltet i durability på gældende bygning)
+
+Alle reglerne for disse betingelser og indstillinger skal lige i seperat config fil - lad os kalde den city-mobs-attack-config.
+
+pt er der to mobs der kan angribe city - demon og skeleton (deres mini png er klar)
+
+Chancer for at spawn på ske ved hver city besøg:
+
+DURABILITY på bygninger og areas
+Nye bygninger og areas starter med 100% i durability, men kan degrade for hvert besøg - hver bygnign og area har 50% chance for at degrade med 0-2% pr besøg i byen. reparation koster den ødelagte procent sats af købs resourcerne (kostede en bygnign 100 sten og skal reperares 10%, koster det 10 sten.)
+
+Andre ting kan senere gøre skabe på durability.
+Durability skal kunne ses i venstre area oversigt og i bygninger oversigt
+Durability regler og parameter skal ligge i egen durability config fil - bemærk der senere kommer et item/udstyr durability system også.

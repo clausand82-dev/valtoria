@@ -1,4 +1,5 @@
 import { drawObject } from "./assets.js";
+import { getRegionObjectFamily } from "./config/region-object-config.js";
 
 const OVERLAY_TYPES = new Set([
   "house",
@@ -9,9 +10,8 @@ const OVERLAY_TYPES = new Set([
   "obelisk",
   "well",
   "crate",
-  "boulder",
+  "tree",
   "stone",
-  "rubble",
   "crystal",
   "chest",
   "firebeacon",
@@ -19,7 +19,7 @@ const OVERLAY_TYPES = new Set([
 ]);
 
 export function isOverlayType(type) {
-  return OVERLAY_TYPES.has(type);
+  return OVERLAY_TYPES.has(type) || String(type ?? "").startsWith("object_") || getRegionObjectFamily(type) === "tree";
 }
 
 export function drawOverlayObject(ctx, object, screen, biome, atlas, time = 0) {

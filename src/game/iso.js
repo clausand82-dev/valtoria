@@ -1,4 +1,4 @@
-import { TILE_H, TILE_W } from "./data.js";
+import { TILE_H, TILE_W } from "./config/game-constants-config.js";
 
 export function worldToIso(x, y, z = 0) {
   return {

@@ -25,6 +25,10 @@ const ITEM_FRAME_BY_BASE = {
   Greaves: 11,
   Boots: 11,
   Gloves: 11,
+  Pauldrons: 11,
+  Cape: 11,
+  Belt: 11,
+  Relic: 11,
 };
 
 const ARMOR_FRAME_BY_BASE = {
@@ -36,6 +40,10 @@ const ARMOR_FRAME_BY_BASE = {
   Bracelet: 8,
   Boots: 9,
   Gloves: 10,
+  Pauldrons: 5,
+  Cape: 6,
+  Belt: 7,
+  Relic: 11,
 };
 
 export function drawLoot(ctx, screen, loot, atlas) {
@@ -152,7 +160,19 @@ function getCustomItemImage(iconUrl) {
 }
 
 export function drawProjectile(ctx, screen, projectile, atlas) {
-  const projectileFrame = projectile.type === "magic" || projectile.type === "burst" ? "orb" : "arrow";
+  const projectileFrame = projectile.type === "magic" || projectile.type === "burst" || projectile.owner ? "orb" : "arrow";
+  if (projectile.owner) {
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = projectile.color ?? "#9de9ff";
+    ctx.shadowColor = projectile.color ?? "#9de9ff";
+    ctx.shadowBlur = projectile.type === "energy_beam" ? 18 : 10;
+    ctx.beginPath();
+    ctx.arc(screen.x, screen.y - 8, projectile.type === "energy_beam" ? 5 : 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   drawAtlasFrame(ctx, atlas, projectileFrame, screen.x, screen.y - 8, {
     scale: projectileFrame === "orb" ? 0.18 : 0.16,
   });

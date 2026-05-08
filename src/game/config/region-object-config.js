@@ -1,12 +1,18 @@
-const TREE_OBJECT_BY_BIOME = {
-  snow: "object_tree_snow",
-  desert: "object_tree_sand",
-  sand: "object_tree_sand",
-  jungle: "object_tree_jungle",
-  rock: "object_tree_rock",
-  lava: "object_tree_lava",
-  mainland: "object_tree_mainland",
-};
+// TODO:DELETE - TREE_OBJECT_BY_BIOME is only used by legacyRegionObjectsFromWeights. All regions now use explicit objects: arrays.
+// const TREE_OBJECT_BY_BIOME = {
+//   snow: "object_tree_snow",
+//   desert: "object_tree_sand",
+//   sand: "object_tree_sand",
+//   jungle: "object_tree_jungle",
+//   rock: "object_tree_rock",
+//   lava: "object_tree_lava",
+//   mainland: "object_tree_mainland",
+// };
+// TODO:DELETE - legacy tree fallback is disabled. Regions must now specify explicit objects.
+// function getTreeObjectIdForBiome(biomeId) {
+//   const map = { snow: "object_tree_snow", desert: "object_tree_sand", sand: "object_tree_sand", jungle: "object_tree_jungle", rock: "object_tree_rock", lava: "object_tree_lava" };
+//   return map[biomeId] ?? "object_tree_mainland";
+// }
 
 /*
 Region object definition guide
@@ -14,9 +20,9 @@ Region object definition guide
 Fields used on each object in REGION_OBJECT_DEFS:
 - spawnTypes: Runtime types that can be spawned for this object id.
   Example: [{ type: "object_woodboxes_ground", weight: 1 }]
-- legacyWeightKey: Only used by the legacy weight fallback mapping.
+- TODO:DELETE legacyWeightKey: Only used by legacyRegionObjectsFromWeights (old biodome weight system).
 - defaultDestructible: Default destructible flag if region override is not set.
-- destructibleProfile: Optional profile key in resource-config.
+- destructible: Inline destructible data used by runtime object damage/loot.
 - renderBiomeId: Optional visual biome override when rendering.
 - graphicsRef: PNG reference text. For new object_* sheet generation this should
   contain a real file name like "my_object.png".
@@ -58,102 +64,198 @@ object_firebeacon_snow: {
 
 export const REGION_OBJECT_DEFS = {
   object_tree_mainland: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_mainland", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.45 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "mainland",
-    graphicsRef: "tree_normal_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_normal.png (tree sheet)",
   },
   object_tree_snow: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.45 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "snow",
-    graphicsRef: "tree_snow_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_snow.png (tree sheet)",
   },
   object_tree_sand: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_sand", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.30 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "desert",
-    graphicsRef: "tree_sand_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_sand.png (tree sheet)",
   },
   object_tree_jungle: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_jungle", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.45 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "jungle",
-    graphicsRef: "tree_jungle_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_jungle.png (tree sheet)",
   },
   object_tree_rock: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_rock", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.45 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "rock",
-    graphicsRef: "tree_dead_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_rock.png (tree sheet)",
   },
   object_tree_lava: {
-    spawnTypes: [
-      { type: "pine", weight: 58 },
-      { type: "old-oak", weight: 42 },
-    ],
-    legacyWeightKey: "tree",
+    spawnTypes: [{ type: "object_tree_lava", weight: 1 }],
+    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 40,
+      damageStages: 3,
+      particleColor: "#b88454",
+      loot: [{ resource: "wood_piece", min: 2, max: 6, chance: 0.25 }],
+      rareLoot: [
+        { resource: "coal", min: 1, max: 2, chance: 0.13 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+    },
     renderBiomeId: "lava",
-    graphicsRef: "tree_dead_sheet.png (tree sheet)",
+    graphicsRef: "object/object_tree_lava.png (tree sheet)",
   },
   object_house_mainland: {
     spawnTypes: [{ type: "building", weight: 1 }],
-    legacyWeightKey: "house",
+    // legacyWeightKey: "house", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructibleProfile: "building",
+    destructible: {
+      hp: 70,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "junk", min: 2, max: 6, chance: 1 },
+        { resource: "wood_piece", min: 1, max: 5, chance: 0.45 },
+        { resource: "rock_piece", min: 1, max: 4, chance: 0.34 },
+        { resource: "iron_piece", min: 1, max: 2, chance: 0.12 },
+        { resource: "crystal_piece", min: 1, max: 4, chance: 0.06 },
+        { resource: "meat", min: 1, max: 2, chance: 0.05 },
+        { resource: "fruit", min: 1, max: 2, chance: 0.05 },
+        { resource: "coal", min: 1, max: 2, chance: 0.05 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+        { resource: "stone_brick", min: 1, max: 1, chance: 0.03 },
+        { resource: "iron_bar", min: 1, max: 1, chance: 0.018 },
+        { resource: "crystal", min: 1, max: 1, chance: 0.012 },
+      ],
+      rareLoot: [
+        { resource: "red_gemstone", min: 1, max: 1, chance: 0.004 },
+        { resource: "yellow_gemstone", min: 1, max: 1, chance: 0.004 },
+        { resource: "green_gemstone", min: 1, max: 1, chance: 0.004 },
+        { resource: "blue_gemstone", min: 1, max: 1, chance: 0.004 },
+        { resource: "black_gemstone", min: 1, max: 1, chance: 0.0007 },
+        { resource: "white_gemstone", min: 1, max: 1, chance: 0.0007 },
+        { resource: "diamond", min: 1, max: 1, chance: 0.00045 },
+      ],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "building_normal_sheet.png (4x4)",
   },
   object_pillar_stone: {
     spawnTypes: [{ type: "pillar", weight: 1 }],
-    legacyWeightKey: "pillar",
+    // legacyWeightKey: "pillar", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructibleProfile: "pillar",
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "stone_brick", min: 1, max: 2, chance: 0.45 }],
+      rareLoot: [],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "atlas frame: pillar",
   },
   object_stone_cluster: {
-    spawnTypes: [
-      { type: "boulder", weight: 58 },
-      { type: "stone", weight: 42 },
-    ],
-    legacyWeightKey: "rock",
+    spawnTypes: [{ type: "object_stone_cluster", weight: 1 }],
+    // legacyWeightKey: "rock", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    destructible: {
+      hp: 42,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 2, max: 5, chance: 0.45 }],
+      rareLoot: [
+        { resource: "iron_piece", min: 1, max: 2, chance: 0.11 },
+        { resource: "coal", min: 1, max: 2, chance: 0.1 },
+        { resource: "stone_brick", min: 1, max: 1, chance: 0.04 },
+        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
     renderBiomeId: "mainland",
-    graphicsRef: "atlas frame: boulder",
+    graphicsRef: "rock_normal_sheet.png (rock sheet)",
   },
   object_ruin_mainland: {
     spawnTypes: [{ type: "ruin", weight: 1 }],
-    legacyWeightKey: "ruin",
+    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructibleProfile: "ruin",
+    destructible: {
+      hp: 64,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
+      rareLoot: [
+        { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+      ],
+      itemLoot: [
+        { rarity: "legendary", chance: 0.0035, tries: 120 },
+      ],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "ruin_normal_sheet.png (4x4)",
   },
   object_fireplace_mainland: {
     spawnTypes: [{ type: "fireplace", weight: 1 }],
-    legacyWeightKey: "fireplace",
+    // legacyWeightKey: "fireplace", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: false,
     renderBiomeId: "mainland",
     graphicsRef: "fireplace_normal_01..04.png (animated)",
@@ -161,7 +263,7 @@ export const REGION_OBJECT_DEFS = {
   object_firebeacon_snow: {
     // Legacy runtime type: still uses "firebeacon" (old OBJECT_SHEETS path).
     spawnTypes: [{ type: "firebeacon", weight: 1 }],
-    legacyWeightKey: "firebeacon",
+    // legacyWeightKey: "firebeacon", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: false,
     renderBiomeId: "snow",
     graphicsRef: "firebeacon_snow_animated_001..008.png (animated)",
@@ -169,30 +271,138 @@ export const REGION_OBJECT_DEFS = {
   object_woodboxes_ground: {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
     defaultDestructible: true,
-    destructibleProfile: "object_woodboxes_ground",
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_woodboxes_ground.png",
   },
-    object_shelfs: {
+  object_shelfs: {
     spawnTypes: [{ type: "object_shelfs", weight: 1 }],
     defaultDestructible: true,
-    destructibleProfile: "object_shelfs",
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "health", min: 1, max: 3, chance: 0.1 },
+        { resource: "paper", min: 1, max: 4, chance: 0.1 },
+        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.005 },
+      ],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_shelfs.png",
   },
   object_field: {
     spawnTypes: [{ type: "object_field", weight: 1 }],
-    defaultDestructible: true,
-    destructibleProfile: "object_field",
+    defaultDestructible: false,
+    // destructibleProfile: "object_field", // TODO: enable again if object_field gets destructible data later
     renderBiomeId: "mainland",
     graphicsRef: "object/object_field.png",
   },
   object_barn: {
     spawnTypes: [{ type: "object_barn", weight: 1 }],
     defaultDestructible: true,
-    destructibleProfile: "object_barn",
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_barn.png",
+  },
+  object_well: {
+    spawnTypes: [{ type: "object_well", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 1, max: 3, chance: 1 }],
+      rareLoot: [
+        { resource: "stone_brick", min: 1, max: 1, chance: 0.06 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_well.png",
+  },
+  object_sacks_ground: {
+    spawnTypes: [{ type: "object_sacks_ground", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "health", min: 1, max: 3, chance: 0.1 },
+        { resource: "paper", min: 1, max: 4, chance: 0.1 },
+        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.005 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_sacks_ground.png",
+  },
+  object_hay01: {
+    spawnTypes: [{ type: "object_hay01", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_hay01.png",
+  },
+  object_hay02: {
+    spawnTypes: [{ type: "object_hay02", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
+      ],
+      rareLoot: [
+        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_hay02.png",
   },
 };
 
@@ -276,10 +486,6 @@ function buildRegionObjectSheets(definitions) {
 
 export const REGION_OBJECT_SHEETS = buildRegionObjectSheets(REGION_OBJECT_DEFS);
 
-function getTreeObjectIdForBiome(biomeId) {
-  return TREE_OBJECT_BY_BIOME[biomeId] ?? TREE_OBJECT_BY_BIOME.mainland;
-}
-
 function parseWeight(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
@@ -298,6 +504,35 @@ function normalizeSpawnTypes(def) {
   return normalized;
 }
 
+export function findRegionObjectDefBySpawnType(type) {
+  if (!type) return null;
+  for (const def of Object.values(REGION_OBJECT_DEFS)) {
+    const spawnTypes = Array.isArray(def?.spawnTypes) ? def.spawnTypes : [];
+    if (spawnTypes.some((entry) => entry?.type === type)) {
+      return def;
+    }
+  }
+  return null;
+}
+
+export function resolveRegionObjectDestructibleDef(type) {
+  return findRegionObjectDefBySpawnType(type)?.destructible ?? null;
+}
+
+export function getRegionObjectFamily(type) {
+  const def = findRegionObjectDefBySpawnType(type);
+  if (!def) return type ?? null;
+  const spawnTypes = Array.isArray(def?.spawnTypes) ? def.spawnTypes : [];
+  if (spawnTypes.some((entry) => String(entry?.type ?? "").startsWith("object_tree_"))) return "tree";
+  if (spawnTypes.some((entry) => entry?.type === "object_stone_cluster")) return "stone";
+  if (spawnTypes.some((entry) => entry?.type === "object_house_mainland")) return "building";
+  if (spawnTypes.some((entry) => entry?.type === "object_ruin_mainland")) return "ruin";
+  if (spawnTypes.some((entry) => entry?.type === "object_pillar_stone")) return "pillar";
+  if (spawnTypes.some((entry) => entry?.type === "object_fireplace_mainland")) return "fireplace";
+  if (spawnTypes.some((entry) => entry?.type === "object_firebeacon_snow")) return "firebeacon";
+  return type ?? null;
+}
+
 function buildObjectEntry(objectId, weight, destructible = null) {
   const def = REGION_OBJECT_DEFS[objectId];
   if (!def) return null;
@@ -311,45 +546,45 @@ function buildObjectEntry(objectId, weight, destructible = null) {
     spawnTypes,
     destructible,
     defaultDestructible: def.defaultDestructible !== false,
-    destructibleProfile: def.destructibleProfile ?? null,
     renderBiomeId: def.renderBiomeId ?? null,
     graphicsRef: def.graphicsRef ?? null,
   };
 }
 
-function legacyObjectIdForWeightKey(weightKey, biomeId) {
-  switch (weightKey) {
-    case "tree":
-      return getTreeObjectIdForBiome(biomeId);
-    case "house":
-      return "object_house_mainland";
-    case "rock":
-      return "object_stone_cluster";
-    case "ruin":
-      return "object_ruin_mainland";
-    case "pillar":
-      return "object_pillar_stone";
-    case "fireplace":
-      return "object_fireplace_mainland";
-    case "firebeacon":
-      return "object_firebeacon_snow";
-    default:
-      return null;
-  }
-}
+// TODO:DELETE - legacy biodome weight mapping is disabled. Regions must now use explicit objects arrays.
+// function legacyObjectIdForWeightKey(weightKey, biomeId) {
+//   switch (weightKey) {
+//     case "tree":
+//       return getTreeObjectIdForBiome(biomeId);
+//     case "house":
+//       return "object_house_mainland";
+//     case "rock":
+//       return "object_stone_cluster";
+//     case "ruin":
+//       return "object_ruin_mainland";
+//     case "pillar":
+//       return "object_pillar_stone";
+//     case "fireplace":
+//       return "object_fireplace_mainland";
+//     case "firebeacon":
+//       return "object_firebeacon_snow";
+//     default:
+//       return null;
+//   }
+// }
 
-export function legacyRegionObjectsFromWeights(weights = {}, biomeId = "mainland") {
-  const keys = ["tree", "house", "rock", "ruin", "pillar", "fireplace", "firebeacon"];
-  const entries = [];
-  for (const key of keys) {
-    const objectId = legacyObjectIdForWeightKey(key, biomeId);
-    if (!objectId) continue;
-    const weight = parseWeight(weights[key]);
-    const entry = buildObjectEntry(objectId, weight, null);
-    if (entry) entries.push(entry);
-  }
-  return entries;
-}
+// export function legacyRegionObjectsFromWeights(weights = {}, biomeId = "mainland") {
+//   const keys = ["tree", "house", "rock", "ruin", "pillar", "fireplace", "firebeacon"];
+//   const entries = [];
+//   for (const key of keys) {
+//     const objectId = legacyObjectIdForWeightKey(key, biomeId);
+//     if (!objectId) continue;
+//     const weight = parseWeight(weights[key]);
+//     const entry = buildObjectEntry(objectId, weight, null);
+//     if (entry) entries.push(entry);
+//   }
+//   return entries;
+// }
 
 export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") {
   const raw = regionConfig.objects;
@@ -370,11 +605,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     if (normalized) entries.push(normalized);
   }
 
-  // Fallback to biome-specific tree entry if someone passes empty object list by mistake.
-  if (!entries.length && Array.isArray(raw)) {
-    const treeFallback = buildObjectEntry(getTreeObjectIdForBiome(biomeId), 1, null);
-    if (treeFallback) return [treeFallback];
-  }
+  // TODO:DELETE - legacy tree fallback is disabled. Empty objects arrays now stay empty.
   return entries;
 }
 

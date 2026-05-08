@@ -1,0 +1,46 @@
+export const EQUIPMENT_SLOTS = [
+  { id: "head", label: "Head", emptyIconKey: "common_helm" },
+  { id: "neck", label: "Neck", emptyIconKey: "common_gorget" },
+  { id: "amulet", label: "Amulet", emptyIconKey: "common_amulet" },
+  { id: "shoulder", label: "Shoulder", emptyIconKey: "common_shoulders" },
+  { id: "cape", label: "Cape", emptyIconKey: "common_cape" },
+  { id: "chest", label: "Chest", emptyIconKey: "common_chestplate" },
+  { id: "arms", label: "Arms", emptyIconKey: "common_arms" },
+  { id: "hands", label: "Hands", emptyIconKey: "common_hands" },
+  { id: "bracelet", label: "Bracelet", emptyIconKey: "common_bracelet" },
+  { id: "ring1", label: "Ring", emptyIconKey: "common_ring" },
+  { id: "ring2", label: "Ring", emptyIconKey: "common_ring" },
+  { id: "belt", label: "Belt", emptyIconKey: "common_belt" },
+  { id: "legs", label: "Legs", emptyIconKey: "common_legs" },
+  { id: "feet", label: "Feet", emptyIconKey: "common_feet" },
+  { id: "weapon", label: "Weapon", emptyIconKey: "common_sword" },
+  { id: "relic", label: "Relic", emptyIconKey: "common_relic" },
+];
+
+export const ARMOR_BASES = [
+  { slot: "head", name: "Helm", armor: 5, life: 9 },
+  { slot: "neck", name: "Gorget", armor: 2, mana: 10 },
+  { slot: "shoulder", name: "Pauldrons", armor: 6, life: 10 },
+  { slot: "chest", name: "Chestplate", armor: 12, life: 18 },
+  { slot: "cape", name: "Cape", armor: 2, speed: 0.08, magic: 1 },
+  { slot: "arms", name: "Vambraces", armor: 7, damage: 1 },
+  { slot: "hands", name: "Gloves", armor: 4, damage: 2 }, 
+  { slot: "ring", name: "Ring", armor: 1, magic: 3 },
+  { slot: "amulet", name: "Amulet", armor: 1, mana: 15 },
+  { slot: "bracelet", name: "Bracelet", armor: 3, damage: 2 },
+  { slot: "legs", name: "Greaves", armor: 8, speed: 0.08 },
+  { slot: "feet", name: "Boots", armor: 5, speed: 0.14 },
+  { slot: "belt", name: "Belt", armor: 4, life: 12 },
+  { slot: "relic", name: "Relic", armor: 1, mana: 12, magic: 2 },
+];
+
+export const WEAPON_BASES = [
+  { name: "Sword", mode: "melee", min: 7, max: 13, range: 1.25, cooldown: 0.52 },
+  { name: "Spear", mode: "melee", min: 8, max: 16, range: 1.65, cooldown: 0.72 },
+  { name: "Dagger", mode: "melee", min: 5, max: 10, range: 1.05, cooldown: 0.35 },
+  { name: "Crossbow", mode: "ranged", min: 9, max: 17, range: 5.3, cooldown: 0.86 },
+  { name: "Bow", mode: "ranged", min: 7, max: 14, range: 5.8, cooldown: 0.62 },
+  { name: "Javelin", mode: "ranged", min: 10, max: 20, range: 4.7, cooldown: 0.95 },
+  { name: "Rune Staff", mode: "magic", min: 8, max: 15, range: 5.2, cooldown: 0.74 },
+  { name: "Spell Mask", mode: "magic", min: 6, max: 12, range: 4.6, cooldown: 0.48 },
+];

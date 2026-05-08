@@ -19,6 +19,12 @@ export const DECAY_SET_DEFS = {
     cols: 4,
     renderScale: 1,
   },
+  decay_blood: {
+    fileName: "decay/decay_blood.png",
+    rows: 4,
+    cols: 4,
+    renderScale: 1,
+  },
     decay_field: {
     fileName: "decay/decay_field.png",
     rows: 4,

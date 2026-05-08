@@ -1,28 +1,22 @@
-import {
-  ARMOR_BASES,
-  BIOMES,
-  BIOME_IDS,
-  CHUNK_SIZE,
-  EQUIPMENT_SLOTS,
-  MONSTER_STATS,
-  NAMED_ITEM_TEMPLATES,
-  PREFIXES,
-  RARITIES,
-  UNIQUE_RARITY,
-  UNIQUE_ITEMS,
-  WEAPON_BASES,
-  WORLD_SEED,
-} from "./data.js";
+import { BIOMES, BIOME_IDS } from "./config/biome-config.js";
+import { CHUNK_SIZE, WORLD_SEED } from "./config/game-constants-config.js";
+import { ARMOR_BASES, EQUIPMENT_SLOTS, WEAPON_BASES } from "./config/equipment-config.js";
+import { NAMED_ITEM_TEMPLATES, PREFIXES, UNIQUE_ITEMS } from "./config/item-config.js";
+import { MONSTER_STATS } from "./config/monster-config.js";
+import { RARITIES, UNIQUE_RARITY } from "./config/rarity-config.js";
 import { DECAL_SETS_BY_BIOME, OBJECT_SPAWN_TUNING, SPAWN_CONFIG } from "./config/spawn-config.js";
-import { DESTRUCTIBLE_OBJECTS } from "./config/resource-config.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset } from "./config/region-asset-config.js";
 import {
-  legacyRegionObjectsFromWeights,
+  getRegionObjectFamily,
+  // legacyRegionObjectsFromWeights,
   normalizeRegionObjects,
   pickObjectSpawnType,
+  resolveRegionObjectDestructibleDef,
 } from "./config/region-object-config.js";
 import { normalizeRegionDecaySets } from "./config/decay-config.js";
+import { BOSS_TINT } from "./config/monster-config.js";
 import { withItemFlags, withItemIcon } from "./item-system.js";
+import { MAX_ITEM_SOCKETS } from "./config/socket-config.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
@@ -34,6 +28,23 @@ const BIOME_FIELDS = BIOME_IDS.map((id, index) => ({
   index,
   weight: BIOMES[id].weight ?? 1,
 }));
+const ITEM_BONUS_STAT_KEYS = [
+  "maxHpPct",
+  "maxManaPct",
+  "armorFlat",
+  "damagePct",
+  "speedPct",
+  "attackSpeed",
+  "critChance",
+  "critDamage",
+  "blockChance",
+  "dodgeChance",
+  "lifeSteal",
+  "magicFind",
+  "goldFind",
+  "resourceFind",
+  "xpGain",
+];
 
 export function createId() {
   nextId += 1;
@@ -113,6 +124,21 @@ function pickWeighted(entries, roll = Math.random()) {
   return entries[entries.length - 1];
 }
 
+function pickWeightedByWeight(entries, roll = Math.random()) {
+  const weighted = entries.map((entry) => ({
+    entry,
+    weight: Math.max(0, Number(entry.weight) || 1),
+  }));
+  const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+  if (total <= 0) return entries[Math.floor(roll * entries.length)] ?? entries[0];
+  let cursor = roll * total;
+  for (const item of weighted) {
+    cursor -= item.weight;
+    if (cursor <= 0) return item.entry;
+  }
+  return weighted[weighted.length - 1]?.entry ?? entries[0];
+}
+
 export function getRarity(level) {
   const shifted = RARITIES.map((rarity, index) => ({
     ...rarity,
@@ -134,7 +160,22 @@ export function itemValue(item) {
     (Number(item.maxHp) || 0) * 0.45 +
     (Number(item.maxMana) || 0) * 0.35 +
     (Number(item.magic) || 0) * 1.6 +
-    (Number(item.speed) || 0) * 55;
+    (Number(item.speed) || 0) * 55 +
+    (Number(item.maxHpPct) || 0) * 115 +
+    (Number(item.maxManaPct) || 0) * 90 +
+    (Number(item.armorFlat) || 0) * 1.8 +
+    (Number(item.damagePct) || 0) * 150 +
+    (Number(item.speedPct) || 0) * 120 +
+    (Number(item.attackSpeed) || 0) * 150 +
+    (Number(item.critChance) || 0) * 220 +
+    (Number(item.critDamage) || 0) * 90 +
+    (Number(item.blockChance) || 0) * 180 +
+    (Number(item.dodgeChance) || 0) * 180 +
+    (Number(item.lifeSteal) || 0) * 260 +
+    (Number(item.magicFind) || 0) * 85 +
+    (Number(item.goldFind) || 0) * 65 +
+    (Number(item.resourceFind) || 0) * 70 +
+    (Number(item.xpGain) || 0) * 75;
   return Math.max(1, Math.floor((8 + level * 6 + power) * rarity.mult));
 }
 
@@ -145,8 +186,21 @@ function withItemValue(item) {
   };
 }
 
+function withRandomSockets(item) {
+  if (!item || item.unique || item.named || (item.slot !== "weapon" && item.mode !== "armor")) return item;
+  const rarityIndex = RARITIES.findIndex((rarity) => rarity.id === item.rarity);
+  const chance = Math.max(0, 0.03 + rarityIndex * 0.035 + Math.max(0, Number(item.level) || 1) * 0.003);
+  if (Math.random() >= chance) return item;
+  const sockets = 1 + (Math.random() < 0.22 ? 1 : 0) + (Math.random() < 0.06 ? 1 : 0);
+  return { ...item, sockets: Array.from({ length: Math.min(MAX_ITEM_SOCKETS, sockets) }, () => null) };
+}
+
 function finalizeItem(item, flags = null, iconKey = null) {
-  return withItemIcon(withItemFlags(withItemValue(item), flags), iconKey);
+  return withItemIcon(withItemFlags(withItemValue(withRandomSockets(item)), flags), iconKey);
+}
+
+function itemBonusStats(stats = {}) {
+  return Object.fromEntries(ITEM_BONUS_STAT_KEYS.map((key) => [key, Number(stats[key]) || 0]));
 }
 
 export function makeItem(level, weaponBias = Math.random()) {
@@ -213,7 +267,7 @@ export function rollUniqueItem(level, context = {}) {
   ));
   if (!candidates.length) return null;
 
-  return makeUniqueItem(candidates[Math.floor(Math.random() * candidates.length)], level);
+  return makeUniqueItem(pickWeightedByWeight(candidates), level);
 }
 
 export function makeUniqueItem(definition, level = 1) {
@@ -244,6 +298,7 @@ export function makeUniqueItem(definition, level = 1) {
     maxMana: Math.floor((stats.maxMana ?? 0) * scale),
     speed: Number(((stats.speed ?? 0) * scale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale),
+    ...itemBonusStats(stats),
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);
@@ -296,6 +351,7 @@ export function makeNamedItem(definition, level = 1) {
     maxMana: Math.floor((stats.maxMana ?? 0) * scale * rarityScale),
     speed: Number(((stats.speed ?? 0) * scale * rarityScale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale * rarityScale),
+    ...itemBonusStats(stats),
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);
@@ -341,6 +397,7 @@ const MAP_SIZE_SCALES = { small: 0.55, medium: 1.0, large: 1.5, giga: 2.2 };
 export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
   const pickedBiomeId = regionConfig?.biodome ?? biomeId ?? BIOME_IDS[Math.floor(seededRand(seed, 1) * BIOME_IDS.length)] ?? "mainland";
   const normalizedTileset = normalizeRegionTileset(regionConfig?.tileset);
+  const normalizedTilesetArray = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : null);
   const normalizedFoliageSets = normalizeRegionFoliageSets(regionConfig ?? {});
   const normalizedObjects = normalizeRegionObjects(regionConfig ?? {}, pickedBiomeId);
   const normalizedDecaySets = normalizeRegionDecaySets(regionConfig ?? {});
@@ -435,22 +492,25 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
       label: regionConfig.label,
       areaMapId: regionConfig.areaMapId,
       biodome: pickedBiomeId,
-      tileset: normalizedTileset
-        ? {
+      tileset: normalizedTilesetArray
+        ? normalizedTilesetArray.map((normalizedTileset) => ({
           fileName: normalizedTileset.fileName,
           sheetId: normalizedTileset.sheetId,
           x: normalizedTileset.x,
           y: normalizedTileset.y,
           lockedVariant: normalizedTileset.lockedVariant,
           variantCount: normalizedTileset.variantCount,
-        }
+        }))
         : null,
       foliageSets: normalizedFoliageSets.map((set) => ({
         fileName: set.fileName,
         sheetId: set.sheetId,
+        weight: set.weight,
+        scale: set.scale,
         rows: set.rows,
         cols: set.cols,
         variantCount: set.variantCount,
+        resourceDrops: set.resourceDrops.map((entry) => ({ ...entry })),
       })),
       objects: normalizedObjects.map((entry) => ({
         id: entry.id,
@@ -458,7 +518,6 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         spawnTypes: entry.spawnTypes.map((item) => ({ type: item.type, weight: item.weight })),
         destructible: entry.destructible,
         defaultDestructible: entry.defaultDestructible,
-        destructibleProfile: entry.destructibleProfile,
         renderBiomeId: entry.renderBiomeId,
         graphicsRef: entry.graphicsRef,
       })),
@@ -586,9 +645,12 @@ export function createChunk(cx, cy, region = null) {
       const biomeId = region ? region.biomeId : lockedStarterGround ? "mainland" : biomeIdAt(worldX, worldY);
       const noise = hashInt(worldX, worldY, 31);
       const regionTileset = region?.mapRegion?.tileset;
-      const useCustomGround = Boolean(regionTileset?.sheetId);
-      const lockedGroundVariant = Number.isInteger(regionTileset?.lockedVariant)
-        ? regionTileset.lockedVariant
+      const chosenTileset = Array.isArray(regionTileset) && regionTileset.length
+        ? regionTileset[noise % regionTileset.length]
+        : regionTileset;
+      const useCustomGround = Boolean(chosenTileset?.sheetId);
+      const lockedGroundVariant = Number.isInteger(chosenTileset?.lockedVariant)
+        ? chosenTileset.lockedVariant
         : null;
       biomeCounts.set(biomeId, (biomeCounts.get(biomeId) ?? 0) + 1);
       const edgeMask = region ? regionEdgeMask(region, worldX, worldY) : 0;
@@ -597,7 +659,7 @@ export function createChunk(cx, cy, region = null) {
         x: worldX,
         y: worldY,
         biomeId,
-        groundSheetId: useCustomGround ? regionTileset.sheetId : null,
+        groundSheetId: useCustomGround ? chosenTileset.sheetId : null,
         variant: lockedGroundVariant ?? (noise % GROUND_VARIANT_COUNT),
         water: waterVariant !== undefined,
         waterVariant,
@@ -667,7 +729,9 @@ function distanceToRegionPath(region, x, y) {
 function regionObjectPool(region) {
   const configured = region?.mapRegion?.objects;
   if (Array.isArray(configured) && configured.length) return configured;
-  return legacyRegionObjectsFromWeights(region?.mapRegion?.weights ?? {}, region?.biomeId ?? "mainland");
+  // TODO:DELETE: legacy biodome/weights object fallback is deprecated.
+  // return legacyRegionObjectsFromWeights(region?.mapRegion?.weights ?? {}, region?.biomeId ?? "mainland");
+  return [];
 }
 
 function pickRegionObjectEntry(entries, cx, cy, salt) {
@@ -680,6 +744,37 @@ function pickRegionObjectEntry(entries, cx, cy, salt) {
     if (cursor <= 0) return entry;
   }
   return entries[entries.length - 1];
+}
+
+function pickWeightedFoliageSet(entries, cx, cy, salt) {
+  if (!entries?.length) return null;
+  const total = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.weight) || 0), 0);
+  if (total <= 0) return entries[Math.floor(rand01(cx, cy, salt) * entries.length)] ?? entries[0];
+  let cursor = rand01(cx, cy, salt) * total;
+  for (const entry of entries) {
+    cursor -= Math.max(0, Number(entry.weight) || 0);
+    if (cursor <= 0) return entry;
+  }
+  return entries[entries.length - 1];
+}
+
+function rollFoliageResourceDrops(entry, cx, cy, foliageIndex) {
+  const drops = Array.isArray(entry?.resourceDrops) ? entry.resourceDrops : [];
+  if (!drops.length) return [];
+  const rolled = [];
+  for (let i = 0; i < drops.length; i += 1) {
+    const drop = drops[i];
+    const chance = Math.max(0, Math.min(1, Number(drop.chance) || 0));
+    if (chance <= 0 || rand01(cx, cy, 7060 + foliageIndex * 97 + i * 13) > chance) continue;
+    const min = Math.max(1, Math.floor(Number(drop.min) || 1));
+    const max = Math.max(min, Math.floor(Number(drop.max) || min));
+    const count = min + Math.floor(rand01(cx, cy, 7070 + foliageIndex * 97 + i * 13) * (max - min + 1));
+    rolled.push({
+      resource: drop.resource,
+      count,
+    });
+  }
+  return rolled;
 }
 
 function addObjects(chunk, safeChunk) {
@@ -706,19 +801,17 @@ function addObjects(chunk, safeChunk) {
     )) continue;
     if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.objectSafeRadius) continue;
 
-    const tuning = OBJECT_SPAWN_TUNING[type] ?? OBJECT_SPAWN_TUNING.default;
+    const tuning = OBJECT_SPAWN_TUNING[type]
+      ?? OBJECT_SPAWN_TUNING[getRegionObjectFamily(type)]
+      ?? OBJECT_SPAWN_TUNING.default;
     const radius = tuning.radius;
     const size = tuning.sizeBase + (tuning.sizeRange ? rand01(chunk.cx, chunk.cy, tuning.sizeSalt + i) * tuning.sizeRange : 0);
 
-    const destructible = DESTRUCTIBLE_OBJECTS[type];
+    const resolvedDef = resolveRegionObjectDestructibleDef(type);
     const explicitDestructible = typeof selectedEntry?.destructible === "boolean"
       ? selectedEntry.destructible
       : null;
-    const effectiveDestructible = explicitDestructible ?? selectedEntry?.defaultDestructible ?? Boolean(destructible);
-    const destructibleProfile = selectedEntry?.destructibleProfile ?? null;
-    const resolvedDef = destructible
-      ?? (destructibleProfile ? DESTRUCTIBLE_OBJECTS[destructibleProfile] : null)
-      ?? null;
+    const effectiveDestructible = explicitDestructible ?? selectedEntry?.defaultDestructible ?? Boolean(resolvedDef);
     chunk.objects.push({
       id: createId(),
       type,
@@ -734,7 +827,6 @@ function addObjects(chunk, safeChunk) {
       visualScale: 0.92 + rand01(chunk.cx, chunk.cy, 590 + i) * 0.18,
       blocking: true,
       destructible: effectiveDestructible,
-      destructibleProfile,
       renderBiomeId: selectedEntry?.renderBiomeId ?? null,
       graphicsRef: selectedEntry?.graphicsRef ?? null,
       maxHp: effectiveDestructible ? resolvedDef?.hp : undefined,
@@ -812,9 +904,12 @@ function addFoliage(chunk, safeChunk) {
     if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.foliageSafeRadius) continue;
 
     const selectedFoliageSet = hasRegionFoliageOverride
-      ? regionFoliageSets[Math.floor(rand01(chunk.cx, chunk.cy, 6650 + i) * regionFoliageSets.length)]
+      ? pickWeightedFoliageSet(regionFoliageSets, chunk.cx, chunk.cy, 6650 + i)
       : null;
     const variantCount = Math.max(1, Number(selectedFoliageSet?.variantCount) || 16);
+    const resourceDrops = rollFoliageResourceDrops(selectedFoliageSet, chunk.cx, chunk.cy, i);
+    const fixedScale = Number(selectedFoliageSet?.scale);
+    const hasFixedScale = Number.isFinite(fixedScale) && fixedScale > 0;
 
     chunk.objects.push({
       id: createId(),
@@ -822,7 +917,7 @@ function addFoliage(chunk, safeChunk) {
       x: chunk.x + localX,
       y: chunk.y + localY,
       radius: 0,
-      size: 0.72 + rand01(chunk.cx, chunk.cy, 6300 + i) * 0.72,
+      size: hasFixedScale ? fixedScale : 0.72 + rand01(chunk.cx, chunk.cy, 6300 + i) * 0.72,
       rotation: (rand01(chunk.cx, chunk.cy, 6400 + i) - 0.5) * 0.55,
       colorShift: rand01(chunk.cx, chunk.cy, 6500 + i),
       flip: rand01(chunk.cx, chunk.cy, 6600 + i) > 0.5,
@@ -831,8 +926,10 @@ function addFoliage(chunk, safeChunk) {
         ? selectedFoliageSet?.sheetId
         : rand01(chunk.cx, chunk.cy, 6750 + i) < SPAWN_CONFIG.foliageBonesChance ? "bones" : chunk.biome.id,
       animSeed: rand01(chunk.cx, chunk.cy, 6800 + i) * Math.PI * 2,
-      visualScale: 0.84 + rand01(chunk.cx, chunk.cy, 6900 + i) * 0.38,
+      visualScale: hasFixedScale ? 1 : 0.84 + rand01(chunk.cx, chunk.cy, 6900 + i) * 0.38,
       wind: rand01(chunk.cx, chunk.cy, 7000 + i) * 0.5,
+      resourceDrops,
+      foliageLooted: false,
       blocking: false,
     });
   }
@@ -961,6 +1058,13 @@ function addMonsters(chunk, safeChunk) {
     const monsterType = pickWeightedMob(monsterTypes, rand01(chunk.cx, chunk.cy, 900 + i));
     const base = MONSTER_STATS[monsterType];
     if (!base) continue;
+    if (base.isBoss) {
+      const spawnedBossTypes = chunk.region
+        ? (chunk.region.__spawnedBossTypes ??= new Set())
+        : (chunk.__spawnedBossTypes ??= new Set());
+      if (spawnedBossTypes.has(monsterType)) continue;
+      spawnedBossTypes.add(monsterType);
+    }
     const level = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 930 + i) * 2);
     const hp = Math.floor(base.hp * (1 + level * 0.18));
     chunk.monsters.push({
@@ -977,7 +1081,24 @@ function addMonsters(chunk, safeChunk) {
       hp,
       damage: Math.floor(base.damage * (1 + level * 0.16)),
       speed: base.speed * (1 + Math.min(0.32, level * 0.025)),
+      baseSpeed: base.speed * (1 + Math.min(0.32, level * 0.025)),
       range: base.range,
+      magic: Math.floor(Number(base.magic) || 0),
+      critChance: Number(base.critChance) || 0,
+      critDamage: Number(base.critDamage) || 1.5,
+      blockChance: Number(base.blockChance) || 0,
+      dodgeChance: Number(base.dodgeChance) || 0,
+      spells: [...(base.spells ?? [])],
+      spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + i) * 1.5,
+      statusEffects: [],
+      allowElite: base.allowElite !== false,
+      isBoss: Boolean(base.isBoss),
+      boss: base.isBoss ? { ...BOSS_TINT } : null,
+      haveMinion: Boolean(base.haveMinion),
+      minions: base.minions ?? false,
+      minionCooldown: Number(base.minions?.cooldown) || 0,
+      isMinion: false,
+      minionOwnerId: null,
       aggro: base.range > 1 ? 8.2 : 6.7,
       attackCooldown: 0.3 + rand01(chunk.cx, chunk.cy, 980 + i),
       color: base.color,

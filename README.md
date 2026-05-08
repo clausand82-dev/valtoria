@@ -31,6 +31,6 @@ Aabn derefter den lokale URL fra terminalen.
 - Monstre med forskellige niveauer, liv, fart, skade og aggro
 - Melee, ranged og magic-vaaben
 - Loot med guld og udstyr
-- Udstyrsslots: head, neck, chest, arms, legs, rings, amulet, bracelet, feet, hands og weapon
+- Udstyrsslots: head, neck, chest, arms, legs, rings, amulet, bracelet, feet, hands, weapon, shoulder, cape, belt og relic
 - Rarity-farver: poor/graa, normal/hvid, upgraded/groen, good/gul, great/lilla, legendary/roed
 - XP, levels, minimap, inventory og auto-pickup

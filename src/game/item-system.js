@@ -1,3 +1,5 @@
+import { RESOURCE_DEFS } from "./config/resource-config.js";
+
 export const ITEM_FLAG_KEYS = [
   "stackable",
   "equippable",
@@ -7,6 +9,7 @@ export const ITEM_FLAG_KEYS = [
   "resource",
   "potion",
   "quest",
+  "readable",
 ];
 
 const EMPTY_FLAGS = Object.freeze({
@@ -18,6 +21,7 @@ const EMPTY_FLAGS = Object.freeze({
   resource: false,
   potion: false,
   quest: false,
+  readable: false,
 });
 
 const MODE_FLAG_PRESETS = {
@@ -58,6 +62,11 @@ const MODE_FLAG_PRESETS = {
     consumable: true,
     stackable: false,
   },
+  readable: {
+    equippable: false,
+    stackable: false,
+    readable: true,
+  },
 };
 
 const COMMON_BASE_ICON_KEYS = {
@@ -79,6 +88,10 @@ const COMMON_BASE_ICON_KEYS = {
   Bracelet: "common_bracelet",
   Boots: "common_feet",
   Gloves: "common_hands",
+  Pauldrons: "common_shoulders",
+  Cape: "common_cape",
+  Belt: "common_belt",
+  Relic: "common_relic",
 };
 
 const RESOURCE_ICON_KEYS = {
@@ -92,8 +105,13 @@ const RESOURCE_ICON_KEYS = {
   stone_brick: "res_stonebrick",
   meat: "res_rawmeat",
   fruit: "res_fruit",
+  wheat: "res_wheat",
+  food: "res_food",
   coal: "res_coal",
   junk: "res_junk",
+  gold_ingot: "gold",
+  gold_bar: "res_goldbar",
+  magic_essence: "res_magicessens",
   paper: "res_paper",
   scroll: "res_scroll",
   red_gemstone: "res_redgemstone",
@@ -107,7 +125,7 @@ const RESOURCE_ICON_KEYS = {
   orange_gemstone: "res_orangegemstone",
   turquoise_gemstone: "res_turquoisegemstone",
   diamond: "res_diamond",
-};
+  };
 
 export function makeItemFlags(mode, customFlags = {}) {
   const preset = MODE_FLAG_PRESETS[mode] ?? EMPTY_FLAGS;
@@ -148,6 +166,10 @@ export function isQuestItem(item) {
   return hasItemFlag(item, "quest") || item?.mode === "quest";
 }
 
+export function isReadableItem(item) {
+  return hasItemFlag(item, "readable") || item?.mode === "readable";
+}
+
 export function isStackableItem(item) {
   return hasItemFlag(item, "stackable");
 }
@@ -172,13 +194,22 @@ export function deriveIconKey(itemLike = {}) {
   if (itemLike.mode === "potion" || itemLike.potionType) {
     return itemLike.potionType === "mana" ? "potion_mana" : "potion_health";
   }
-  if (itemLike.resourceId && RESOURCE_ICON_KEYS[itemLike.resourceId]) {
-    return RESOURCE_ICON_KEYS[itemLike.resourceId];
+  if (itemLike.resourceId) {
+    const resId = String(itemLike.resourceId);
+    const def = RESOURCE_DEFS[resId];
+    if (def?.iconUrl && typeof def.iconUrl === "string") {
+      const parts = def.iconUrl.split("/");
+      const filename = parts[parts.length - 1] ?? def.iconUrl;
+      const key = filename.replace(/^item_/, "").replace(/\.[^.]+$/, "");
+      return slugToken(key);
+    }
+    if (RESOURCE_ICON_KEYS[resId]) return RESOURCE_ICON_KEYS[resId];
   }
   if (itemLike.baseName && COMMON_BASE_ICON_KEYS[itemLike.baseName]) {
     return COMMON_BASE_ICON_KEYS[itemLike.baseName];
   }
   if (itemLike.uniqueId) return slugToken(itemLike.uniqueId);
+  if (itemLike.readableId) return slugToken(itemLike.readableId);
   if (itemLike.questItemId) return slugToken(itemLike.questItemId);
   const fromBase = slugToken(itemLike.baseName);
   if (fromBase) return fromBase;

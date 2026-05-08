@@ -1,3 +1,5 @@
+import { RESOURCE_DEFS } from "./resource-config.js";
+
 const GENERATED_ASSET_PREFIX = "/assets/generated/";
 const DEFAULT_GROUND_GRID = 4;
 const DEFAULT_FOLIAGE_GRID = 4;
@@ -5,6 +7,12 @@ const LEGACY_FOLIAGE_GRID = 8;
 
 function clampInt(value, min, max) {
   const parsed = Math.floor(Number(value));
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function clampNumber(value, min, max) {
+  const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.min(max, Math.max(min, parsed));
 }
@@ -42,7 +50,37 @@ function resolveLockedTileVariant(tileset, grid = DEFAULT_GROUND_GRID) {
   return (y - 1) * grid + (x - 1);
 }
 
-export function normalizeRegionTileset(tilesetInput) {
+function normalizeResourceDropEntry(resourceId, value) {
+  const raw = value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : { chance: value };
+  const id = String(raw.resource ?? raw.resourceId ?? resourceId ?? "").trim();
+  if (!id || !RESOURCE_DEFS[id]) return null;
+
+  const chance = clampNumber(raw.chance ?? raw.dropChance ?? 1, 0, 1);
+  if (!chance) return null;
+
+  const min = clampInt(raw.min ?? raw.count ?? raw.amount ?? 1, 1, 9999) ?? 1;
+  const max = clampInt(raw.max ?? raw.count ?? raw.amount ?? min, min, 9999) ?? min;
+  return { resource: id, chance, min, max };
+}
+
+function normalizeResourceDrops(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => normalizeResourceDropEntry(null, entry))
+      .filter(Boolean);
+  }
+  if (typeof value === "object") {
+    return Object.entries(value)
+      .map(([resourceId, entry]) => normalizeResourceDropEntry(resourceId, entry))
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function normalizeRegionTilesetEntry(tilesetInput) {
   const raw = toSpecObject(tilesetInput);
   if (!raw) return null;
   const fileName = normalizeFileName(raw.fileName ?? raw.png ?? raw.src);
@@ -58,6 +96,15 @@ export function normalizeRegionTileset(tilesetInput) {
   };
 }
 
+export function normalizeRegionTileset(tilesetInput) {
+  if (!tilesetInput) return null;
+  if (Array.isArray(tilesetInput)) {
+    const entries = tilesetInput.map((t) => normalizeRegionTilesetEntry(t)).filter(Boolean);
+    return entries.length ? entries : null;
+  }
+  return normalizeRegionTilesetEntry(tilesetInput);
+}
+
 function normalizeFoliageEntry(entry, defaults = {}) {
   const raw = toSpecObject(entry);
   if (!raw) return null;
@@ -65,12 +112,19 @@ function normalizeFoliageEntry(entry, defaults = {}) {
   if (!fileName) return null;
   const rows = clampInt(raw.rows, 1, 16) ?? defaults.rows ?? DEFAULT_FOLIAGE_GRID;
   const cols = clampInt(raw.cols, 1, 16) ?? defaults.cols ?? DEFAULT_FOLIAGE_GRID;
+  const parsedWeight = Number(raw.weight);
+  const weight = Number.isFinite(parsedWeight) ? Math.max(0, parsedWeight) : 1;
+  const parsedScale = Number(raw.scale);
+  const scale = Number.isFinite(parsedScale) && parsedScale > 0 ? parsedScale : null;
   return {
     fileName,
+    weight,
+    scale,
     rows,
     cols,
     variantCount: rows * cols,
     sheetId: buildFoliageSheetId(fileName, rows, cols),
+    resourceDrops: normalizeResourceDrops(raw.resourceDrops ?? raw.resourceDrop),
   };
 }
 
@@ -97,8 +151,9 @@ export function normalizeRegionFoliageSets(regionConfig = {}) {
   const deduped = [];
   const seen = new Set();
   for (const entry of normalized) {
-    if (seen.has(entry.sheetId)) continue;
-    seen.add(entry.sheetId);
+    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     deduped.push(entry);
   }
   return deduped;
@@ -114,11 +169,13 @@ export function collectRegionAssetOverrides(mapRegionSets) {
     if (!Array.isArray(regions)) continue;
     for (const region of regions) {
       const tileset = normalizeRegionTileset(region?.tileset);
-      if (tileset && !seenGround.has(tileset.sheetId)) {
-        seenGround.add(tileset.sheetId);
+      const tiles = Array.isArray(tileset) ? tileset : (tileset ? [tileset] : []);
+      for (const t of tiles) {
+        if (!t || seenGround.has(t.sheetId)) continue;
+        seenGround.add(t.sheetId);
         groundSheets.push({
-          sheetId: tileset.sheetId,
-          fileName: tileset.fileName,
+          sheetId: t.sheetId,
+          fileName: t.fileName,
         });
       }
 

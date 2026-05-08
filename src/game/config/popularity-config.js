@@ -1,3 +1,5 @@
+import { MONSTER_POPULARITY_RULES } from "./monster-config.js";
+
 // Popularity er en procent-stat fra 0 til 100.
 //
 // Tanken er, at popularity senere kan bruges til konsekvenser som priser,
@@ -22,14 +24,7 @@ export const POPULARITY_CONFIG = {
   max: 100,
 
   defaultMonsterChange: 0,
-  monsterRules: {
-    Demon: { change: 1.7 },
-    Skeleton: { change: 1.2 },
-    Ghost: { change: 1.35 },
-    Spider: { change: 0.85 },
-    Wolf: { change: -0.35 },
-    Snake: { change: -0.3 },
-  },
+  monsterRules: MONSTER_POPULARITY_RULES,
 
   monsterLevelScalePerLevel: 0.08,
   minMonsterLevelMultiplier: 0.45,
