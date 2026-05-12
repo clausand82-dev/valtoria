@@ -74,19 +74,27 @@ export const lifecycleMethods = {
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("contextmenu", preventDefault);
-    loadGeneratedAtlas()
-      .then((atlas) => {
-        this.atlas = atlas;
-        for (const chunk of this.chunks.values()) {
-          chunk.terrainLayer = null;
-        }
-      })
-      .catch((error) => console.error("Atlas load failed", error));
-    loadAnimationSheets()
-      .then((sheets) => {
-        this.animationSheets = sheets;
-      })
-      .catch((error) => console.error("Animation sheet load failed", error));
+    if (this.atlas) {
+      for (const chunk of this.chunks.values()) {
+        chunk.terrainLayer = null;
+      }
+    } else if (!this.deferAssetLoad) {
+      loadGeneratedAtlas()
+        .then((atlas) => {
+          this.atlas = atlas;
+          for (const chunk of this.chunks.values()) {
+            chunk.terrainLayer = null;
+          }
+        })
+        .catch((error) => console.error("Atlas load failed", error));
+    }
+    if (!this.animationSheets && !this.deferAssetLoad) {
+      loadAnimationSheets()
+        .then((sheets) => {
+          this.animationSheets = sheets;
+        })
+        .catch((error) => console.error("Animation sheet load failed", error));
+    }
     this.raf = requestAnimationFrame(this.loop);
   },
 

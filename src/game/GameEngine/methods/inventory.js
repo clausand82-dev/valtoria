@@ -48,6 +48,11 @@ import {
   itemCanHaveSockets,
   normalizeSockets,
 } from "../../config/socket-config.js";
+import {
+  ITEM_REPAIR_BASE_COSTS_PER_PCT,
+  ITEM_REPAIR_MAGIC_ESSENCE_PER_PCT,
+  ITEM_REPAIR_HIDE_PER_PCT,
+} from "../../config/durability-config.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -936,5 +941,53 @@ export const inventoryMethods = {
     }
     parts.push(`${item.value ?? itemValue(item)} g`);
     return parts.join(" | ");
-  }
+  },
+
+  // ─── Item repair at Blacksmith ────────────────────────────────────────────────
+  // slotId: equipment slot id (e.g. "weapon", "chest", ...)
+  // Returns true on success, false on failure (calls addToast with reason).
+  repairEquippedItem(slotId) {
+    const item = this.player.equipment?.[slotId];
+    if (!item) { this.addToast("Intet udstyr i den slot."); return false; }
+
+    const dur = Number(item.durability ?? 100);
+    const missing = Math.ceil(100 - dur);
+    if (missing <= 0) { this.addToast(`${item.name} er allerede fuldt repareret.`); return false; }
+
+    const isArmor = item.slot !== "weapon";
+
+    // Build cost map: base costs + magic_essence for high rarity + hide for armor
+    const costs = {};
+    for (const [resId, perPct] of Object.entries(ITEM_REPAIR_BASE_COSTS_PER_PCT)) {
+      costs[resId] = Math.max(1, Math.ceil(perPct * missing));
+    }
+    const essencePer = ITEM_REPAIR_MAGIC_ESSENCE_PER_PCT[item.rarity] ?? 0;
+    if (essencePer > 0) {
+      costs.magic_essence = Math.max(1, Math.ceil(essencePer * missing));
+    }
+    if (isArmor) {
+      costs.hide = Math.max(1, Math.ceil(ITEM_REPAIR_HIDE_PER_PCT * missing));
+    }
+
+    // Check availability
+    const deficits = Object.entries(costs)
+      .filter(([resId, needed]) => resourceCount(this.player.inventory, resId) < needed)
+      .map(([resId, needed]) => {
+        const have = resourceCount(this.player.inventory, resId);
+        const name = RESOURCE_DEFS[resId]?.name ?? resId;
+        return `${name} ${needed} (har ${have})`;
+      });
+
+    if (deficits.length > 0) {
+      this.addToast(`Kan ikke reparere: mangler ${deficits.join(", ")}`);
+      return false;
+    }
+
+    // Consume resources
+    consumeResourceInputs(this.player.inventory, costs);
+    item.durability = 100;
+    this.addToast(`${item.name} repareret til 100% durability`);
+    this.publishSnapshot();
+    return true;
+  },
 };

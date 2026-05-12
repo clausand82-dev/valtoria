@@ -53,6 +53,52 @@
 .city-area-panel-slot {
   min-width: 0;
   display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 10px;
+}
+
+.city-threat-meter {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid rgba(244, 218, 150, 0.26);
+  border-radius: 8px;
+  background: rgba(11, 13, 12, 0.82);
+}
+
+.city-threat-meter span {
+  color: #f4efe3;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+.city-threat-meter-bar-wrap {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.city-threat-meter-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7ddc83 0%, #f2ce68 55%, #ff6c5a 100%);
+  box-shadow: 0 0 12px rgba(255, 120, 90, 0.25);
+}
+
+.city-threat-meter.low {
+  border-color: rgba(125, 220, 131, 0.36);
+}
+
+.city-threat-meter.medium {
+  border-color: rgba(242, 206, 104, 0.42);
+}
+
+.city-threat-meter.high,
+.city-threat-meter.critical {
+  border-color: rgba(255, 108, 90, 0.52);
 }
 
 .city-map-background,
@@ -467,6 +513,46 @@
   border-color: rgba(139, 233, 255, 0.76);
   background: rgba(8, 10, 11, 0.9);
   color: #cdeef4;
+}
+
+.city-map-mob-icons {
+  z-index: 8;
+}
+
+.city-map-mob-mini {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+
+.city-map-mob-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+}
+
+.city-map-mob-mini:hover,
+.city-map-mob-mini:focus-visible {
+  outline: none;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.city-map-mob-mini.blocked {
+  opacity: 0.58;
+}
+
+.city-map-mob-mini.blocked img {
+  filter: grayscale(0.7) brightness(0.8) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
 }
 
 .city-map-action-icon.building {

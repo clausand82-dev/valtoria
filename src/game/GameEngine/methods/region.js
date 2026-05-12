@@ -53,6 +53,7 @@ export const regionMethods = {
       regionId: regionConfig.id,
       label: regionConfig.label ?? regionConfig.id,
     };
+    this.activeMapRegion.mapSize = regionConfig.mapSize ?? "medium";
     this.mapReturn = null;
     this.region = createRegion(this.regionIndex, seed, regionConfig.biodome, {
       ...regionConfig,
@@ -104,6 +105,10 @@ export const regionMethods = {
       label: active.label,
       cleared,
     };
+    this.mapReturn.mapSize = active.mapSize ?? "medium";
+    if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
+    if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
+    if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -134,6 +139,10 @@ export const regionMethods = {
       cleared: false,
       abandoned: true,
     };
+    this.mapReturn.mapSize = active.mapSize ?? "medium";
+    if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
+    if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
+    if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
     this.addToast(`${active.label} forladt. Progression blev nulstillet, og du er tilbage i byen.`);
     this.saveProgress({ force: true });
     this.publishSnapshot();

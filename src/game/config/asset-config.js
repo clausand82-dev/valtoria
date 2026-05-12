@@ -38,11 +38,11 @@ export const TREE_SHEETS = {
   // Tree sheets skæres op i 4x4 celler. Hver biodome peger på det tree-sheet,
   // der passer visuelt. Hvis en biodome mangler, falder loaderen tilbage til
   // mainland i assets.js.
-  mainland: "tree_normal_sheet.png",
-  jungle: "tree_jungle_sheet.png",
-  snow: "tree_snow_sheet.png",
-  lava: "tree_dead_sheet.png",
-  desert: "tree_sand_sheet.png",
+  mainland: "object/object_tree_normal.png",
+  jungle: "object/object_tree_jungle.png",
+  snow: "object/object_tree_snow.png",
+  lava: "object/object_tree_dead.png",
+  desert: "object/object_tree_sand.png",
 };
 
 export const FOLIAGE_SHEETS = {

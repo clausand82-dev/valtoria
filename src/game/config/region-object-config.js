@@ -146,7 +146,7 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "rock",
-    graphicsRef: "object/object_tree_rock.png (tree sheet)",
+    graphicsRef: "object/object_tree_normal.png (tree sheet)",
   },
   object_tree_lava: {
     spawnTypes: [{ type: "object_tree_lava", weight: 1 }],
@@ -163,7 +163,7 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "lava",
-    graphicsRef: "object/object_tree_lava.png (tree sheet)",
+    graphicsRef: "object/object_tree_dead.png (tree sheet)",
   },
   object_house_mainland: {
     spawnTypes: [{ type: "building", weight: 1 }],

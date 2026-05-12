@@ -24,6 +24,7 @@ export class GameEngine {
     this.saveStorageKey = options.saveStorageKey;
     this.onSave = typeof options.onSave === "function" ? options.onSave : null;
     this.newGame = Boolean(options.newGame);
+    this.deferAssetLoad = Boolean(options.deferAssetLoad);
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
@@ -48,6 +49,8 @@ export class GameEngine {
     this.mapRegionCheckpoint = null;
     this.mapReturn = null;
     this.mapReturnSerial = 0;
+    this.lastDeath = null;
+    this.deathSerial = 0;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.camera = { offsetX: 0, offsetY: 0, targetOffsetX: 0, targetOffsetY: 0, shake: 0 };
@@ -78,8 +81,8 @@ export class GameEngine {
     this.snapshotTimer = 0;
     this.autosaveTimer = AUTOSAVE_INTERVAL_SECONDS;
     this.ambientTimer = 0;
-    this.atlas = null;
-    this.animationSheets = null;
+    this.atlas = options.atlas ?? null;
+    this.animationSheets = options.animationSheets ?? null;
   
     this.resize = this.resize.bind(this);
     this.loop = this.loop.bind(this);

@@ -35,13 +35,29 @@ import {
 } from "../helpers.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
+import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 
 export const persistenceMethods = {
+  serializeItemForSave(item) {
+    if (!item || typeof item !== "object") return item;
+    const serialized = { ...item };
+    if (!SAVE_PERSIST_CONFIG.items.durability) delete serialized.durability;
+    if (!SAVE_PERSIST_CONFIG.items.sockets) delete serialized.sockets;
+    if (!SAVE_PERSIST_CONFIG.items.iconData) {
+      delete serialized.iconUrl;
+      delete serialized.iconSheet;
+      delete serialized.iconIndex;
+    }
+    if (!SAVE_PERSIST_CONFIG.items.value) delete serialized.value;
+    return serialized;
+  },
+
   currentSaveStorageKey() {
     return this.saveStorageKey || SAVE_STORAGE_KEY;
   },
 
   readSavePayload() {
+    if (!SAVE_PERSIST_CONFIG.storage.playerSave) return null;
     try {
       const raw = localStorage.getItem(this.currentSaveStorageKey());
       if (!raw) return null;
@@ -274,44 +290,68 @@ export const persistenceMethods = {
   saveProgress(options = {}) {
     const force = Boolean(options?.force);
     if (this.activeMapRegion && !force) return false;
+    if (!SAVE_PERSIST_CONFIG.storage.playerSave) return false;
+    const cfg = SAVE_PERSIST_CONFIG;
+    const inventoryPayload = cfg.player.inventory
+      ? this.player.inventory.map((item) => this.serializeItemForSave(item))
+      : [];
+    const equipmentPayload = cfg.player.equipment
+      ? Object.fromEntries(
+        EQUIPMENT_SLOTS.map((slot) => [
+          slot.id,
+          this.player.equipment[slot.id] ? this.serializeItemForSave(this.player.equipment[slot.id]) : null,
+        ]),
+      )
+      : Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot.id, null]));
+
     const payload = {
       version: SAVE_VERSION,
       seed: WORLD_SEED,
       savedAt: Date.now(),
       player: {
-        id: this.player.id,
-        x: this.player.x,
-        y: this.player.y,
-        facingX: this.player.facingX,
-        facingY: this.player.facingY,
-        level: this.player.level,
-        xp: this.player.xp,
-        gold: this.player.gold,
-        popularity: this.player.popularity,
-        potions: { ...this.player.potions },
-        readableBonuses: { ...this.player.readableBonuses },
-        skillTree: normalizeSkillTree(this.player.skillTree),
-        unlockedSpells: [...(this.player.unlockedSpells ?? [])],
-        activeSpellId: this.player.activeSpellId ?? null,
-        stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } },
-        hp: this.player.hp,
-        mana: this.player.mana,
-        attackCooldown: this.player.attackCooldown,
-        spellCooldown: this.player.spellCooldown,
-        hurtCooldown: this.player.hurtCooldown,
-        attackAnim: this.player.attackAnim,
-        castAnim: this.player.castAnim,
-        gait: this.player.gait,
-        moveSpeed: this.player.moveSpeed,
-        deadTimer: this.player.deadTimer,
-        inventory: this.player.inventory.map((item) => ({ ...item })),
-        equipment: Object.fromEntries(
-          EQUIPMENT_SLOTS.map((slot) => [slot.id, this.player.equipment[slot.id] ? { ...this.player.equipment[slot.id] } : null]),
-        ),
+        ...(cfg.player.core ? {
+          id: this.player.id,
+          x: this.player.x,
+          y: this.player.y,
+          facingX: this.player.facingX,
+          facingY: this.player.facingY,
+          level: this.player.level,
+          xp: this.player.xp,
+        } : {}),
+        ...(cfg.player.economy ? {
+          gold: this.player.gold,
+          popularity: this.player.popularity,
+        } : {}),
+        ...(cfg.player.potions ? { potions: { ...this.player.potions } } : {}),
+        ...(cfg.player.readableBonuses ? { readableBonuses: { ...this.player.readableBonuses } } : {}),
+        ...(cfg.player.skillTree ? { skillTree: normalizeSkillTree(this.player.skillTree) } : {}),
+        ...(cfg.player.spells ? {
+          unlockedSpells: [...(this.player.unlockedSpells ?? [])],
+          activeSpellId: this.player.activeSpellId ?? null,
+        } : {}),
+        ...(cfg.player.stats ? { stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } } } : {}),
+        ...(cfg.player.vitals ? {
+          hp: this.player.hp,
+          mana: this.player.mana,
+        } : {}),
+        ...(cfg.player.cooldownsAndAnim ? {
+          attackCooldown: this.player.attackCooldown,
+          spellCooldown: this.player.spellCooldown,
+          hurtCooldown: this.player.hurtCooldown,
+          attackAnim: this.player.attackAnim,
+          castAnim: this.player.castAnim,
+          gait: this.player.gait,
+          moveSpeed: this.player.moveSpeed,
+          deadTimer: this.player.deadTimer,
+        } : {}),
+        inventory: inventoryPayload,
+        equipment: equipmentPayload,
       },
       quests: {
-        active: this.questState.active.map((quest) => ({ ...quest, progress: { ...(quest.progress ?? {}) } })),
-        completed: [...this.questState.completed],
+        active: cfg.quests.active
+          ? this.questState.active.map((quest) => ({ ...quest, progress: { ...(quest.progress ?? {}) } }))
+          : [],
+        completed: cfg.quests.completed ? [...this.questState.completed] : [],
       },
       loots: [],
     };

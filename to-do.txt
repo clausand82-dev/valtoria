@@ -159,7 +159,18 @@ ANGREB PÅ byen
 - marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
 - man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
 
+- en config liste over hvad der skal nulstillet ved abandom action map
+- bankbox skal auto stacke items og res
+- durability virker ikke til at blive gemt/loadet
+- durability på udstyr skal altid vises
+- bekæmpede mobs i city forsvinder ikke
+- city battle map skal bruge korrekt mobs
+- city battle maps skal have en config fil, ligesom region (samme opsætning), hvor battle kan defineres (måske mob definere 1-3 setups, der random vælges imellem - eller en kombi af mobs og område)
 
+
+
+
+DONE
 Random spawn system
 Ude i venstre side af city skal være et threatmeter - trusselsmeter. Trusselsmeter starter på 0%, men stiger hver gang man dør udfra følgende beregning: Er ens nuværende XP mindre end 25% udført, stiger trusselmeter med random 10-15. Er ens nuværende XP fra 25%-49% udført, så stiger trusselsmeter med random 5-10, er man over halvejs imod næste level i XP, så stiger trusselmeter kun med 2-5 ved dødsfald. Gennemføre man map run og når exit, falder trusselmeter udfra hvad map størrelse man var på (small giver fald fra 0-15, medium fra 0-25, large fra 0-35, giga fra 0-65).
 
@@ -214,12 +225,3 @@ Hvis et mobs når til ejede defence tower (defence tower ligger i bridge område
 Alle reglerne for disse betingelser og indstillinger skal lige i seperat config fil - lad os kalde den city-mobs-attack-config.
 
 pt er der to mobs der kan angribe city - demon og skeleton (deres mini png er klar)
-
-Chancer for at spawn på ske ved hver city besøg:
-
-DURABILITY på bygninger og areas
-Nye bygninger og areas starter med 100% i durability, men kan degrade for hvert besøg - hver bygnign og area har 50% chance for at degrade med 0-2% pr besøg i byen. reparation koster den ødelagte procent sats af købs resourcerne (kostede en bygnign 100 sten og skal reperares 10%, koster det 10 sten.)
-
-Andre ting kan senere gøre skabe på durability.
-Durability skal kunne ses i venstre area oversigt og i bygninger oversigt
-Durability regler og parameter skal ligge i egen durability config fil - bemærk der senere kommer et item/udstyr durability system også.

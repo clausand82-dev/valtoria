@@ -17,6 +17,7 @@ import { normalizeRegionDecaySets } from "./config/decay-config.js";
 import { BOSS_TINT } from "./config/monster-config.js";
 import { withItemFlags, withItemIcon } from "./item-system.js";
 import { MAX_ITEM_SOCKETS } from "./config/socket-config.js";
+import { ITEM_DURABILITY_RANDOM_MIN, ITEM_DURABILITY_RANDOM_MAX } from "./config/durability-config.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
@@ -196,6 +197,13 @@ function withRandomSockets(item) {
 }
 
 function finalizeItem(item, flags = null, iconKey = null) {
+  // Add random durability to all equipment items (weapon / armor slots)
+  if (!Object.prototype.hasOwnProperty.call(item, "durability")) {
+    const pct = Math.round(
+      ITEM_DURABILITY_RANDOM_MIN + Math.random() * (ITEM_DURABILITY_RANDOM_MAX - ITEM_DURABILITY_RANDOM_MIN)
+    );
+    item.durability = pct;
+  }
   return withItemIcon(withItemFlags(withItemValue(withRandomSockets(item)), flags), iconKey);
 }
 

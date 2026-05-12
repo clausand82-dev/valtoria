@@ -77,6 +77,7 @@ export const snapshotMethods = {
       regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
       mobs: this.monsterCounterSnapshot(),
       mapReturn: this.mapReturn ? { ...this.mapReturn } : null,
+      lastDeath: this.lastDeath ? { ...this.lastDeath } : null,
       exitPrompt: this.exitPromptOpen,
       nearbyFoliageLoot: this.nearbyFoliageLoot ? {
         id: this.nearbyFoliageLoot.id,

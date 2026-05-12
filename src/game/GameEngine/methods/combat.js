@@ -22,6 +22,15 @@ import {
 } from "../helpers.js";
 import { skillTreeBonuses } from "../../config/skill-tree-config.js";
 import { socketBonusesForItem } from "../../config/socket-config.js";
+import {
+  ITEM_DURABILITY_WEAPON_PER_ATTACK,
+  ITEM_DURABILITY_ARMOR_PER_HIT,
+  ITEM_DURABILITY_PENALTY_THRESHOLD,
+  ITEM_DURABILITY_DEATH_MIN_PCT,
+  ITEM_DURABILITY_DEATH_MAX_PCT,
+  ITEM_DURABILITY_DEATH_THRESHOLD,
+  ITEM_GOLD_DEATH_LOSS_MAX,
+} from "../../config/durability-config.js";
 
 export const combatMethods = {
   updateMonsters(dt) {
@@ -222,6 +231,7 @@ export const combatMethods = {
       this.player.stats.meleeAttacks += 1;
       const { damage } = this.rollPlayerDamage(stats);
       this.damageObject(target, damage);
+      this.drainWeaponDurability();
       this.camera.shake = Math.max(this.camera.shake, 3);
       this.player.attackTargetId = null;
       this.player.attackObjectId = null;
@@ -232,6 +242,7 @@ export const combatMethods = {
       this.player.stats.meleeAttacks += 1;
       const { damage, critical } = this.rollPlayerDamage(stats);
       this.damageMonster(target, damage, "melee", critical);
+      this.drainWeaponDurability();
       this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
       this.camera.shake = Math.max(this.camera.shake, 3);
       this.player.attackTargetId = null;
@@ -257,6 +268,7 @@ export const combatMethods = {
       life: stats.range / speed,
       color,
     });
+    this.drainWeaponDurability();
   },
 
   castSpellAt(x, y, spellId = null) {
@@ -418,10 +430,18 @@ export const combatMethods = {
     this.camera.shake = Math.max(this.camera.shake, 4);
     this.addFloater(this.player.x, this.player.y, blocked ? `Block -${mitigated}` : critical ? `CRIT -${mitigated}` : `-${mitigated}`, "#ff7272");
     this.addParticles(this.player.x, this.player.y, "#cc3c3c", 9, 0.1);
+    this.drainArmorDurability();
     if (this.player.hp <= 0) {
       this.player.stats.deaths += 1;
+      this.applyDeathDurabilityLoss();
       this.addToast(`Faldt mod ${source.typeName}`);
     }
+      if (this.player.hp <= 0) {
+        const xp = Math.max(0, Number(this.player.xp) || 0);
+        const nextXp = Math.max(1, this.xpForNextLevel());
+        const xpPct = xp / nextXp;
+        this.lastDeath = { id: ++this.deathSerial, xpPct };
+      }
   },
 
   damageMonster(monster, amount, sourceType, critical = false) {
@@ -595,36 +615,43 @@ export const combatMethods = {
     stats.magic += readableBonus.magic;
     for (const item of Object.values(this.player.equipment)) {
       if (!item) continue;
-      stats.armor += item.armor || 0;
-      stats.maxHp += item.maxHp || 0;
-      stats.maxMana += item.maxMana || 0;
-      stats.speed += item.speed || 0;
-      stats.magic += item.magic || 0;
-      stats.maxHp *= 1 + (item.maxHpPct || 0);
-      stats.maxMana *= 1 + (item.maxManaPct || 0);
-      stats.armor += item.armorFlat || 0;
-      stats.damageMin *= 1 + (item.damagePct || 0);
-      stats.damageMax *= 1 + (item.damagePct || 0);
-      stats.speed *= 1 + (item.speedPct || 0);
-      stats.cooldown *= Math.max(0.55, 1 - (item.attackSpeed || 0));
-      stats.critChance += item.critChance || 0;
-      stats.critDamage += item.critDamage || 0;
-      stats.blockChance += item.blockChance || 0;
-      stats.dodgeChance += item.dodgeChance || 0;
-      stats.lifeSteal += item.lifeSteal || 0;
-      stats.magicFind += item.magicFind || 0;
-      stats.goldFind += item.goldFind || 0;
-      stats.resourceFind += item.resourceFind || 0;
-      stats.xpGain += item.xpGain || 0;
+      // Durability penalty: below threshold stats degrade; at 0 item is unusable
+      const dur = Number(item.durability ?? 100);
+      if (dur <= 0) continue; // 0% = unusable, skip entirely
+      const durMult = dur >= ITEM_DURABILITY_PENALTY_THRESHOLD
+        ? 1
+        : dur / ITEM_DURABILITY_PENALTY_THRESHOLD;
+      const s = (v) => (v || 0) * durMult;
+      stats.armor += s(item.armor);
+      stats.maxHp += s(item.maxHp);
+      stats.maxMana += s(item.maxMana);
+      stats.speed += s(item.speed);
+      stats.magic += s(item.magic);
+      stats.maxHp *= 1 + s(item.maxHpPct);
+      stats.maxMana *= 1 + s(item.maxManaPct);
+      stats.armor += s(item.armorFlat);
+      stats.damageMin *= 1 + s(item.damagePct);
+      stats.damageMax *= 1 + s(item.damagePct);
+      stats.speed *= 1 + s(item.speedPct);
+      stats.cooldown *= Math.max(0.55, 1 - s(item.attackSpeed));
+      stats.critChance += s(item.critChance);
+      stats.critDamage += s(item.critDamage);
+      stats.blockChance += s(item.blockChance);
+      stats.dodgeChance += s(item.dodgeChance);
+      stats.lifeSteal += s(item.lifeSteal);
+      stats.magicFind += s(item.magicFind);
+      stats.goldFind += s(item.goldFind);
+      stats.resourceFind += s(item.resourceFind);
+      stats.xpGain += s(item.xpGain);
       if (item.slot === "weapon") {
-        stats.damageMin += item.damageMin || 0;
-        stats.damageMax += item.damageMax || 0;
-        stats.range = item.range || stats.range;
-        stats.cooldown = item.cooldown || stats.cooldown;
+        stats.damageMin += s(item.damageMin);
+        stats.damageMax += s(item.damageMax);
+        stats.range = (item.range || stats.range);
+        stats.cooldown = (item.cooldown || stats.cooldown);
         stats.mode = item.mode || stats.mode;
       } else {
-        stats.damageMin += item.damageMin || 0;
-        stats.damageMax += item.damageMax || 0;
+        stats.damageMin += s(item.damageMin);
+        stats.damageMax += s(item.damageMax);
       }
       this.applyStatBonuses(stats, socketBonusesForItem(item));
     }
@@ -641,6 +668,52 @@ export const combatMethods = {
     stats.dodgeChance = clamp(stats.dodgeChance, 0, 0.55);
     stats.lifeSteal = clamp(stats.lifeSteal, 0, 0.25);
     return stats;
+  },
+
+  // ─── Item durability helpers ─────────────────────────────────────────────────
+
+  drainWeaponDurability() {
+    const weapon = this.player.equipment?.weapon;
+    if (!weapon) return;
+    const before = Number(weapon.durability ?? 100);
+    weapon.durability = Math.max(0, parseFloat((before - ITEM_DURABILITY_WEAPON_PER_ATTACK).toFixed(2)));
+    if (before > 0 && weapon.durability === 0) {
+      this.addToast(`${weapon.name} er brudt! Reparer det hos smeden.`);
+      this.publishSnapshot();
+    }
+  },
+
+  drainArmorDurability() {
+    let changed = false;
+    for (const [slotId, item] of Object.entries(this.player.equipment ?? {})) {
+      if (!item || slotId === "weapon") continue;
+      const before = Number(item.durability ?? 100);
+      item.durability = Math.max(0, parseFloat((before - ITEM_DURABILITY_ARMOR_PER_HIT).toFixed(2)));
+      if (before > 0 && item.durability === 0) {
+        this.addToast(`${item.name} er brudt! Reparer det hos smeden.`);
+        changed = true;
+      }
+    }
+    if (changed) this.publishSnapshot();
+  },
+
+  applyDeathDurabilityLoss() {
+    const lossMin = ITEM_DURABILITY_DEATH_MIN_PCT;
+    const lossMax = ITEM_DURABILITY_DEATH_MAX_PCT;
+    for (const item of Object.values(this.player.equipment ?? {})) {
+      if (!item) continue;
+      const dur = Number(item.durability ?? 100);
+      if (dur <= ITEM_DURABILITY_DEATH_THRESHOLD) continue; // already low
+      const loss = lossMin + Math.random() * (lossMax - lossMin);
+      item.durability = Math.max(0, parseFloat((dur - loss).toFixed(2)));
+    }
+    // Gold loss: 0–5% of current gold
+    const goldLoss = Math.floor(this.player.gold * Math.random() * ITEM_GOLD_DEATH_LOSS_MAX);
+    if (goldLoss > 0) {
+      this.player.gold = Math.max(0, this.player.gold - goldLoss);
+      this.addToast(`Mistede ${goldLoss} guld ved dødsfald`);
+    }
+    this.publishSnapshot();
   },
 
   xpForNextLevel() {

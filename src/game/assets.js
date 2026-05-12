@@ -42,6 +42,11 @@ const HERO_SHEET = {
   cols: 8,
 };
 
+let generatedAtlasPromise = null;
+let generatedAtlasCache = null;
+let animationSheetsPromise = null;
+let animationSheetsCache = null;
+
 const OBJECT_FRAME = {
   tree: "tree",
   house: "house",
@@ -55,7 +60,9 @@ const OBJECT_FRAME = {
 };
 
 export function loadGeneratedAtlas() {
-  return Promise.all([
+  if (generatedAtlasCache) return Promise.resolve(generatedAtlasCache);
+  if (generatedAtlasPromise) return generatedAtlasPromise;
+  generatedAtlasPromise = Promise.all([
     loadChromaImage("/assets/generated/runebound-atlas-source.png"),
     loadGroundSheets(),
     loadTreeSheets(),
@@ -77,30 +84,39 @@ export function loadGeneratedAtlas() {
     resourceSheet,
     armorSheet,
     objectSheets,
-  ]) => ({
-    canvas,
-    frames: ATLAS_FRAMES,
-    sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
-    groundSheets,
-    treeSheets,
-    waterSheet,
-    foliageSheet,
-    decaySheets,
-    itemSheet,
-    resourceSheet,
-    armorSheet,
-    objectSheets,
-  }));
+  ]) => {
+    generatedAtlasCache = {
+      canvas,
+      frames: ATLAS_FRAMES,
+      sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
+      groundSheets,
+      treeSheets,
+      waterSheet,
+      foliageSheet,
+      decaySheets,
+      itemSheet,
+      resourceSheet,
+      armorSheet,
+      objectSheets,
+    };
+    return generatedAtlasCache;
+  }).catch((error) => {
+    generatedAtlasPromise = null;
+    throw error;
+  });
+  return generatedAtlasPromise;
 }
 
 export function loadAnimationSheets() {
+  if (animationSheetsCache) return Promise.resolve(animationSheetsCache);
+  if (animationSheetsPromise) return animationSheetsPromise;
   // Deduplicate URLs so shared sheets (skeleton+ghost) are only loaded once.
   const urlMap = new Map();
   for (const cfg of MONSTER_SHEETS) {
     if (!urlMap.has(cfg.url)) urlMap.set(cfg.url, loadChromaImage(cfg.url));
   }
 
-  return Promise.all([
+  animationSheetsPromise = Promise.all([
     loadChromaImage(HERO_SHEET.url),
     loadChromaImage("/assets/generated/hero_cast_sheet.png"),
     ...urlMap.values(),
@@ -118,12 +134,17 @@ export function loadAnimationSheets() {
       };
     }
 
-    return {
+    animationSheetsCache = {
       hero: makeAnimationSheet(heroCanvas, HERO_SHEET.rows, HERO_SHEET.cols, "hero"),
       heroCast: makeAnimationSheet(heroCastCanvas, 1, 8, "hero"),
       monsters,
     };
+    return animationSheetsCache;
+  }).catch((error) => {
+    animationSheetsPromise = null;
+    throw error;
   });
+  return animationSheetsPromise;
 }
 
 function loadChromaImage(src, options = {}) {

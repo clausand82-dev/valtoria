@@ -42,6 +42,97 @@ button {
   overflow: hidden;
 }
 
+.app-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  align-content: end;
+  gap: 10px;
+  padding: clamp(18px, 4vw, 42px);
+  isolation: isolate;
+  background: #07090b;
+}
+
+.app-loading-screen::before,
+.app-loading-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.app-loading-screen::before {
+  z-index: -2;
+  background: url("/assets/generated/menu.png") center / cover no-repeat;
+  transform: scale(0.92);
+  transform-origin: center;
+}
+
+.app-loading-screen::after {
+  z-index: -1;
+  background: linear-gradient(rgba(7, 9, 11, 0.34), rgba(7, 9, 11, 0.86));
+}
+
+.app-loading-copy {
+  display: grid;
+  gap: 4px;
+  width: min(620px, 100%);
+}
+
+.app-loading-copy b {
+  color: #f4da96;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(30px, 5vw, 58px);
+  line-height: 1;
+  text-shadow: 0 12px 34px rgba(0, 0, 0, 0.74);
+}
+
+.app-loading-copy span,
+.app-loading-copy em,
+.app-loading-meta {
+  color: rgba(244, 239, 227, 0.86);
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.app-loading-copy em {
+  color: #ffaaa0;
+}
+
+.app-loading-bar {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(244, 218, 150, 0.32);
+  border-radius: 6px;
+  background: rgba(8, 10, 12, 0.82);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+
+.app-loading-bar span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #87642d, #f4da96);
+  transition: width 180ms ease;
+}
+
+.app-loading-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 18px;
+}
+
+.app-loading-meta b {
+  color: #f4da96;
+}
+
 .start-menu-screen {
   position: fixed;
   inset: 0;
@@ -994,6 +1085,23 @@ button {
   cursor: pointer;
 }
 
+/* Durability bar on item cards */
+.item-card-dur-bar-wrap {
+  display: block;
+  width: calc(100% - 8px);
+  height: 3px;
+  margin: 0 4px 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.item-card-dur-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+
 .item-card.empty-slot {
   cursor: default;
   opacity: 0.46;
@@ -1350,6 +1458,31 @@ button {
 .item-detail {
   display: grid;
   gap: 7px;
+}
+
+.item-detail-durability {
+  display: grid;
+  gap: 3px;
+}
+
+.item-detail-durability > span:first-child {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.item-detail-dur-bar-wrap {
+  display: block;
+  height: 5px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.item-detail-dur-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
 }
 
 .item-detail > b {
@@ -2142,6 +2275,12 @@ button {
   background: rgba(0, 0, 0, 0.18);
 }
 
+.city-building-thumb img {
+  max-width: 170px;
+  max-height: 150px;
+  object-fit: contain;
+}
+
 .city-popup-summary p,
 .city-popup-main p {
   margin: 0;
@@ -2925,9 +3064,11 @@ button {
   cursor: pointer;
 }
 
-.city-addon canvas {
+.city-addon canvas,
+.city-addon img {
   width: 46px;
   height: 42px;
+  object-fit: contain;
 }
 
 .city-addon span {
@@ -2965,6 +3106,85 @@ button {
   gap: 12px;
   margin-top: 18px;
 }
+
+/* ── Repair tabs ─────────────────────────────────────────────────────────── */
+.blacksmith-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.blacksmith-tab-btn {
+  padding: 4px 12px;
+  font-size: 0.78em;
+  border-radius: 5px 5px 0 0;
+  border: 1px solid rgba(244,218,150,0.2);
+  background: rgba(255,255,255,0.04);
+  color: #aaa;
+  cursor: pointer;
+}
+.blacksmith-tab-btn.active {
+  background: rgba(244,218,150,0.12);
+  color: #f4da96;
+  border-bottom-color: transparent;
+}
+
+/* ── Repair slot list ─────────────────────────────────────────────────────── */
+.repair-slot-list {
+  display: grid;
+  gap: 6px;
+}
+.repair-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.repair-slot.repaired {
+  opacity: 0.55;
+}
+.repair-slot-info {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  column-gap: 6px;
+  row-gap: 2px;
+  align-items: center;
+}
+.repair-slot-name { font-size: 0.82em; font-weight: 600; }
+.repair-slot-label { font-size: 0.72em; color: #888; text-align: right; }
+.repair-durability-bar-wrap {
+  grid-column: 1 / 3;
+  height: 5px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.repair-durability-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.repair-durability-pct {
+  grid-column: 1 / 3;
+  font-size: 0.72em;
+}
+.repair-btn {
+  padding: 4px 12px;
+  font-size: 0.78em;
+  border-radius: 5px;
+  background: rgba(244,218,150,0.15);
+  border: 1px solid rgba(244,218,150,0.3);
+  color: #f4da96;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.repair-btn:hover { background: rgba(244,218,150,0.28); }
+.repair-done { font-size: 0.78em; color: #58d96d; }
 
 .blacksmith-station {
   display: grid;
