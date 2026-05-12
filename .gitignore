@@ -2,3 +2,6 @@ node_modules/
 dist/
 .env
 .tmp/
+work/
+backup*.zip
+*.psd
