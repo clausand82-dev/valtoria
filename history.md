@@ -1,26 +1,29 @@
 History over changes
 
+* V. 1.61
+- app.jsx is reduced more, same with shared.jsx
+
 * V. 1.60
-* total new city map look
-* area are introduced i city
-* city stats is introduced (population, provision, water, housing, health, city defence aso ...)
-* More mobs added (a bunch of angry villages)
-* city areas and buildings have now durability
-* items now have durability (won't save still)
-* app.jsx was a big 6000+ lines files, it has been split to more managed files
+- total new city map look
+- area are introduced i city
+- city stats is introduced (population, provision, water, housing, health, city defence aso ...)
+- More mobs added (a bunch of angry villages)
+- city areas and buildings have now durability
+- items now have durability (won't save still)
+- app.jsx was a big 6000+ lines files, it has been split to more managed files
 
 * V. 1.50
-* added armor slot for belt, cape, relic and shoulders
-* loottable added for new items
-* added lord kealand unique items
-* added lady lirine unique items
-* unique drop chances can be guidet via weight
-* unique and named items can use all stats
-* added more quest, resources and items
-* added more quest flexibility
-* opened up village zone - a large map
-* foilage can now have fixed scale
-* added more foilage sets
+- added armor slot for belt, cape, relic and shoulders
+- loottable added for new items
+- added lord kealand unique items
+- added lady lirine unique items
+- unique drop chances can be guidet via weight
+- unique and named items can use all stats
+- added more quest, resources and items
+- added more quest flexibility
+- opened up village zone - a large map
+- foilage can now have fixed scale
+- added more foilage sets
 
 * V. 1.40
 * removed hero movement fra city mode - using mouse clikc instead

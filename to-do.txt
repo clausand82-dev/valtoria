@@ -178,9 +178,8 @@ SIDE PANEL
 
 - world map skal fungerer ligesom city mode og ikke vise mana, mini map osv - tænker world map skal være ligesom city mode, måske endda samme størrelse
 
+---------------------------DONE------------------------------
 
-
-DONE
 Random spawn system
 Ude i venstre side af city skal være et threatmeter - trusselsmeter. Trusselsmeter starter på 0%, men stiger hver gang man dør udfra følgende beregning: Er ens nuværende XP mindre end 25% udført, stiger trusselmeter med random 10-15. Er ens nuværende XP fra 25%-49% udført, så stiger trusselsmeter med random 5-10, er man over halvejs imod næste level i XP, så stiger trusselmeter kun med 2-5 ved dødsfald. Gennemføre man map run og når exit, falder trusselmeter udfra hvad map størrelse man var på (small giver fald fra 0-15, medium fra 0-25, large fra 0-35, giga fra 0-65).
 

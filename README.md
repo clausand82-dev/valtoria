@@ -11,6 +11,13 @@ npm run dev
 
 Aabn derefter den lokale URL fra terminalen.
 
+## Build
+
+```bash
+npm run build
+npm run check
+```
+
 ## Styring
 
 - WASD eller piletaster: bevaeg karakteren i isometrisk retning
