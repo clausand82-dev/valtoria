@@ -6,10 +6,12 @@ export {
   saveRegionCorruption,
   loadRegionMapInitialId,
   loadRegionCorruption,
+} from "./save/save-slots.js";
+export {
   regionStatusKey,
-  emptySnapshot,
   CITY_STORAGE_KEY,
-} from "./shared.jsx";
+} from "./save/save-keys.js";
+export { emptySnapshot } from "./app-snapshot.js";
 
 export { AppLoadingScreen } from "./loading/app-loading-screen.jsx";
 export { InventoryPanel } from "./inventory/inventory-panel.jsx";
@@ -24,6 +26,9 @@ export {
 export { GameHud } from "./hud/game-hud.jsx";
 export {
   CITY_STAT_DEFS,
+  CITY_STAT_ALIASES,
+  CITY_STAT_ICON_URLS,
+  CITY_CITIZEN_CONDITION_DEFS,
   CityCitizenConditions,
   CityStatsTopBar,
   ResourceBar,
@@ -37,6 +42,7 @@ export {
 export {
   MinimapDialog,
   RegionMapDialog,
+  mapRegionColor,
 } from "./map/map-dialogs.jsx";
 export { HeroDialog } from "./hero/hero-dialog.jsx";
 export { StartMenu } from "./ui/start-menu.jsx";
@@ -44,7 +50,9 @@ export {
   AtlasIcon,
   ImageIcon,
   InventoryIcon,
+  ITEM_GOLD_ICON_URL,
   ITEM_MONEY_ICON_URL,
+  ITEM_STANDARD_ICON_URL,
   QUICKBAR_ATTACK_ICON_URL,
   QUICKBAR_CITY_ICON_URL,
   QUICKBAR_HEALTH_POTION_ICON_URL,

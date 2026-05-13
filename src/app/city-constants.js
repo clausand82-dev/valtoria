@@ -1,0 +1,1 @@
+export const CITY_BUILDING_CHIPS_ALWAYS_VISIBLE = true;

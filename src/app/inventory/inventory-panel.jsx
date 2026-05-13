@@ -11,7 +11,7 @@ import {
   itemMatchesInventoryFilter,
 } from "./inventory-filters.js";
 import { InventoryIcon } from "../ui/icons.jsx";
-import { InventoryItemDetail } from "../shared.jsx";
+import { InventoryItemDetail } from "./inventory-item-detail.jsx";
 
 export function InventoryPanel({
   cityOpen,

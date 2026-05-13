@@ -63,17 +63,18 @@ import {
   CITY_CITIZEN_CONDITION_DEFS,
   CITY_STAT_ALIASES,
   CITY_STAT_ICON_URLS,
-  CITY_STORAGE_KEY,
-  ITEM_GOLD_ICON_URL,
-  ITEM_MONEY_ICON_URL,
+} from "./hud/resource-bar.jsx";
+import {
   ImageIcon,
   InventoryIcon,
-  QuestObjectiveMeta,
-  ReadableDialog,
-  emptySnapshot,
-  mapRegionColor,
-  regionStatusKey,
-} from "./shared.jsx";
+  ITEM_GOLD_ICON_URL,
+  ITEM_MONEY_ICON_URL,
+} from "./ui/icons.jsx";
+import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
+import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
+import { ReadableDialog } from "./inventory/readable-dialog.jsx";
+import { mapRegionColor } from "./map/map-dialogs.jsx";
+import { emptySnapshot } from "./app-snapshot.js";
 
 
 function CityItemName({ item }) {

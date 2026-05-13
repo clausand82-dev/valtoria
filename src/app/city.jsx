@@ -52,21 +52,24 @@ import {
 } from "../game/item-system.js";
 
 import {
-  CITY_BUILDING_CHIPS_ALWAYS_VISIBLE,
+  ImageIcon,
+  InventoryIcon,
+  ITEM_GOLD_ICON_URL,
+  ITEM_MONEY_ICON_URL,
+} from "./ui/icons.jsx";
+import {
   CITY_CITIZEN_CONDITION_DEFS,
   CITY_STAT_ALIASES,
   CITY_STAT_ICON_URLS,
-  CITY_STORAGE_KEY,
-  ITEM_GOLD_ICON_URL,
-  ITEM_MONEY_ICON_URL,
-  ImageIcon,
-  InventoryIcon,
-  QuestObjectiveMeta,
-  ReadableDialog,
-  emptySnapshot,
-  mapRegionColor,
-  regionStatusKey,
-} from "./shared.jsx";
+} from "./hud/resource-bar.jsx";
+import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
+import { ReadableDialog } from "./inventory/readable-dialog.jsx";
+import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
+import { mapRegionColor } from "./map/map-dialogs.jsx";
+import { emptySnapshot } from "./app-snapshot.js";
+import {
+  CITY_BUILDING_CHIPS_ALWAYS_VISIBLE,
+} from "./city-constants.js";
 import {
   CityArcaneExtractorPanel,
   CityBlacksmithPanel,
