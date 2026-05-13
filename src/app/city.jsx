@@ -127,6 +127,7 @@ import {
   getCityMapQuestNpcs,
   isCityAreaUnlocked,
   loadCityAssets,
+  loadCityAssetsOnce,
   loadCityProgress,
   loadImage,
   mergeCityStatEffects,
@@ -631,128 +632,136 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
   const costEntries = cityAreaCostEntries(area);
   const activeEffects = cityAreaActiveStatEffects(area, areaState.level);
   const panelImageUrl = buildingRefs[0]?.building?.imageUrl ?? CITY_MAP_IMAGE.src;
+  const durabilityValue = Math.max(0, Math.min(100, Number(areaState.durability ?? DURABILITY_DEFAULT) || 0));
+  const repairPct = Math.max(0, Math.ceil(100 - durabilityValue));
+  const repairCostEntries = computeRepairCostEntries(area.unlock?.cost ?? area.cost ?? {}, repairPct);
   return (
     <aside
       className={`city-area-popover ${unlocked ? "unlocked" : "locked"}`}
     >
       <header style={{ "--city-area-panel-image": `url("${panelImageUrl}")` }}>
-        <b>{area.title}</b>
-        <span>{unlocked ? `Level ${areaState.level}` : "Locked"}</span>
+        <div className="city-area-panel-heading">
+          <div className="city-area-panel-titleline">
+            <b>{area.title}</b>
+            <span>{unlocked ? `Level ${areaState.level}` : "Locked"}</span>
+          </div>
+          <p>{area.description ?? "No area description configured yet."}</p>
+        </div>
       </header>
-      <p className="city-area-panel-description">{area.description ?? "No area description configured yet."}</p>
       {unlocked ? (
         <div className="city-area-popover-body">
-          <CityPanelSection title="Stats effect">
-            <CityStatEffectsSummary effects={activeEffects} />
-          </CityPanelSection>
-          {area.id === "outer_5" && <CityCampStats cityStats={cityStats} />}
-          {buildingRefs.length > 0 && (
-            <CityPanelSection title="Buildings">
-              <div className="city-area-mini-list">
-                {buildingRefs.map(({ building }) => <span key={building.id}>{building.title}</span>)}
-              </div>
-            </CityPanelSection>
-          )}
-          <CityPanelSection title="Durability">
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <b>Durability:</b>
-              <span>{(Math.floor(Number(areaState.durability ?? DURABILITY_DEFAULT) * 100) / 100).toFixed(2)}%</span>
-              <button
-                type="button"
-                disabled={(areaState.durability ?? DURABILITY_DEFAULT) >= 100}
-                onClick={() => onRepair?.(area, Math.ceil(100 - (areaState.durability ?? DURABILITY_DEFAULT)))}
-              >
-                Repair
-              </button>
+          <div className="city-area-info-grid">
+            <div className="city-area-info-row">
+              <b>Stats</b>
+              <CityStatEffectsSummary effects={activeEffects} />
             </div>
-            <div style={{ marginTop: 8 }}>
-              <b>Repair cost:</b>
-              <div className="city-area-costs" style={{ marginTop: 6 }}>
-                {(computeRepairCostEntries(area.unlock?.cost ?? area.cost ?? {}, Math.max(0, Math.ceil(100 - (areaState.durability ?? DURABILITY_DEFAULT))))).length === 0 && (
-                  <span>Ingen resources kræves.</span>
-                )}
-                {computeRepairCostEntries(area.unlock?.cost ?? area.cost ?? {}, Math.max(0, Math.ceil(100 - (areaState.durability ?? DURABILITY_DEFAULT))))
-                  .map(([resourceId, amount]) => (
-                    <span key={resourceId} className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"}>
-                      <CityCostIcon resourceId={resourceId} />
-                      {amount} {cityCostLabel(resourceId)} {`(${cityCostAvailable(snapshot, resourceId)} available)`}
-                    </span>
-                  ))}
+            {buildingRefs.length > 0 && (
+              <div className="city-area-info-row">
+                <b>Buildings</b>
+                <div className="city-area-mini-list">
+                  {buildingRefs.map(({ building }) => <span key={building.id}>{building.title}</span>)}
+                </div>
+              </div>
+            )}
+          </div>
+          {area.id === "outer_5" && <CityCampStats cityStats={cityStats} />}
+          <CityPanelSection title="Durability">
+            <div className="city-durability-meter" style={{ "--city-durability": `${durabilityValue}%` }}>
+              <div className="city-durability-meter-head">
+                <b>{durabilityValue.toFixed(2)}%</b>
+                <span>{repairPct > 0 ? `${repairPct}% repair needed` : "Fully repaired"}</span>
+              </div>
+              <div className="city-durability-track" aria-label={`Durability ${durabilityValue.toFixed(2)} percent`}>
+                <span />
               </div>
             </div>
           </CityPanelSection>
           {buildingRefs.length === 0 && <p>Empty area.</p>}
-          {nextLevel && (
-            <>
-            <CityPanelSection title="Next level">
-              <div className="city-upgrade-summary">
-                <b>Level {nextLevel.level}</b>
-                {nextLevel.title && <span>{nextLevel.title}</span>}
+          {(nextLevel || repairPct > 0) && (
+            <CityPanelSection title="Area work">
+              <div className="city-area-work-grid">
+                <div className="city-area-work-card">
+                  <div className="city-area-work-head">
+                    <b>Repair</b>
+                    <button
+                      type="button"
+                      disabled={durabilityValue >= 100}
+                      onClick={() => onRepair?.(area, repairPct)}
+                    >
+                      Repair
+                    </button>
+                  </div>
+                  <div className="city-area-costs">
+                    {repairCostEntries.length === 0 && <span>Ingen resources kræves.</span>}
+                    {repairCostEntries.map(([resourceId, amount]) => (
+                      <span key={resourceId} className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"}>
+                        <CityCostIcon resourceId={resourceId} />
+                        {amount} {cityCostLabel(resourceId)} {`(${cityCostAvailable(snapshot, resourceId)} available)`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {nextLevel && <div className="city-area-work-card">
+                  <div className="city-area-work-head">
+                    <div>
+                      <b>Upgrade</b>
+                      <span>Level {nextLevel.level}{nextLevel.title ? ` - ${nextLevel.title}` : ""}</span>
+                    </div>
+                    <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>Upgrade area</button>
+                  </div>
+                  <CityStatEffectsSummary effects={nextLevel.statEffects} />
+                  <div className="city-area-requirements">
+                    {nextLevelRequirementEntries.map((entry) => (
+                      <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
+                    ))}
+                    {nextLevelRequirementEntries.length === 0 && <span>No requirements</span>}
+                  </div>
+                  <div className="city-area-costs">
+                    {nextLevelCostEntries.map(([resourceId, amount]) => (
+                      <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
+                        <CityCostIcon resourceId={resourceId} />
+                        {amount} {cityCostLabel(resourceId)}
+                      </span>
+                    ))}
+                    {nextLevelCostEntries.length === 0 && <span>No price configured</span>}
+                  </div>
+                </div>}
               </div>
             </CityPanelSection>
-            <CityPanelSection title="Stats effect">
-              <CityStatEffectsSummary effects={nextLevel.statEffects} />
-            </CityPanelSection>
-            <CityPanelSection title="Requirements">
-              {nextLevelRequirementEntries.length > 0 && (
-                <div className="city-area-requirements">
-                  {nextLevelRequirementEntries.map((entry) => (
-                    <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
-                  ))}
-                </div>
-              )}
-              {nextLevelRequirementEntries.length === 0 && <p>No requirements.</p>}
-            </CityPanelSection>
-            <CityPanelSection title="Build price">
-              {nextLevelCostEntries.length > 0 && (
-                <div className="city-area-costs">
-                  {nextLevelCostEntries.map(([resourceId, amount]) => (
-                    <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
-                      <CityCostIcon resourceId={resourceId} />
-                      {amount} {cityCostLabel(resourceId)}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {nextLevelCostEntries.length === 0 && <p>No price configured.</p>}
-              <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>Upgrade area</button>
-            </CityPanelSection>
-            </>
           )}
         </div>
       ) : (
         <div className="city-area-popover-body">
-          <CityPanelSection title="Next level">
-            <div className="city-upgrade-summary"><b>Level 1</b></div>
-          </CityPanelSection>
-          <CityPanelSection title="Stats effect">
-            <CityStatEffectsSummary effects={area.statEffects} />
-          </CityPanelSection>
-          <CityPanelSection title="Requirements">
-            {gates.length > 0 ? (
+          <div className="city-area-info-grid">
+            <div className="city-area-info-row">
+              <b>Level 1</b>
+              <CityStatEffectsSummary effects={area.statEffects} />
+            </div>
+          </div>
+          <CityPanelSection title="Area work">
+            <div className="city-area-work-card">
+              <div className="city-area-work-head">
+                <b>Unlock</b>
+                <button type="button" disabled={!canUnlock} onClick={onUnlock}>
+                  Unlock area
+                </button>
+              </div>
               <div className="city-area-requirements">
-                {gates.map((entry) => (
+                {gates.length > 0 ? gates.map((entry) => (
                   <span className={entry.met ? "met" : "missing"} key={entry.key}>
                     {entry.label}
                   </span>
-                ))}
+                )) : <span>No requirements</span>}
               </div>
-            ) : <p>No requirements.</p>}
-          </CityPanelSection>
-          <CityPanelSection title="Build price">
-            {costEntries.length > 0 ? (
               <div className="city-area-costs">
-                {costEntries.map(([resourceId, amount]) => (
+                {costEntries.length > 0 ? costEntries.map(([resourceId, amount]) => (
                   <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
                     <CityCostIcon resourceId={resourceId} />
                     {amount} {cityCostLabel(resourceId)}
                   </span>
-                ))}
+                )) : <span>No price configured</span>}
               </div>
-            ) : <p>No price configured.</p>}
-            <button type="button" disabled={!canUnlock} onClick={onUnlock}>
-              Unlock area
-            </button>
+            </div>
           </CityPanelSection>
         </div>
       )}
@@ -2324,6 +2333,7 @@ export {
   CityPage,
   CityThreatMeter,
   loadCityAssets,
+  loadCityAssetsOnce,
   loadCityProgress,
   saveCityProgress,
   normalizeCityMobs,

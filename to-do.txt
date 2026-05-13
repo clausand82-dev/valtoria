@@ -93,6 +93,8 @@ Pænere UI til karakter
 QUEST TO ADD:
 Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
 
+Annelise vil have en til at afleverer en note til Innkeeper. Ved indlevering ved innkeeper, ber innkeeper en om at afleverer en ring til Noble. Indlevering der får noble til at be en om at jagte en ulv, der har slugt et vigtigt stykke papir og samtidig åbner et nyt område, hvor den ulv kan jagtes (Elvbækken) - samtidig åbner noble også for at man skal dræbe x antal ulve OG nakke en ulve boss samme sted. Herefter skal det vigtige papir afleveres til noble, som underskriver det og starter en ny quest, hvor man skal tilbage til elis og afleverer dette papir. Dette er en questline, der kræver at en questgiver ikke er questtaker - spændende om det allerede er kodet. Nye items er ringen, ikke underskrevet dokument, underskrevet dokument.
+
 
 MAGI 
 - teleport item, der konsekvensløs kan hive en ud af map og tilbage til city (kan evt være et merge item, der skal samles fra forskellige ingredienser)
@@ -167,6 +169,14 @@ ANGREB PÅ byen
 - city battle map skal bruge korrekt mobs
 - city battle maps skal have en config fil, ligesom region (samme opsætning), hvor battle kan defineres (måske mob definere 1-3 setups, der random vælges imellem - eller en kombi af mobs og område)
 
+SIDE PANEL
+- city side panel rettelser: ikoner ind for bygninger istedet for chips med ikon navne
+- city side panel skal vise stats ikoner (yderligere info i hover)
+- vise resource ikoner og antal, yderligere info i hover - eller en nem ikon (antal mangler/antal har) - rød eller grøn udfra om man har eller ej
+
+- overveje om progress skal "slettes" ved early battle map leave eller om det skal moderares lidt
+
+- world map skal fungerer ligesom city mode og ikke vise mana, mini map osv - tænker world map skal være ligesom city mode, måske endda samme størrelse
 
 
 

@@ -4,4 +4,6 @@ dist/
 .tmp/
 work/
 backup*.zip
+*.zip
+*.log
 *.psd

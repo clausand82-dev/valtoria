@@ -4,7 +4,6 @@ import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-g
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue } from "../game/world.js";
 import { makeResourceItem } from "../game/GameEngine/helpers.js";
-import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
@@ -23,8 +22,40 @@ import {
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
 import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
-import { SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
-import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
+import { SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
+import {
+  CITY_STORAGE_KEY,
+  regionStatusKey,
+} from "./save/save-keys.js";
+import {
+  collectSaveSlots,
+  createSaveSlot,
+  loadRegionCorruption,
+  loadRegionMapInitialId,
+  normalizeSaveSlot,
+  saveRegionCorruption,
+  upsertSaveSlot,
+  formatSaveTimestamp,
+} from "./save/save-slots.js";
+import {
+  INVENTORY_FILTERS,
+  isItemRequiredByActiveQuests,
+  itemMatchesInventoryFilter,
+} from "./inventory/inventory-filters.js";
+import {
+  AtlasIcon,
+  ImageIcon,
+  InventoryIcon,
+  ITEM_GOLD_ICON_URL,
+  ITEM_MONEY_ICON_URL,
+  ITEM_STANDARD_ICON_URL,
+  QUICKBAR_ATTACK_ICON_URL,
+  QUICKBAR_CITY_ICON_URL,
+  QUICKBAR_HEALTH_POTION_ICON_URL,
+  QUICKBAR_MANA_POTION_ICON_URL,
+  QUICKBAR_QUEST_ICON_URL,
+  QUICKBAR_WILDERNESS_ICON_URL,
+} from "./ui/icons.jsx";
 import {
   CITY_MOB_DAMAGE_PER_LEVEL_PCT,
   CITY_MOB_LEVELS,
@@ -59,13 +90,6 @@ const cityAssetCache = {
 const cityPrebuildCache = {
   layout: null,
 };
-
-const CITY_STORAGE_KEY = "runebound-depths-city-v1";
-const SAVE_INDEX_STORAGE_KEY = "runebound-depths-save-index-v1";
-const SAVE_SLOT_STORAGE_PREFIX = "runebound-depths-save-slot-v1-";
-const CITY_SLOT_STORAGE_PREFIX = "runebound-depths-city-slot-v1-";
-const REGION_CORRUPTION_SLOT_STORAGE_PREFIX = "runebound-depths-region-corruption-slot-v1-";
-const REGION_MAP_LAST_SLOT_STORAGE_PREFIX = "runebound-depths-region-map-last-slot-v1-";
 
 const emptySnapshot = {
   player: {
@@ -112,28 +136,6 @@ const emptySnapshot = {
   toasts: [],
 };
 
-const INVENTORY_FILTERS = [
-  { id: "all", label: "All", text: "*", color: "#f5f3ea" },
-  { id: "merge", label: "Can merge", text: "M", color: "#f1c657" },
-  { id: "resource", label: "Resources", text: "R", color: "#8be9ff" },
-  { id: "poor", label: "Poor", text: "P", color: "#9a9a9a" },
-  { id: "normal", label: "Normal", text: "N", color: "#f5f3ea" },
-  { id: "upgraded", label: "Upgraded", text: "U", color: "#58d96d" },
-  { id: "rare", label: "Rare", text: "G", color: "#ffd85d" },
-  { id: "epic", label: "Epic", text: "E", color: "#b579ff" },
-  { id: "legendary", label: "Legendary", text: "L", color: "#ff5757" },
-  { id: "unique", label: "Unique", text: "Q", color: "#f1c657" },
-];
-
-const QUICKBAR_HEALTH_POTION_ICON_URL = iconUrlFromKey(deriveIconKey({ mode: "potion", potionType: "health" }));
-const QUICKBAR_MANA_POTION_ICON_URL = iconUrlFromKey(deriveIconKey({ mode: "potion", potionType: "mana" }));
-const QUICKBAR_ATTACK_ICON_URL = iconUrlFromKey("common_sword");
-const QUICKBAR_CITY_ICON_URL = "/assets/generated/icon_city.png";
-const QUICKBAR_WILDERNESS_ICON_URL = "/assets/generated/icon_wilderness.png";
-const QUICKBAR_QUEST_ICON_URL = "/assets/generated/item/item_res_scroll.png";
-const ITEM_STANDARD_ICON_URL = "/assets/generated/item/item_standard.png";
-const ITEM_GOLD_ICON_URL = "/assets/generated/item/item_gold.png";
-const ITEM_MONEY_ICON_URL = "/assets/generated/item/item_gold.png";
 const CITY_STAT_ALIASES = {
   defence: "city_defence",
   cityDefence: "city_defence",
@@ -181,194 +183,10 @@ const CITY_STAT_ICON_URLS = {
   gold: ITEM_MONEY_ICON_URL,
 };
 const CITY_BUILDING_CHIPS_ALWAYS_VISIBLE = true;
-const REGION_CORRUPTION_STORAGE_KEY = "runebound-depths-region-corruption-v1";
-const REGION_MAP_LAST_ID_STORAGE_KEY = "runebound-depths-region-map-last-id-v1";
-
-function regionStatusKey(areaMapId, regionId) {
-  return `${areaMapId}:${regionId}`;
-}
-
-function loadRegionCorruption(storageKey = REGION_CORRUPTION_STORAGE_KEY) {
-  const initial = {};
-  for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
-    if (areaMapId === WORLD_MAP.id) continue;
-    for (const region of regions) {
-      initial[regionStatusKey(areaMapId, region.id)] = region.corrupted !== false;
-    }
-  }
-
-  if (!SAVE_PERSIST_CONFIG.storage.regionCorruption) return initial;
-
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    if (saved && typeof saved === "object") {
-      for (const key of Object.keys(initial)) {
-        if (typeof saved[key] === "boolean") initial[key] = saved[key];
-      }
-    }
-  } catch {
-    // Keep default corruption state if localStorage is unavailable or invalid.
-  }
-  return initial;
-}
-
-function loadRegionMapInitialId(storageKey = REGION_MAP_LAST_ID_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.regionMapLastId) return WORLD_MAP.id;
-  try {
-    const saved = String(localStorage.getItem(storageKey) || "").trim();
-    if (saved === WORLD_MAP.id) return WORLD_MAP.id;
-    if (saved && AREA_MAPS[saved]) return saved;
-  } catch {
-    // Fallback to world map when storage is unavailable.
-  }
-  return WORLD_MAP.id;
-}
-
-function saveRegionCorruption(regionCorruption, storageKey = REGION_CORRUPTION_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.regionCorruption) return;
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(regionCorruption));
-  } catch {
-    // Ignore quota or storage-denied errors.
-  }
-}
-
 function mapRegionColor(mapId, region, regionCorruption) {
   if (mapId === WORLD_MAP.id) return region.color;
   const corrupted = regionCorruption[regionStatusKey(mapId, region.id)] ?? region.corrupted ?? true;
   return corrupted ? "#d94343" : "#58d96d";
-}
-
-function saveSlotKeys(slotId) {
-  return {
-    saveKey: `${SAVE_SLOT_STORAGE_PREFIX}${slotId}`,
-    cityStorageKey: `${CITY_SLOT_STORAGE_PREFIX}${slotId}`,
-    regionCorruptionStorageKey: `${REGION_CORRUPTION_SLOT_STORAGE_PREFIX}${slotId}`,
-    regionMapLastIdStorageKey: `${REGION_MAP_LAST_SLOT_STORAGE_PREFIX}${slotId}`,
-  };
-}
-
-function normalizeSaveSlot(slot) {
-  if (!slot || typeof slot !== "object") return null;
-  const id = String(slot.id ?? "").trim();
-  if (!id) return null;
-  const keys = saveSlotKeys(id);
-  return {
-    id,
-    label: String(slot.label ?? "Valtoria Save").trim() || "Valtoria Save",
-    createdAt: Math.max(0, Number(slot.createdAt) || 0),
-    updatedAt: Math.max(0, Number(slot.updatedAt) || 0),
-    legacy: Boolean(slot.legacy),
-    saveKey: String(slot.saveKey ?? keys.saveKey),
-    cityStorageKey: String(slot.cityStorageKey ?? keys.cityStorageKey),
-    regionCorruptionStorageKey: String(slot.regionCorruptionStorageKey ?? keys.regionCorruptionStorageKey),
-    regionMapLastIdStorageKey: String(slot.regionMapLastIdStorageKey ?? keys.regionMapLastIdStorageKey),
-  };
-}
-
-function readSavePayloadAt(storageKey) {
-  if (!SAVE_PERSIST_CONFIG.storage.playerSave) return null;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.version !== SAVE_VERSION) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function readSaveIndex() {
-  if (!SAVE_PERSIST_CONFIG.storage.saveIndex) return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SAVE_INDEX_STORAGE_KEY) || "{}");
-    const rawSlots = Array.isArray(parsed) ? parsed : Array.isArray(parsed.slots) ? parsed.slots : [];
-    return rawSlots.map(normalizeSaveSlot).filter(Boolean);
-  } catch {
-    return [];
-  }
-}
-
-function writeSaveIndex(slots) {
-  if (!SAVE_PERSIST_CONFIG.storage.saveIndex) return;
-  try {
-    localStorage.setItem(SAVE_INDEX_STORAGE_KEY, JSON.stringify({ version: 1, slots }));
-  } catch {
-    // Save slot metadata is convenience data; the actual save payload is stored separately.
-  }
-}
-
-function upsertSaveSlot(slot) {
-  const normalized = normalizeSaveSlot(slot);
-  if (!normalized || normalized.legacy) return normalized;
-  const slots = readSaveIndex();
-  const next = [normalized, ...slots.filter((entry) => entry.id !== normalized.id)];
-  writeSaveIndex(next);
-  return normalized;
-}
-
-function createSaveSlot() {
-  const createdAt = Date.now();
-  const id = `${createdAt.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  return normalizeSaveSlot({
-    id,
-    label: `Valtoria ${formatSaveTimestamp(createdAt)}`,
-    createdAt,
-    updatedAt: createdAt,
-    ...saveSlotKeys(id),
-  });
-}
-
-function collectSaveSlots() {
-  const indexedSlots = readSaveIndex();
-  const usedSaveKeys = new Set(indexedSlots.map((slot) => slot.saveKey));
-  const legacyPayload = readSavePayloadAt(SAVE_STORAGE_KEY);
-  const slots = [...indexedSlots];
-  if (legacyPayload && !usedSaveKeys.has(SAVE_STORAGE_KEY)) {
-    const savedAt = Math.max(0, Number(legacyPayload.savedAt) || 0);
-    slots.unshift(normalizeSaveSlot({
-      id: "legacy-autosave",
-      label: "Legacy Autosave",
-      createdAt: savedAt,
-      updatedAt: savedAt,
-      legacy: true,
-      saveKey: SAVE_STORAGE_KEY,
-      cityStorageKey: CITY_STORAGE_KEY,
-      regionCorruptionStorageKey: REGION_CORRUPTION_STORAGE_KEY,
-      regionMapLastIdStorageKey: REGION_MAP_LAST_ID_STORAGE_KEY,
-    }));
-  }
-  return slots.map(summarizeSaveSlot).filter(Boolean);
-}
-
-function summarizeSaveSlot(slot) {
-  const payload = readSavePayloadAt(slot.saveKey);
-  const savedAt = Math.max(0, Number(payload?.savedAt) || Number(slot.updatedAt) || Number(slot.createdAt) || 0);
-  const player = payload?.player ?? {};
-  return {
-    ...slot,
-    exists: Boolean(payload),
-    updatedAt: savedAt,
-    level: Math.max(1, Math.floor(Number(player.level) || 1)),
-    gold: Math.max(0, Math.floor(Number(player.gold) || 0)),
-    activeQuestCount: Array.isArray(payload?.quests?.active) ? payload.quests.active.length : 0,
-  };
-}
-
-function formatSaveTimestamp(timestamp) {
-  if (!timestamp) return "No date";
-  try {
-    return new Intl.DateTimeFormat("da-DK", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(timestamp));
-  } catch {
-    return new Date(timestamp).toLocaleString();
-  }
 }
 
 function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame }) {
@@ -1462,240 +1280,6 @@ function detailEntries(record = {}) {
     .filter(([, value]) => Number(value) > 0)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}: ${value}`);
-}
-
-function itemMatchesInventoryFilter(item, filter) {
-  if (filter === "merge") return Boolean(item.canMerge);
-  if (filter === "resource") return item.mode === "resource";
-  if (filter === "unique") return item.unique || item.rarity === "unique";
-  return item.mode !== "resource" && item.rarity === filter;
-}
-
-function isItemRequiredByActiveQuests(item, activeQuests = []) {
-  if (!item || !activeQuests?.length) return false;
-  for (const quest of activeQuests) {
-    if (quest.type !== "collect_quest_item") continue;
-    const target = quest.target ?? {};
-    // Quest-specific quest items
-    if (target.questItemId && item.mode === "quest" && String(item.questItemId) === String(target.questItemId)) return true;
-    if (Array.isArray(target.questItems) && item.mode === "quest") {
-      for (const req of target.questItems) {
-        if (String(req.questItemId) === String(item.questItemId)) return true;
-      }
-    }
-    // Resource requirements
-    if (target.resources && item.mode === "resource") {
-      for (const req of target.resources) {
-        if (String(req.resource) === String(item.resourceId)) return true;
-      }
-    }
-    // Specific item matching rules
-    if (Array.isArray(target.items)) {
-      for (const req of target.items) {
-        let match = true;
-        if (req.templateId) match = match && (String(item.uniqueId) === String(req.templateId) || String(item.namedId) === String(req.templateId));
-        if (req.namePrefix) match = match && String(item.name || "").startsWith(`${req.namePrefix} `);
-        if (req.baseName) match = match && String(item.baseName || "") === String(req.baseName);
-        if (req.rarity) match = match && String(item.rarity || "") === String(req.rarity);
-        if (match) return true;
-      }
-    }
-  }
-  return false;
-}
-
-const iconSheetPromises = new Map();
-
-function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
-  const canvasRef = useRef(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const itemFallbackSource = ITEM_STANDARD_ICON_URL;
-    const fallbackSource = (
-      iconSheet === "armor"
-        ? "/assets/generated/armor001_sheet.png"
-        : iconSheet === "resources"
-          ? "/assets/generated/res_sheet_001.png"
-          : iconSheet === "gemstones"
-            ? "/assets/generated/res_sheet_002.png"
-          : "/assets/generated/items001_sheet.png"
-    );
-    const iconFallbackSource = itemFallbackSource;
-
-    const source = iconUrl || fallbackSource;
-    if (!iconSheetPromises.has(source)) {
-      iconSheetPromises.set(source, new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = source;
-      }));
-    }
-
-    if (!iconSheetPromises.has(iconFallbackSource)) {
-      iconSheetPromises.set(iconFallbackSource, new Promise((resolve, reject) => {
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = reject;
-        image.src = iconFallbackSource;
-      }));
-    }
-
-    iconSheetPromises.get(source).then((image) => {
-      if (cancelled || !canvasRef.current) return;
-      if (iconUrl) {
-        drawCustomInventoryIcon(canvasRef.current, image);
-      } else {
-        drawInventoryIcon(canvasRef.current, image, iconIndex, iconSheet);
-      }
-    }).catch(() => {
-      iconSheetPromises.get(iconFallbackSource)?.then((image) => {
-        if (cancelled || !canvasRef.current) return;
-        drawCustomInventoryIcon(canvasRef.current, image);
-      }).catch(() => {});
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [iconIndex, iconSheet, iconUrl]);
-
-  return <canvas ref={canvasRef} className="inventory-icon" width="52" height="52" aria-hidden="true" />;
-}
-
-function ImageIcon({ src }) {
-  return <img className="hud-image-icon" src={src} alt="" />;
-}
-
-function AtlasIcon({ frameName }) {
-  const canvasRef = useRef(null);
-  useEffect(() => {
-    let cancelled = false;
-    const image = new Image();
-    image.onload = () => {
-      if (cancelled || !canvasRef.current) return;
-      const frame = ATLAS_FRAMES[frameName];
-      if (!frame) return;
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const temp = document.createElement("canvas");
-      temp.width = frame.w;
-      temp.height = frame.h;
-      const tctx = temp.getContext("2d", { willReadFrequently: true });
-      tctx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
-      const imageData = tctx.getImageData(0, 0, temp.width, temp.height);
-      const { data } = imageData;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        if (g > 135 && g > r * 1.45 && g > b * 1.35) data[i + 3] = 0;
-      }
-      tctx.putImageData(imageData, 0, 0);
-      const bounds = expandBounds(alphaBoundsFromCanvas(temp), temp.width, temp.height, frameName === "orb" ? 18 : 3);
-      const scale = Math.min((canvas.width - 6) / bounds.w, (canvas.height - 6) / bounds.h, frameName === "orb" ? 0.34 : Infinity);
-      const width = bounds.w * scale;
-      const height = bounds.h * scale;
-      ctx.drawImage(temp, bounds.x, bounds.y, bounds.w, bounds.h, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-    };
-    image.src = "/assets/generated/runebound-atlas-source.png";
-    return () => {
-      cancelled = true;
-    };
-  }, [frameName]);
-  return <canvas ref={canvasRef} className="inventory-icon" width="52" height="52" aria-hidden="true" />;
-}
-
-function alphaBoundsFromCanvas(canvas) {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = imageData;
-  let minX = canvas.width;
-  let minY = canvas.height;
-  let maxX = 0;
-  let maxY = 0;
-  for (let y = 0; y < canvas.height; y += 1) {
-    for (let x = 0; x < canvas.width; x += 1) {
-      if (data[(y * canvas.width + x) * 4 + 3] <= 20) continue;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  if (maxX <= minX || maxY <= minY) return { x: 0, y: 0, w: canvas.width, h: canvas.height };
-  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
-}
-
-function expandBounds(bounds, maxW, maxH, pad) {
-  const x = Math.max(0, bounds.x - pad);
-  const y = Math.max(0, bounds.y - pad);
-  const right = Math.min(maxW, bounds.x + bounds.w + pad);
-  const bottom = Math.min(maxH, bounds.y + bounds.h + pad);
-  return { x, y, w: right - x, h: bottom - y };
-}
-
-function drawCustomInventoryIcon(canvas, image) {
-  const ctx = canvas.getContext("2d");
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const scale = Math.min((canvas.width - 8) / image.naturalWidth, (canvas.height - 8) / image.naturalHeight);
-  const width = image.naturalWidth * scale;
-  const height = image.naturalHeight * scale;
-  ctx.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-}
-
-function drawInventoryIcon(canvas, image, iconIndex, iconSheet = "items") {
-  const ctx = canvas.getContext("2d");
-  const cols = 4;
-  const rows = 3;
-  const col = Math.abs(iconIndex ?? 0) % cols;
-  const row = Math.floor(Math.abs(iconIndex ?? 0) / cols) % rows;
-  const sx = Math.round((col * image.naturalWidth) / cols);
-  const sy = Math.round((row * image.naturalHeight) / rows);
-  const nextX = Math.round(((col + 1) * image.naturalWidth) / cols);
-  const nextY = Math.round(((row + 1) * image.naturalHeight) / rows);
-  const cellW = nextX - sx;
-  const cellH = nextY - sy;
-
-  const temp = document.createElement("canvas");
-  temp.width = cellW;
-  temp.height = cellH;
-  const tctx = temp.getContext("2d", { willReadFrequently: true });
-  tctx.drawImage(image, sx, sy, cellW, cellH, 0, 0, cellW, cellH);
-  const imageData = tctx.getImageData(0, 0, cellW, cellH);
-  const data = imageData.data;
-  let minX = cellW;
-  let minY = cellH;
-  let maxX = 0;
-  let maxY = 0;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (g > 145 && g > r * 1.55 && g > b * 1.55) data[i + 3] = 0;
-    if (data[i + 3] > 45) {
-      const p = i / 4;
-      const x = p % cellW;
-      const y = Math.floor(p / cellW);
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x);
-      maxY = Math.max(maxY, y);
-    }
-  }
-  tctx.putImageData(imageData, 0, 0);
-
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (maxX <= minX || maxY <= minY) return;
-  const sourceW = maxX - minX + 1;
-  const sourceH = maxY - minY + 1;
-  const scale = Math.min((canvas.width - 8) / sourceW, (canvas.height - 8) / sourceH);
-  const width = sourceW * scale;
-  const height = sourceH * scale;
-  ctx.drawImage(temp, minX, minY, sourceW, sourceH, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
 }
 
 function findEquippedComparison(item, equipment) {

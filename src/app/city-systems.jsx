@@ -980,6 +980,10 @@ function loadCityAssets() {
   return cityAssetCache.promise;
 }
 
+function loadCityAssetsOnce() {
+  return loadCityAssets();
+}
+
 function loadCityLayerImages() {
   const urls = new Set([CITY_MAP_IMAGE.src]);
   for (const area of CITY_AREAS) {
@@ -1249,6 +1253,7 @@ export {
   cityStatsMeetRequirements,
   cityStatLabel,
   loadCityAssets,
+  loadCityAssetsOnce,
   loadCityProgress,
   applyMapReturnPopulationProgress,
   saveCityProgress,

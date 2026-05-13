@@ -11,48 +11,28 @@ import {
   calcThreatRiseOnDeath,
 } from "./game/config/city-mobs-attack-config.js";
 import {
-  iconUrlFromKey,
-  isEquippableItem,
-  isQuestItem,
-} from "./game/item-system.js";
-import {
-  AtlasIcon,
+  AppLoadingScreen,
   CITY_STAT_DEFS,
   CITY_STORAGE_KEY,
-  CityCitizenConditions,
   CityPage,
-  CityStatsTopBar,
-  CityThreatMeter,
+  GameHud,
   HeroDialog,
-  ImageIcon,
-  InventoryIcon,
-  InventoryItemDetail,
-  INVENTORY_FILTERS,
-  ITEM_MONEY_ICON_URL,
+  InventoryPanel,
   MergeChoiceDialog,
   MinimapDialog,
-  QUICKBAR_ATTACK_ICON_URL,
-  QUICKBAR_CITY_ICON_URL,
-  QUICKBAR_HEALTH_POTION_ICON_URL,
-  QUICKBAR_MANA_POTION_ICON_URL,
-  QUICKBAR_QUEST_ICON_URL,
-  QUICKBAR_WILDERNESS_ICON_URL,
   QuestDetailDialog,
   QuestObjectiveMeta,
   QuestOfferDialog,
   QuestOverviewDialog,
   ReadableDialog,
   RegionMapDialog,
-  ResourceBar,
   StartMenu,
   applyMapReturnPopulationProgress,
   calculateCityStats,
   collectSaveSlots,
   createSaveSlot,
   emptySnapshot,
-  isItemRequiredByActiveQuests,
-  itemMatchesInventoryFilter,
-  loadCityAssets,
+  loadCityAssetsOnce,
   loadCityProgress,
   loadRegionCorruption,
   loadRegionMapInitialId,
@@ -62,6 +42,7 @@ import {
   saveCityProgress,
   saveRegionCorruption,
   upsertSaveSlot,
+  useEngineModalLock,
 } from "./app/index.jsx";
 
 function loadUiImage(src) {
@@ -71,26 +52,6 @@ function loadUiImage(src) {
     image.onerror = () => reject(new Error(`Image load failed: ${src}`));
     image.src = src;
   });
-}
-
-function AppLoadingScreen({ state }) {
-  const percent = Math.max(0, Math.min(100, Math.round(Number(state?.percent) || 0)));
-  return (
-    <section className="app-loading-screen" role="status" aria-live="polite" aria-label="Loading">
-      <div className="app-loading-copy">
-        <b>{state?.title ?? "Loading"}</b>
-        <span>{state?.label ?? "Preparing game..."}</span>
-        {state?.error && <em>{state.error}</em>}
-      </div>
-      <div className="app-loading-bar" aria-hidden="true">
-        <span style={{ width: `${percent}%` }} />
-      </div>
-      <div className="app-loading-meta">
-        <span>{state?.detail ?? ""}</span>
-        <b>{percent}%</b>
-      </div>
-    </section>
-  );
 }
 
 export default function App() {
@@ -148,7 +109,7 @@ export default function App() {
         update({ active: true, percent: 5, title: "Loading", label: "Loading menu", detail: "Menu artwork" });
         await loadUiImage("/assets/generated/menu.png").catch(() => null);
         update({ percent: 20, label: "Loading city", detail: "Map, buildings, addons and NPCs" });
-        await loadCityAssets();
+        await loadCityAssetsOnce();
         update({ percent: 100, label: "Ready", detail: "Menu ready" });
         window.setTimeout(() => update({ active: false }), 120);
       } catch (error) {
@@ -185,7 +146,7 @@ export default function App() {
     });
 
     update({ percent: 18, label: "Loading city", detail: "Map, buildings, addons and NPCs" });
-    await loadCityAssets();
+    await loadCityAssetsOnce();
     preloadedGameAssetsRef.current = { atlas: null, animationSheets: null };
     update({ percent: 92, label: "Preparing UI", detail: "Save data and city state" });
     return token;
@@ -425,26 +386,19 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [cityOpen]);
 
-  useEffect(() => {
-    const modalOpen = cityOpen
-      || mapOpen
-      || regionMapOpen
-      || heroOpen
-      || questOverviewOpen
-      || confirmMapAbandonOpen
-      || Boolean(questOffer)
-      || Boolean(acceptedQuestNotice);
-    engineRef.current?.setInputLocked(modalOpen);
-    engineRef.current?.setPaused(modalOpen);
-    if (cityOpen) {
-      setInventoryOpen(false);
-      setSelectedItem(null);
-    }
-    return () => {
-      engineRef.current?.setInputLocked(false);
-      engineRef.current?.setPaused(false);
-    };
-  }, [cityOpen, mapOpen, regionMapOpen, heroOpen, questOverviewOpen, confirmMapAbandonOpen, questOffer, acceptedQuestNotice]);
+  useEngineModalLock({
+    acceptedQuestNotice,
+    cityOpen,
+    confirmMapAbandonOpen,
+    engineRef,
+    heroOpen,
+    mapOpen,
+    questOffer,
+    questOverviewOpen,
+    regionMapOpen,
+    setInventoryOpen,
+    setSelectedItem,
+  });
 
   useEffect(() => {
     if (!minimapRef.current) return;
@@ -601,173 +555,34 @@ export default function App() {
         />
       )}
 
-      {gameSession && <canvas ref={canvasRef} className="game-canvas" aria-label="Runebound Depths isometric game" />}
+      {gameSession && <canvas ref={canvasRef} className="game-canvas" aria-label="Valtoria isometric game" />}
 
       {gameSession && (
       <>
-      <section className="hud hud-left" aria-live="polite">
-        {cityOpen ? (
-          <div className="city-hero-cluster">
-            <div className="portrait">
-              <b>{player.level}</b>
-            </div>
-            <CityCitizenConditions stats={derivedCityStats} />
-          </div>
-        ) : (
-          <div className="portrait">
-            <b>{player.level}</b>
-          </div>
-        )}
-        {cityOpen ? (
-          <CityStatsTopBar stats={cityHudStats} />
-        ) : (
-          <div className="resource-stack">
-            <ResourceBar type="health" value={hpPct} label={`HP ${player.hp} / ${player.maxHp}`} />
-            <ResourceBar type="mana" value={manaPct} label={`MANA ${player.mana} / ${player.maxMana}`} />
-            <ResourceBar type="xp" value={xpPct} label={`XP ${player.xp} / ${player.nextXp}`} />
-            <ResourceBar type="popularity" value={popularityPct} label={`POPULARITY ${Math.round(player.popularity ?? 0)}%`} />
-          </div>
-        )}
-        {cityOpen && <CityThreatMeter threatLevel={cityThreatLevel} />}
-        {!cityOpen && (
-          <div className="stat-chip">
-            <span>Guld</span>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <ImageIcon src={ITEM_MONEY_ICON_URL} />
-              <b>{player.gold}</b>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="hud hud-right">
-        <div className="zone-panel">
-          <div className="zone-header">
-            <b>{cityOpen ? "City" : snapshot.zone.name}</b>
-          </div>
-          {!cityOpen && (
-            <span>
-              Seed {snapshot.zone.seed} | Omraade L{snapshot.zone.level}
-            </span>
-          )}
-        </div>
-        {!cityOpen && <canvas ref={minimapRef} className="minimap" width="154" height="154" aria-label="Minimap" />}
-      </section>
-
-      {hoverMonster && (
-        <section className="monster-hover-card" aria-live="polite">
-          <div className="monster-hover-title">
-            <span>L{hoverMonster.level}</span>
-            <b>{hoverMonster.name}</b>
-          </div>
-          <ResourceBar type="monster-health" value={monsterHpPct} label={`${hoverMonster.hp} / ${hoverMonster.maxHp}`} />
-        </section>
-      )}
-
-      <section className="combat-card">
-        <span>Skade {player.damage}</span>
-        <span>Armor {player.armor}</span>
-        <span>{player.mode}</span>
-        {snapshot.regionRun && snapshot.mobs?.total > 0 && (
-          <span>Mobs {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
-        )}
-      </section>
-
-      {trackedQuests.length > 0 && (
-        <section className="quest-tracker" aria-label="Aktive quests">
-          {trackedQuests.slice(0, 8).map((quest) => (
-            <div
-              className={`quest-track-row ${quest.complete ? "complete" : ""}`}
-              key={quest.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => setViewedQuest(quest)}
-              onKeyDown={(e) => { if (e.key === "Enter") setViewedQuest(quest); }}
-            >
-              <b>{quest.title}</b>
-              <span>{quest.progressText}</span>
-              <QuestObjectiveMeta quest={quest} compact />
-            </div>
-          ))}
-        </section>
-      )}
-
-      <section className="skillbar">
-        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
-          <button
-            type="button"
-            className="quick-potion"
-            title="Health potion"
-            disabled={cityOpen || !snapshot.quickActions.healthPotions || snapshot.quickActions.potionCooldown > 0}
-            onClick={() => engineRef.current?.usePotion("health")}
-          >
-            <InventoryIcon iconIndex={4} iconSheet="items" iconUrl={QUICKBAR_HEALTH_POTION_ICON_URL} />
-            <span className="hotkey-badge">1</span>
-            <b>{snapshot.quickActions.healthPotions}</b>
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
-          <button
-            type="button"
-            className="quick-potion"
-            title="Mana potion"
-            disabled={cityOpen || !snapshot.quickActions.manaPotions || snapshot.quickActions.potionCooldown > 0}
-            onClick={() => engineRef.current?.usePotion("mana")}
-          >
-            <InventoryIcon iconIndex={3} iconSheet="items" iconUrl={QUICKBAR_MANA_POTION_ICON_URL} />
-            <span className="hotkey-badge">2</span>
-            <b>{snapshot.quickActions.manaPotions}</b>
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
-          <button type="button" className="skill active" title="Angrib" disabled={cityOpen} onClick={() => engineRef.current?.primaryAttack()}>
-            <InventoryIcon iconIndex={0} iconSheet="items" iconUrl={QUICKBAR_ATTACK_ICON_URL} />
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgængelig i byen" : undefined}>
-          <button
-            type="button"
-            className="skill"
-            title="Kast magi"
-            disabled={cityOpen}
-            onClick={() => {
-              const engine = engineRef.current;
-              if (engine) engine.castSpellAt(engine.pointer.worldX, engine.pointer.worldY);
-            }}
-          >
-            <AtlasIcon frameName="orb" />
-          </button>
-        </span>
-        <button type="button" className="skill" title="Rygsaek" onClick={() => setInventoryOpen((value) => !value)}>
-          <ImageIcon src="/assets/generated/icon_backpack.png" />
-          <span className="hotkey-badge">I</span>
-        </button>
-        <button type="button" className="skill" title={cityOpen ? "Minimap er deaktiveret i byen" : "Map"} disabled={cityOpen} onClick={() => setMapOpen(true)}>
-          <ImageIcon src="/assets/generated/icon_map.png" />
-          <span className="hotkey-badge">M</span>
-        </button>
-        <button type="button" className="skill" title="Hero" onClick={() => setHeroOpen(true)}>
-          <ImageIcon src="/assets/generated/ui_hero.png" />
-          <span className="hotkey-badge">C</span>
-        </button>
-        <button type="button" className="skill" title="Questoversigt" onClick={() => setQuestOverviewOpen(true)}>
-          <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
-        </button>
-        <button
-          type="button"
-          className="skill"
-          title={snapshot.regionRun ? "Til world map (progression nulstilles)" : "Aaben world map"}
-          onClick={() => {
-            if (snapshot.regionRun) {
-              setConfirmMapAbandonOpen(true);
-              return;
-            }
-            openWorldMapFromCity();
-          }}
-        >
-          <ImageIcon src={snapshot.regionRun ? QUICKBAR_WILDERNESS_ICON_URL : QUICKBAR_CITY_ICON_URL} />
-        </button>
-      </section>
+      <GameHud
+        cityHudStats={cityHudStats}
+        cityOpen={cityOpen}
+        cityThreatLevel={cityThreatLevel}
+        derivedCityStats={derivedCityStats}
+        engineRef={engineRef}
+        hoverMonster={hoverMonster}
+        hpPct={hpPct}
+        manaPct={manaPct}
+        minimapRef={minimapRef}
+        monsterHpPct={monsterHpPct}
+        openWorldMapFromCity={openWorldMapFromCity}
+        player={player}
+        popularityPct={popularityPct}
+        setConfirmMapAbandonOpen={setConfirmMapAbandonOpen}
+        setHeroOpen={setHeroOpen}
+        setInventoryOpen={setInventoryOpen}
+        setMapOpen={setMapOpen}
+        setQuestOverviewOpen={setQuestOverviewOpen}
+        setViewedQuest={setViewedQuest}
+        snapshot={snapshot}
+        trackedQuests={trackedQuests}
+        xpPct={xpPct}
+      />
 
       {confirmMapAbandonOpen && (
         <div className="confirm-backdrop" role="presentation">
@@ -811,159 +626,19 @@ export default function App() {
       )}
 
       {inventoryOpen && (
-        <aside className="inventory-panel" onMouseLeave={() => setSelectedItem(null)}>
-          <header>
-            <div>
-              <h1>Rygsaek</h1>
-              <span>
-                {snapshot.inventory.length} / {MAX_INVENTORY}
-              </span>
-            </div>
-            <button type="button" className="close-button" onClick={() => setInventoryOpen(false)} title="Luk">
-              x
-            </button>
-          </header>
-
-          <div className="equipment-grid">
-            {snapshot.equipment.map((slot) => (
-              <button
-                type="button"
-                className={`equipment-slot equipment-${slot.id} ${slot.item ? "equipped" : "empty"}`}
-                style={{ "--item-quality": slot.item?.rarityColor ?? "rgba(255,255,255,0.16)" }}
-                key={slot.id}
-                onMouseEnter={() => setSelectedItem(slot.item)}
-                onFocus={() => setSelectedItem(slot.item)}
-              >
-                <span className="equipment-icon" aria-hidden="true">
-                  {slot.item ? (
-                    <InventoryIcon iconIndex={slot.item.iconIndex} iconSheet={slot.item.iconSheet} iconUrl={slot.item.iconUrl} />
-                  ) : slot.emptyIconKey ? (
-                    <InventoryIcon iconSheet="items" iconUrl={iconUrlFromKey(slot.emptyIconKey)} />
-                  ) : (
-                    <i />
-                  )}
-                </span>
-                <span className="equipment-label">{slot.label}</span>
-                <b className={slot.item?.rarity ?? ""}>{slot.item?.name ?? "Empty"}</b>
-              </button>
-            ))}
-          </div>
-
-          <div className="inventory-filter-bar" aria-label="Backpack visual filters">
-            {INVENTORY_FILTERS.map((filter) => (
-              <button
-                type="button"
-                className={`inventory-filter filter-${filter.id} ${inventoryFilter === filter.id ? "active" : ""}`}
-                style={{ "--filter-color": filter.color }}
-                key={filter.id}
-                title={filter.label}
-                onClick={() => setInventoryFilter(filter.id)}
-              >
-                <i aria-hidden="true" />
-                <span>{filter.text}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="item-grid">
-            {inventorySlots.map((item, slotIndex) => {
-              if (!item) {
-                return <article className="item-card empty-slot" key={`empty-${slotIndex}`} aria-hidden="true" />;
-              }
-              const dimmed = inventoryFilter !== "all" && !itemMatchesInventoryFilter(item, inventoryFilter);
-              return (
-                <article
-                  className={`item-card ${item.rarity} ${item.mode === "resource" ? "resource-item" : ""} ${dimmed ? "filter-dimmed" : ""} ${isItemRequiredByActiveQuests(item, snapshot.quests?.active) ? "quest-related" : ""}`}
-                  style={{ "--item-quality": item.rarityColor ?? "rgba(255,255,255,0.16)" }}
-                  key={item.id}
-                  onMouseEnter={() => setSelectedItem(item)}
-                  onFocus={() => setSelectedItem(item)}
-                  onClick={() => {
-                    if (isEquippableItem(item)) engineRef.current?.equipItem(item.index);
-                  }}
-                  tabIndex={0}
-                >
-                  <button
-                    type="button"
-                    className="corner-action drop-action"
-                    title={cityOpen ? "Kan ikke droppe i byen" : isQuestItem(item) ? "Kan ikke droppe quest item" : "Drop"}
-                    disabled={cityOpen || isQuestItem(item)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (!cityOpen && !isQuestItem(item)) {
-                        engineRef.current?.dropInventoryItem(item.index);
-                      }
-                    }}
-                  >
-                    D
-                  </button>
-                  <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
-                  {(item.mode === "potion" || item.mode === "resource") && item.count > 1 && <b className="stack-count">{item.count}</b>}
-                  {item.durability !== undefined && item.mode !== "resource" && item.mode !== "potion" && (() => {
-                    const dp = Math.max(0, Math.min(100, Number(item.durability ?? 100)));
-                    const dc = dp >= 75 ? "#58d96d" : dp >= 40 ? "#ffd85d" : "#ff6b5f";
-                    return (
-                      <span className="item-card-dur-bar-wrap" title={`Durability: ${Math.round(dp)}%`}>
-                        <span className="item-card-dur-bar-fill" style={{ width: `${dp}%`, background: dc }} />
-                      </span>
-                    );
-                  })()}
-                  <span>
-                    {item.rarityLabel} | L{item.level} | {item.value}g
-                  </span>
-                  {item.canMerge && (
-                    <button
-                      type="button"
-                      className="corner-action merge-action"
-                      title="Merge"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        const result = engineRef.current?.mergeInventoryItem(item.index);
-                        if (result?.type === "resource-choice" || result?.type === "readable-choice") setMergeChoice(result);
-                      }}
-                    >
-                      M
-                    </button>
-                  )}
-                  {item.canRead && (
-                    <button
-                      type="button"
-                      className="corner-action merge-action"
-                      title="Read"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        const result = engineRef.current?.readInventoryItem?.(item.index);
-                        if (result?.type === "readable-text") setReadableDialog(result);
-                      }}
-                    >
-                      R
-                    </button>
-                  )}
-                  {item.canConsume && (
-                    <button
-                      type="button"
-                      className="corner-action merge-action"
-                      title="Use"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        engineRef.current?.consumeInventoryItem?.(item.index);
-                      }}
-                    >
-                      U
-                    </button>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-
-        </aside>
-      )}
-
-      {inventoryOpen && selectedItem && (
-        <aside className="item-hover-panel" aria-live="polite">
-          <InventoryItemDetail selectedItem={selectedItem} equipment={snapshot.equipment} />
-        </aside>
+        <InventoryPanel
+          cityOpen={cityOpen}
+          engineRef={engineRef}
+          inventoryFilter={inventoryFilter}
+          inventorySlots={inventorySlots}
+          selectedItem={selectedItem}
+          setInventoryFilter={setInventoryFilter}
+          setInventoryOpen={setInventoryOpen}
+          setMergeChoice={setMergeChoice}
+          setReadableDialog={setReadableDialog}
+          setSelectedItem={setSelectedItem}
+          snapshot={snapshot}
+        />
       )}
 
       <div className="toast-stack">

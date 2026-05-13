@@ -39,10 +39,16 @@ export {
   CITY_STAT_DEFS,
 } from "./shared.jsx";
 
+export { AppLoadingScreen } from "./loading/app-loading-screen.jsx";
+export { InventoryPanel } from "./inventory/inventory-panel.jsx";
+export { GameHud } from "./hud/game-hud.jsx";
+export { useEngineModalLock } from "./hooks/use-engine-modal-lock.js";
+
 export {
   CityPage,
   CityThreatMeter,
   loadCityAssets,
+  loadCityAssetsOnce,
   loadCityProgress,
   saveCityProgress,
   normalizeCityMobs,

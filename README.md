@@ -1,4 +1,4 @@
-# Runebound Depths
+# Valtoria
 
 Isometrisk Diablo-lignende browserprototype bygget i React + Vite med en custom Canvas-engine.
 
