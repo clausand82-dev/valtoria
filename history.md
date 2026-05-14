@@ -9,6 +9,9 @@ History over changes
 - object, foilage with more particle system added
 - weather including thunderstorm added
 - better debth handling on battle map
+- fixed food barrel not going in inventory when bought
+- did a tranfer all resource button in bank
+- added magic damage to weapons
 
 * V. 1.61
 - app.jsx is reduced more

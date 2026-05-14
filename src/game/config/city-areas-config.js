@@ -174,6 +174,7 @@ export const CITY_AREAS = [
     id: "mystic_quarter",
     title: "Mystic Quarter",
     category: "district",
+    prebuilt: true,
     showLabel: true,
     points: "922,392 1005,308 1021,311 1057,368 1081,442 1070,455 953,453 943,420 943,420",
     builtLayers: [

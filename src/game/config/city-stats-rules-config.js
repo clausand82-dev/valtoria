@@ -77,9 +77,9 @@ export const CITY_STATS_RULES = {
       { resourceId: "wheat", label: "Wheat" },
     ],
     // Base input cost before popularity discount is applied.
-    baseCost: 50,
+    baseCost: 10,
     // Lowest possible input cost after all discounts.
-    minCost: 50,
+    minCost: 10,
     // Popularity value where discounting starts.
     popularityStart: 50,
     // Popularity points required per discount step.

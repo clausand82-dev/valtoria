@@ -820,6 +820,7 @@ export default function App() {
           key={gameSession.slot.id}
           engineRef={engineRef}
           snapshot={snapshot}
+          setSnapshot={setSnapshot}
           onQuestCompleted={(result) => setQuestRewardModal(result)}
           cityStorageKey={gameSession.slot.cityStorageKey}
           onProgressChange={setCityProgressHud}

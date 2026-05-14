@@ -242,6 +242,13 @@ export const combatMethods = {
       this.player.stats.meleeAttacks += 1;
       const { damage, critical } = this.rollPlayerDamage(stats);
       this.damageMonster(target, damage, "melee", critical);
+      this.triggerWeaponOnHitEffects({
+        weapon: this.player.equipment?.weapon,
+        player: this.player,
+        target,
+        sourceType: "melee",
+        stats,
+      });
       this.drainWeaponDurability();
       this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
       this.camera.shake = Math.max(this.camera.shake, 3);
@@ -269,6 +276,53 @@ export const combatMethods = {
       color,
     });
     this.drainWeaponDurability();
+  },
+
+  triggerWeaponOnHitEffects(context = {}) {
+    const effects = context.weapon?.effects?.onHit;
+    if (!Array.isArray(effects) || effects.length === 0) return;
+    for (const effect of effects) {
+      if (!effect || typeof effect !== "object") continue;
+      const chance = clamp(Number(effect.chance ?? 1), 0, 1);
+      if (chance <= 0 || Math.random() > chance) continue;
+      if (effect.type === "areaDamage") {
+        this.applyWeaponAreaDamageEffect(effect, context);
+      }
+    }
+  },
+
+  applyWeaponAreaDamageEffect(effect, context = {}) {
+    const radius = Math.max(0, Number(effect.radius) || 0);
+    if (radius <= 0) return;
+    const center = this.weaponEffectCenter(effect, context);
+    if (!center) return;
+    const stats = context.stats ?? this.calcStats();
+    const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
+    const damage = Math.max(1, Math.floor((Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0)));
+    const damageType = String(effect.damageType || "magic");
+    const damaged = new Set();
+
+    for (const monster of this.nearbyMonsters(2)) {
+      if (monster.dead || damaged.has(monster.id)) continue;
+      if (Math.hypot(monster.x - center.x, monster.y - center.y) > radius + monster.radius) continue;
+      damaged.add(monster.id);
+      this.damageMonster(monster, damage, damageType, false);
+    }
+
+    if (effect.visual === "expandingEnergyRing") {
+      this.spawnExpandingEnergyRingEffect(center.x, center.y, radius, {
+        color: effect.color,
+        durationMs: effect.durationMs,
+      });
+    } else {
+      this.addParticles(center.x, center.y, effect.color ?? "#8feaff", 18, 0.08);
+    }
+  },
+
+  weaponEffectCenter(effect, context = {}) {
+    if (effect.center === "player") return context.player ?? this.player;
+    if (context.target) return context.target;
+    return context.player ?? this.player;
   },
 
   castSpellAt(x, y, spellId = null) {

@@ -176,6 +176,7 @@ import {
 function CityPage({
   engineRef,
   snapshot,
+  setSnapshot,
   cityStorageKey = CITY_STORAGE_KEY,
   skipMobProgressForVisit = false,
   onMobProgressSkipConsumed,
@@ -476,18 +477,36 @@ function CityPage({
   const convertCityResourceToResource = (inputResourceId, inputCount, outputResourceId, outputCount = 1) => {
     const cost = Math.max(1, Math.floor(Number(inputCount) || 1));
     const outCount = Math.max(1, Math.floor(Number(outputCount) || 1));
+    const outputId = String(outputResourceId ?? "").trim();
+    const output = makeResourceItem(outputId, outCount);
+    if (!output) {
+      engineRef.current?.addToast?.(`Ugyldig output resource: ${String(outputResourceId)}`);
+      return false;
+    }
     if (cityResourceAvailable(inputResourceId) < cost) {
       engineRef.current?.addToast?.(`Kraever ${cost}x ${RESOURCE_DEFS[inputResourceId]?.name ?? inputResourceId}`);
       return false;
     }
-    if (!backpackResourceCanAccept(outputResourceId, outCount, [[inputResourceId, cost]])) {
+    if (!backpackResourceCanAccept(outputId, outCount, [[inputResourceId, cost]])) {
       engineRef.current?.addToast?.("Rygsaekken er fuld");
       return false;
     }
     const paid = payCityEntries([[inputResourceId, cost]]);
     if (!paid) return false;
-    const output = makeResourceItem(outputResourceId, outCount);
-    if (!engineRef.current?.addInventoryItem?.(output)) return false;
+    if (!engineRef.current?.addInventoryItem?.(output)) {
+      engineRef.current?.addToast?.("Kunne ikke tilfoeje item til rygsaekken.");
+      return false;
+    }
+    // Opdater snapshot.player.inventory så UI re-rendrer og viser det nye item
+    if (typeof setSnapshot === "function") {
+      setSnapshot((prev) => ({
+        ...prev,
+        player: {
+          ...prev.player,
+          inventory: [...engineRef.current.player.inventory],
+        },
+      }));
+    }
     engineRef.current?.addToast?.(`Created ${outCount}x ${output.name}`);
     engineRef.current?.saveProgress?.({ force: true });
     return true;
@@ -1683,6 +1702,33 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     });
   };
 
+  const transferAllResources = (sectionKey) => {
+    if (!owned) return;
+    const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
+    if (!section || section.fixedDefs?.length) return; // Don't transfer if section has fixed slots
+    const resources = (snapshot.inventory ?? [])
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => isResourceItem(item))
+      .sort((a, b) => (a.item.resourceId ?? "").localeCompare(b.item.resourceId ?? ""));
+    let transferred = 0;
+    for (const { item, index } of resources) {
+      if (transferred >= (snapshot.inventory ?? []).length) break;
+      const remainingAttempts = 10;
+      for (let attempt = 0; attempt < remainingAttempts; attempt++) {
+        const currentItem = snapshot.inventory?.[index];
+        if (!currentItem) break;
+        const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
+        if (!section) break;
+        const inventories = normalizeCityInventories(buildingState, building);
+        const slotIndex = firstCityInventorySlotForItem(currentItem, section, inventories[sectionKey] ?? []);
+        if (slotIndex < 0) break;
+        depositInventoryItem(index, sectionKey, slotIndex, true);
+        transferred += 1;
+      }
+    }
+    if (transferred > 0) engineRef.current?.addToast?.(`Overførte ${transferred} resource item til ${section.label}`);
+  };
+
   const repairBuilding = (percent = null) => {
     if (!building) return;
     const state = progress?.[building.id] ?? {};
@@ -2066,6 +2112,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               onWithdrawStoredItem={withdrawStoredItem}
               onMoveStoredItem={moveStoredItem}
               onReadStoredItem={(item) => setStoredReadable(readableDialogFromItem(item))}
+              onTransferAllResources={transferAllResources}
             />
           )}
           {building.id === "mage_tower" && owned && activeAddonId === "arcane_extractor" && purchasedAddons.has("arcane_extractor") && (
@@ -2636,6 +2683,7 @@ function CityStoragePanel({
   onWithdrawStoredItem,
   onMoveStoredItem,
   onReadStoredItem,
+  onTransferAllResources,
 }) {
   const sections = cityInventorySections(building, buildingState, owned);
   const activeSection = sections.find((section) => section.key === activeSectionKey) ?? sections[0];
@@ -2652,7 +2700,16 @@ function CityStoragePanel({
   return (
     <section className="city-bank-panel">
       <div className="city-bank-column">
-        <h4>Backpack</h4>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+          <h4>Backpack</h4>
+          <button 
+            type="button" 
+            onClick={() => onTransferAllResources?.(activeSection.key)}
+            style={{ padding: "4px 8px", fontSize: "12px" }}
+          >
+            Overfør al
+          </button>
+        </div>
         <div
           className="city-bank-grid backpack-drop"
           onDragOver={(event) => event.preventDefault()}

@@ -533,15 +533,36 @@ export const renderingMethods = {
 
   drawParticles(ctx, layer = "aboveEntities") {
     for (const p of this.particles) {
-      const particleLayer = p.configParticle ? (p.renderLayer ?? "aboveEntities") : "aboveEntities";
+      const particleLayer = p.configParticle || p.effectParticle ? (p.renderLayer ?? "aboveEntities") : "aboveEntities";
       if (particleLayer !== layer) continue;
       const fogAlpha = p.screenSpace ? 1 : this.fogPointAlpha(p);
       if (fogAlpha <= 0.02) continue;
       const screen = p.screenSpace
         ? { x: p.screenX, y: p.screenY }
         : worldToScreen(p.x, p.y, p.z, this.camera);
-      if (!visibleScreenPoint(screen, this.width, this.height, Math.max(90, (p.r ?? 0) + 24))) continue;
+      const effectPad = p.visual === "expandingEnergyRing" ? Math.max(TILE_W, TILE_H) * (p.radiusWorld ?? 0) + 40 : 0;
+      if (!visibleScreenPoint(screen, this.width, this.height, Math.max(90, effectPad, (p.r ?? 0) + 24))) continue;
       ctx.save();
+      if (p.visual === "expandingEnergyRing") {
+        const progress = p.maxLife ? clamp((p.age ?? 0) / p.maxLife, 0, 1) : 1;
+        const alpha = (1 - progress) * fogAlpha;
+        const radiusWorld = (p.radiusWorld ?? 0) * progress;
+        const radiusX = Math.max(2, radiusWorld * TILE_W);
+        const radiusY = Math.max(1, radiusWorld * TILE_H);
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = p.color ?? "#8feaff";
+        ctx.lineWidth = Math.max(1.2, 4 - progress * 2.3);
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = p.color ?? "#8feaff";
+        ctx.beginPath();
+        ctx.ellipse(screen.x, screen.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.lineWidth = Math.max(3, 9 - progress * 5);
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
       if (p.configParticle) {
         const agePct = p.maxLife ? 1 - clamp(p.life / p.maxLife, 0, 1) : 0;
         const fadeIn = clamp(agePct * 5, 0, 1);

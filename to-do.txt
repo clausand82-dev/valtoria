@@ -18,6 +18,8 @@ Ting at få gjort
 
 - resource droprate skal nok sættes en del ned
 
+- marker equemp udstyr i repair listen
+
 
 
 - overveje om progress skal "slettes" ved early battle map leave eller om det skal moderares lidt

@@ -2,9 +2,11 @@ import {
   loadGeneratedAtlas,
   loadAnimationSheets,
   EQUIPMENT_SLOTS,
+  UNIQUE_ITEMS,
   createEquipment,
   createId,
   makeItem,
+  makeUniqueItem,
   clamp,
   distance,
   lerp,
@@ -22,9 +24,16 @@ import {
 } from "../helpers.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 
+function makeDevTestInventory() {
+  if (!import.meta.env.DEV) return [];
+  const pulseBlade = UNIQUE_ITEMS.find((item) => item.id === "blade_of_the_pulse");
+  return pulseBlade ? [makeUniqueItem(pulseBlade, 1)] : [];
+}
+
 export const lifecycleMethods = {
   createPlayer(options = {}) {
     const empty = Boolean(options.empty);
+    const devTestInventory = makeDevTestInventory();
     return {
       id: createId(),
       x: this.region.start.x,
@@ -57,7 +66,7 @@ export const lifecycleMethods = {
       gait: 0,
       moveSpeed: 0,
       deadTimer: 0,
-      inventory: empty ? [] : [makeItem(1, 0.82), makeItem(1, 0.18)],
+      inventory: empty ? devTestInventory : [makeItem(1, 0.82), makeItem(1, 0.18), ...devTestInventory],
       equipment: empty ? Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot.id, null])) : createEquipment(),
     };
   },

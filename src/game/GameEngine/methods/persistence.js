@@ -37,6 +37,16 @@ import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 
+function normalizeItemEffects(effects) {
+  if (!effects || typeof effects !== "object") return undefined;
+  const onHit = Array.isArray(effects.onHit)
+    ? effects.onHit
+      .filter((effect) => effect && typeof effect === "object" && typeof effect.type === "string")
+      .map((effect) => ({ ...effect }))
+    : [];
+  return onHit.length ? { onHit } : undefined;
+}
+
 export const persistenceMethods = {
   serializeItemForSave(item) {
     if (!item || typeof item !== "object") return item;
@@ -132,6 +142,7 @@ export const persistenceMethods = {
       mergeLocation: item.mergeLocation ? String(item.mergeLocation) : undefined,
       mergeParts: Array.isArray(item.mergeParts) ? item.mergeParts.map(String) : undefined,
       consumableEffect: item.consumableEffect && typeof item.consumableEffect === "object" ? { ...item.consumableEffect } : undefined,
+      effects: normalizeItemEffects(item.effects),
       iconIndex: Number.isFinite(Number(item.iconIndex)) ? Math.floor(Number(item.iconIndex)) : undefined,
       stackMax: isResourceItem(item) ? resourceStackMax(savedResourceId) : undefined,
       count: isPotionItem(item)
@@ -186,10 +197,12 @@ export const persistenceMethods = {
       const def = UNIQUE_ITEMS.find((entry) => entry.id === normalized.uniqueId);
       // Always re-derive from definition — never trust the saved iconUrl for unique items.
       normalized.iconUrl = def?.iconUrl || iconUrlFromKey(deriveIconKey({ uniqueId: normalized.uniqueId }));
+      normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
     } else if (normalized.namedId) {
       const def = NAMED_ITEM_TEMPLATES.find((entry) => entry.id === normalized.namedId);
       // Named items: use definition iconUrl if set, else fall through to baseName mapping.
       normalized.iconUrl = def?.iconUrl || undefined;
+      normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
     } else if (!isResourceItem(normalized) && !isQuestItem(normalized)) {
       // Generic gear: clear stale saved iconUrl so baseName mapping takes over.
       normalized.iconUrl = undefined;

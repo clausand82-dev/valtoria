@@ -49,6 +49,18 @@ const ITEM_BONUS_STAT_KEYS = [
   "xpGain",
 ];
 
+function cloneItemEffects(effects) {
+  if (!effects || typeof effects !== "object") return undefined;
+  return {
+    ...effects,
+    onHit: Array.isArray(effects.onHit)
+      ? effects.onHit
+        .filter((effect) => effect && typeof effect === "object")
+        .map((effect) => ({ ...effect }))
+      : undefined,
+  };
+}
+
 export function createId() {
   nextId += 1;
   return nextId;
@@ -309,6 +321,7 @@ export function makeUniqueItem(definition, level = 1) {
     speed: Number(((stats.speed ?? 0) * scale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale),
     ...itemBonusStats(stats),
+    effects: cloneItemEffects(definition.effects),
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);
@@ -362,6 +375,7 @@ export function makeNamedItem(definition, level = 1) {
     speed: Number(((stats.speed ?? 0) * scale * rarityScale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale * rarityScale),
     ...itemBonusStats(stats),
+    effects: cloneItemEffects(definition.effects),
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);

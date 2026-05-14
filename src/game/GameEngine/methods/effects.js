@@ -230,6 +230,12 @@ export const effectsMethods = {
   updateEffects(dt) {
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
+      if (p.effectParticle) {
+        p.age += dt;
+        p.life -= dt;
+        if (p.life <= 0) this.particles.splice(i, 1);
+        continue;
+      }
       if (p.configParticle) {
         updateConfiguredParticle(p, dt);
         p.life -= dt;
@@ -522,6 +528,23 @@ export const effectsMethods = {
         life: 0.32 + Math.random() * 0.28,
       });
     }
+  },
+
+  spawnExpandingEnergyRingEffect(x, y, radius, options = {}) {
+    const duration = Math.max(0.05, (Number(options.durationMs) || 350) / 1000);
+    this.particles.push({
+      effectParticle: true,
+      visual: "expandingEnergyRing",
+      renderLayer: "aboveEntities",
+      x,
+      y,
+      z: 2,
+      radiusWorld: Math.max(0.05, Number(radius) || 0.05),
+      color: options.color ?? "#8feaff",
+      age: 0,
+      life: duration,
+      maxLife: duration,
+    });
   },
 
   addFloater(x, y, text, color, life = 0.85) {

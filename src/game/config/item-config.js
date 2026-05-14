@@ -39,7 +39,70 @@ export const PREFIXES = {
 // Procent-stats ovenfor skalerer ikke med level eller rarity.
 // Unique items kan bruge weight til relativ drop-vaegt blandt matchende uniques.
 // Eksempel: weight 3 er tre gange saa sandsynlig som weight 1, naar begge matcher.
+//
+// Weapon effects:
+// effects er optional ekstra adfaerd paa et item. Lige nu understoettes:
+// effects: {
+//   onHit: [
+//     {
+//       type: "areaDamage",       // effekt-type. "areaDamage" giver skade til flere monstre i radius.
+//       id: "unique_effect_id",   // stabilt effekt-id til debugging/fremtidige hooks.
+//       chance: 1,                // proc chance: 1 = 100%, 0.25 = 25%.
+//       radius: 1.35,             // world radius omkring center-positionen.
+//       damage: 18,               // base damage for area-effekten. Kommer oveni normalt weapon hit.
+//       damageScale: "magic",     // optional stat-navn fra calcStats(), fx "magic".
+//       damageScaleAmount: 0.4,   // hvor meget af damageScale-statten der laegges til damage.
+//       damageType: "magic",      // sendes videre til damageMonster som sourceType; styrer bl.a. floater-farve.
+//       visual: "expandingEnergyRing", // optional visual. Ukendt visual falder tilbage til particles.
+//       color: "#8feaff",        // visual/particle farve.
+//       durationMs: 350,          // visual duration i millisekunder.
+//       center: "target",         // "target" eller "player". Default opfoerer sig som target.
+//     },
+//   ],
+// }
+//
+// onHit effects trigger kun fra weapon hits hvor combat-flowet eksplicit kalder
+// triggerWeaponOnHitEffects(). For melee sker det efter normal damage, saa effekten
+// erstatter ikke det almindelige slag og koster ikke mana.
 export const UNIQUE_ITEMS = [
+  {
+    id: "blade_of_the_pulse",
+    name: "Blade of the Pulse",
+    baseName: "Sword",
+    rarity: "unique",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    iconUrl: "/assets/generated/item/item_common_sword.png",
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 18,
+      damageMax: 29,
+      range: 1.28,
+      cooldown: 0.5,
+      magic: 10,
+    },
+    effects: {
+      onHit: [
+        {
+          type: "areaDamage",
+          id: "blade_energy_ring",
+          chance: 1,
+          radius: 1.35,
+          damage: 18,
+          damageScale: "magic",
+          damageScaleAmount: 0.4,
+          damageType: "magic",
+          visual: "expandingEnergyRing",
+          color: "#8feaff",
+          durationMs: 350,
+          center: "target",
+        },
+      ],
+    },
+  },
   {
     id: "frostheart",
     name: "Frostheart",

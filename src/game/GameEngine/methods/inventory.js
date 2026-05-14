@@ -951,6 +951,7 @@ export const inventoryMethods = {
       parts.push(`${item.damageMin}-${item.damageMax} skade`);
       parts.push(`${item.range} range`);
       parts.push(item.mode);
+      if (Array.isArray(item.effects?.onHit) && item.effects.onHit.length) parts.push(`on-hit ${item.effects.onHit.length}`);
       pushGearBonuses({ includeDamage: false });
     } else {
       pushGearBonuses();

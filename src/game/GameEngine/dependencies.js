@@ -29,6 +29,7 @@ export {
   itemValue,
   makeItem,
   makePotion,
+  makeUniqueItem,
   rollNamedItem,
   rollUniqueItem,
 } from "../world.js";
