@@ -8,9 +8,11 @@ import {
 } from "./config/asset-config.js";
 import { BIOMES } from "./config/biome-config.js";
 import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
-import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_DEFS, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
 import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
+import { MAP_PREFABS } from "./config/map-prefab-config.js";
+import { normalizePrefabContent } from "./world/map-prefab-placement.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
 import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset } from "./config/region-asset-config.js";
 import { RESOURCE_DEFS } from "./config/resource-config.js";
@@ -220,13 +222,22 @@ function buildRegionAssetManifest(input) {
   for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName));
 
   const foliageSets = normalizeRegionFoliageSets(regionConfig);
+  const prefabDefs = prefabsForRegionConfig(regionConfig);
+  const prefabFoliageIds = new Set();
+  for (const prefab of prefabDefs) {
+    const content = normalizePrefabContent(prefab);
+    for (const item of content.foliage ?? []) {
+      const id = String(item?.id ?? "").trim();
+      if (id && FOLIAGE_SHEETS[id]) prefabFoliageIds.add(id);
+    }
+  }
   const foliageSpecs = foliageSets.length
     ? foliageSets.map((entry) => ({
       id: entry.sheetId,
       fileName: entry.fileName,
       rows: entry.rows,
       cols: entry.cols,
-    }))
+    })).concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)))
     : [...new Set(["mainland", biomeId, "bones"])]
       .map((id) => FOLIAGE_SHEETS[id] ? normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8) : null)
       .filter(Boolean);
@@ -246,6 +257,27 @@ function buildRegionAssetManifest(input) {
     const family = getRegionObjectFamily(type);
     if (family) objectTypes.add(family);
   }
+  for (const prefab of prefabDefs) {
+    const content = normalizePrefabContent(prefab);
+    for (const item of content.objects ?? []) {
+      const def = REGION_OBJECT_DEFS[item?.id];
+      for (const spawnType of def?.spawnTypes ?? []) {
+        if (!spawnType?.type) continue;
+        objectTypes.add(spawnType.type);
+        const family = getRegionObjectFamily(spawnType.type);
+        if (family) objectTypes.add(family);
+      }
+    }
+  }
+
+  const decayIds = new Set(normalizeRegionDecaySets(regionConfig).map((entry) => entry.id));
+  for (const prefab of prefabDefs) {
+    const content = normalizePrefabContent(prefab);
+    for (const item of content.decals ?? []) {
+      const id = String(item?.decayId ?? item?.id ?? "").trim();
+      if (DECAY_SET_DEFS[id]) decayIds.add(id);
+    }
+  }
 
   return {
     full: false,
@@ -255,7 +287,7 @@ function buildRegionAssetManifest(input) {
       .map((id) => TREE_SHEETS[id] ? { biomeId: id, fileName: TREE_SHEETS[id] } : null)
       .filter(Boolean),
     foliageSpecs,
-    decayIds: new Set(normalizeRegionDecaySets(regionConfig).map((entry) => entry.id)),
+    decayIds,
     objectTypes,
   };
 }
@@ -273,8 +305,25 @@ function buildAnimationAssetManifest(input) {
     const base = MONSTER_STATS[type];
     if (base?.sprite) monsterIds.add(base.sprite);
   }
+  for (const prefab of prefabsForRegionConfig(regionConfig)) {
+    const content = normalizePrefabContent(prefab);
+    for (const item of content.monsters ?? []) {
+      const type = item?.type ?? item?.typeName;
+      if (!type) continue;
+      monsterIds.add(monsterSpriteId(type));
+      const base = MONSTER_STATS[type];
+      if (base?.sprite) monsterIds.add(base.sprite);
+    }
+  }
   if (!monsterIds.size) monsterIds.add("wolf");
   return { monsterIds };
+}
+
+function prefabsForRegionConfig(regionConfig) {
+  const pool = Array.isArray(regionConfig?.prefabRules?.pool) ? regionConfig.prefabRules.pool : [];
+  return pool
+    .map((entry) => MAP_PREFABS[entry?.id])
+    .filter(Boolean);
 }
 
 function loadHeroAnimationSheet() {

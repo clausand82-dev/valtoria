@@ -5,12 +5,12 @@ Ting at få gjort
 - befri indbyggere til ens by/lejr
 
 - fjerne animation af krystal
-- area damage
 
 - forskellige udstyr til at klare forskellige opgaver
 - bedre mobs IQ (pathfinding)
 - grafik til start og stop
-- Pænere UI til karakter
+- Pænere UI til karakter - SOON
+- Have map-region-config splittet op i mindre regioner! - Noget skal ændres til area maps. Måske kommentar hjælp skal være seperat fil
 
 - marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
 - man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
@@ -24,11 +24,7 @@ Ting at få gjort
 
 - overveje om progress skal "slettes" ved early battle map leave eller om det skal moderares lidt
 
---- STØRRE OMRÅDER ---
-kan jeg bruge hele 1254x1254 (det der normalt er 16 texture), til at dække for 16, men tælle som en? Måske en region ting under tileset, med en para til tileset, der hedder bigTexture eller noget, og så ved systemet at den bruges 1 gang, og fylder for 16. (se projekt chat for detaljer og AI forslag)
-- vand områder/flod områder
-- biodome grafik elementer kan indeholde større flader (broer over flod osv)
-- mulighed for at lave "scener" som kan smides i map generator (kræver det en designer eller hvordan)?
+
 
 --- QUESTTYPE ---
 Runesten som skal aktiveres rundt omkring - måske gemstone skal bruges til aktiveringen.
@@ -48,7 +44,7 @@ normal = default som det er nu
 quest = kan spawne 1 entry, hvis relaterede quest betingelse er opfyldt (bruger også questens spawnrate)
 story = kan spawne 1 entry på map
 
-Måske det er region der skal have mulighed for at gøre object til quest objekt eller story object i stedet for selve object listen. Ved quest eller story, er det en random af de mulige 16 objects der bruges, medmindre x og y er sat. - hvor skal story stå? Måske story skal være config fil for sig selv, som så kan kaldes med variable/id - til alt, der bruger story.
+Måske det er region der skal have mulighed for at gøre object til quest objekt eller story object i stedet for selve object listen. Ved quest eller story, er det en random af de mulige 16 objects der bruges, medmindre x og y er sat. - hvor skal story stå? Måske story skal være config fil for sig selv, som så kan kaldes med variable/id - til alt, der bruger story. MÅSKE PREFAB SYSTEM KAN BRUGES HER!
 
 
 -- REGION OBJECT para tilføjelse --

@@ -12,6 +12,7 @@ History over changes
 - fixed food barrel not going in inventory when bought
 - did a tranfer all resource button in bank
 - added magic damage to weapons
+- a small prefeb system is implemented, is a light version and can be more advandced later
 
 * V. 1.61
 - app.jsx is reduced more

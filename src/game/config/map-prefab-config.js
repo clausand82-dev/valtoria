@@ -1,0 +1,197 @@
+export const DEBUG_MAP_PREFABS = false;
+
+export const MAP_PREFABS = {
+  small_camp: {
+    id: "small_camp",
+    label: "Small Camp",
+    w: 7,
+    h: 6,
+    tags: ["camp", "forest", "early"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 10,
+    avoidExit: 8,
+    objects: [
+      { id: "object_fireplace_mainland", x: 3, y: 3, blocking: true },
+      { id: "object_woodboxes_ground", x: 2, y: 2, blocking: true, variant: 5 },
+      { id: "object_woodboxes_ground", x: 4, y: 2, blocking: true, variant: 9 },
+    ],
+    foliage: [
+      { id: "mainland", x: 1, y: 1, variant: 4, size: 0.75 },
+      { id: "mainland", x: 5, y: 4, variant: 9, size: 0.7 },
+    ],
+    decals: [
+      { type: "debris", x: 3, y: 4, size: 0.95 },
+      { type: "pebble", x: 5, y: 2, size: 0.8 },
+    ],
+    monsters: [
+      { type: "Wolf", x: 1, y: 4 },
+      { type: "WolfCub", x: 5, y: 4 },
+    ],
+  },
+
+  broken_wagon_ambush: {
+    id: "broken_wagon_ambush",
+    label: "Broken Wagon Ambush",
+    w: 8,
+    h: 5,
+    tags: ["ambush", "road", "forest"],
+    anchor: "pathSide",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 12,
+    avoidExit: 8,
+    objects: [
+      { id: "object_woodboxes_ground", x: 3, y: 2, blocking: true },
+      { id: "object_sacks_ground", x: 4, y: 2, blocking: true },
+      { id: "object_woodboxes_ground", x: 5, y: 1, blocking: true },
+    ],
+    foliage: [
+      { id: "mainland", x: 1, y: 3, variant: 11, size: 0.7 },
+      { id: "bones", x: 6, y: 3, variant: 5, size: 0.55 },
+    ],
+    decals: [
+      { type: "debris", x: 2, y: 2, size: 1.05 },
+      { type: "debris", x: 6, y: 2, size: 0.9 },
+    ],
+    monsters: [
+      { type: "Wolf", x: 2, y: 3 },
+      { type: "Wolf", x: 6, y: 1 },
+    ],
+  },
+
+  ruined_shrine: {
+    id: "ruined_shrine",
+    label: "Ruined Shrine",
+    w: 7,
+    h: 7,
+    tags: ["ruin", "shrine", "forest"],
+    anchor: "clearing",
+    rotate: true,
+    mirror: false,
+    clearArea: true,
+    avoidStart: 12,
+    avoidExit: 8,
+    objects: [
+      { id: "object_ruin_mainland", x: 3, y: 3, blocking: true },
+      { id: "object_pillar_stone", x: 2, y: 2, blocking: true },
+      { id: "object_pillar_stone", x: 4, y: 2, blocking: true },
+      { id: "object_stone_cluster", x: 3, y: 5, blocking: true },
+    ],
+    foliage: [
+      { id: "bones", x: 1, y: 4, variant: 2, size: 0.5 },
+      { id: "mainland", x: 5, y: 5, variant: 12, size: 0.65 },
+    ],
+    decals: [
+      { type: "crack", x: 3, y: 3, size: 1.2 },
+      { type: "pebble", x: 2, y: 5, size: 0.8 },
+    ],
+    monsters: [
+      { type: "Ghost", x: 3, y: 1 },
+    ],
+  },
+
+  old_well_clearing: {
+    id: "old_well_clearing",
+    label: "Old Well Clearing",
+    w: 5,
+    h: 5,
+    tags: ["well", "clearing", "forest", "early"],
+    anchor: "clearing",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 10,
+    avoidExit: 8,
+    tiles: [
+      ".....",
+      ".gpB.",
+      "..W..",
+      ".c.g.",
+      "SSSSS",
+    ],
+    legend: {
+      ".": { type: "keep" },
+      "W": { object: "object_well", blocking: true },
+      "B": { foliage: "bones", variant: 4, size: 0.48 },
+      "c": { chest: "basic_chest", blocking: true },
+      "g": { foliage: "mainland", variant: 6, size: 0.75 },
+      "p": { decal: "pebble", size: 0.85 },
+      "S": { monster: "MotherSpider" },
+    },
+    decals: [
+      { type: "crack", x: 2, y: 2, size: 0.95 },
+    ],
+  },
+
+  spider_nest: {
+    id: "spider_nest",
+    label: "Spider Nest",
+    w: 7,
+    h: 6,
+    tags: ["spider", "nest", "forest"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 11,
+    avoidExit: 7,
+    foliage: [
+      { id: "bones", x: 2, y: 3, variant: 7, size: 1.55 },
+      { id: "bones", x: 4, y: 4, variant: 10, size: 1.55 },
+    ],
+    decals: [
+      { type: "debris", x: 2, y: 2, size: 0.9 },
+      { type: "bone", x: 4, y: 3, size: 0.75 },
+    ],
+    monsters: [
+      { type: "Spider", x: 2, y: 1 },
+      { type: "MiniSpider", x: 4, y: 4 },
+    ],
+    objects: [
+      { id: "object_shelfs", x: 3, y: 3, blocking: true },
+    ]
+  },
+
+    labyrint: {
+    id: "labyrint",
+    label: "Labyrint",
+    w: 10,
+    h: 10,
+    tags: ["labyrint", "clearing", "forest", "early"],
+    anchor: "clearing",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 10,
+    avoidExit: 8,
+    tiles: [
+      "FWWW.WWWWW",
+      "WWWW.WWWWW",
+      "W....WWWWW",
+      "W.WWWWWWWW",
+      "W........W",
+      "WWWWWWWW.W",
+      "WWWWWWWW.W",
+      "WWWWWWWW.W",
+      "WWWWWWWW.W",
+      "WWWWWWWW.W",
+    ],
+    legend: {
+      ".": { type: "keep" },
+      "W": { object: "object_woodboxes_ground", blocking: true, variant: 5 },
+      "F": { object: "object_fireplace_mainland", variant: 6, size: 0.75 },
+      "B": { foliage: "bones", variant: 4, size: 0.48 },
+      "c": { chest: "basic_chest", blocking: true },
+      "g": { foliage: "mainland", variant: 6, size: 0.75 },
+      "p": { decal: "pebble", size: 0.85 },
+      "S": { monster: "MotherSpider" },
+    },
+    decals: [
+      { type: "crack", x: 2, y: 2, size: 0.95 },
+    ],
+  },
+};

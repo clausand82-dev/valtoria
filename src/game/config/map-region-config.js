@@ -660,6 +660,20 @@ export const MAP_REGION_SETS = {
       //unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
       labelX: 53,
       labelY: 52,
+      layout: {
+        pool: [
+          { id: "forked_path", weight: 3 },
+          { id: "linear_path", weight: 1 },
+        ],
+      },
+      prefabRules: {
+        maxTotal: 1,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room"],
+        pool: [
+          { id: "xx", weight: 1, max: 1 },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 2, rock: 2, foilage: 4, water: 8, fireplace: 1 }
       weights: { foilage: 4, water: 8 },
       objects: [
@@ -668,7 +682,7 @@ export const MAP_REGION_SETS = {
         { id: "object_house_mainland", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },
         { id: "object_ruin_mainland", weight: 1 },
-        { id: "object_fireplace_mainland", weight: 1 },
+        //{ id: "object_fireplace_mainland", weight: 1 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
     }),
@@ -1060,6 +1074,24 @@ export const MAP_REGION_SETS = {
       color: "#cadf74",
       labelX: 20,
       labelY: 49,
+      layout: {
+        pool: [
+          { id: "linear_path", weight: 4 },
+          { id: "forked_path", weight: 3 },
+          { id: "central_clearing", weight: 2 },
+        ],
+      },
+      prefabRules: {
+        maxTotal: 4,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["room", "pathSide", "clearing"],
+        pool: [
+          { id: "small_camp", weight: 4, max: 2 },
+          { id: "broken_wagon_ambush", weight: 3, max: 1 },
+          { id: "ruined_shrine", weight: 2, max: 1 },
+          { id: "spider_nest", weight: 2, max: 1 },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 9, rock: 2, pillar: 1, foilage: 12, fireplace: 1 }
       weights: { foilage: 12 },
       objects: [
