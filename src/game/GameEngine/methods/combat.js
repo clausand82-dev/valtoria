@@ -725,6 +725,7 @@ export const combatMethods = {
     let bestD = maxRange;
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      if (!this.isPointVisible(monster)) continue;
       const d = distance(this.player, monster);
       if (d < bestD) {
         best = monster;
@@ -740,6 +741,7 @@ export const combatMethods = {
     for (const chunk of this.nearbyChunks(1)) {
       for (const object of chunk.objects) {
         if (!isDestructibleObject(object)) continue;
+        if (!this.isPointVisible(object)) continue;
         const d = distance(this.player, object);
         if (d < bestD) {
           best = object;
@@ -764,6 +766,7 @@ export const combatMethods = {
     let bestD = 999;
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      if (!this.isPointVisible(monster)) continue;
       const screen = worldToScreen(monster.x, monster.y, 0, this.camera);
       const d = Math.hypot(screen.x - x, screen.y - 30 - y);
       if (d < 34 + monster.radius * 28 && d < bestD) {
@@ -780,6 +783,7 @@ export const combatMethods = {
     for (const chunk of this.nearbyChunks(2)) {
       for (const object of chunk.objects) {
         if (!isDestructibleObject(object)) continue;
+        if (!this.isPointVisible(object)) continue;
         const screen = worldToScreen(object.x, object.y, 0, this.camera);
         const hit = destructibleObjectScreenHit(object);
         const d = Math.hypot(screen.x - x, screen.y - hit.offsetY - y);
@@ -795,6 +799,7 @@ export const combatMethods = {
   questgiverAtScreen(x, y) {
     const questgiver = this.questState.wildernessNpc;
     if (!questgiver) return null;
+    if (!this.isPointVisible(questgiver)) return null;
     const screen = worldToScreen(questgiver.x, questgiver.y, 0, this.camera);
     const d = Math.hypot(screen.x - x, screen.y - 34 - y);
     return d < 42 ? questgiver : null;

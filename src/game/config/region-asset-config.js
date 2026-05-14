@@ -1,7 +1,9 @@
 import { RESOURCE_DEFS } from "./resource-config.js";
+import { normalizeParticleConfigs } from "./particle-presets.js";
 
 const GENERATED_ASSET_PREFIX = "/assets/generated/";
 const DEFAULT_GROUND_GRID = 4;
+
 const DEFAULT_FOLIAGE_GRID = 4;
 const LEGACY_FOLIAGE_GRID = 8;
 
@@ -15,6 +17,22 @@ function clampNumber(value, min, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeDepthMode(value, fallback = "ground") {
+  const mode = String(value ?? fallback).trim();
+  return ["ground", "dynamic", "alwaysBehind", "alwaysFront"].includes(mode) ? mode : fallback;
+}
+
+function normalizeSortAnchor(value) {
+  if (!value || typeof value !== "object") return null;
+  const x = clampNumber(value.x, 0, 1);
+  const y = clampNumber(value.y, 0, 1);
+  if (x === null && y === null) return null;
+  return {
+    x: x ?? 0.5,
+    y: y ?? 1,
+  };
 }
 
 function normalizeFileName(value) {
@@ -125,6 +143,10 @@ function normalizeFoliageEntry(entry, defaults = {}) {
     variantCount: rows * cols,
     sheetId: buildFoliageSheetId(fileName, rows, cols),
     resourceDrops: normalizeResourceDrops(raw.resourceDrops ?? raw.resourceDrop),
+    particles: normalizeParticleConfigs(raw.particles),
+    depthMode: normalizeDepthMode(raw.depthMode, "ground"),
+    sortAnchor: normalizeSortAnchor(raw.sortAnchor),
+    depthOffset: Number.isFinite(Number(raw.depthOffset)) ? Number(raw.depthOffset) : 0,
   };
 }
 
@@ -151,7 +173,7 @@ export function normalizeRegionFoliageSets(regionConfig = {}) {
   const deduped = [];
   const seen = new Set();
   for (const entry of normalized) {
-    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}`;
+    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}|${JSON.stringify(entry.particles)}|${entry.depthMode}|${JSON.stringify(entry.sortAnchor)}|${entry.depthOffset}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(entry);

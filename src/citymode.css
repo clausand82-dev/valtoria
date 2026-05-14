@@ -366,6 +366,11 @@
   align-items: start;
 }
 
+.city-area-info-row.city-area-info-stack {
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
 .city-area-info-row > b,
 .city-area-work-head b {
   color: #f4da96;
@@ -383,10 +388,16 @@
 
 .city-durability-meter-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
   font-size: 12px;
+}
+
+.city-durability-meter-head > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .city-durability-meter-head b {
@@ -436,6 +447,11 @@
   border-top: 0;
 }
 
+.city-area-work-card.no-top-border {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .city-area-work-head {
   display: flex;
   align-items: center;
@@ -475,8 +491,8 @@
 .city-area-requirements,
 .city-area-costs,
 .city-stat-effects div {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 5px;
 }
 
@@ -495,6 +511,67 @@
   color: #e4decf;
   font-size: 11px;
   line-height: 1.1;
+}
+
+.city-chip-grid span,
+.city-stat-effects span {
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.city-chip-grid span b,
+.city-stat-effects span b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.city-stat-chip-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.58));
+}
+
+.city-area-building-icons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.city-area-building-chip {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 2px 0;
+}
+
+.city-area-building-chip img,
+.city-area-building-chip i {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.22);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  color: #f4da96;
+}
+
+.city-area-building-chip b {
+  overflow: hidden;
+  color: #e9dec8;
+  font-size: 10px;
+  line-height: 1.12;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .city-area-mini-list.npc-list span {
@@ -657,7 +734,7 @@
   height: 100%;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
+  filter: none;
 }
 
 .city-map-mob-mini:hover,
@@ -671,7 +748,48 @@
 }
 
 .city-map-mob-mini.blocked img {
-  filter: grayscale(0.7) brightness(0.8) drop-shadow(0 4px 8px rgba(0, 0, 0, 0.45));
+  filter: grayscale(0.7) brightness(0.8);
+}
+
+.city-mob-action-popup {
+  position: absolute;
+  z-index: 12;
+  width: 220px;
+  padding: 10px;
+  border: 1px solid rgba(244, 218, 150, 0.42);
+  border-radius: 6px;
+  background: rgba(8, 10, 11, 0.94);
+  color: #f4efe3;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.48);
+}
+
+.city-mob-action-popup header,
+.city-army-send-box label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.city-mob-action-popup button {
+  min-height: 26px;
+}
+
+.city-army-send-box {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.city-army-send-box input {
+  width: 52px;
+}
+
+.city-army-training-costs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 5px;
 }
 
 .city-map-action-icon.building {

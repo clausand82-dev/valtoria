@@ -65,6 +65,7 @@ export const lifecycleMethods = {
   start() {
     this.resize();
     this.ensureWorldAroundPlayer();
+    this.updateFogOfWar(true);
     this.publishSnapshot();
     window.addEventListener("resize", this.resize);
     window.addEventListener("keydown", this.handleKeyDown);
@@ -143,6 +144,7 @@ export const lifecycleMethods = {
   update(dt) {
     this.time += dt;
     this.ensureWorldAroundPlayer();
+    this.updateFogOfWar();
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 0, stats.maxHp);
     this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, stats.maxMana);
@@ -167,6 +169,9 @@ export const lifecycleMethods = {
 
     this.updateEffects(dt);
     this.updateAmbient(dt);
+    this.updateConfiguredParticles(dt);
+    this.updateWeatherEvents(dt);
+    this.updateWeatherOverlay(dt);
     this.updateRegionExit(dt);
     this.updateCamera(dt);
     this.autosaveTimer -= dt;

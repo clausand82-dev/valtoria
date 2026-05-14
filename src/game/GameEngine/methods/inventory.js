@@ -49,9 +49,8 @@ import {
   normalizeSockets,
 } from "../../config/socket-config.js";
 import {
-  ITEM_REPAIR_BASE_COSTS_PER_PCT,
-  ITEM_REPAIR_MAGIC_ESSENCE_PER_PCT,
-  ITEM_REPAIR_HIDE_PER_PCT,
+  ITEM_REPAIR_GOLD_PER_PCT,
+  ITEM_REPAIR_JUNK_PER_PCT,
 } from "../../config/durability-config.js";
 
 function recipeRequiresResearchLab(recipe) {
@@ -360,6 +359,27 @@ export const inventoryMethods = {
     this.player.inventory.splice(index, 1);
     this.publishSnapshot();
     return item;
+  },
+
+  takeInventoryItemCount(index, count = 1) {
+    const item = this.player.inventory[index];
+    if (!item) return null;
+    const requested = Math.max(1, Math.floor(Number(count) || 1));
+    if (!isResourceItem(item)) {
+      this.player.inventory.splice(index, 1);
+      this.publishSnapshot();
+      return item;
+    }
+    const current = Math.max(1, Math.floor(Number(item.count) || 1));
+    const moved = Math.min(current, requested);
+    const taken = { ...item, count: moved };
+    if (current > moved) {
+      item.count = current - moved;
+    } else {
+      this.player.inventory.splice(index, 1);
+    }
+    this.publishSnapshot();
+    return taken;
   },
 
   returnInventoryItem(item) {
@@ -946,7 +966,7 @@ export const inventoryMethods = {
   // ─── Item repair at Blacksmith ────────────────────────────────────────────────
   // slotId: equipment slot id (e.g. "weapon", "chest", ...)
   // Returns true on success, false on failure (calls addToast with reason).
-  repairEquippedItem(slotId) {
+  repairEquippedItem(slotId, options = {}) {
     const item = this.player.equipment?.[slotId];
     if (!item) { this.addToast("Intet udstyr i den slot."); return false; }
 
@@ -954,40 +974,43 @@ export const inventoryMethods = {
     const missing = Math.ceil(100 - dur);
     if (missing <= 0) { this.addToast(`${item.name} er allerede fuldt repareret.`); return false; }
 
-    const isArmor = item.slot !== "weapon";
+    // Calculate costs: gold and junk only
+    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
+    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
 
-    // Build cost map: base costs + magic_essence for high rarity + hide for armor
-    const costs = {};
-    for (const [resId, perPct] of Object.entries(ITEM_REPAIR_BASE_COSTS_PER_PCT)) {
-      costs[resId] = Math.max(1, Math.ceil(perPct * missing));
-    }
-    const essencePer = ITEM_REPAIR_MAGIC_ESSENCE_PER_PCT[item.rarity] ?? 0;
-    if (essencePer > 0) {
-      costs.magic_essence = Math.max(1, Math.ceil(essencePer * missing));
-    }
-    if (isArmor) {
-      costs.hide = Math.max(1, Math.ceil(ITEM_REPAIR_HIDE_PER_PCT * missing));
-    }
+    if (!options?.prepaid) {
+      const goldHave = Math.max(0, Math.floor(Number(this.player.gold) || 0));
+      const junkHave = resourceCount(this.player.inventory, "junk");
 
-    // Check availability
-    const deficits = Object.entries(costs)
-      .filter(([resId, needed]) => resourceCount(this.player.inventory, resId) < needed)
-      .map(([resId, needed]) => {
-        const have = resourceCount(this.player.inventory, resId);
-        const name = RESOURCE_DEFS[resId]?.name ?? resId;
-        return `${name} ${needed} (har ${have})`;
-      });
+      // Check availability
+      const deficits = [];
+      if (goldHave < goldNeeded) deficits.push(`Guld ${goldNeeded} (har ${goldHave})`);
+      if (junkHave < junkNeeded) deficits.push(`Skrot ${junkNeeded} (har ${junkHave})`);
 
-    if (deficits.length > 0) {
-      this.addToast(`Kan ikke reparere: mangler ${deficits.join(", ")}`);
-      return false;
+      if (deficits.length > 0) {
+        this.addToast(`Kan ikke reparere: mangler ${deficits.join(", ")}`);
+        return false;
+      }
+
+      // Consume resources (gold is wallet currency, junk is inventory resource)
+      this.player.gold = Math.max(0, goldHave - goldNeeded);
+      consumeResourceInputs(this.player.inventory, { junk: junkNeeded });
     }
-
-    // Consume resources
-    consumeResourceInputs(this.player.inventory, costs);
     item.durability = 100;
-    this.addToast(`${item.name} repareret til 100% durability`);
+    this.addToast(`${item.name} repareret. Brugt: ${goldNeeded}x Guld, ${junkNeeded}x Skrot`);
     this.publishSnapshot();
     return true;
+  },
+
+  // Calculate repair cost for an item (returns {gold, junk})
+  getRepairCost(item) {
+    if (!item) return { gold: 0, junk: 0 };
+    const dur = Number(item.durability ?? 100);
+    const missing = Math.max(0, Math.ceil(100 - dur));
+    if (missing <= 0) return { gold: 0, junk: 0 };
+    return {
+      gold: Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing)),
+      junk: Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing)),
+    };
   },
 };

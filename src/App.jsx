@@ -81,6 +81,7 @@ export default function App() {
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
   const [cityMinimapHero, setCityMinimapHero] = useState(null);
   const [cityProgressHud, setCityProgressHud] = useState(() => loadCityProgress());
+  const [skipCityMobProgressReturnId, setSkipCityMobProgressReturnId] = useState(null);
   const snapshotRef = useRef(emptySnapshot);
   const gameSessionRef = useRef(null);
   const lastMapReturnIdRef = useRef(null);
@@ -152,8 +153,7 @@ export default function App() {
     return token;
   };
 
-  const preloadWildernessAssets = async (title = "Loading map") => {
-    if (preloadedGameAssetsRef.current.atlas && preloadedGameAssetsRef.current.animationSheets) return true;
+  const preloadWildernessAssets = async (title = "Loading map", region = null) => {
     const token = loadTokenRef.current + 1;
     loadTokenRef.current = token;
     const update = (patch) => {
@@ -169,9 +169,9 @@ export default function App() {
         detail: "Terrain, objects and overlays",
         error: "",
       });
-      const atlas = await loadGeneratedAtlas();
+      const atlas = await loadGeneratedAtlas(region);
       update({ percent: 68, label: "Loading combat", detail: "Hero and monster animations" });
-      const animationSheets = await loadAnimationSheets();
+      const animationSheets = await loadAnimationSheets(region);
       preloadedGameAssetsRef.current = { atlas, animationSheets };
       if (engineRef.current) {
         engineRef.current.atlas = atlas;
@@ -305,6 +305,10 @@ export default function App() {
       const filtered = normalizeCityMobs(nextProgress.cityMobs).filter((mob) => mob.id !== mapReturn.cityMobId);
       nextProgress = { ...nextProgress, cityMobs: filtered };
       cityProgressChanged = true;
+    }
+
+    if (isCityMobBattle) {
+      setSkipCityMobProgressReturnId(mapReturn.id);
     }
 
     if (!isCityMobBattle) {
@@ -447,7 +451,7 @@ export default function App() {
   );
   const startPlayableMapRegion = async (areaMapId, region) => {
     if (!areaMapId || !region?.id) return;
-    const ready = await preloadWildernessAssets("Loading map");
+    const ready = await preloadWildernessAssets("Loading map", region);
     if (!ready) return;
     const started = engineRef.current?.startMapRegion?.(areaMapId, region);
     if (!started) return;
@@ -462,7 +466,7 @@ export default function App() {
 
   const startCityMobBattle = async ({ areaMapId, region, cityMobId, cityMobType, cityMobLevel }) => {
     if (!areaMapId || !region?.id) return false;
-    const ready = await preloadWildernessAssets("Loading battle");
+    const ready = await preloadWildernessAssets("Loading battle", region);
     if (!ready) return false;
     const started = engineRef.current?.startMapRegion?.(areaMapId, region);
     if (!started) return false;
@@ -530,7 +534,7 @@ export default function App() {
     setMapOpen(false);
     setInventoryOpen(false);
     setHeroOpen(false);
-    setCityOpen(false);
+    setCityOpen(true);
   };
 
   const handleOpenCityFromMap = () => {
@@ -588,7 +592,7 @@ export default function App() {
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="abandon-map-title">
             <h2 id="abandon-map-title">Tilbage til byen?</h2>
-            <p>Hvis du forlader dette map nu, nulstilles al progression herfra, inklusive nyt loot, XP og quest-fremgang.</p>
+            <p>Hvis du forlader dette map nu, bruges abandon-configen til at afgore hvilke dele af run-progress der nulstilles.</p>
             <div>
               <button type="button" onClick={() => setConfirmMapAbandonOpen(false)}>
                 Bliv her
@@ -820,6 +824,8 @@ export default function App() {
           cityStorageKey={gameSession.slot.cityStorageKey}
           onProgressChange={setCityProgressHud}
           onStartCityMobBattle={startCityMobBattle}
+          skipMobProgressForVisit={skipCityMobProgressReturnId === snapshot.mapReturn?.id}
+          onMobProgressSkipConsumed={() => setSkipCityMobProgressReturnId(null)}
           onClose={openWorldMapFromCity}
         />
       )}

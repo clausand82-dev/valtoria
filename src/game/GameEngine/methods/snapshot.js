@@ -66,6 +66,12 @@ export const snapshotMethods = {
         name: this.region.mapRegion?.label ?? chunk.biome.name,
         level: this.region.index,
         seed: this.region.seed,
+        weather: this.region.mapRegion?.weather
+          ? {
+            id: this.region.mapRegion.weather.id ?? "none",
+            label: this.region.mapRegion.weather.label ?? "No weather",
+          }
+          : { id: "none", label: "No weather" },
       },
       region: {
         name: this.region.mapRegion?.label ?? this.region.biome.name,
@@ -73,6 +79,12 @@ export const snapshotMethods = {
         seed: this.region.seed,
         areaMapId: this.region.mapRegion?.areaMapId ?? null,
         regionId: this.region.mapRegion?.id ?? null,
+        weather: this.region.mapRegion?.weather
+          ? {
+            id: this.region.mapRegion.weather.id ?? "none",
+            label: this.region.mapRegion.weather.label ?? "No weather",
+          }
+          : { id: "none", label: "No weather" },
       },
       regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
       mobs: this.monsterCounterSnapshot(),

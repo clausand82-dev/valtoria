@@ -14,6 +14,8 @@ import {
   resolveRegionObjectDestructibleDef,
 } from "./config/region-object-config.js";
 import { normalizeRegionDecaySets } from "./config/decay-config.js";
+import { normalizeParticleConfigs, rollParticleConfigs } from "./config/particle-presets.js";
+import { resolveWeatherForRegion } from "./config/weather-presets.js";
 import { BOSS_TINT } from "./config/monster-config.js";
 import { withItemFlags, withItemIcon } from "./item-system.js";
 import { MAX_ITEM_SOCKETS } from "./config/socket-config.js";
@@ -519,6 +521,10 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         cols: set.cols,
         variantCount: set.variantCount,
         resourceDrops: set.resourceDrops.map((entry) => ({ ...entry })),
+        particles: set.particles.map((entry) => ({ ...entry })),
+        depthMode: set.depthMode,
+        sortAnchor: set.sortAnchor ? { ...set.sortAnchor } : null,
+        depthOffset: set.depthOffset,
       })),
       objects: normalizedObjects.map((entry) => ({
         id: entry.id,
@@ -528,6 +534,10 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         defaultDestructible: entry.defaultDestructible,
         renderBiomeId: entry.renderBiomeId,
         graphicsRef: entry.graphicsRef,
+        particles: entry.particles.map((particle) => ({ ...particle })),
+        depthMode: entry.depthMode,
+        sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : null,
+        depthOffset: entry.depthOffset,
       })),
       decaySets: normalizedDecaySets.map((set) => ({
         id: set.id,
@@ -538,7 +548,13 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         fileName: set.fileName,
         renderScale: set.renderScale,
         variants: [...set.variants],
+        particles: set.particles.map((entry) => ({ ...entry })),
       })),
+      ambient: {
+        ...((regionConfig.ambient && typeof regionConfig.ambient === "object") ? regionConfig.ambient : {}),
+        particles: normalizeParticleConfigs(regionConfig.ambient?.particles).map((entry) => ({ ...entry })),
+      },
+      weather: resolveWeatherForRegion(regionConfig, seed + regionIndex * 9973),
       weights: { ...(regionConfig.weights ?? {}) },
       antiDrops: {
         items: [...(regionConfig.antiDrops?.items ?? [])],
@@ -837,6 +853,11 @@ function addObjects(chunk, safeChunk) {
       destructible: effectiveDestructible,
       renderBiomeId: selectedEntry?.renderBiomeId ?? null,
       graphicsRef: selectedEntry?.graphicsRef ?? null,
+      particles: rollParticleConfigs(selectedEntry?.particles, () => rand01(chunk.cx, chunk.cy, 7600 + i)),
+      depthMode: selectedEntry?.depthMode ?? "dynamic",
+      sortAnchor: selectedEntry?.sortAnchor ? { ...selectedEntry.sortAnchor } : { x: 0.5, y: 1 },
+      depthOffset: Number.isFinite(Number(selectedEntry?.depthOffset)) ? Number(selectedEntry.depthOffset) : 0,
+      // TODO: Support occluder metadata here for future pixel/shape masking.
       maxHp: effectiveDestructible ? resolvedDef?.hp : undefined,
       hp: effectiveDestructible ? resolvedDef?.hp : undefined,
     });
@@ -883,6 +904,9 @@ function addRegionChest(chunk) {
     animSeed: 0,
     visualScale: 1,
     blocking: true,
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+    depthOffset: 0,
   });
 }
 
@@ -916,6 +940,7 @@ function addFoliage(chunk, safeChunk) {
       : null;
     const variantCount = Math.max(1, Number(selectedFoliageSet?.variantCount) || 16);
     const resourceDrops = rollFoliageResourceDrops(selectedFoliageSet, chunk.cx, chunk.cy, i);
+    const particles = rollParticleConfigs(selectedFoliageSet?.particles, () => rand01(chunk.cx, chunk.cy, 7100 + i));
     const fixedScale = Number(selectedFoliageSet?.scale);
     const hasFixedScale = Number.isFinite(fixedScale) && fixedScale > 0;
 
@@ -937,6 +962,10 @@ function addFoliage(chunk, safeChunk) {
       visualScale: hasFixedScale ? 1 : 0.84 + rand01(chunk.cx, chunk.cy, 6900 + i) * 0.38,
       wind: rand01(chunk.cx, chunk.cy, 7000 + i) * 0.5,
       resourceDrops,
+      particles,
+      depthMode: selectedFoliageSet?.depthMode ?? "ground",
+      sortAnchor: selectedFoliageSet?.sortAnchor ? { ...selectedFoliageSet.sortAnchor } : { x: 0.5, y: 1 },
+      depthOffset: Number.isFinite(Number(selectedFoliageSet?.depthOffset)) ? Number(selectedFoliageSet.depthOffset) : 0,
       foliageLooted: false,
       blocking: false,
     });
@@ -1008,6 +1037,7 @@ function addDecals(chunk, safeChunk) {
         decayVariant: pickDecayVariant(selectedDecaySet, 1450 + i),
         decayRenderScale: decayScale,
         animSeed: rand01(chunk.cx, chunk.cy, 1800 + i) * Math.PI * 2,
+        particles: rollParticleConfigs(selectedDecaySet.particles, () => rand01(chunk.cx, chunk.cy, 1810 + i)),
       });
       continue;
     }

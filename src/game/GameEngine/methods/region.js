@@ -10,6 +10,82 @@ import {
   MAX_ELITE_MONSTERS_PER_REGION
 } from "../dependencies.js";
 import { rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
+import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.js";
+
+function cloneAbandonValue(value) {
+  if (value === null || value === undefined) return value;
+  if (typeof structuredClone === "function") return structuredClone(value);
+  return JSON.parse(JSON.stringify(value));
+}
+
+function captureAbandonState(engine) {
+  return {
+    player: {
+      position: {
+        x: engine.player.x,
+        y: engine.player.y,
+        facingX: engine.player.facingX,
+        facingY: engine.player.facingY,
+      },
+      levelAndXp: {
+        level: engine.player.level,
+        xp: engine.player.xp,
+      },
+      economy: {
+        gold: engine.player.gold,
+        popularity: engine.player.popularity,
+      },
+      vitalsAndCooldowns: {
+        hp: engine.player.hp,
+        mana: engine.player.mana,
+        attackCooldown: engine.player.attackCooldown,
+        spellCooldown: engine.player.spellCooldown,
+        hurtCooldown: engine.player.hurtCooldown,
+        attackAnim: engine.player.attackAnim,
+        castAnim: engine.player.castAnim,
+        gait: engine.player.gait,
+        moveSpeed: engine.player.moveSpeed,
+        deadTimer: engine.player.deadTimer,
+      },
+      potions: cloneAbandonValue(engine.player.potions),
+      readableBonuses: cloneAbandonValue(engine.player.readableBonuses),
+      skillTree: cloneAbandonValue(engine.player.skillTree),
+      spells: {
+        unlockedSpells: cloneAbandonValue(engine.player.unlockedSpells),
+        activeSpellId: engine.player.activeSpellId,
+      },
+      stats: cloneAbandonValue(engine.player.stats),
+      inventory: cloneAbandonValue(engine.player.inventory),
+      equipment: cloneAbandonValue(engine.player.equipment),
+    },
+    quests: {
+      active: cloneAbandonValue(engine.questState.active),
+      completed: cloneAbandonValue(engine.questState.completed),
+    },
+  };
+}
+
+function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESET_CONFIG) {
+  const playerCfg = config.player ?? {};
+  const questCfg = config.quests ?? {};
+  const currentPlayer = currentState.player;
+  if (playerCfg.position === false) Object.assign(engine.player, currentPlayer.position);
+  if (playerCfg.levelAndXp === false) Object.assign(engine.player, currentPlayer.levelAndXp);
+  if (playerCfg.economy === false) Object.assign(engine.player, currentPlayer.economy);
+  if (playerCfg.vitalsAndCooldowns === false) Object.assign(engine.player, currentPlayer.vitalsAndCooldowns);
+  if (playerCfg.potions === false) engine.player.potions = cloneAbandonValue(currentPlayer.potions);
+  if (playerCfg.readableBonuses === false) engine.player.readableBonuses = cloneAbandonValue(currentPlayer.readableBonuses);
+  if (playerCfg.skillTree === false) engine.player.skillTree = cloneAbandonValue(currentPlayer.skillTree);
+  if (playerCfg.spells === false) {
+    engine.player.unlockedSpells = cloneAbandonValue(currentPlayer.spells.unlockedSpells);
+    engine.player.activeSpellId = currentPlayer.spells.activeSpellId;
+  }
+  if (playerCfg.stats === false) engine.player.stats = cloneAbandonValue(currentPlayer.stats);
+  if (playerCfg.inventory === false) engine.player.inventory = cloneAbandonValue(currentPlayer.inventory);
+  if (playerCfg.equipment === false) engine.player.equipment = cloneAbandonValue(currentPlayer.equipment);
+  if (questCfg.active === false) engine.questState.active = cloneAbandonValue(currentState.quests.active);
+  if (questCfg.completed === false) engine.questState.completed = cloneAbandonValue(currentState.quests.completed);
+}
 
 export const regionMethods = {
   updateRegionExit(dt) {
@@ -38,6 +114,7 @@ export const regionMethods = {
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureWorldAroundPlayer();
+    this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
     this.addToast(`Rejst til ${this.region.mapRegion?.label ?? this.region.biome.name}`);
     this.publishSnapshot();
@@ -63,6 +140,7 @@ export const regionMethods = {
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();
     this.ensureWorldAroundPlayer();
+    this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
     // Set total spawned count for active clear_map quests targeting this region
     for (const quest of this.questState.active) {
@@ -123,8 +201,10 @@ export const regionMethods = {
   abandonMapRegionToWorldMap() {
     const active = this.activeMapRegion;
     if (!active) return false;
+    const currentState = captureAbandonState(this);
     // Roll back to the forced save taken when the map run started.
     this.loadProgress();
+    restoreKeptAbandonState(this, currentState);
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -163,6 +243,11 @@ export const regionMethods = {
     this.hoverMonsterId = null;
     this.nearbyQuestgiver = null;
     this.nearbyFoliageLoot = null;
+    this.fogExploredTiles = new Set();
+    this.fogVisibleTiles = new Set();
+    this.fogExploredPoints = [];
+    this.fogExploredPointKeys = new Set();
+    this.fogLastReveal = { x: null, y: null, regionId: null };
     this.regionStartPlayerLevel = this.player.level;
     this.eliteMonsterCount = 0;
     if (this.region) this.region.__spawnedBossTypes = new Set();

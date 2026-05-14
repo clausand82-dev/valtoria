@@ -105,6 +105,8 @@ Optional gameplay fields:
   - object: { fileName: "my_foliage.png", rows: 4, cols: 4 }
   - object with fixed scale: { fileName: "my_foliage.png", scale: 1.1 }
   - object with loot: { fileName: "my_foliage.png", resourceDrop: { wood_piece: 0.04 } }
+  - object with attached visual particles:
+    { fileName: "foilage/foilage_deadanimal_small.png", particles: { type: "flies", chance: 0.75 } }
   - array of strings/objects to mix multiple sheets.
   Notes:
   - If set, region foliage uses these sheets instead of biome+bones logic.
@@ -113,6 +115,8 @@ Optional gameplay fields:
   - resourceDrop maps resource ids from resource-config.js to a per-foliage chance.
     The chance is rolled when each foliage piece is placed. No rolled resource means no E prompt.
   - For amounts, use resourceDrop: { wood_piece: { chance: 0.04, min: 1, max: 2 } }.
+  - particles is visual-only and never creates gameplay entities. particles.type
+    must match a key in particle-presets.js / PARTICLE_PRESETS.
 - objects: Optional explicit object spawn list for this region.
   If set and non-empty, this list overrides normal weight-based object selection.
   Format: array of object definitions:
@@ -132,6 +136,42 @@ Optional gameplay fields:
   Notes:
   - x/y are 1-based cell selectors on the 4x4 grid.
   - If x/y are omitted, all cells from the decay set are used.
+  - particles can be attached to placed decals, for example blood/slim with flies.
+- ambient: Optional visual-only region atmosphere.
+  Example:
+  ambient: {
+    particles: [
+      { type: "fireflies", density: 0.2, area: "wholeMap", chance: 1 },
+      { type: "fogWisps", density: 0.1, area: "wholeMap", chance: 0.5 },
+    ],
+  }
+  TODO: area currently behaves as viewport/whole-map spawning. Add advanced
+  area rules later if region-specific masks or named zones become necessary.
+  Examples:
+  - swamp: { type: "fogWisps", density: 0.16, area: "wholeMap" }
+  - forest: { type: "fireflies", density: 0.14, area: "wholeMap" }
+  - dead animals foliage: { type: "flies", chance: 0.75, count: [4, 10], radius: 24 }
+  - campfires/bonfires: configured on object_fireplace_mainland with smoke + embers.
+- weather: Optional visual-only dynamic weather using the same particle system.
+  Missing weather means "none". active wins over possible.
+  Fixed weather:
+  weather: {
+    active: "light_rain",
+  }
+  Stable weighted weather for a generated battle map:
+  weather: {
+    possible: [
+      { id: "none", weight: 60 },
+      { id: "light_rain", weight: 25 },
+      { id: "fog", weight: 15 },
+    ],
+  }
+  Notes:
+  - Weather presets live in weather-presets.js.
+  - Weather is visual-only in this version; gameplay fields are reserved for later.
+  - Particle layer "screen" is for rain/snow/ash over the viewport.
+  - Particle layer "world" reuses bounded world ambient spawning for low fog/magic haze.
+  - Unknown weather ids fall back to none and unknown particle types are skipped.
 - mobs: Array of monster types allowed in this region. Defaults to ["Wolf", "Spider"].
   Supports plain strings (equal weight) and weighted objects:
   - "Wolf"                           plain string, weight 1
@@ -338,6 +378,18 @@ export const MAP_REGION_SETS = {
       unlock: { locked: true, text: "Swampfield kraever en senere historiequest." },
       labelX: 58.53,
       labelY: 62.17,
+      ambient: {
+        particles: [
+          { type: "fogWisps", density: 0.16, area: "wholeMap", chance: 1 },
+        ],
+      },
+      weather: {
+        possible: [
+          { id: "none", weight: 45 },
+          { id: "fog", weight: 35 },
+          { id: "light_rain", weight: 20 },
+        ],
+      },
       objects: [
         { id: "object_tree_mainland", weight: 8 },
         { id: "object_stone_cluster", weight: 4 },
@@ -626,12 +678,45 @@ export const MAP_REGION_SETS = {
       mapSize: "small",
       color: "#7fb172",
       tileset: "tileset/tileset_bricktiles.png",
+      ambient: {
+        particles: [
+          {
+            type: "smoke",
+            density: 0.52,
+            movement: "drift",
+            color: "#a9aaa0",
+            size: [110, 260],
+            alpha: [0.12, 0.24],
+            lifetime: [12, 20],
+            speed: [0.01, 0.05],
+            ambientScale: 1,
+            renderLayer: "aboveEntities",
+            avoidPlayerRadius: 1.8,
+            avoidPlayerMinAlpha: 0.12,
+            chance: 1,
+          },
+          {
+            type: "fogWisps",
+            density: 0.28,
+            movement: "drift",
+            color: "#d0d0c4",
+            size: [44, 118],
+            alpha: [0.08, 0.18],
+            lifetime: [6, 12],
+            speed: [0.04, 0.12],
+            renderLayer: "aboveEntities",
+            avoidPlayerRadius: 1.4,
+            avoidPlayerMinAlpha: 0.16,
+            chance: 1,
+          },
+        ],
+      },
       //populationGain: 10,
       foliageSet: [
         { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
         { fileName: "foilage/foilage_boneparts.png"},
-        { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5},
-        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25 },
+        { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
+        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
@@ -661,7 +746,7 @@ export const MAP_REGION_SETS = {
       foliageSet: [{ fileName: "foilage/foilage_barn.png"},
         { fileName: "foilage/foilage_boneparts.png"},
         { fileName: "foilage/foilage_barnitems.png", scale: 0.5},
-        { fileName: "foilage/foilage_smashed_smallanimals.png", scale: 0.25 },],
+        { fileName: "foilage/foilage_smashed_smallanimals.png", scale: 0.25, particles: { type: "flies", chance: 0.65, count: [3, 8], radius: 22, heightOffset: -10 } },],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
         //{ id: "object_barn", weight: 15, destructible: true },
@@ -680,7 +765,7 @@ export const MAP_REGION_SETS = {
       labelX: 58,
       labelY: 59,
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
-      antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: true },
+      antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: false },
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
     }),
@@ -749,6 +834,7 @@ export const MAP_REGION_SETS = {
       foliageSet: [
         { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 } },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
+        { fileName: "foilage/foilage_foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
       decay: [
         { id: "decay_field", weight: 20 },
@@ -761,13 +847,17 @@ export const MAP_REGION_SETS = {
       weights: { foilage: 100 },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
-        { id: "object_tree_mainland", weight: 3 },
-        { id: "object_stone_cluster", weight: 2 },
-        { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
-        { id: "object_barn", weight: 15, destructible: true },
+        { id: "object_hay01", weight: 3 },
+        { id: "object_hay02", weight: 3 },
         { id: "object_sacks_ground", weight: 5, destructible: true },
       ],
+      weather: {
+        possible: [
+          { id: "thunderstorm", weight: 45 },
+          //{ id: "fog", weight: 35 },
+          //{ id: "light_rain", weight: 20 },
+        ],
+      },
       points: "98.09,25.50 81.34,44.63 70.57,57.39 58.61,51.01 55.02,48.88 56.22,42.51 72.97,27.63 83.73,17.00",
     }),
     region({
@@ -795,7 +885,7 @@ export const MAP_REGION_SETS = {
       unlock: { completedQuests: ["vitlias_kings_relics"] },
       // TODO:DELETE: weights: { house: 8, tree: 3, rock: 2, foilage: 5, fireplace: 3 }
       weights: { foilage: 5 },
-      mobs: ["Knight", "Wild Boar", "Village01", "Village02", "Village03", "Village04", "Village05", "Village06", "Wizard"],
+      mobs: ["Wild Boar", "Village01", "Village02", "Village03", "Village04", "Village05", "Village06"],
       objects: [
         { id: "object_house_mainland", weight: 20 },
         { id: "object_tree_mainland", weight: 3 },
@@ -808,13 +898,21 @@ export const MAP_REGION_SETS = {
       id: "the-forest",
       label: "The Forest",
       color: "#7fb172",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      mapSize: "large",
+      tileset: { fileName: "tileset/tileset_grass.png" },
+      foliageSet: [
+        { fileName: "foilage/foilage_forest.png", weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
+        { fileName: "foilage/foilage_boneparts.png", weight: 10 },
+        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5},],
+      //unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       labelX: 54,
       labelY: 16,
       // TODO:DELETE: weights: { tree: 11, rock: 2, foilage: 10, fireplace: 1 }
       weights: { foilage: 10 },
+      mobs: [{ type: "Wild Boar", weight: 3 }, { type: "Wolf", weight: 2 }, { type: "WolfCub", weight: 2 }, { type: "WolfFenris", weight: 2 }],
       objects: [
-        { id: "object_tree_mainland", weight: 11 },
+        { id: "object_tree_mainland", weight: 25 },
         { id: "object_stone_cluster", weight: 2 },
         { id: "object_house_mainland", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },

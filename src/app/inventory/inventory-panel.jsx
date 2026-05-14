@@ -13,6 +13,23 @@ import {
 import { InventoryIcon } from "../ui/icons.jsx";
 import { InventoryItemDetail } from "./inventory-item-detail.jsx";
 
+function gearDurability(item) {
+  if (!item || item.mode === "resource" || item.mode === "potion" || item.mode === "readable") return null;
+  const value = Number.isFinite(Number(item.durability)) ? Number(item.durability) : 100;
+  return Math.max(0, Math.min(100, value));
+}
+
+function DurabilityBar({ item, className = "" }) {
+  const dp = gearDurability(item);
+  if (dp === null) return null;
+  const dc = dp >= 75 ? "#58d96d" : dp >= 40 ? "#ffd85d" : "#ff6b5f";
+  return (
+    <span className={`item-card-dur-bar-wrap ${className}`} title={`Durability: ${Math.round(dp)}%`}>
+      <span className="item-card-dur-bar-fill" style={{ width: `${dp}%`, background: dc }} />
+    </span>
+  );
+}
+
 export function InventoryPanel({
   cityOpen,
   engineRef,
@@ -62,6 +79,7 @@ export function InventoryPanel({
               </span>
               <span className="equipment-label">{slot.label}</span>
               <b className={slot.item?.rarity ?? ""}>{slot.item?.name ?? "Empty"}</b>
+              <DurabilityBar item={slot.item} className="equipment-durability" />
             </button>
           ))}
         </div>
@@ -116,15 +134,7 @@ export function InventoryPanel({
                 </button>
                 <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
                 {(item.mode === "potion" || item.mode === "resource") && item.count > 1 && <b className="stack-count">{item.count}</b>}
-                {item.durability !== undefined && item.mode !== "resource" && item.mode !== "potion" && (() => {
-                  const dp = Math.max(0, Math.min(100, Number(item.durability ?? 100)));
-                  const dc = dp >= 75 ? "#58d96d" : dp >= 40 ? "#ffd85d" : "#ff6b5f";
-                  return (
-                    <span className="item-card-dur-bar-wrap" title={`Durability: ${Math.round(dp)}%`}>
-                      <span className="item-card-dur-bar-fill" style={{ width: `${dp}%`, background: dc }} />
-                    </span>
-                  );
-                })()}
+                <DurabilityBar item={item} />
                 <span>
                   {item.rarityLabel} | L{item.level} | {item.value}g
                 </span>

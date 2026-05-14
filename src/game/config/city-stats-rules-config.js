@@ -33,10 +33,10 @@
 export const CITY_STATS_RULES = {
   baseStats: {
     city_defence: 50,
-    population: 50,
-    housing: 50,
-    provision: 50,
-    water: 50,
+    population: 150,
+    housing: 1500,
+    provision: 1500,
+    water: 5000,
     army: 0,
     happiness: 50,
     citizens_health: 50,
@@ -64,6 +64,29 @@ export const CITY_STATS_RULES = {
     { resourceId: "meat", cost: 10, provision: 1, label: "Meat" },
     { resourceId: "fruit", cost: 20, provision: 1, label: "Fruit" },
   ],
+  // Farm conversion rule used for making food barrels from raw food resources.
+  farmFoodBarrelRecipe: {
+    // Resource id created by the conversion action.
+    outputResourceId: "food",
+    // How many output resources are created per conversion.
+    outputCount: 1,
+    // Allowed input resources the player can spend for this conversion.
+    inputOptions: [
+      { resourceId: "meat", label: "Meat" },
+      { resourceId: "fruit", label: "Fruit" },
+      { resourceId: "wheat", label: "Wheat" },
+    ],
+    // Base input cost before popularity discount is applied.
+    baseCost: 50,
+    // Lowest possible input cost after all discounts.
+    minCost: 50,
+    // Popularity value where discounting starts.
+    popularityStart: 50,
+    // Popularity points required per discount step.
+    popularityStep: 10,
+    // Input cost reduced for each discount step.
+    discountPerStep: 5,
+  },
   pressureWeights: {
     sick_people: {
       homeless_people: 3,

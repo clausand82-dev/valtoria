@@ -1,3 +1,5 @@
+import { normalizeParticleConfigs } from "./particle-presets.js";
+
 // TODO:DELETE - TREE_OBJECT_BY_BIOME is only used by legacyRegionObjectsFromWeights. All regions now use explicit objects: arrays.
 // const TREE_OBJECT_BY_BIOME = {
 //   snow: "object_tree_snow",
@@ -29,6 +31,14 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - graphics: Optional explicit graphics config.
   - { mode: "sheet", fileName, rows, cols, renderScale }
   - { mode: "frames", frameFiles: [...], animated: true, ... }
+- depthMode: Render sorting layer. Use "dynamic" for tall/blocking props that
+  should sort with actors, "ground" for flat decoration.
+- sortAnchor: Visual base point inside the rendered sprite, normalized 0..1.
+  Default is { x: 0.5, y: 1 }.
+- depthOffset: Optional pixel offset applied after sortAnchor depth.
+- particles: Optional visual-only particle effects attached to placed objects,
+  for example smoke, embers, flies, spores, or magical glow. particles.type
+  must match PARTICLE_PRESETS in particle-presets.js.
 
 How to tell old vs new system here:
 - New defs-driven sheet path: spawnTypes has exactly one type starting with
@@ -79,6 +89,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_tree_normal.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_tree_snow: {
     spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
@@ -96,6 +108,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "snow",
     graphicsRef: "object/object_tree_snow.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_tree_sand: {
     spawnTypes: [{ type: "object_tree_sand", weight: 1 }],
@@ -113,6 +127,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "desert",
     graphicsRef: "object/object_tree_sand.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_tree_jungle: {
     spawnTypes: [{ type: "object_tree_jungle", weight: 1 }],
@@ -130,6 +146,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "jungle",
     graphicsRef: "object/object_tree_jungle.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_tree_rock: {
     spawnTypes: [{ type: "object_tree_rock", weight: 1 }],
@@ -147,6 +165,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "rock",
     graphicsRef: "object/object_tree_normal.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_tree_lava: {
     spawnTypes: [{ type: "object_tree_lava", weight: 1 }],
@@ -164,6 +184,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "lava",
     graphicsRef: "object/object_tree_dead.png (tree sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_house_mainland: {
     spawnTypes: [{ type: "building", weight: 1 }],
@@ -199,6 +221,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "building_normal_sheet.png (4x4)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.94 },
   },
   object_pillar_stone: {
     spawnTypes: [{ type: "pillar", weight: 1 }],
@@ -213,6 +237,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "atlas frame: pillar",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.92 },
   },
   object_stone_cluster: {
     spawnTypes: [{ type: "object_stone_cluster", weight: 1 }],
@@ -232,6 +258,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "rock_normal_sheet.png (rock sheet)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.85 },
   },
   object_ruin_mainland: {
     spawnTypes: [{ type: "ruin", weight: 1 }],
@@ -252,6 +280,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "ruin_normal_sheet.png (4x4)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
   },
   object_fireplace_mainland: {
     spawnTypes: [{ type: "fireplace", weight: 1 }],
@@ -259,6 +289,12 @@ export const REGION_OBJECT_DEFS = {
     defaultDestructible: false,
     renderBiomeId: "mainland",
     graphicsRef: "fireplace_normal_01..04.png (animated)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+    particles: [
+      { type: "smoke", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 },
+      { type: "embers", count: [1, 4], radius: 12, heightOffset: -20, chance: 1 },
+    ],
   },
   object_firebeacon_snow: {
     // Legacy runtime type: still uses "firebeacon" (old OBJECT_SHEETS path).
@@ -267,6 +303,12 @@ export const REGION_OBJECT_DEFS = {
     defaultDestructible: false,
     renderBiomeId: "snow",
     graphicsRef: "firebeacon_snow_animated_001..008.png (animated)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.93 },
+    particles: [
+      { type: "smoke", count: [3, 6], radius: 20, heightOffset: -54, chance: 1 },
+      { type: "embers", count: [2, 5], radius: 16, heightOffset: -32, chance: 1 },
+    ],
   },
   object_woodboxes_ground: {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
@@ -286,6 +328,11 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_woodboxes_ground.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+    particles: [
+      { type: "dust", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 },
+    ],
   },
   object_shelfs: {
     spawnTypes: [{ type: "object_shelfs", weight: 1 }],
@@ -305,6 +352,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_shelfs.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.92 },
   },
   object_field: {
     spawnTypes: [{ type: "object_field", weight: 1 }],
@@ -312,6 +361,7 @@ export const REGION_OBJECT_DEFS = {
     // destructibleProfile: "object_field", // TODO: enable again if object_field gets destructible data later
     renderBiomeId: "mainland",
     graphicsRef: "object/object_field.png",
+    depthMode: "ground",
   },
   object_barn: {
     spawnTypes: [{ type: "object_barn", weight: 1 }],
@@ -331,6 +381,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_barn.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.94 },
   },
   object_well: {
     spawnTypes: [{ type: "object_well", weight: 1 }],
@@ -346,6 +398,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_well.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
   },
   object_sacks_ground: {
     spawnTypes: [{ type: "object_sacks_ground", weight: 1 }],
@@ -356,6 +410,7 @@ export const REGION_OBJECT_DEFS = {
       particleColor: "#c99b5d",
       loot: [
         { resource: "health", min: 1, max: 3, chance: 0.1 },
+        { resource: "wheat", min: 1, max: 3, chance: 0.65 },
         { resource: "paper", min: 1, max: 4, chance: 0.1 },
         { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
       ],
@@ -365,6 +420,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_sacks_ground.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.88 },
   },
   object_hay01: {
     spawnTypes: [{ type: "object_hay01", weight: 1 }],
@@ -374,7 +431,7 @@ export const REGION_OBJECT_DEFS = {
       damageStages: 3,
       particleColor: "#c99b5d",
       loot: [
-        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wheat", min: 1, max: 3, chance: 0.75 },
         { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
         { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
       ],
@@ -384,6 +441,8 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_hay01.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
   },
   object_hay02: {
     spawnTypes: [{ type: "object_hay02", weight: 1 }],
@@ -393,7 +452,7 @@ export const REGION_OBJECT_DEFS = {
       damageStages: 3,
       particleColor: "#c99b5d",
       loot: [
-        { resource: "junk", min: 1, max: 3, chance: 1 },
+        { resource: "wheat", min: 1, max: 3, chance: 0.75 },
         { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
         { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
       ],
@@ -403,8 +462,31 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_hay02.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
   },
 };
+
+function clampNumber(value, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function normalizeDepthMode(value, fallback = "dynamic") {
+  const mode = String(value ?? fallback).trim();
+  return ["ground", "dynamic", "alwaysBehind", "alwaysFront"].includes(mode) ? mode : fallback;
+}
+
+function normalizeSortAnchor(value) {
+  if (!value || typeof value !== "object") return { x: 0.5, y: 1 };
+  const x = clampNumber(value.x, 0, 1);
+  const y = clampNumber(value.y, 0, 1);
+  return {
+    x: x ?? 0.5,
+    y: y ?? 1,
+  };
+}
 
 function extractPngFileName(graphicsRef) {
   const raw = String(graphicsRef ?? "").trim();
@@ -548,6 +630,10 @@ function buildObjectEntry(objectId, weight, destructible = null) {
     defaultDestructible: def.defaultDestructible !== false,
     renderBiomeId: def.renderBiomeId ?? null,
     graphicsRef: def.graphicsRef ?? null,
+    particles: normalizeParticleConfigs(def.particles),
+    depthMode: normalizeDepthMode(def.depthMode, "dynamic"),
+    sortAnchor: normalizeSortAnchor(def.sortAnchor),
+    depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
   };
 }
 
@@ -602,6 +688,18 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     const destructible = typeof entry.destructible === "boolean" ? entry.destructible : null;
     const weight = parseWeight(entry.weight) || 1;
     const normalized = buildObjectEntry(objectId, weight, destructible);
+    if (normalized && entry.particles) {
+      normalized.particles = normalizeParticleConfigs(entry.particles);
+    }
+    if (normalized && entry.depthMode) {
+      normalized.depthMode = normalizeDepthMode(entry.depthMode, normalized.depthMode);
+    }
+    if (normalized && entry.sortAnchor) {
+      normalized.sortAnchor = normalizeSortAnchor(entry.sortAnchor);
+    }
+    if (normalized && Number.isFinite(Number(entry.depthOffset))) {
+      normalized.depthOffset = Number(entry.depthOffset);
+    }
     if (normalized) entries.push(normalized);
   }
 

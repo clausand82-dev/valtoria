@@ -42,6 +42,11 @@ export class GameEngine {
     this.toasts = [];
     this.potionCooldown = 0;
     this.nearbyFoliageLoot = null;
+    this.fogExploredTiles = new Set();
+    this.fogVisibleTiles = new Set();
+    this.fogExploredPoints = [];
+    this.fogExploredPointKeys = new Set();
+    this.fogLastReveal = { x: null, y: null, regionId: null };
     this.regionIndex = 1;
     // Use a stable base region at boot so reload never drops the player into a random biome.
     this.region = createRegion(this.regionIndex, WORLD_SEED, "mainland");

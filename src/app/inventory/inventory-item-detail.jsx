@@ -43,7 +43,7 @@ export function InventoryItemDetail({ selectedItem, equipment }) {
 
   const comparisonItem = findEquippedComparison(selectedItem, equipment);
   const diffs = comparisonItem ? getItemDiffs(selectedItem, comparisonItem) : [];
-  const showDurability = selectedItem.mode !== "resource" && selectedItem.mode !== "potion" && selectedItem.mode !== "readable" && selectedItem.durability !== undefined;
+  const showDurability = selectedItem.mode !== "resource" && selectedItem.mode !== "potion" && selectedItem.mode !== "readable";
   const durPct = showDurability ? Math.max(0, Math.min(100, Number(selectedItem.durability ?? 100))) : null;
   const durColor = durPct === null ? null : durPct >= 75 ? "#58d96d" : durPct >= 40 ? "#ffd85d" : "#ff6b5f";
 

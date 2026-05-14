@@ -3,6 +3,7 @@ import {
   CHUNK_SIZE,
   TILE_H,
   TILE_W,
+  MONSTER_SHEETS,
   drawGroundTile,
   drawHero,
   drawMonster,
@@ -14,8 +15,10 @@ import {
   chunkCoords,
   clamp,
   getRegionObjectFamily,
+  FOG_OF_WAR_CONFIG,
   visibleScreenPoint,
   worldToScreen,
+  monsterSpriteId,
   TERRAIN_LAYER_PAD_TOP,
   TERRAIN_LAYER_PAD_BOTTOM
 } from "../dependencies.js";
@@ -27,9 +30,222 @@ import {
   drawTerrainDecal
 } from "../helpers.js";
 
+const DEFAULT_SORT_ANCHOR = { x: 0.5, y: 1 };
+
+function clampSortAnchor(anchor) {
+  if (!anchor || typeof anchor !== "object") return DEFAULT_SORT_ANCHOR;
+  const x = Number(anchor.x);
+  const y = Number(anchor.y);
+  return {
+    x: Number.isFinite(x) ? clamp(x, 0, 1) : DEFAULT_SORT_ANCHOR.x,
+    y: Number.isFinite(y) ? clamp(y, 0, 1) : DEFAULT_SORT_ANCHOR.y,
+  };
+}
+
+function getRenderableLayer(depthMode, fallback = 1) {
+  switch (depthMode) {
+    case "ground":
+    case "alwaysBehind":
+      return 0;
+    case "alwaysFront":
+      return 2;
+    case "dynamic":
+      return 1;
+    default:
+      return fallback;
+  }
+}
+
+function getSheetObjectBaseScale(type) {
+  return type === "building" ? 0.58
+    : type === "ruin" ? 0.54
+      : type === "crystal" ? 0.46
+        : type === "chest" ? 0.28
+          : type === "firebeacon" ? 0.44
+            : 0.4;
+}
+
+function getObjectSheet(atlas, object, biome) {
+  const sheetsByBiome = atlas?.objectSheets?.[object.type];
+  return sheetsByBiome?.[biome?.id]
+    ?? sheetsByBiome?.default
+    ?? sheetsByBiome?.mainland
+    ?? null;
+}
+
+function getObjectSortOffsetY(object, biome, atlas) {
+  const anchor = clampSortAnchor(object.sortAnchor);
+  const depthOffset = Number.isFinite(Number(object.depthOffset)) ? Number(object.depthOffset) : 0;
+
+  if (object.type === "foliage") {
+    const sheetId = object.foliageSheet ?? biome?.id ?? "mainland";
+    const sheet = atlas?.foliageSheet?.sheets?.[sheetId]
+      ?? atlas?.foliageSheet?.sheets?.mainland
+      ?? atlas?.foliageSheet;
+    const cells = sheet?.cells;
+    const cell = cells?.[Math.abs(Math.floor(object.foliageVariant ?? object.treeVariant ?? 0)) % cells.length];
+    const sprite = cell?.sprite;
+    if (sprite) {
+      const scale = 0.38 * object.size * (object.visualScale ?? 1) * (Number(sheet?.renderScale) || 1);
+      const height = sprite.height * scale;
+      return 12 - height * 0.74 + height * anchor.y + depthOffset;
+    }
+    return depthOffset;
+  }
+
+  const sheet = getObjectSheet(atlas, object, biome);
+  const cells = sheet?.cells;
+  const cell = cells?.[Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length] ?? cells?.[0];
+  const sprite = cell?.sprite;
+  if (sprite) {
+    const scale = getSheetObjectBaseScale(object.type) * object.size * (object.visualScale ?? 1) * (sheet.renderScale ?? 1);
+    const height = sprite.height * scale;
+    const frameOffset = sheet.frameOffsets?.[Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length] ?? { y: 0 };
+    return 12 - height + 24 * scale + frameOffset.y * scale + height * anchor.y + depthOffset;
+  }
+
+  if (getRegionObjectFamily(object.type) === "tree") {
+    return 14 + depthOffset;
+  }
+  return depthOffset;
+}
+
+function getObjectDepth(object, screen, biome, atlas) {
+  return screen.y + getObjectSortOffsetY(object, biome, atlas);
+}
+
+function getMonsterFootOffset(monster) {
+  const spriteId = monsterSpriteId(monster?.typeName);
+  const cfg = MONSTER_SHEETS.find((entry) => entry.id === spriteId);
+  return Number.isFinite(Number(cfg?.yOffset)) ? Number(cfg.yOffset) : 38;
+}
+
+function getActorDepth(actor, screen, kind) {
+  const explicitOffset = Number(actor?.footOffsetY);
+  if (Number.isFinite(explicitOffset)) return screen.y + explicitOffset;
+  if (kind === "hero") return screen.y + 30;
+  if (kind === "questgiver") return screen.y + 16;
+  return screen.y + getMonsterFootOffset(actor);
+}
+
+function getRenderableDepth(renderable, atlas) {
+  if (renderable.type === "object") return getObjectDepth(renderable.object, renderable.screen, renderable.biome, atlas);
+  if (renderable.type === "monster") return getActorDepth(renderable.monster, renderable.screen, "monster");
+  if (renderable.type === "hero") return getActorDepth(renderable.actor, renderable.screen, "hero");
+  if (renderable.type === "questgiver") return getActorDepth(renderable.questgiver, renderable.screen, "questgiver");
+  return renderable.screen?.y ?? 0;
+}
+
+function getTypeSortOrder(type) {
+  switch (type) {
+    case "loot": return 0;
+    case "object": return 1;
+    case "questgiver": return 2;
+    case "monster": return 3;
+    case "hero": return 4;
+    case "projectile": return 5;
+    default: return 9;
+  }
+}
+
 export const renderingMethods = {
   get assetsReady() {
     return this.atlas !== null && this.animationSheets !== null;
+  },
+
+  get fogOfWarActive() {
+    return Boolean(FOG_OF_WAR_CONFIG.enabled && this.activeMapRegion && this.region?.mapRegion);
+  },
+
+  fogTileKey(x, y) {
+    return `${Math.floor(x)},${Math.floor(y)}`;
+  },
+
+  updateFogOfWar(force = false) {
+    if (!this.fogOfWarActive) {
+      if (this.fogVisibleTiles?.size) this.fogVisibleTiles.clear();
+      return;
+    }
+    const px = Math.floor(this.player.x);
+    const py = Math.floor(this.player.y);
+    const regionId = this.region?.id ?? this.region?.mapRegion?.id ?? "";
+    if (
+      !force
+      && this.fogLastReveal?.x === px
+      && this.fogLastReveal?.y === py
+      && this.fogLastReveal?.regionId === regionId
+    ) return;
+
+    const revealRadius = Math.max(1, Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8);
+    const visibleRadius = revealRadius + Math.max(
+      0,
+      Number(FOG_OF_WAR_CONFIG.visiblePaddingTiles) || 0,
+      Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 0,
+    );
+    const stampSpacing = Math.max(0.25, Number(FOG_OF_WAR_CONFIG.exploreStampSpacingTiles) || 1.2);
+    const stampX = Math.floor(this.player.x / stampSpacing);
+    const stampY = Math.floor(this.player.y / stampSpacing);
+    const stampKey = `${stampX},${stampY}`;
+    if (!this.fogExploredPointKeys?.has(stampKey)) {
+      this.fogExploredPointKeys.add(stampKey);
+      this.fogExploredPoints.push({ x: this.player.x, y: this.player.y, radius: revealRadius });
+    }
+    const minX = Math.floor(this.player.x - visibleRadius);
+    const maxX = Math.ceil(this.player.x + visibleRadius);
+    const minY = Math.floor(this.player.y - visibleRadius);
+    const maxY = Math.ceil(this.player.y + visibleRadius);
+    this.fogVisibleTiles = new Set();
+    for (let y = minY; y <= maxY; y += 1) {
+      for (let x = minX; x <= maxX; x += 1) {
+        const d = Math.hypot(x + 0.5 - this.player.x, y + 0.5 - this.player.y);
+        if (d > visibleRadius) continue;
+        if (!this.region.mask?.has(`${x},${y}`)) continue;
+        const key = `${x},${y}`;
+        this.fogVisibleTiles.add(key);
+        if (d <= revealRadius) this.fogExploredTiles.add(key);
+      }
+    }
+    this.fogLastReveal = { x: px, y: py, regionId };
+  },
+
+  isTileVisible(x, y) {
+    if (!this.fogOfWarActive) return true;
+    return this.fogVisibleTiles?.has(this.fogTileKey(x, y))
+      || Math.hypot((x ?? 0) - this.player.x, (y ?? 0) - this.player.y) <= Math.max(1, Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8);
+  },
+
+  isTileExplored(x, y) {
+    if (!this.fogOfWarActive) return true;
+    const key = this.fogTileKey(x, y);
+    return this.fogVisibleTiles?.has(key) || this.fogExploredTiles?.has(key);
+  },
+
+  isPointVisible(point) {
+    if (!this.fogOfWarActive) return true;
+    const visibleRadius = Math.max(1, Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8) + Math.max(
+      0,
+      Number(FOG_OF_WAR_CONFIG.visiblePaddingTiles) || 0,
+      Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 0,
+    );
+    return Math.hypot((point?.x ?? 0) - this.player.x, (point?.y ?? 0) - this.player.y) <= visibleRadius;
+  },
+
+  fogPointAlpha(point) {
+    if (!this.fogOfWarActive) return 1;
+    if (this.isPointExplored(point)) return 1;
+    const revealRadius = Math.max(1, Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8);
+    const visiblePadding = Math.max(0.1, Number(FOG_OF_WAR_CONFIG.visiblePaddingTiles) || 1.5);
+    const entityFade = Math.max(0.1, Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || visiblePadding);
+    const visibleRadius = revealRadius + Math.max(visiblePadding, entityFade);
+    const d = Math.hypot((point?.x ?? 0) - this.player.x, (point?.y ?? 0) - this.player.y);
+    if (d >= visibleRadius) return 0;
+    if (d <= visibleRadius - entityFade) return 1;
+    const t = (visibleRadius - d) / entityFade;
+    return clamp(t * t * (3 - 2 * t), 0, 1);
+  },
+
+  isPointExplored(point) {
+    return this.isTileExplored(point?.x ?? 0, point?.y ?? 0);
   },
 
   drawLoadingScreen(ctx) {
@@ -74,9 +290,12 @@ export const renderingMethods = {
     ctx.translate(shakeX, shakeY);
     this.drawBackdrop(ctx);
     this.drawTiles(ctx);
+    this.drawParticles(ctx, "belowEntities");
     this.drawWorldObjects(ctx);
-    this.drawParticles(ctx);
+    this.drawParticles(ctx, "aboveEntities");
     this.drawFloaters(ctx);
+    this.drawWeatherEvents(ctx);
+    this.drawFogOfWar(ctx);
     this.drawVignette(ctx);
     ctx.restore();
   },
@@ -190,56 +409,74 @@ export const renderingMethods = {
     const drawables = [];
     for (const chunk of this.nearbyChunks(2)) {
       for (const object of chunk.objects) {
+        const alpha = this.fogPointAlpha(object);
+        if (alpha <= 0.02) continue;
         const screen = worldToScreen(object.x, object.y, 0, this.camera);
         if (visibleScreenPoint(screen, this.width, this.height, 180)) {
+          const depthMode = object.depthMode ?? (object.type === "foliage" ? "ground" : "dynamic");
           drawables.push({
             type: "object",
             object,
             biome: BIOMES[object.renderBiomeId] ?? chunk.biome,
             screen,
-            layer: object.type === "foliage" ? 0 : 1,
-            depth: object.x + object.y + 0.1,
+            alpha,
+            layer: getRenderableLayer(depthMode, object.type === "foliage" ? 0 : 1),
+            depthMode,
           });
         }
       }
     }
 
     for (const loot of this.loots) {
+      const alpha = this.fogPointAlpha(loot);
+      if (alpha <= 0.02) continue;
       const screen = worldToScreen(loot.x, loot.y, 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 130)) {
-        drawables.push({ type: "loot", loot, screen, layer: 1, depth: loot.x + loot.y + 0.15 });
+        drawables.push({ type: "loot", loot, screen, alpha, layer: 1, depth: screen.y + 6 });
       }
     }
 
     for (const projectile of this.projectiles) {
+      const alpha = this.fogPointAlpha(projectile);
+      if (alpha <= 0.02) continue;
       const screen = worldToScreen(projectile.x, projectile.y, 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 130)) {
-        drawables.push({ type: "projectile", projectile, screen, layer: 1, depth: projectile.x + projectile.y + 0.2 });
+        drawables.push({ type: "projectile", projectile, screen, alpha, layer: 1, depth: screen.y + 8 });
       }
     }
 
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      const alpha = this.fogPointAlpha(monster);
+      if (alpha <= 0.02) continue;
       const screen = worldToScreen(monster.x, monster.y, 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 170)) {
-        drawables.push({ type: "monster", monster, screen, layer: 1, depth: monster.x + monster.y + 0.35 });
+        drawables.push({ type: "monster", monster, screen, alpha, layer: 1 });
       }
     }
 
     const questgiver = this.questState.wildernessNpc;
-    if (questgiver) {
+    const questgiverAlpha = this.fogPointAlpha(questgiver);
+    if (questgiver && questgiverAlpha > 0.02) {
       const screen = worldToScreen(questgiver.x, questgiver.y, 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 170)) {
-        drawables.push({ type: "questgiver", questgiver, screen, layer: 1, depth: questgiver.x + questgiver.y + 0.32 });
+        drawables.push({ type: "questgiver", questgiver, screen, alpha: questgiverAlpha, layer: 1 });
       }
     }
 
     const heroScreen = worldToScreen(this.player.x, this.player.y, 0, this.camera);
-    drawables.push({ type: "hero", screen: heroScreen, layer: 1, depth: this.player.x + this.player.y + 0.35 });
-    drawables.sort((a, b) => a.layer - b.layer || a.depth - b.depth);
+    drawables.push({ type: "hero", actor: this.player, screen: heroScreen, layer: 1 });
+    for (const drawable of drawables) {
+      if (!Number.isFinite(Number(drawable.depth))) {
+        drawable.depth = getRenderableDepth(drawable, this.atlas);
+      }
+    }
+    drawables.sort((a, b) => a.layer - b.layer || a.depth - b.depth || getTypeSortOrder(a.type) - getTypeSortOrder(b.type));
 
     const stats = this.calcStats();
     for (const item of drawables) {
+      ctx.save();
+      ctx.globalAlpha *= item.alpha ?? 1;
       if (item.type === "object") {
         const drawn = drawFoliageObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time)
           || drawOverlayObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time);
@@ -265,6 +502,7 @@ export const renderingMethods = {
           weaponColor: stats.mode === "magic" ? "#9de9ff" : stats.mode === "ranged" ? "#e4c27a" : "#d9d3ca",
         }, this.atlas, this.animationSheets);
       }
+      ctx.restore();
     }
   },
 
@@ -293,12 +531,56 @@ export const renderingMethods = {
     ctx.restore();
   },
 
-  drawParticles(ctx) {
+  drawParticles(ctx, layer = "aboveEntities") {
     for (const p of this.particles) {
-      const screen = worldToScreen(p.x, p.y, p.z, this.camera);
-      if (!visibleScreenPoint(screen, this.width, this.height, 90)) continue;
+      const particleLayer = p.configParticle ? (p.renderLayer ?? "aboveEntities") : "aboveEntities";
+      if (particleLayer !== layer) continue;
+      const fogAlpha = p.screenSpace ? 1 : this.fogPointAlpha(p);
+      if (fogAlpha <= 0.02) continue;
+      const screen = p.screenSpace
+        ? { x: p.screenX, y: p.screenY }
+        : worldToScreen(p.x, p.y, p.z, this.camera);
+      if (!visibleScreenPoint(screen, this.width, this.height, Math.max(90, (p.r ?? 0) + 24))) continue;
       ctx.save();
-      ctx.globalAlpha = clamp(p.life / 0.55, 0, 1);
+      if (p.configParticle) {
+        const agePct = p.maxLife ? 1 - clamp(p.life / p.maxLife, 0, 1) : 0;
+        const fadeIn = clamp(agePct * 5, 0, 1);
+        const fadeOut = clamp(p.life / Math.max(0.25, p.maxLife * 0.35), 0, 1);
+        let playerAvoidAlpha = 1;
+        if (p.avoidPlayerRadius > 0) {
+          const d = Math.hypot(p.x - this.player.x, p.y - this.player.y);
+          const minAlpha = p.avoidPlayerMinAlpha ?? 0.18;
+          playerAvoidAlpha = minAlpha + (1 - minAlpha) * clamp(d / p.avoidPlayerRadius, 0, 1);
+        }
+        ctx.globalAlpha = (p.alpha ?? 1) * fadeIn * fadeOut * fogAlpha * playerAvoidAlpha;
+        if (p.visual === "line") {
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = Math.max(1, Math.min(2.5, (p.r ?? 8) * 0.12));
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(screen.x, screen.y);
+          ctx.lineTo(screen.x + (p.vx ?? -120) * 0.035, screen.y + (p.lineLength ?? p.r ?? 12));
+          ctx.stroke();
+        } else if (p.visual === "softCircle") {
+          const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, p.r);
+          gradient.addColorStop(0, p.color);
+          gradient.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillStyle = p.color;
+          if (p.visual === "softDot") ctx.shadowBlur = Math.max(3, p.r * 1.8);
+          if (p.visual === "softDot") ctx.shadowColor = p.color;
+          ctx.beginPath();
+          ctx.arc(screen.x, screen.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
+      ctx.globalAlpha = clamp(p.life / 0.55, 0, 1) * fogAlpha;
       ctx.fillStyle = p.color;
       ctx.beginPath();
       ctx.arc(screen.x, screen.y, p.r, 0, Math.PI * 2);
@@ -313,8 +595,10 @@ export const renderingMethods = {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const f of this.floaters) {
+      const fogAlpha = this.fogPointAlpha(f);
+      if (fogAlpha <= 0.02) continue;
       const screen = worldToScreen(f.x, f.y, f.z, this.camera);
-      ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1);
+      ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1) * fogAlpha;
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(0,0,0,0.75)";
       ctx.strokeText(f.text, screen.x, screen.y);
@@ -322,6 +606,89 @@ export const renderingMethods = {
       ctx.fillText(f.text, screen.x, screen.y);
     }
     ctx.restore();
+  },
+
+  drawWeatherEvents(ctx) {
+    const flash = this.weatherFlash;
+    if (!flash) return;
+    const pct = flash.maxLife ? clamp(flash.life / flash.maxLife, 0, 1) : 0;
+    const alpha = (flash.alpha ?? 0.5) * pct;
+    if (alpha <= 0.01) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = flash.color ?? "#dbe9ff";
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    const bolt = flash.bolt;
+    if (bolt?.points?.length && bolt.life > 0) {
+      const boltPct = bolt.maxLife ? clamp(bolt.life / bolt.maxLife, 0, 1) : pct;
+      ctx.globalAlpha = Math.min(1, alpha + 0.35) * boltPct;
+      ctx.strokeStyle = flash.color ?? "#dbe9ff";
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(bolt.points[0].x, bolt.points[0].y);
+      for (let i = 1; i < bolt.points.length; i += 1) {
+        ctx.lineTo(bolt.points[i].x, bolt.points[i].y);
+      }
+      ctx.stroke();
+      ctx.globalAlpha *= 0.42;
+      ctx.lineWidth = 6;
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  drawFogOfWar(ctx) {
+    if (!this.fogOfWarActive) return;
+    const unexploredAlpha = clamp(Number(FOG_OF_WAR_CONFIG.unexploredOverlayAlpha) || 0.96, 0, 1);
+    const exploredCutAlpha = unexploredAlpha;
+    const visibleCutAlpha = unexploredAlpha;
+    const screenTileScale = Math.max(TILE_W, TILE_H) * 0.5;
+    const fogEdgeFade = Math.max(4, (Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 2.8) * screenTileScale);
+    const visibleRadius = screenTileScale * (
+      (Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8.5)
+      + Math.max(
+        0,
+        Number(FOG_OF_WAR_CONFIG.visiblePaddingTiles) || 0,
+        Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 0,
+      )
+    );
+
+    const overlay = this.fogOverlayCanvas ??= document.createElement("canvas");
+    const overlayWidth = Math.ceil(this.width);
+    const overlayHeight = Math.ceil(this.height);
+    if (overlay.width !== overlayWidth) overlay.width = overlayWidth;
+    if (overlay.height !== overlayHeight) overlay.height = overlayHeight;
+    const fogCtx = overlay.getContext("2d");
+    fogCtx.clearRect(0, 0, overlay.width, overlay.height);
+    fogCtx.globalCompositeOperation = "source-over";
+    fogCtx.fillStyle = `rgba(0, 0, 0, ${unexploredAlpha})`;
+    fogCtx.fillRect(0, 0, overlay.width, overlay.height);
+    fogCtx.globalCompositeOperation = "destination-out";
+    for (const point of this.fogExploredPoints ?? []) {
+      const screen = worldToScreen(point.x, point.y, 0, this.camera);
+      const radius = Math.max(16, screenTileScale * (point.radius ?? FOG_OF_WAR_CONFIG.revealRadiusTiles));
+      if (!visibleScreenPoint(screen, this.width, this.height, radius + 80)) continue;
+      this.drawFogRevealGradient(fogCtx, screen.x, screen.y, radius, exploredCutAlpha, fogEdgeFade);
+    }
+    const heroScreen = worldToScreen(this.player.x, this.player.y, 0, this.camera);
+    this.drawFogRevealGradient(fogCtx, heroScreen.x, heroScreen.y, visibleRadius, visibleCutAlpha, fogEdgeFade);
+    ctx.drawImage(overlay, 0, 0);
+  },
+
+  drawFogRevealGradient(ctx, x, y, radius, alpha, edgeFadeRadius) {
+    if (alpha <= 0 || radius <= 0) return;
+    const innerRadius = Math.max(0, radius - Math.max(1, edgeFadeRadius ?? radius * 0.34));
+    const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius);
+    gradient.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
   },
 
   drawVignette(ctx) {
@@ -356,15 +723,19 @@ export const renderingMethods = {
           const px = center + (tile.x - this.player.x) * scale;
           const py = center + (tile.y - this.player.y) * scale;
           const biome = BIOMES[tile.biomeId] ?? chunk.biome;
+          ctx.globalAlpha = 1;
           ctx.fillStyle = tile.edgeMask ? "rgba(245, 239, 227, 0.22)" : biome.tile[0];
           ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale) + 1, Math.ceil(scale) + 1);
         }
       }
     }
-    this.drawMinimapPoint(ctx, this.region.start, center, scale, "#8bdfff", 3);
-    this.drawMinimapPoint(ctx, this.region.end, center, scale, "#f4da96", 3.4);
+    this.drawMinimapFog(ctx, center, scale);
+    ctx.globalAlpha = 1;
+    if (this.isPointExplored(this.region.start)) this.drawMinimapPoint(ctx, this.region.start, center, scale, "#8bdfff", 3);
+    if (this.isPointExplored(this.region.end)) this.drawMinimapPoint(ctx, this.region.end, center, scale, "#f4da96", 3.4);
     for (const monster of this.monsters.values()) {
       if (monster.dead) continue;
+      if (!this.isPointVisible(monster)) continue;
       const x = center + (monster.x - this.player.x) * scale;
       const y = center + (monster.y - this.player.y) * scale;
       if (x >= 0 && y >= 0 && x <= size && y <= size) {
@@ -373,6 +744,7 @@ export const renderingMethods = {
       }
     }
     for (const loot of this.loots) {
+      if (!this.isPointVisible(loot)) continue;
       const x = center + (loot.x - this.player.x) * scale;
       const y = center + (loot.y - this.player.y) * scale;
       if (x >= 0 && y >= 0 && x <= size && y <= size) {
@@ -383,6 +755,50 @@ export const renderingMethods = {
     ctx.fillStyle = "#f5f3ea";
     ctx.beginPath();
     ctx.arc(center, center, 4, 0, Math.PI * 2);
+    ctx.fill();
+  },
+
+  drawMinimapFog(ctx, center, scale) {
+    if (!this.fogOfWarActive) return;
+    const unexploredAlpha = clamp(Number(FOG_OF_WAR_CONFIG.unexploredOverlayAlpha) || 0.96, 0, 1);
+    const exploredCutAlpha = unexploredAlpha;
+    const visibleCutAlpha = unexploredAlpha;
+    const fogEdgeFade = Math.max(1, (Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 2.8) * scale);
+    const visibleRadius = ((Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8.5)
+      + Math.max(
+        0,
+        Number(FOG_OF_WAR_CONFIG.visiblePaddingTiles) || 0,
+        Number(FOG_OF_WAR_CONFIG.entityFadeTiles) || 0,
+      )) * scale;
+
+    const overlay = this.fogMinimapOverlayCanvas ??= document.createElement("canvas");
+    if (overlay.width !== ctx.canvas.width) overlay.width = ctx.canvas.width;
+    if (overlay.height !== ctx.canvas.height) overlay.height = ctx.canvas.height;
+    const fogCtx = overlay.getContext("2d");
+    fogCtx.clearRect(0, 0, overlay.width, overlay.height);
+    fogCtx.globalCompositeOperation = "source-over";
+    fogCtx.fillStyle = `rgba(0, 0, 0, ${unexploredAlpha})`;
+    fogCtx.fillRect(0, 0, overlay.width, overlay.height);
+    fogCtx.globalCompositeOperation = "destination-out";
+    for (const point of this.fogExploredPoints ?? []) {
+      const x = center + (point.x - this.player.x) * scale;
+      const y = center + (point.y - this.player.y) * scale;
+      const radius = Math.max(2, (point.radius ?? FOG_OF_WAR_CONFIG.revealRadiusTiles) * scale);
+      this.drawMinimapRevealGradient(fogCtx, x, y, radius, exploredCutAlpha, fogEdgeFade);
+    }
+    this.drawMinimapRevealGradient(fogCtx, center, center, visibleRadius, visibleCutAlpha, fogEdgeFade);
+    ctx.drawImage(overlay, 0, 0);
+  },
+
+  drawMinimapRevealGradient(ctx, x, y, radius, alpha, edgeFadeRadius) {
+    if (alpha <= 0 || radius <= 0) return;
+    const innerRadius = Math.max(0, radius - Math.max(1, edgeFadeRadius ?? radius * 0.34));
+    const gradient = ctx.createRadialGradient(x, y, innerRadius, x, y, radius);
+    gradient.addColorStop(0, `rgba(0, 0, 0, ${alpha})`);
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
   },
 

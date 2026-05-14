@@ -215,8 +215,12 @@ export const CITY_AREAS = [
     id: "south_empty",
     title: "South Empty Plot",
     category: "empty",
+    prebuilt: true,
     showLabel: true,
     points: "843,601 877,592 906,573 983,651 985,670 929,703 853,725 843,714",
+    buildings: [
+      { id: "barracks", x: 912, y: 654 },
+    ],
     unlock: { level: 2, cost: { gold: 650, wood_plank: 14, stone_brick: 10 } },
   },
   {

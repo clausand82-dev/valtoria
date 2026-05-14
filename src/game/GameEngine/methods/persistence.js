@@ -114,6 +114,9 @@ export const persistenceMethods = {
       goldFind: Number(item.goldFind) || 0,
       resourceFind: Number(item.resourceFind) || 0,
       xpGain: Number(item.xpGain) || 0,
+      durability: Number.isFinite(Number(item.durability))
+        ? clamp(Number(item.durability), 0, 100)
+        : undefined,
       sockets: normalizeSockets(item.sockets),
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,

@@ -16,7 +16,6 @@ export const DEFAULT_MONSTER_LOOT_PROFILE = {
 
 export const DEFAULT_MONSTER_RESOURCE_DROPS = {
   loot: [
-    { resource: "meat", min: 1, max: 2, chance: 0.18 },
     { resource: "fruit", min: 1, max: 2, chance: 0.12 },
     { resource: "paper", min: 1, max: 2, chance: 0.12 },
     { resource: "scroll", min: 1, max: 2, chance: 0.12 },
@@ -132,6 +131,16 @@ export const MONSTER_SHEETS = [
     shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22,
     yOffset: 49,
   },
+    {
+    id: "wolf_cub",
+    url: "/assets/generated/mobs/wolf_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.30,
+    shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
+    yOffset: 39,
+  },
   {
     id: "wolf",
     url: "/assets/generated/mobs/wolf_animated_sheet.png",
@@ -139,6 +148,16 @@ export const MONSTER_SHEETS = [
     cols: 4,
     sequences: seq3x4,
     scale: 0.48,
+    shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
+    yOffset: 39,
+  },
+    {
+    id: "wolf_fenris",
+    url: "/assets/generated/mobs/wolf_animated_sheet.png",
+    rows: 3,
+    cols: 4,
+    sequences: seq3x4,
+    scale: 0.95,
     shadowW: 32, shadowH: 10, shadowAlpha: 0.36,
     yOffset: 39,
   },
@@ -332,7 +351,7 @@ export const MONSTER_DEFS = {
     spriteUrl: sheetUrl("wildboar"),
     stats: { hp: 76, damage: 15, speed: 1.82, range: 0.56, radius: 0.34, color: "#8a5e3d", xp: 28 },
     lootProfile: { goldChance: 0.18, goldMult: 0.65, weights: { health: 8, mana: 2, weapon: 3, armor: 3, none: 84 } },
-    resources: { inheritDefaultLoot: false, loot: [{ resource: "meat", min: 1, max: 3, chance: 0.32 }] },
+    resources: { loot: [{ resource: "meat", min: 1, max: 2, chance: 0.32 }, { resource: "hide", min: 1, max: 1, chance: 0.12 }] },
     popularity: { change: -0.15 },
   },
   Village01: {
@@ -430,6 +449,7 @@ export const MONSTER_DEFS = {
     spriteUrl: sheetUrl("snake"),
     stats: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
     lootProfile: { goldChance: 0.16, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 3, armor: 3, none: 86 } },
+    resources: { loot: [{ resource: "hide", min: 1, max: 1, chance: 0.06 }] },
     popularity: { change: -0.3 },
   },
   Spider: {
@@ -474,12 +494,39 @@ export const MONSTER_DEFS = {
       statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 },
     },
   },
+    WolfCub: {
+    sprite: "wolf_cub",
+    spriteUrl: sheetUrl("wolf_cub"),
+    stats: { hp: 52, damage: 14, speed: 2.00, range: 0.12, radius: 0.34, color: "#8b8f93", xp: 28 },
+    lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
+    resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
+    popularity: { change: -0.35 },
+  },
   Wolf: {
     sprite: "wolf",
     spriteUrl: sheetUrl("wolf"),
     stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
+    resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
     popularity: { change: -0.35 },
+  },
+    WolfFenris: {
+    sprite: "wolf_fenris",
+    spriteUrl: sheetUrl("wolf_fenris"),
+    stats: { hp: 220, damage: 30, speed: 1.25, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
+    lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 2 } },
+    resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
+    popularity: { change: -0.35 },
+    allowElite: false,
+    isBoss: true,
+    haveMinion: true,
+    minions: {
+      cooldown: 8,
+      maxActive: 4,
+      spawnCount: 2,
+      scale: 0.42,
+      statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 },
+    },
   },
 };
 

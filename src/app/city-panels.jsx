@@ -10,7 +10,7 @@ import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-c
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
-import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
+import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT, ITEM_REPAIR_GOLD_PER_PCT, ITEM_REPAIR_JUNK_PER_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
 import { GEM_SOCKET_BONUSES, MAX_ITEM_SOCKETS, itemCanHaveSockets, normalizeSockets } from "../game/config/socket-config.js";
@@ -97,7 +97,7 @@ import {
   socketText,
 } from "./city-panel-helpers.jsx";
 
-function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons }) {
+function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, onRepairEquippedItem }) {
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
@@ -108,7 +108,13 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
   return (
     <section className="blacksmith-panel">
       {!activeAddonId && (
-        <BlacksmithRepairStation engineRef={engineRef} snapshot={snapshot} snapshotRef={snapshotRef} />
+        <BlacksmithRepairStation
+          engineRef={engineRef}
+          snapshot={snapshot}
+          snapshotRef={snapshotRef}
+          resourceCount={resourceCount}
+          onRepairEquippedItem={onRepairEquippedItem}
+        />
       )}
       {activeAddonId === "weapon_anvil" && (
         <BlacksmithMergeStation
@@ -150,7 +156,7 @@ function durabilityColor(dur) {
   return "#ff6b5f";
 }
 
-function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef }) {
+function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, onRepairEquippedItem }) {
   const equipment = snapshot.equipment ?? [];
   const equippedItems = equipment.filter((slot) => slot.item != null);
 
@@ -174,8 +180,11 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef }) {
           <BlacksmithRepairSlot
             key={slot.id}
             slot={slot}
+            snapshot={snapshot}
             engineRef={engineRef}
             snapshotRef={snapshotRef}
+            resourceCount={resourceCount}
+            onRepairEquippedItem={onRepairEquippedItem}
           />
         ))}
       </div>
@@ -183,18 +192,30 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef }) {
   );
 }
 
-function BlacksmithRepairSlot({ slot, engineRef, snapshotRef }) {
+function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, onRepairEquippedItem }) {
   const item = slot.item;
   const dur = Number(item.durability ?? 100);
   const missing = Math.ceil(100 - dur);
   const isFullyRepaired = missing <= 0;
   const color = durabilityColor(dur);
 
+  // Calculate repair costs
+  const goldCost = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
+  const junkCost = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
+
+  // Check if player has enough resources
+  const goldHave = Math.max(0, Math.floor(Number(snapshot.player?.gold) || 0));
+  const junkHave = resourceCount ? resourceCount("junk") : cityResourceCount(snapshot.inventory, "junk");
+  const canAfford = goldHave >= goldCost && junkHave >= junkCost;
+
   return (
     <div className={`repair-slot${isFullyRepaired ? " repaired" : ""}`}>
       <div className="repair-slot-info">
-        <span className="repair-slot-name" style={{ color: item.rarityColor ?? "#f5f3ea" }}>{item.name}</span>
-        <span className="repair-slot-label" style={{ color: "#aaa" }}>{slot.label}</span>
+        <div className="repair-slot-header">
+          <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
+          <span className="repair-slot-name" style={{ color: item.rarityColor ?? "#f5f3ea" }}>{item.name}</span>
+          <span className="repair-slot-label" style={{ color: "#aaa" }}>{slot.label}</span>
+        </div>
         <span className="repair-durability-bar-wrap">
           <span
             className="repair-durability-bar-fill"
@@ -210,12 +231,29 @@ function BlacksmithRepairSlot({ slot, engineRef, snapshotRef }) {
         </span>
       </div>
       {!isFullyRepaired && (
-        <button
-          className="repair-btn"
-          onClick={() => engineRef.current?.repairEquippedItem?.(slot.id)}
-        >
-          Reparer
-        </button>
+        <div className="repair-slot-action">
+          <div className={`repair-cost-display${canAfford ? " affordable" : " unaffordable"}`}>
+            <span className="cost-item">
+              <InventoryIcon iconSheet="items" iconUrl={ITEM_GOLD_ICON_URL} />
+              <span>{goldCost}</span>
+            </span>
+            <span className="cost-item">
+              <InventoryIcon iconSheet="resources" iconUrl={iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: "junk" }))} />
+              <span>{junkCost}</span>
+            </span>
+          </div>
+          <button
+            className="repair-btn"
+            disabled={!canAfford}
+            onClick={() => (
+              onRepairEquippedItem
+                ? onRepairEquippedItem(slot.id, { gold: goldCost, junk: junkCost })
+                : engineRef.current?.repairEquippedItem?.(slot.id)
+            )}
+          >
+            Reparer
+          </button>
+        </div>
       )}
       {isFullyRepaired && (
         <span className="repair-done">OK</span>
@@ -338,13 +376,16 @@ function BlacksmithForgeStation({ enabled, weapons, onDestroy }) {
   );
 }
 
-function CityGoldBarPanel({ gold, popularity, onSmelt }) {
+function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, onSmelt, onSmeltIron }) {
   const unitCost = goldBarUnitCost(popularity);
+  const ironPieceCost = 3;
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const ironPieces = countResource("iron_piece");
   return (
     <section className="blacksmith-station">
       <header>
         <h4>Minting Furnace</h4>
-        <span>{unitCost} gold {"->"} 1 Gold Bar</span>
+        <span>Smelt metals and mint bars.</span>
       </header>
       <div className="blacksmith-row">
         <InventoryIcon iconSheet="items" iconUrl="/assets/generated/item/item_res_goldbar.png" />
@@ -354,17 +395,28 @@ function CityGoldBarPanel({ gold, popularity, onSmelt }) {
         </div>
         <button type="button" disabled={gold < unitCost} onClick={onSmelt}>Smelt</button>
       </div>
+      <div className="blacksmith-row">
+        <InventoryIcon iconSheet="resources" iconIndex={RESOURCE_DEFS.iron_bar?.iconIndex} iconUrl={RESOURCE_DEFS.iron_bar?.iconUrl} />
+        <div>
+          <b>Iron Bar</b>
+          <span>{ironPieceCost} Iron Piece {"->"} 1 Iron Bar | Available: {ironPieces}</span>
+        </div>
+        <button type="button" disabled={ironPieces < ironPieceCost} onClick={onSmeltIron}>Smelt</button>
+      </div>
     </section>
   );
 }
 
-function CityFarmPanel({ inventory, popularity, onProduceFoodBarrel, onProduceProvision }) {
+function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarrel, onProduceProvision }) {
   const foodBarrelCostValue = foodBarrelCost(popularity);
-  const foodBarrelOptions = [
-    { id: "meat", label: "Meat" },
-    { id: "fruit", label: "Fruit" },
-    { id: "wheat", label: "Wheat" },
-  ];
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const foodBarrelRecipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
+  const foodBarrelOutputId = String(foodBarrelRecipe.outputResourceId ?? "food");
+  const foodBarrelOutputCount = Math.max(1, Math.floor(Number(foodBarrelRecipe.outputCount) || 1));
+  const foodBarrelOptions = (foodBarrelRecipe.inputOptions ?? []).map((option) => ({
+    id: String(option?.resourceId ?? ""),
+    label: option?.label ?? String(option?.resourceId ?? "Unknown"),
+  })).filter((option) => option.id);
   const provisionOptions = CITY_STATS_RULES.farmProvisionRecipes ?? [];
   return (
     <section className="blacksmith-station">
@@ -373,7 +425,7 @@ function CityFarmPanel({ inventory, popularity, onProduceFoodBarrel, onProducePr
         <span>{foodBarrelCostValue} raw food {"->"} 1 Food Barrel</span>
       </header>
       {foodBarrelOptions.map((option) => {
-        const available = cityResourceCount(inventory, option.id);
+        const available = countResource(option.id);
         const def = RESOURCE_DEFS[option.id];
         return (
           <div className="blacksmith-row" key={`barrel-${option.id}`}>
@@ -382,7 +434,13 @@ function CityFarmPanel({ inventory, popularity, onProduceFoodBarrel, onProducePr
               <b>{option.label}</b>
               <span>Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
             </div>
-            <button type="button" disabled={available < foodBarrelCostValue} onClick={() => onProduceFoodBarrel(option.id, foodBarrelCostValue)}>Make</button>
+            <button
+              type="button"
+              disabled={available < foodBarrelCostValue}
+              onClick={() => onProduceFoodBarrel(option.id, foodBarrelCostValue, foodBarrelOutputId, foodBarrelOutputCount)}
+            >
+              Make
+            </button>
           </div>
         );
       })}
@@ -391,7 +449,7 @@ function CityFarmPanel({ inventory, popularity, onProduceFoodBarrel, onProducePr
         <span>Convert food resources into city provision.</span>
       </header>
       {provisionOptions.map((option) => {
-        const available = cityResourceCount(inventory, option.resourceId);
+        const available = countResource(option.resourceId);
         const def = RESOURCE_DEFS[option.resourceId];
         return (
           <div className="blacksmith-row" key={`provision-${option.resourceId}`}>
@@ -440,9 +498,10 @@ function CityTownHallPanel({ inventory, army, population, popularity, onContribu
   );
 }
 
-function CityResearchPanel({ buildingState, snapshot, onBuyRecipe, onMerge }) {
+function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe, onMerge }) {
   const bought = new Set(buildingState.recipes ?? []);
   const recipes = cityResearchRecipes();
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(snapshot.inventory, resourceId));
   return (
     <section className="blacksmith-station">
       <header>
@@ -453,7 +512,7 @@ function CityResearchPanel({ buildingState, snapshot, onBuyRecipe, onMerge }) {
         const key = researchRecipeKey(recipe);
         const unlocked = bought.has(key);
         const cost = researchRecipeCost(recipe);
-        const hasInputs = Object.entries(recipe.inputs ?? {}).every(([resourceId, count]) => cityResourceCount(snapshot.inventory, resourceId) >= count);
+        const hasInputs = Object.entries(recipe.inputs ?? {}).every(([resourceId, count]) => countResource(resourceId) >= count);
         const outputDef = RESOURCE_DEFS[recipe.output];
         const inputText = Object.entries(recipe.inputs ?? {})
           .map(([resourceId, count]) => `${count} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`)

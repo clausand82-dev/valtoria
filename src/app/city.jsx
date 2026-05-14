@@ -3,13 +3,15 @@ import { MAX_INVENTORY, RARITIES, TILE_H, TILE_W } from "../game/data.js";
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue } from "../game/world.js";
-import { makeResourceItem } from "../game/GameEngine/helpers.js";
+import { makeResourceItem, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { armyTrainingRecipesForAddon } from "../game/config/city-army-recipe-config.js";
+import { CITY_ARMY_UNIT_DEFS, normalizeArmyUnits } from "../game/config/city-army-unit-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
@@ -84,6 +86,7 @@ import {
 } from "./city-panels.jsx";
 
 import {
+  addCityPermanentStatBonus,
   applyCityMobProgressForVisit,
   applyMapReturnPopulationProgress,
   calculateCityStats,
@@ -116,6 +119,9 @@ import {
   cityBuildingNextLevel,
   cityCostAvailable,
   cityCostLabel,
+  cityArmyCanTrainUnit,
+  cityArmyUnitCount,
+  cityUsableSoldierCapacity,
   cityLevelCostEntries,
   cityMapMobRefs,
   cityMapPositionStyle,
@@ -129,16 +135,19 @@ import {
   getCityLayout,
   getCityMapQuestNpcs,
   isCityAreaUnlocked,
+  addCityArmyUnit,
+  addCityPopulationLoss,
   loadCityAssets,
   loadCityAssetsOnce,
   loadCityProgress,
   loadImage,
   mergeCityStatEffects,
   normalizeCityMobs,
-  payCityAreaUnlockCost,
   payCityCostEntries,
   pickCityBattleRegion,
   removeGreenScreen,
+  removeCityArmyUnits,
+  resolveCityArmyBattle,
   saveCityProgress,
 } from "./city-systems.jsx";
 
@@ -164,7 +173,17 @@ import {
 } from "./city-panel-helpers.jsx";
 
 
-function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onClose, onQuestCompleted, onProgressChange, onStartCityMobBattle }) {
+function CityPage({
+  engineRef,
+  snapshot,
+  cityStorageKey = CITY_STORAGE_KEY,
+  skipMobProgressForVisit = false,
+  onMobProgressSkipConsumed,
+  onClose,
+  onQuestCompleted,
+  onProgressChange,
+  onStartCityMobBattle,
+}) {
   const snapshotRef = useRef(snapshot);
   const cityStorageKeyRef = useRef(cityStorageKey);
   const [loadingCity, setLoadingCity] = useState(!cityAssetCache.assets);
@@ -172,10 +191,13 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
   const [selectedQuestNpcId, setSelectedQuestNpcId] = useState(null);
   const [hoveredAreaId, setHoveredAreaId] = useState(null);
   const [clickedAreaId, setClickedAreaId] = useState(null);
+  const [selectedCityMobId, setSelectedCityMobId] = useState(null);
+  const [armyBattleResult, setArmyBattleResult] = useState(null);
   const [cityProgress, setCityProgress] = useState(() => loadCityProgress(cityStorageKey));
   const [cityAssets, setCityAssets] = useState(() => cityAssetCache.assets ?? { houseImages: {}, npcImages: {} });
   const cityProgressRef = useRef(cityProgress);
   const npcPlacementSeedRef = useRef(Math.floor(Math.random() * 1000000));
+  const skippedMobProgressForVisitRef = useRef(false);
   const interactiveAreas = useMemo(() => CITY_AREAS.filter((area) => area.interactive !== false), []);
   const hoveredArea = useMemo(
     () => interactiveAreas.find((area) => area.id === hoveredAreaId) ?? null,
@@ -267,6 +289,13 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
 
   // Spawn and progress city mobs on each city visit.
   useEffect(() => {
+    if (skipMobProgressForVisit) {
+      skippedMobProgressForVisitRef.current = true;
+      return () => onMobProgressSkipConsumed?.();
+    }
+    if (skippedMobProgressForVisitRef.current) {
+      return;
+    }
     setCityProgress((current) => applyCityMobProgressForVisit(current));
   }, [cityStorageKey]);
 
@@ -323,8 +352,8 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
   const unlockArea = (area) => {
     if (!area || isCityAreaUnlocked(cityProgressRef.current, area)) return;
     const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current);
-    if (!cityAreaCanUnlock(area, snapshotRef.current, stats)) return;
-    const paid = payCityAreaUnlockCost(area, engineRef.current, snapshotRef.current);
+    if (!cityAreaCanUnlock(area, snapshotRef.current, stats, cityProgressRef.current)) return;
+    const paid = payCityEntries(cityAreaCostEntries(area));
     if (!paid) return;
     setCityProgress((current) => ({
       ...current,
@@ -342,7 +371,7 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
     const nextLevel = cityAreaNextLevel(area, state.level);
     if (!nextLevel) return;
     if (!cityStatsMeetRequirements(nextLevel.statRequirements ?? nextLevel.unlock?.statRequirements, stats)) return;
-    if (!payCityCostEntries(cityLevelCostEntries(nextLevel), engineRef.current, snapshotRef.current)) return;
+    if (!payCityEntries(cityLevelCostEntries(nextLevel))) return;
     setCityProgress((current) => ({
       ...current,
       areas: {
@@ -369,7 +398,7 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
     const repairEntries = computeRepairCostEntries(baseCost, missing);
 
     const deficits = repairEntries
-      .map(([resourceId, amount]) => ({ resourceId, amount, available: cityCostAvailable(snapshotRef.current, resourceId) }))
+      .map(([resourceId, amount]) => ({ resourceId, amount, available: cityCostAvailable(snapshotRef.current, resourceId, progressState) }))
       .filter((entry) => entry.available < entry.amount);
     if (deficits.length > 0) {
       const parts = deficits.map((d) => `${cityCostLabel(d.resourceId)} ${d.amount} (du har ${d.available})`);
@@ -377,7 +406,7 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
       return;
     }
 
-    const paid = payCityCostEntries(repairEntries, engineRef.current, snapshotRef.current);
+    const paid = payCityEntries(repairEntries, progressState);
     if (!paid) {
       engineRef.current?.addToast?.("Betaling mislykkedes ved reparation af område.");
       return;
@@ -411,20 +440,79 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
     setSelectedBuildingId(buildingId);
   };
 
+  const payCityEntries = (entries, progressOverride = cityProgressRef.current) => (
+    payCityCostEntries(entries, engineRef.current, snapshotRef.current, progressOverride, setCityProgress)
+  );
+
+  const cityResourceAvailable = (resourceId, progressOverride = cityProgressRef.current) => (
+    cityCostAvailable(snapshotRef.current, resourceId, progressOverride)
+  );
+
+  const backpackResourceCanAccept = (resourceId, count = 1, paidEntries = []) => {
+    const output = makeResourceItem(resourceId, count);
+    if (!output) return false;
+    const stackMax = Math.max(1, Math.floor(Number(output.stackMax ?? resourceStackMax(resourceId)) || 1));
+    const inventory = (snapshotRef.current?.inventory ?? []).map((item) => item ? { ...item } : item);
+    for (const [paidResourceId, paidAmount] of paidEntries) {
+      let remaining = Math.max(0, Math.floor(Number(paidAmount) || 0));
+      for (let index = inventory.length - 1; index >= 0 && remaining > 0; index -= 1) {
+        const item = inventory[index];
+        if (item?.mode !== "resource" || String(item.resourceId) !== String(paidResourceId)) continue;
+        const itemCount = Math.max(1, Math.floor(Number(item.count) || 1));
+        const used = Math.min(itemCount, remaining);
+        remaining -= used;
+        if (itemCount > used) item.count = itemCount - used;
+        else inventory.splice(index, 1);
+      }
+    }
+    if (inventory.some((item) => (
+      item?.mode === "resource"
+      && String(item.resourceId) === String(resourceId)
+      && Math.max(1, Math.floor(Number(item.count) || 1)) < stackMax
+    ))) return true;
+    return inventory.length < MAX_INVENTORY;
+  };
+
+  const convertCityResourceToResource = (inputResourceId, inputCount, outputResourceId, outputCount = 1) => {
+    const cost = Math.max(1, Math.floor(Number(inputCount) || 1));
+    const outCount = Math.max(1, Math.floor(Number(outputCount) || 1));
+    if (cityResourceAvailable(inputResourceId) < cost) {
+      engineRef.current?.addToast?.(`Kraever ${cost}x ${RESOURCE_DEFS[inputResourceId]?.name ?? inputResourceId}`);
+      return false;
+    }
+    if (!backpackResourceCanAccept(outputResourceId, outCount, [[inputResourceId, cost]])) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return false;
+    }
+    const paid = payCityEntries([[inputResourceId, cost]]);
+    if (!paid) return false;
+    const output = makeResourceItem(outputResourceId, outCount);
+    if (!engineRef.current?.addInventoryItem?.(output)) return false;
+    engineRef.current?.addToast?.(`Created ${outCount}x ${output.name}`);
+    engineRef.current?.saveProgress?.({ force: true });
+    return true;
+  };
+
   const openNpc = (npcId) => {
     setSelectedBuildingId(null);
     setSelectedQuestNpcId(npcId);
   };
 
-  const attackCityMob = async (mobId) => {
+  const openCityMobActions = (mobId) => {
     const mob = cityMobs.find((entry) => entry.id === mobId);
     if (!mob) return;
     if (!attackableCityMobIds.has(mob.id)) {
       engineRef.current?.addToast?.("Du skal angribe den inderste mob i stien foerst.");
       return;
     }
+    setSelectedCityMobId(mob.id);
+  };
+
+  const attackCityMobWithHero = async (mobId) => {
+    const mob = cityMobs.find((entry) => entry.id === mobId);
+    if (!mob) return;
     const levelDef = CITY_MOB_LEVELS[Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, mob.level))] ?? CITY_MOB_LEVELS[1];
-    const target = pickCityBattleRegion(mob.mobType, levelDef.mapSize);
+    const target = pickCityBattleRegion(mob.mobType, levelDef.mapSize, mob.areaId);
     if (!target) {
       engineRef.current?.addToast?.("Kunne ikke finde et egnet map til city-kamp.");
       return;
@@ -438,7 +526,34 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
     });
     if (!started) {
       engineRef.current?.addToast?.("Kampen kunne ikke startes.");
+    } else {
+      setSelectedCityMobId(null);
     }
+  };
+
+  const attackCityMobWithArmy = (mobId, sentUnits) => {
+    const mob = cityMobs.find((entry) => entry.id === mobId);
+    if (!mob) return;
+    const result = resolveCityArmyBattle({
+      progress: cityProgress,
+      cityStats,
+      mob,
+      sentUnits,
+    });
+    if (Object.keys(result.usedUnits ?? {}).length === 0) return;
+    setCityProgress((current) => {
+      let next = removeCityArmyUnits(current, result.losses);
+      if (result.populationLoss > 0) next = addCityPopulationLoss(next, result.populationLoss);
+      if (result.won) {
+        next = {
+          ...next,
+          cityMobs: normalizeCityMobs(next.cityMobs).filter((entry) => entry.id !== mob.id),
+        };
+      }
+      return next;
+    });
+    setSelectedCityMobId(null);
+    setArmyBattleResult({ ...result, mob });
   };
 
   return (
@@ -533,8 +648,18 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
           <CityMapMobIcons
             mobRefs={cityMobRefs}
             attackableMobIds={attackableCityMobIds}
-            onAttack={attackCityMob}
+            onAttack={openCityMobActions}
           />
+          {selectedCityMobId && (
+            <CityMobActionPopup
+              mob={cityMobs.find((entry) => entry.id === selectedCityMobId)}
+              cityProgress={cityProgress}
+              cityStats={cityStats}
+              onHeroBattle={() => attackCityMobWithHero(selectedCityMobId)}
+              onArmyBattle={(sentUnits) => attackCityMobWithArmy(selectedCityMobId, sentUnits)}
+              onClose={() => setSelectedCityMobId(null)}
+            />
+          )}
         </div>
         <div className={`city-area-panel-slot ${activeAreaPanel ? "has-content" : ""}`}>
         {activeAreaPanel ? (
@@ -568,6 +693,7 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
           progress={cityProgress}
           houseImages={cityAssets.houseImages ?? {}}
           cityStats={cityStats}
+          onConvertResourceToResource={convertCityResourceToResource}
           onChangeProgress={setCityProgress}
           onClose={() => setSelectedBuildingId(null)}
         />
@@ -579,6 +705,12 @@ function CityPage({ engineRef, snapshot, cityStorageKey = CITY_STORAGE_KEY, onCl
           npcStates={snapshot.quests?.cityNpcStates ?? []}
           onQuestCompleted={onQuestCompleted}
           onClose={() => setSelectedQuestNpcId(null)}
+        />
+      )}
+      {armyBattleResult && (
+        <CityArmyBattleResultModal
+          result={armyBattleResult}
+          onClose={() => setArmyBattleResult(null)}
         />
       )}
       <p className="city-help">ESC: aaben kort.</p>
@@ -629,8 +761,8 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
   const nextLevelRequirementEntries = cityStatRequirementEntries(nextLevel?.statRequirements ?? nextLevel?.unlock?.statRequirements, cityStats);
   const canUpgrade = Boolean(nextLevel)
     && nextLevelRequirementEntries.every((entry) => entry.met)
-    && nextLevelCostEntries.every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId) >= amount);
-  const canUnlock = cityAreaCanUnlock(area, snapshot, cityStats);
+    && nextLevelCostEntries.every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) >= amount);
+  const canUnlock = cityAreaCanUnlock(area, snapshot, cityStats, progress);
   const gates = cityAreaGateEntries(area, snapshot, cityStats);
   const costEntries = cityAreaCostEntries(area);
   const activeEffects = cityAreaActiveStatEffects(area, areaState.level);
@@ -653,117 +785,73 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
       </header>
       {unlocked ? (
         <div className="city-area-popover-body">
-          <div className="city-area-info-grid">
-            <div className="city-area-info-row">
-              <b>Stats</b>
-              <CityStatEffectsSummary effects={activeEffects} />
-            </div>
-            {buildingRefs.length > 0 && (
-              <div className="city-area-info-row">
-                <b>Buildings</b>
-                <div className="city-area-mini-list">
-                  {buildingRefs.map(({ building }) => <span key={building.id}>{building.title}</span>)}
-                </div>
-              </div>
-            )}
-          </div>
+          <CityPanelSection title="Stats">
+            <CityStatEffectsSummary effects={activeEffects} />
+          </CityPanelSection>
+          {buildingRefs.length > 0 && (
+            <CityPanelSection title="Buildings">
+              <CityBuildingIconList buildingRefs={buildingRefs} />
+            </CityPanelSection>
+          )}
           {area.id === "outer_5" && <CityCampStats cityStats={cityStats} />}
           <CityPanelSection title="Durability">
             <div className="city-durability-meter" style={{ "--city-durability": `${durabilityValue}%` }}>
               <div className="city-durability-meter-head">
-                <b>{durabilityValue.toFixed(2)}%</b>
-                <span>{repairPct > 0 ? `${repairPct}% repair needed` : "Fully repaired"}</span>
+                <div>
+                  <b>{durabilityValue.toFixed(2)}%</b>
+                  <span>{repairPct > 0 ? `${repairPct}% repair needed` : "Fully repaired"}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={durabilityValue >= 100}
+                  onClick={() => onRepair?.(area, repairPct)}
+                >
+                  Repair
+                </button>
               </div>
               <div className="city-durability-track" aria-label={`Durability ${durabilityValue.toFixed(2)} percent`}>
                 <span />
               </div>
+              <CityCostGrid entries={repairCostEntries} snapshot={snapshot} progress={progress} emptyText="Ingen resources kraeves." />
             </div>
           </CityPanelSection>
           {buildingRefs.length === 0 && <p>Empty area.</p>}
-          {(nextLevel || repairPct > 0) && (
-            <CityPanelSection title="Area work">
-              <div className="city-area-work-grid">
-                <div className="city-area-work-card">
-                  <div className="city-area-work-head">
-                    <b>Repair</b>
-                    <button
-                      type="button"
-                      disabled={durabilityValue >= 100}
-                      onClick={() => onRepair?.(area, repairPct)}
-                    >
-                      Repair
-                    </button>
+          {nextLevel && (
+            <CityPanelSection title="Upgrade">
+              <div className="city-area-work-card no-top-border">
+                <div className="city-area-work-head">
+                  <div>
+                    <span>Level {nextLevel.level}{nextLevel.title ? ` - ${nextLevel.title}` : ""}</span>
                   </div>
-                  <div className="city-area-costs">
-                    {repairCostEntries.length === 0 && <span>Ingen resources kræves.</span>}
-                    {repairCostEntries.map(([resourceId, amount]) => (
-                      <span key={resourceId} className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"}>
-                        <CityCostIcon resourceId={resourceId} />
-                        {amount} {cityCostLabel(resourceId)} {`(${cityCostAvailable(snapshot, resourceId)} available)`}
-                      </span>
-                    ))}
-                  </div>
+                  <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>Upgrade area</button>
                 </div>
-                {nextLevel && <div className="city-area-work-card">
-                  <div className="city-area-work-head">
-                    <div>
-                      <b>Upgrade</b>
-                      <span>Level {nextLevel.level}{nextLevel.title ? ` - ${nextLevel.title}` : ""}</span>
-                    </div>
-                    <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>Upgrade area</button>
-                  </div>
-                  <CityStatEffectsSummary effects={nextLevel.statEffects} />
-                  <div className="city-area-requirements">
-                    {nextLevelRequirementEntries.map((entry) => (
-                      <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
-                    ))}
-                    {nextLevelRequirementEntries.length === 0 && <span>No requirements</span>}
-                  </div>
-                  <div className="city-area-costs">
-                    {nextLevelCostEntries.map(([resourceId, amount]) => (
-                      <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
-                        <CityCostIcon resourceId={resourceId} />
-                        {amount} {cityCostLabel(resourceId)}
-                      </span>
-                    ))}
-                    {nextLevelCostEntries.length === 0 && <span>No price configured</span>}
-                  </div>
-                </div>}
+                <CityStatEffectsSummary effects={nextLevel.statEffects} />
+                <CityRequirementGrid entries={nextLevelRequirementEntries} />
+                <CityCostGrid entries={nextLevelCostEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />
               </div>
             </CityPanelSection>
           )}
         </div>
       ) : (
         <div className="city-area-popover-body">
-          <div className="city-area-info-grid">
-            <div className="city-area-info-row">
-              <b>Level 1</b>
-              <CityStatEffectsSummary effects={area.statEffects} />
-            </div>
-          </div>
-          <CityPanelSection title="Area work">
-            <div className="city-area-work-card">
+          <CityPanelSection title="Stats">
+            <CityStatEffectsSummary effects={area.statEffects} />
+          </CityPanelSection>
+          {buildingRefs.length > 0 && (
+            <CityPanelSection title="Buildings">
+              <CityBuildingIconList buildingRefs={buildingRefs} />
+            </CityPanelSection>
+          )}
+          <CityPanelSection title="Unlock">
+            <div className="city-area-work-card no-top-border">
               <div className="city-area-work-head">
-                <b>Unlock</b>
+                <span>Level 1</span>
                 <button type="button" disabled={!canUnlock} onClick={onUnlock}>
                   Unlock area
                 </button>
               </div>
-              <div className="city-area-requirements">
-                {gates.length > 0 ? gates.map((entry) => (
-                  <span className={entry.met ? "met" : "missing"} key={entry.key}>
-                    {entry.label}
-                  </span>
-                )) : <span>No requirements</span>}
-              </div>
-              <div className="city-area-costs">
-                {costEntries.length > 0 ? costEntries.map(([resourceId, amount]) => (
-                  <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
-                    <CityCostIcon resourceId={resourceId} />
-                    {amount} {cityCostLabel(resourceId)}
-                  </span>
-                )) : <span>No price configured</span>}
-              </div>
+              <CityRequirementGrid entries={gates} />
+              <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />
             </div>
           </CityPanelSection>
         </div>
@@ -778,6 +866,65 @@ function CityPanelSection({ title, children }) {
       <h4>{title}</h4>
       {children}
     </section>
+  );
+}
+
+function CityBuildingIconList({ buildingRefs }) {
+  if (!buildingRefs?.length) return null;
+  return (
+    <div className="city-area-building-icons">
+      {buildingRefs.map(({ building }) => (
+        <span className="city-area-building-chip" title={building.title} key={building.id}>
+          {building.imageUrl ? <img src={building.imageUrl} alt="" draggable="false" /> : <i>{cityBuildingIconText(building)}</i>}
+          <b>{building.title}</b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CityStatIcon({ statId }) {
+  const iconUrl = CITY_STAT_ICON_URLS[statId];
+  if (!iconUrl) return null;
+  return <img className="city-stat-chip-icon" src={iconUrl} alt="" draggable="false" />;
+}
+
+function CityRequirementGrid({ entries, emptyText = "No requirements" }) {
+  if (!entries?.length) {
+    return <div className="city-area-requirements city-chip-grid"><span>{emptyText}</span></div>;
+  }
+  return (
+    <div className="city-area-requirements city-chip-grid">
+      {entries.map((entry) => (
+        <span className={entry.met ? "met" : "missing"} key={entry.key} title={entry.label}>
+          {entry.type === "stat" && <CityStatIcon statId={entry.statId} />}
+          {entry.type === "stat" ? <b>{entry.current}/{entry.needed}</b> : entry.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CityCostGrid({ entries, snapshot, progress, emptyText = "No price configured" }) {
+  if (!entries?.length) {
+    return <div className="city-area-costs city-chip-grid"><span>{emptyText}</span></div>;
+  }
+  return (
+    <div className="city-area-costs city-chip-grid">
+      {entries.map(([resourceId, amount]) => {
+        const available = cityCostAvailable(snapshot, resourceId, progress);
+        return (
+          <span
+            className={available >= amount ? "met" : "missing"}
+            key={resourceId}
+            title={`${cityCostLabel(resourceId)} ${amount}/${available}`}
+          >
+            <CityCostIcon resourceId={resourceId} />
+            <b>{amount}/{available}</b>
+          </span>
+        );
+      })}
+    </div>
   );
 }
 
@@ -875,6 +1022,80 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function CityMobActionPopup({ mob, cityProgress, cityStats, onHeroBattle, onArmyBattle, onClose }) {
+  const armyUnits = normalizeArmyUnits(cityProgress?.armyUnits);
+  const [sentUnits, setSentUnits] = useState(() => Object.fromEntries(
+    Object.entries(armyUnits).map(([unitId, count]) => [unitId, Math.min(1, count)]),
+  ));
+  if (!mob) return null;
+  const unitEntries = Object.entries(CITY_ARMY_UNIT_DEFS);
+  const totalSent = Object.values(sentUnits).reduce((sum, count) => sum + Math.max(0, Math.floor(Number(count) || 0)), 0);
+  const preview = resolveCityArmyBattle({ progress: cityProgress, cityStats, mob, sentUnits, rng: () => 0.5 });
+  return (
+    <div className="city-mob-action-popup" style={cityMapPositionStyle(mob.x + 44, mob.y - 22)}>
+      <header>
+        <b>{mob.mobType} Lv.{mob.level}</b>
+        <button type="button" onClick={onClose}>X</button>
+      </header>
+      <button type="button" onClick={onHeroBattle}>Fight with hero</button>
+      <div className="city-army-send-box">
+        <b>Send army</b>
+        {unitEntries.map(([unitId, def]) => {
+          const available = armyUnits[unitId] ?? 0;
+          return (
+            <label key={unitId}>
+              <span>{def.label}</span>
+              <input
+                type="number"
+                min="0"
+                max={available}
+                value={sentUnits[unitId] ?? 0}
+                onChange={(event) => {
+                  const value = Math.max(0, Math.min(available, Math.floor(Number(event.target.value) || 0)));
+                  setSentUnits((current) => ({ ...current, [unitId]: value }));
+                }}
+              />
+              <i>/ {available}</i>
+            </label>
+          );
+        })}
+        <span>Win chance: {Math.round((preview.winChance ?? 0) * 100)}% | Morale x{preview.morale.toFixed(2)}</span>
+        <button type="button" disabled={totalSent <= 0} onClick={() => onArmyBattle(sentUnits)}>Attack with army</button>
+      </div>
+    </div>
+  );
+}
+
+function CityArmyBattleResultModal({ result, onClose }) {
+  const lossText = Object.entries(result.losses ?? {})
+    .map(([unitId, count]) => `${CITY_ARMY_UNIT_DEFS[unitId]?.label ?? unitId}: ${count}`)
+    .join(", ") || "None";
+  return (
+    <div className="city-popup-backdrop">
+      <section className="city-popup city-army-result-modal" role="dialog" aria-modal="true" aria-label="Army battle result">
+        <header className="city-popup-header">
+          <div>
+            <h3>{result.won ? "Army victory" : "Army defeated"}</h3>
+            <span>{result.mob?.mobType} Lv.{result.mob?.level}</span>
+          </div>
+          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+        </header>
+        <div className="city-popup-summary">
+          <div>
+            <p>{result.won ? "Mob group removed from the city map." : "Mob group remains active."}</p>
+            <p>Win chance: {Math.round((result.winChance ?? 0) * 100)}% | Morale x{Number(result.morale || 1).toFixed(2)}</p>
+            <p>Army losses: {lossText}</p>
+            <p>Population lost: {result.populationLoss ?? 0}</p>
+          </div>
+        </div>
+        <div className="city-popup-actions">
+          <button type="button" onClick={onClose}>Close</button>
+        </div>
+      </section>
     </div>
   );
 }
@@ -1281,7 +1502,7 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   );
 }
 
-function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, onChangeProgress, onClose }) {
+function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
   const [draggedCityItem, setDraggedCityItem] = useState(null);
   const [activeAddonId, setActiveAddonId] = useState(null);
@@ -1293,12 +1514,18 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
   const prebuilt = Boolean(building.prebuilt);
+  const payBuildingEntries = (entries, progressOverride = progress) => (
+    payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
+  );
+  const buildingResourceAvailable = (resourceId, progressOverride = progress) => (
+    cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId, progressOverride)
+  );
   const nextBuildingLevel = owned ? cityBuildingNextLevel(building, buildingState.level) : null;
   const nextBuildingLevelCostEntries = cityLevelCostEntries(nextBuildingLevel);
   const nextBuildingLevelRequirementEntries = cityStatRequirementEntries(nextBuildingLevel?.statRequirements ?? nextBuildingLevel?.unlock?.statRequirements, cityStats);
   const canUpgradeBuilding = Boolean(nextBuildingLevel)
     && nextBuildingLevelRequirementEntries.every((entry) => entry.met)
-    && nextBuildingLevelCostEntries.every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId) >= amount);
+    && nextBuildingLevelCostEntries.every(([resourceId, amount]) => buildingResourceAvailable(resourceId) >= amount);
   const costEntries = Object.entries(building.cost ?? {});
   const remainingCostEntries = costEntries.map(([resourceId, needed]) => {
     const paid = Math.max(0, buildingState.paid?.[resourceId] ?? 0);
@@ -1308,7 +1535,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const statRequirementEntries = cityStatRequirementEntries(buildingStatRequirements, cityStats);
   const statRequirementsMet = cityStatsMeetRequirements(buildingStatRequirements, cityStats);
   const canBuyBuilding = remainingCostEntries.every(([resourceId, remaining]) => (
-    remaining <= 0 || cityCostAvailable(snapshot, resourceId) >= remaining
+    remaining <= 0 || buildingResourceAvailable(resourceId) >= remaining
   )) && statRequirementsMet;
   const sprite = cityImageForBuilding(houseImages, building);
   const purchasedAddons = new Set(buildingState.addons ?? []);
@@ -1323,12 +1550,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     if (!statRequirementsMet) return;
     const paid = Math.max(0, buildingState.paid?.[resourceId] ?? 0);
     const needed = Math.max(0, (building.cost?.[resourceId] ?? 0) - paid);
-    const available = cityCostAvailable(snapshot, resourceId);
+    const available = buildingResourceAvailable(resourceId);
     const count = Math.min(needed, available, amount);
     if (count <= 0) return;
-    const consumed = resourceId === "gold"
-      ? engineRef.current?.consumeGold?.(count) ?? 0
-      : engineRef.current?.consumeResource?.(resourceId, count) ?? 0;
+    const consumed = payBuildingEntries([[resourceId, count]]) ? count : 0;
     if (consumed <= 0) return;
     onChangeProgress((current) => ({
       ...current,
@@ -1362,7 +1587,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const upgradeBuilding = () => {
     if (!owned || !nextBuildingLevel || !canUpgradeBuilding) return;
-    if (!payCityCostEntries(nextBuildingLevelCostEntries, engineRef.current, snapshot)) return;
+    if (!payBuildingEntries(nextBuildingLevelCostEntries)) return;
     onChangeProgress((current) => ({
       ...current,
       [building.id]: {
@@ -1401,8 +1626,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       return;
     }
     const inventories = normalizeCityInventories(buildingState, building);
-    if (inventories[sectionKey]?.[slotIndex]) return;
-    const taken = engineRef.current?.takeInventoryItem?.(inventoryIndex);
+    const depositPlan = planCityInventoryDeposit(item, section, slotIndex, inventories[sectionKey] ?? []);
+    if (!depositPlan || depositPlan.movedCount <= 0) return;
+    const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, depositPlan.movedCount)
+      ?? engineRef.current?.takeInventoryItem?.(inventoryIndex);
     if (!taken) return;
     if (section.fixedDefs?.[slotIndex]) {
       const xp = Math.max(0, Math.floor(Number(taken.readableXp ?? READABLE_DEF_BY_ID[taken.readableId]?.xp) || 0));
@@ -1415,7 +1642,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       const currentBuildingState = getCityBuildingState(current, building);
       const nextInventories = normalizeCityInventories(currentBuildingState, building);
       const items = [...(nextInventories[sectionKey] ?? [])];
-      items[slotIndex] = taken;
+      applyCityInventoryDepositPlan(items, taken, depositPlan);
       return {
         ...current,
         [building.id]: {
@@ -1467,7 +1694,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     // Check availability and show informative toast if missing
     const deficits = repairEntries
       .map(([resourceId, amount]) => {
-        const available = cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId);
+        const available = buildingResourceAvailable(resourceId, progress);
         return { resourceId, amount, available };
       })
       .filter((entry) => entry.available < entry.amount);
@@ -1477,7 +1704,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       return;
     }
 
-    const paid = payCityCostEntries(repairEntries, engineRef.current, snapshotRef?.current ?? snapshot);
+    const paid = payBuildingEntries(repairEntries, progress);
     if (!paid) {
       engineRef.current?.addToast?.("Betaling mislykkedes ved reparation.");
       return;
@@ -1515,9 +1742,19 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       const moving = fromItems[fromSlotIndex];
       const target = toItems[toSlotIndex];
       if (!moving || !itemMatchesCityInventorySlot(moving, toSection, toSlotIndex)) return current;
-      if (target && !itemMatchesCityInventorySlot(target, fromSection, fromSlotIndex)) return current;
-      fromItems[fromSlotIndex] = target ?? null;
-      toItems[toSlotIndex] = moving;
+      if (cityInventoryItemsCanStack(moving, target)) {
+        const stackMax = cityInventoryStackMax(moving);
+        const movingCount = Math.max(1, Math.floor(Number(moving.count) || 1));
+        const targetCount = Math.max(1, Math.floor(Number(target.count) || 1));
+        const moved = Math.min(stackMax - targetCount, movingCount);
+        if (moved <= 0) return current;
+        toItems[toSlotIndex] = { ...target, count: targetCount + moved };
+        fromItems[fromSlotIndex] = movingCount > moved ? { ...moving, count: movingCount - moved } : null;
+      } else {
+        if (target && !itemMatchesCityInventorySlot(target, fromSection, fromSlotIndex)) return current;
+        fromItems[fromSlotIndex] = target ?? null;
+        toItems[toSlotIndex] = moving;
+      }
       return {
         ...current,
         [building.id]: {
@@ -1532,14 +1769,25 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     });
   };
 
-  const produceFoodBarrel = (resourceId, cost) => {
-    engineRef.current?.convertResourceToResource?.(resourceId, cost, "food", 1);
+  const produceFoodBarrel = (resourceId, cost, outputResourceId = "food", outputCount = 1) => {
+    onConvertResourceToResource?.(resourceId, cost, outputResourceId, outputCount);
   };
 
   const addFarmProvision = (resourceId, cost, provision) => {
-    const consumed = engineRef.current?.consumeResource?.(resourceId, cost) ?? 0;
-    if (consumed < cost) return;
+    if (!payBuildingEntries([[resourceId, cost]])) return;
     onChangeProgress((current) => addCityPermanentStatBonus(current, "provision", provision));
+  };
+
+  const repairEquippedItem = (slotId, cost = {}) => {
+    const entries = [
+      ["gold", Math.max(0, Math.floor(Number(cost.gold) || 0))],
+      ["junk", Math.max(0, Math.floor(Number(cost.junk) || 0))],
+    ].filter(([, amount]) => amount > 0);
+    if (!payBuildingEntries(entries)) return;
+    const repaired = engineRef.current?.repairEquippedItem?.(slotId, { prepaid: true }) ?? false;
+    if (!repaired) {
+      engineRef.current?.addToast?.("Reparation mislykkedes efter betaling.");
+    }
   };
 
   const contributeTownHallResource = (resourceId, cost, armyGain) => {
@@ -1548,6 +1796,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     if (army >= population) return;
     const consumed = engineRef.current?.consumeResource?.(resourceId, cost) ?? 0;
     if (consumed >= cost) engineRef.current?.addArmy?.(Math.min(armyGain, population - army), RESOURCE_DEFS[resourceId]?.name ?? resourceId);
+  };
+
+  const trainArmyUnit = (recipe) => {
+    if (!recipe?.unitId || !cityArmyCanTrainUnit(progress, cityStats, recipe.unitId, recipe.count ?? 1)) return;
+    const entries = Object.entries(recipe.cost ?? {});
+    if (!payBuildingEntries(entries)) return;
+    onChangeProgress((current) => addCityArmyUnit(current, recipe.unitId, recipe.count ?? 1));
   };
 
   const buyResearchRecipe = (recipeKey) => {
@@ -1572,7 +1827,24 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const mergeResearchRecipe = (recipe) => {
     const key = researchRecipeKey(recipe);
     if (!new Set(buildingState.recipes ?? []).has(key)) return;
-    engineRef.current?.mergeResearchResourceRecipe?.(recipe.output);
+    const output = makeResourceItem(recipe.output, recipe.count ?? 1);
+    if (!output) return;
+    const inputs = Object.entries(recipe.inputs ?? {});
+    if (!inputs.every(([resourceId, amount]) => buildingResourceAvailable(resourceId) >= Math.max(1, Math.floor(Number(amount) || 1)))) return;
+    const stackMax = Math.max(1, Math.floor(Number(output.stackMax ?? resourceStackMax(recipe.output)) || 1));
+    const canFit = (snapshotRef?.current?.inventory ?? []).some((item) => (
+      item?.mode === "resource"
+      && String(item.resourceId) === String(recipe.output)
+      && Math.max(1, Math.floor(Number(item.count) || 1)) < stackMax
+    )) || (snapshotRef?.current?.inventory ?? []).length < MAX_INVENTORY;
+    if (!canFit) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+    if (!payBuildingEntries(inputs)) return;
+    if (!engineRef.current?.addInventoryItem?.(output)) return;
+    engineRef.current?.addToast?.(`Merged: ${output.name}`);
+    engineRef.current?.saveProgress?.({ force: true });
   };
 
   const setMerchantState = (updater) => {
@@ -1669,9 +1941,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                     <span>Ingen resources kræves.</span>
                   )}
                   {computeRepairCostEntries(building.cost ?? {}, Math.max(0, Math.ceil(100 - (buildingState.durability ?? DURABILITY_DEFAULT)))).map(([resourceId, amount]) => (
-                    <span key={resourceId} className={cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId) >= amount ? "met" : "missing"}>
+                    <span key={resourceId} className={buildingResourceAvailable(resourceId) >= amount ? "met" : "missing"}>
                       <CityCostIcon resourceId={resourceId} />
-                      {amount} {cityCostLabel(resourceId)} {cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId) !== undefined && `(${cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId)} available)`}
+                      {amount} {cityCostLabel(resourceId)} {buildingResourceAvailable(resourceId) !== undefined && `(${buildingResourceAvailable(resourceId)} available)`}
                     </span>
                   ))}
                 </div>
@@ -1691,7 +1963,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 {nextBuildingLevelCostEntries.length > 0 && (
                   <div className="city-area-costs">
                     {nextBuildingLevelCostEntries.map(([resourceId, amount]) => (
-                      <span className={cityCostAvailable(snapshot, resourceId) >= amount ? "met" : "missing"} key={resourceId}>
+                      <span className={buildingResourceAvailable(resourceId) >= amount ? "met" : "missing"} key={resourceId}>
                         <CityCostIcon resourceId={resourceId} />
                         {amount} {cityCostLabel(resourceId)}
                       </span>
@@ -1709,7 +1981,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 ))}
               </div>
             )}
-            {!owned && costEntries.length > 0 && <CityCostSummary costEntries={costEntries} buildingState={buildingState} snapshot={snapshot} />}
+            {!owned && costEntries.length > 0 && <CityCostSummary costEntries={costEntries} buildingState={buildingState} snapshot={snapshot} progress={progress} />}
           </div>
         </div>
 
@@ -1812,31 +2084,44 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           {building.id === "blacksmith" && owned && activeAddonId === "minting_furnace" && purchasedAddons.has("minting_furnace") && (
             <CityGoldBarPanel
               gold={snapshot.player?.gold ?? 0}
+              inventory={snapshot.inventory}
               popularity={snapshot.player?.popularity ?? 0}
+              resourceCount={buildingResourceAvailable}
               onSmelt={() => engineRef.current?.smeltGoldToBar?.(1)}
+              onSmeltIron={() => onConvertResourceToResource?.("iron_piece", 3, "iron_bar", 1)}
             />
           )}
           {building.id === "farm" && owned && (
             <CityFarmPanel
               inventory={snapshot.inventory}
               popularity={snapshot.player?.popularity ?? 0}
+              resourceCount={buildingResourceAvailable}
               onProduceFoodBarrel={produceFoodBarrel}
               onProduceProvision={addFarmProvision}
             />
           )}
           {building.id === "town_hall" && owned && (
-            <CityTownHallPanel
-              inventory={snapshot.inventory}
-              army={snapshot.player?.stats?.army ?? 0}
-              population={cityStats.population ?? 0}
-              popularity={snapshot.player?.popularity ?? 0}
-              onContribute={contributeTownHallResource}
+            <section className="blacksmith-station">
+              <header>
+                <h4>Army Muster disabled</h4>
+                <span>Army is now trained as units in the Barracks.</span>
+              </header>
+            </section>
+          )}
+          {building.id === "barracks" && owned && activeAddon && (
+            <CityBarracksTrainingPanel
+              addon={activeAddon}
+              progress={progress}
+              cityStats={cityStats}
+              snapshot={snapshot}
+              onTrain={trainArmyUnit}
             />
           )}
           {building.id === "research_lab" && owned && !activeAddonId && (
             <CityResearchPanel
               buildingState={buildingState}
               snapshot={snapshot}
+              resourceCount={buildingResourceAvailable}
               onBuyRecipe={(recipeKey) => buyResearchRecipe(recipeKey)}
               onMerge={(recipe) => mergeResearchRecipe(recipe)}
             />
@@ -1872,6 +2157,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               snapshotRef={snapshotRef}
               activeAddonId={activeAddonId}
               purchasedAddons={purchasedAddons}
+              resourceCount={buildingResourceAvailable}
+              onRepairEquippedItem={repairEquippedItem}
             />
           )}
         </main>
@@ -1881,6 +2168,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           building={building}
           buildingState={buildingState}
           snapshot={snapshot}
+          progress={progress}
           costEntries={costEntries}
           canFinish={remainingCostEntries.every(([, remaining]) => remaining <= 0)}
           canPayAll={canBuyBuilding}
@@ -2038,6 +2326,7 @@ function itemMatchesCityInventorySlot(item, section, slotIndex) {
 function itemCanEnterAnyCityInventorySlot(item, section, storedItems = []) {
   if (!item || !section) return false;
   for (let index = 0; index < section.slots; index += 1) {
+    if (cityInventoryItemsCanStack(item, storedItems[index])) return true;
     if (!storedItems[index] && itemMatchesCityInventorySlot(item, section, index)) return true;
   }
   return false;
@@ -2046,9 +2335,86 @@ function itemCanEnterAnyCityInventorySlot(item, section, storedItems = []) {
 function firstCityInventorySlotForItem(item, section, storedItems = []) {
   if (!item || !section) return -1;
   for (let index = 0; index < section.slots; index += 1) {
+    if (cityInventoryItemsCanStack(item, storedItems[index])) return index;
+  }
+  for (let index = 0; index < section.slots; index += 1) {
     if (!storedItems[index] && itemMatchesCityInventorySlot(item, section, index)) return index;
   }
   return -1;
+}
+
+function cityInventoryStackMax(item) {
+  if (!isResourceItem(item)) return 1;
+  return Math.max(1, Math.floor(Number(item.stackMax ?? resourceStackMax(item.resourceId)) || 1));
+}
+
+function cityInventoryItemsCanStack(incoming, target) {
+  if (!isResourceItem(incoming) || !isResourceItem(target)) return false;
+  if (String(incoming.resourceId ?? "") !== String(target.resourceId ?? "")) return false;
+  return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
+}
+
+function planCityInventoryDeposit(item, section, slotIndex, storedItems = []) {
+  if (!item || !section) return null;
+  const target = storedItems[slotIndex] ?? null;
+  if (!isResourceItem(item)) {
+    if (target || !itemMatchesCityInventorySlot(item, section, slotIndex)) return null;
+    return { movedCount: 1, steps: [{ type: "place", slotIndex, count: 1 }] };
+  }
+  if (target && !cityInventoryItemsCanStack(item, target)) return null;
+  const stackMax = cityInventoryStackMax(item);
+  let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+  const steps = [];
+  const reserve = new Set();
+  const addFillStep = (index) => {
+    const stored = storedItems[index];
+    if (!cityInventoryItemsCanStack(item, stored)) return;
+    const current = Math.max(1, Math.floor(Number(stored.count) || 1));
+    const moved = Math.min(stackMax - current, remaining);
+    if (moved <= 0) return;
+    steps.push({ type: "fill", slotIndex: index, count: moved });
+    remaining -= moved;
+  };
+
+  if (target) {
+    addFillStep(slotIndex);
+  } else {
+    for (let index = 0; index < section.slots && remaining > 0; index += 1) {
+      addFillStep(index);
+    }
+    if (remaining > 0 && itemMatchesCityInventorySlot(item, section, slotIndex)) {
+      const moved = Math.min(stackMax, remaining);
+      steps.push({ type: "place", slotIndex, count: moved });
+      reserve.add(slotIndex);
+      remaining -= moved;
+    }
+    for (let index = 0; index < section.slots && remaining > 0; index += 1) {
+      if (reserve.has(index) || storedItems[index] || !itemMatchesCityInventorySlot(item, section, index)) continue;
+      const moved = Math.min(stackMax, remaining);
+      steps.push({ type: "place", slotIndex: index, count: moved });
+      remaining -= moved;
+    }
+  }
+
+  const movedCount = steps.reduce((sum, step) => sum + step.count, 0);
+  return movedCount > 0 ? { movedCount, steps } : null;
+}
+
+function applyCityInventoryDepositPlan(items, item, plan) {
+  let remaining = Math.max(1, Math.floor(Number(item.count) || plan.movedCount || 1));
+  for (const step of plan.steps) {
+    if (remaining <= 0) break;
+    const moved = Math.min(step.count, remaining);
+    if (step.type === "fill") {
+      const target = items[step.slotIndex];
+      if (!target) continue;
+      const current = Math.max(1, Math.floor(Number(target.count) || 1));
+      items[step.slotIndex] = { ...target, count: current + moved };
+    } else {
+      items[step.slotIndex] = { ...item, count: moved };
+    }
+    remaining -= moved;
+  }
 }
 
 function itemMatchesCityInventoryType(item, type) {
@@ -2090,7 +2456,7 @@ function itemMatchesCityInventoryType(item, type) {
 
 
 
-function CityCostSummary({ costEntries, buildingState, snapshot }) {
+function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
   if (!costEntries.length) return null;
   return (
     <div className="city-cost-summary">
@@ -2101,11 +2467,63 @@ function CityCostSummary({ costEntries, buildingState, snapshot }) {
           <span key={resourceId}>
             <CityCostIcon resourceId={resourceId} />
             {paid}/{needed} {cityCostLabel(resourceId)}
-            {remaining > 0 && ` (${cityCostAvailable(snapshot, resourceId)} available)`}
+            {remaining > 0 && ` (${cityCostAvailable(snapshot, resourceId, progress)} available)`}
           </span>
         );
       })}
     </div>
+  );
+}
+
+function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, onTrain }) {
+  const recipes = armyTrainingRecipesForAddon(addon?.id);
+  const armyUnits = normalizeArmyUnits(progress?.armyUnits);
+  const used = cityArmyUnitCount(armyUnits);
+  const capacity = cityUsableSoldierCapacity(cityStats);
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>{addon.title}</h4>
+        <span>Soldiers {used} / {capacity} usable citizens</span>
+      </header>
+      {Object.entries(CITY_ARMY_UNIT_DEFS).map(([unitId, def]) => (
+        <div className="blacksmith-row" key={`owned-${unitId}`}>
+          {def.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
+          <div>
+            <b>{def.label}</b>
+            <span>Owned: {armyUnits[unitId] ?? 0} | Power: {def.armyValue}</span>
+          </div>
+        </div>
+      ))}
+      {recipes.map((recipe) => {
+        const def = CITY_ARMY_UNIT_DEFS[recipe.unitId];
+        const hasResources = Object.entries(recipe.cost ?? {}).every(([resourceId, count]) => cityCostAvailable(snapshot, resourceId, progress) >= count);
+        const hasCapacity = cityArmyCanTrainUnit(progress, cityStats, recipe.unitId, recipe.count ?? 1);
+        return (
+          <div className="blacksmith-row" key={recipe.id}>
+            {def?.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
+            <div>
+              <b>Train {def?.label ?? recipe.unitId}</b>
+              <div className="city-area-costs city-army-training-costs">
+                {Object.entries(recipe.cost ?? {}).map(([resourceId, count]) => {
+                  const available = cityCostAvailable(snapshot, resourceId, progress);
+                  return (
+                    <span className={available >= count ? "met" : "missing"} key={resourceId}>
+                      <CityCostIcon resourceId={resourceId} />
+                      {count} {cityCostLabel(resourceId)} ({available})
+                    </span>
+                  );
+                })}
+                <span className={hasCapacity ? "met" : "missing"}>
+                  Citizens {used}/{capacity}
+                </span>
+              </div>
+            </div>
+            <button type="button" disabled={!hasResources || !hasCapacity} onClick={() => onTrain(recipe)}>Train</button>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
@@ -2117,8 +2535,9 @@ function CityStatEffectsSummary({ title, effects }) {
       {title && <b>{title}</b>}
       <div>
         {entries.map(([statId, amount]) => (
-          <span className={amount >= 0 ? "positive" : "negative"} key={statId}>
-            {amount >= 0 ? "+" : ""}{amount} {cityStatLabel(statId)}
+          <span className={amount >= 0 ? "positive" : "negative"} key={statId} title={cityStatLabel(statId)}>
+            <CityStatIcon statId={statId} />
+            <b>{amount >= 0 ? "+" : ""}{amount}</b>
           </span>
         ))}
       </div>
@@ -2138,17 +2557,17 @@ function CityCampStats({ cityStats }) {
     <div className="city-stat-effects">
       <b>Camp</b>
       <div>
-        <span>{camp} outside city</span>
-        <span>{homeless} homeless</span>
-        <span>{hungry} hungry</span>
-        <span>{thirsty} thirsty</span>
+        <span title="Camp population"><b>{camp}</b> outside city</span>
+        <span title="Homeless"><CityStatIcon statId="homeless_people" /><b>{homeless}</b></span>
+        <span title="Hungry"><CityStatIcon statId="hungry_people" /><b>{hungry}</b></span>
+        <span title="Thirsty"><CityStatIcon statId="thirsty_people" /><b>{thirsty}</b></span>
       </div>
       <p>{overlapText}</p>
     </div>
   );
 }
 
-function CityBuildPaymentModal({ building, buildingState, snapshot, costEntries, canFinish, canPayAll, statRequirementsMet = true, onApplyResource, onPayAll, onFinish, onClose }) {
+function CityBuildPaymentModal({ building, buildingState, snapshot, progress, costEntries, canFinish, canPayAll, statRequirementsMet = true, onApplyResource, onPayAll, onFinish, onClose }) {
   return (
     <div className="city-build-payment-backdrop" role="presentation">
       <section className="city-build-payment-modal" role="dialog" aria-modal="true" aria-label={`Build ${building.title}`}>
@@ -2164,7 +2583,7 @@ function CityBuildPaymentModal({ building, buildingState, snapshot, costEntries,
           {costEntries.map(([resourceId, needed]) => {
             const paid = Math.max(0, buildingState.paid?.[resourceId] ?? 0);
             const remaining = Math.max(0, needed - paid);
-            const available = cityCostAvailable(snapshot, resourceId);
+            const available = cityCostAvailable(snapshot, resourceId, progress);
             const label = cityCostLabel(resourceId);
             return (
               <div className="city-cost-row" key={resourceId}>

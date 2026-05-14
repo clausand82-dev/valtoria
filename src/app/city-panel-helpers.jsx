@@ -167,7 +167,14 @@ function popularityBonusStep(popularity) {
 }
 
 function foodBarrelCost(popularity) {
-  return Math.max(50, 100 - (popularityBonusStep(popularity) * 5));
+  const recipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
+  const baseCost = Math.max(1, Math.floor(Number(recipe.baseCost) || 100));
+  const minCost = Math.max(1, Math.floor(Number(recipe.minCost) || 50));
+  const popularityStart = Math.max(0, Math.floor(Number(recipe.popularityStart) || 50));
+  const popularityStep = Math.max(1, Math.floor(Number(recipe.popularityStep) || 10));
+  const discountPerStep = Math.max(0, Math.floor(Number(recipe.discountPerStep) || 5));
+  const steps = Math.max(0, Math.floor((Math.max(0, Number(popularity) || 0) - popularityStart) / popularityStep));
+  return Math.max(minCost, baseCost - (steps * discountPerStep));
 }
 
 function socketText(item) {

@@ -1,3 +1,5 @@
+import { normalizeParticleConfigs } from "./particle-presets.js";
+
 const DEFAULT_DECAY_GRID = 4;
 
 export const DECAY_SET_DEFS = {
@@ -111,6 +113,7 @@ function normalizeDecayEntry(entry) {
     renderScale: Number.isFinite(Number(def.renderScale)) ? Number(def.renderScale) : 1,
     sheetId: buildDecaySheetId(id),
     variants,
+    particles: normalizeParticleConfigs(typeof entry === "object" ? entry.particles : def.particles),
   };
 }
 

@@ -1,7 +1,26 @@
 History over changes
 
+* V 1.62
+- added wolf_cub og wolf_fenris (last as boss)
+- moved food barrel recipes from code to config file
+- loading battle maps now only loads nessacery assets and base core, next map will load not allready nessecary assets
+- fog of war added
+- ambient particle system added
+- object, foilage with more particle system added
+- weather including thunderstorm added
+- better debth handling on battle map
+
 * V. 1.61
-- app.jsx is reduced more, same with shared.jsx
+- app.jsx is reduced more
+- shared.jsx is split into smaller files and deleted
+- fixed bank stacking
+- fixed missing durability in ssaves - now lost durability stays
+- durability bar now always shows
+- world map is part of city instead of battle map
+- a config files now defines punishment for leaving battle map early
+- changed layout in sidepanel
+- use of resources now draw from every inventory slot (back pack first)
+- redesigned army system (now you buy different army unit to use defending city)
 
 * V. 1.60
 - total new city map look

@@ -6,11 +6,13 @@ import {
   OBJECT_SHEETS,
   TREE_SHEETS,
 } from "./config/asset-config.js";
-import { buildDecaySheetId, DECAY_SET_DEFS } from "./config/decay-config.js";
-import { getRegionObjectFamily, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { BIOMES } from "./config/biome-config.js";
+import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
+import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
-import { MONSTER_SHEETS } from "./config/monster-config.js";
-import { collectRegionAssetOverrides } from "./config/region-asset-config.js";
+import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
+import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset } from "./config/region-asset-config.js";
 import { RESOURCE_DEFS } from "./config/resource-config.js";
 
 export const ATLAS_FRAMES = {
@@ -46,6 +48,33 @@ let generatedAtlasPromise = null;
 let generatedAtlasCache = null;
 let animationSheetsPromise = null;
 let animationSheetsCache = null;
+const chromaImageCache = new Map();
+
+const atlasPartCache = {
+  canvas: null,
+  canvasPromise: null,
+  groundSheets: {},
+  groundPromises: new Map(),
+  treeSheets: {},
+  treePromises: new Map(),
+  waterSheet: undefined,
+  waterPromise: null,
+  foliageSheets: {},
+  foliagePromises: new Map(),
+  decaySheets: {},
+  decayPromises: new Map(),
+  objectSheets: {},
+  objectPromises: new Map(),
+};
+
+const animationPartCache = {
+  hero: null,
+  heroPromise: null,
+  heroCast: null,
+  heroCastPromise: null,
+  monsters: {},
+  monsterPromises: new Map(),
+};
 
 const OBJECT_FRAME = {
   tree: "tree",
@@ -59,20 +88,22 @@ const OBJECT_FRAME = {
   crate: "crate",
 };
 
-export function loadGeneratedAtlas() {
-  if (generatedAtlasCache) return Promise.resolve(generatedAtlasCache);
-  if (generatedAtlasPromise) return generatedAtlasPromise;
+export function loadGeneratedAtlas(regionConfig = null) {
+  const manifest = buildRegionAssetManifest(regionConfig);
+  if (generatedAtlasPromise) {
+    return generatedAtlasPromise.then(() => loadGeneratedAtlas(regionConfig));
+  }
   generatedAtlasPromise = Promise.all([
-    loadChromaImage("/assets/generated/runebound-atlas-source.png"),
-    loadGroundSheets(),
-    loadTreeSheets(),
-    loadWaterSheet(),
-    loadFoliageSheet(),
-    loadDecaySheets(),
+    loadAtlasCanvas(),
+    loadGroundSheets(manifest),
+    loadTreeSheets(manifest),
+    manifest.water ? loadWaterSheet() : Promise.resolve(atlasPartCache.waterSheet ?? null),
+    loadFoliageSheet(manifest),
+    loadDecaySheets(manifest),
     loadItemSheet(),
     loadResourceSheet(),
     loadArmorSheet(),
-    loadObjectSheets(),
+    loadObjectSheets(manifest),
   ]).then(([
     canvas,
     groundSheets,
@@ -101,54 +132,235 @@ export function loadGeneratedAtlas() {
     };
     return generatedAtlasCache;
   }).catch((error) => {
-    generatedAtlasPromise = null;
     throw error;
+  }).finally(() => {
+    generatedAtlasPromise = null;
   });
   return generatedAtlasPromise;
 }
 
-export function loadAnimationSheets() {
-  if (animationSheetsCache) return Promise.resolve(animationSheetsCache);
-  if (animationSheetsPromise) return animationSheetsPromise;
-  // Deduplicate URLs so shared sheets (skeleton+ghost) are only loaded once.
-  const urlMap = new Map();
-  for (const cfg of MONSTER_SHEETS) {
-    if (!urlMap.has(cfg.url)) urlMap.set(cfg.url, loadChromaImage(cfg.url));
+export function loadAnimationSheets(regionConfig = null) {
+  const manifest = buildAnimationAssetManifest(regionConfig);
+  if (animationSheetsPromise) {
+    return animationSheetsPromise.then(() => loadAnimationSheets(regionConfig));
   }
-
   animationSheetsPromise = Promise.all([
-    loadChromaImage(HERO_SHEET.url),
-    loadChromaImage("/assets/generated/hero_cast_sheet.png"),
-    ...urlMap.values(),
-  ]).then(([heroCanvas, heroCastCanvas, ...monsterCanvases]) => {
-    const urlToCanvas = new Map();
-    let i = 0;
-    for (const url of urlMap.keys()) urlToCanvas.set(url, monsterCanvases[i++]);
-
-    const monsters = {};
-    for (const cfg of MONSTER_SHEETS) {
-      const canvas = urlToCanvas.get(cfg.url);
-      monsters[cfg.id] = {
-        sheet: makeAnimationSheet(canvas, cfg.rows, cfg.cols, "monsters"),
-        cfg,
-      };
-    }
-
+    loadHeroAnimationSheet(),
+    loadHeroCastAnimationSheet(),
+    loadMonsterAnimationSheets(manifest),
+  ]).then(([hero, heroCast, monsters]) => {
     animationSheetsCache = {
-      hero: makeAnimationSheet(heroCanvas, HERO_SHEET.rows, HERO_SHEET.cols, "hero"),
-      heroCast: makeAnimationSheet(heroCastCanvas, 1, 8, "hero"),
+      hero,
+      heroCast,
       monsters,
     };
     return animationSheetsCache;
   }).catch((error) => {
-    animationSheetsPromise = null;
     throw error;
+  }).finally(() => {
+    animationSheetsPromise = null;
   });
   return animationSheetsPromise;
 }
 
+function isRegionConfig(value) {
+  return Boolean(value && typeof value === "object" && (
+    value.id
+    || value.biodome
+    || value.tileset
+    || value.foliageSet
+    || value.foliageSets
+    || value.foilageSet
+    || value.foilageSets
+    || value.objects
+    || value.decay
+    || value.mobs
+  ));
+}
+
+function normalizeAssetLoaderInput(input) {
+  if (isRegionConfig(input?.regionConfig)) return input.regionConfig;
+  return isRegionConfig(input) ? input : null;
+}
+
+function buildFullRegionAssetManifest() {
+  const regionAssetOverrides = collectRegionAssetOverrides({
+    ...MAP_REGION_SETS,
+    __cityMobBattleProfiles: CITY_MOB_BATTLE_PROFILES,
+  });
+  return {
+    full: true,
+    water: true,
+    groundSpecs: Object.entries(GROUND_SHEETS).map(([biomeId, config]) => groundSpecFromConfig(biomeId, config))
+      .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName))),
+    treeSpecs: Object.entries(TREE_SHEETS).map(([biomeId, fileName]) => ({ biomeId, fileName })),
+    foliageSpecs: Object.entries(FOLIAGE_SHEETS).map(([id, config]) => normalizeFoliageSheetSpec(id, config, 8))
+      .concat(regionAssetOverrides.foliageSheets.map((entry) => ({
+        id: entry.sheetId,
+        fileName: entry.fileName,
+        rows: entry.rows,
+        cols: entry.cols,
+      }))),
+    decayIds: new Set(Object.keys(DECAY_SET_DEFS ?? {})),
+    objectTypes: new Set(Object.keys({ ...OBJECT_SHEETS, ...REGION_OBJECT_SHEETS })),
+  };
+}
+
+function buildRegionAssetManifest(input) {
+  const regionConfig = normalizeAssetLoaderInput(input);
+  if (!regionConfig) return buildFullRegionAssetManifest();
+
+  const biomeId = regionConfig.biodome ?? "mainland";
+  const biomeIds = new Set(["mainland", biomeId]);
+  const groundSpecs = [...biomeIds]
+    .map((id) => GROUND_SHEETS[id] ? groundSpecFromConfig(id, GROUND_SHEETS[id]) : null)
+    .filter(Boolean);
+  const normalizedTileset = normalizeRegionTileset(regionConfig.tileset);
+  const tilesets = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : []);
+  for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName));
+
+  const foliageSets = normalizeRegionFoliageSets(regionConfig);
+  const foliageSpecs = foliageSets.length
+    ? foliageSets.map((entry) => ({
+      id: entry.sheetId,
+      fileName: entry.fileName,
+      rows: entry.rows,
+      cols: entry.cols,
+    }))
+    : [...new Set(["mainland", biomeId, "bones"])]
+      .map((id) => FOLIAGE_SHEETS[id] ? normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8) : null)
+      .filter(Boolean);
+
+  const objectTypes = new Set(["chest"]);
+  for (const entry of normalizeRegionObjects(regionConfig, biomeId)) {
+    for (const spawnType of entry.spawnTypes ?? []) {
+      const type = spawnType?.type;
+      if (!type) continue;
+      objectTypes.add(type);
+      const family = getRegionObjectFamily(type);
+      if (family) objectTypes.add(family);
+    }
+  }
+  for (const type of BIOMES[biomeId]?.objects ?? []) {
+    objectTypes.add(type);
+    const family = getRegionObjectFamily(type);
+    if (family) objectTypes.add(family);
+  }
+
+  return {
+    full: false,
+    water: (Number(regionConfig.weights?.water) || 0) > 0,
+    groundSpecs,
+    treeSpecs: [...biomeIds]
+      .map((id) => TREE_SHEETS[id] ? { biomeId: id, fileName: TREE_SHEETS[id] } : null)
+      .filter(Boolean),
+    foliageSpecs,
+    decayIds: new Set(normalizeRegionDecaySets(regionConfig).map((entry) => entry.id)),
+    objectTypes,
+  };
+}
+
+function buildAnimationAssetManifest(input) {
+  const regionConfig = normalizeAssetLoaderInput(input);
+  if (!regionConfig) return { monsterIds: new Set(MONSTER_SHEETS.map((cfg) => cfg.id)) };
+  const monsterIds = new Set();
+  const biomeId = regionConfig.biodome ?? "mainland";
+  const mobs = regionConfig.mobs?.length ? regionConfig.mobs : BIOMES[biomeId]?.monsters ?? [];
+  for (const entry of mobs) {
+    const type = typeof entry === "string" ? entry : entry?.type;
+    if (!type) continue;
+    monsterIds.add(monsterSpriteId(type));
+    const base = MONSTER_STATS[type];
+    if (base?.sprite) monsterIds.add(base.sprite);
+  }
+  if (!monsterIds.size) monsterIds.add("wolf");
+  return { monsterIds };
+}
+
+function loadHeroAnimationSheet() {
+  if (animationPartCache.hero) return Promise.resolve(animationPartCache.hero);
+  if (!animationPartCache.heroPromise) {
+    animationPartCache.heroPromise = loadChromaImage(HERO_SHEET.url)
+      .then((canvas) => {
+        animationPartCache.hero = makeAnimationSheet(canvas, HERO_SHEET.rows, HERO_SHEET.cols, "hero");
+        return animationPartCache.hero;
+      })
+      .catch((error) => {
+        animationPartCache.heroPromise = null;
+        throw error;
+      });
+  }
+  return animationPartCache.heroPromise;
+}
+
+function loadHeroCastAnimationSheet() {
+  if (animationPartCache.heroCast) return Promise.resolve(animationPartCache.heroCast);
+  if (!animationPartCache.heroCastPromise) {
+    animationPartCache.heroCastPromise = loadChromaImage("/assets/generated/hero_cast_sheet.png")
+      .then((canvas) => {
+        animationPartCache.heroCast = makeAnimationSheet(canvas, 1, 8, "hero");
+        return animationPartCache.heroCast;
+      })
+      .catch((error) => {
+        animationPartCache.heroCastPromise = null;
+        throw error;
+      });
+  }
+  return animationPartCache.heroCastPromise;
+}
+
+function loadMonsterAnimationSheets(manifest) {
+  const configs = MONSTER_SHEETS.filter((cfg) => manifest.monsterIds.has(cfg.id));
+  return Promise.all(configs.map((cfg) => {
+    if (animationPartCache.monsters[cfg.id]) return Promise.resolve([cfg.id, animationPartCache.monsters[cfg.id]]);
+    if (!animationPartCache.monsterPromises.has(cfg.id)) {
+      animationPartCache.monsterPromises.set(cfg.id, loadChromaImage(cfg.url)
+        .then((canvas) => [cfg.id, {
+          sheet: makeAnimationSheet(canvas, cfg.rows, cfg.cols, "monsters"),
+          cfg,
+        }])
+        .catch((error) => {
+          console.warn(`Monster sheet load failed for ${cfg.id}: ${cfg.url}`, error);
+          return [cfg.id, null];
+        }));
+    }
+    return animationPartCache.monsterPromises.get(cfg.id);
+  })).then((entries) => {
+    for (const [id, entry] of entries) {
+      if (entry) animationPartCache.monsters[id] = entry;
+    }
+    return animationPartCache.monsters;
+  });
+}
+
+function groundSpecFromConfig(biomeId, config) {
+  return {
+    biomeId,
+    fileName: typeof config === "string" ? config : config.fileName,
+    sourceInset: typeof config === "string" ? 0 : config.sourceInset ?? 0,
+    edgeFeather: typeof config === "string" ? 0 : config.edgeFeather ?? 0,
+    textureAlpha: typeof config === "string" ? 1 : config.textureAlpha ?? 1,
+    visualScale: typeof config === "string" ? 1 : config.visualScale ?? 1,
+    baseAlpha: typeof config === "string" ? 1 : config.baseAlpha ?? 1,
+  };
+}
+
+function customGroundSpec(biomeId, fileName) {
+  return {
+    biomeId,
+    fileName,
+    sourceInset: 0.025,
+    edgeFeather: 0.12,
+    textureAlpha: 1,
+    visualScale: 1.18,
+    baseAlpha: 0.18,
+  };
+}
+
 function loadChromaImage(src, options = {}) {
-  return new Promise((resolve, reject) => {
+  const cacheKey = `${src}|${options.keyEdgeBlack ? 1 : 0}|${options.keyEdgeHalo ? 1 : 0}|${options.blackThreshold ?? ""}`;
+  if (chromaImageCache.has(cacheKey)) return chromaImageCache.get(cacheKey);
+  const promise = new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
       const canvas = document.createElement("canvas");
@@ -182,7 +394,12 @@ function loadChromaImage(src, options = {}) {
     };
     image.onerror = () => reject(new Error(`Image load failed: ${src}`));
     image.src = src;
+  }).catch((error) => {
+    chromaImageCache.delete(cacheKey);
+    throw error;
   });
+  chromaImageCache.set(cacheKey, promise);
+  return promise;
 }
 
 function removeEdgeBlackBackground(canvas, threshold = 24) {
@@ -290,30 +507,30 @@ function loadRawImage(src) {
   });
 }
 
-function loadGroundSheets() {
-  const regionAssetOverrides = collectRegionAssetOverrides(MAP_REGION_SETS);
-  const customGroundSpecs = regionAssetOverrides.groundSheets.map((entry) => ({
-    biomeId: entry.sheetId,
-    fileName: entry.fileName,
-    sourceInset: 0.025,
-    edgeFeather: 0.12,
-    textureAlpha: 1,
-    visualScale: 1.18,
-    baseAlpha: 0.18,
-  }));
-  const biomeGroundSpecs = Object.entries(GROUND_SHEETS).map(([biomeId, config]) => ({
-    biomeId,
-    fileName: typeof config === "string" ? config : config.fileName,
-    sourceInset: typeof config === "string" ? 0 : config.sourceInset ?? 0,
-    edgeFeather: typeof config === "string" ? 0 : config.edgeFeather ?? 0,
-    textureAlpha: typeof config === "string" ? 1 : config.textureAlpha ?? 1,
-    visualScale: typeof config === "string" ? 1 : config.visualScale ?? 1,
-    baseAlpha: typeof config === "string" ? 1 : config.baseAlpha ?? 1,
-  }));
+function loadAtlasCanvas() {
+  if (atlasPartCache.canvas) return Promise.resolve(atlasPartCache.canvas);
+  if (!atlasPartCache.canvasPromise) {
+    atlasPartCache.canvasPromise = loadChromaImage("/assets/generated/runebound-atlas-source.png")
+      .then((canvas) => {
+        atlasPartCache.canvas = canvas;
+        return canvas;
+      })
+      .catch((error) => {
+        atlasPartCache.canvasPromise = null;
+        throw error;
+      });
+  }
+  return atlasPartCache.canvasPromise;
+}
 
+function loadGroundSheets(manifest = buildFullRegionAssetManifest()) {
   return Promise.all(
-    [...biomeGroundSpecs, ...customGroundSpecs].map((spec) => {
-      return loadGroundImage(`/assets/generated/${spec.fileName}`).then((canvas) => [spec.biomeId, makeGroundSheet(canvas, {
+    manifest.groundSpecs.map((spec) => {
+      if (atlasPartCache.groundSheets[spec.biomeId]) {
+        return Promise.resolve([spec.biomeId, atlasPartCache.groundSheets[spec.biomeId]]);
+      }
+      if (!atlasPartCache.groundPromises.has(spec.biomeId)) {
+        atlasPartCache.groundPromises.set(spec.biomeId, loadGroundImage(`/assets/generated/${spec.fileName}`).then((canvas) => [spec.biomeId, makeGroundSheet(canvas, {
         sourceInset: spec.sourceInset,
         edgeFeather: spec.edgeFeather,
         textureAlpha: spec.textureAlpha,
@@ -323,49 +540,64 @@ function loadGroundSheets() {
         .catch((error) => {
           console.warn(`Ground sheet load failed for ${spec.biomeId}: ${spec.fileName}`, error);
           return [spec.biomeId, null];
-        });
+        }));
+      }
+      return atlasPartCache.groundPromises.get(spec.biomeId);
     }),
   ).then((entries) => {
-    const sheets = Object.fromEntries(entries);
-    if (!sheets.mainland) throw new Error("Required mainland ground sheet failed to load");
-    for (const [id, sheet] of Object.entries(sheets)) {
-      if (!sheet) sheets[id] = sheets.mainland;
+    for (const [id, sheet] of entries) {
+      if (sheet) atlasPartCache.groundSheets[id] = sheet;
     }
-    return sheets;
+    if (!atlasPartCache.groundSheets.mainland) throw new Error("Required mainland ground sheet failed to load");
+    for (const [id, sheet] of entries) {
+      if (!sheet) atlasPartCache.groundSheets[id] = atlasPartCache.groundSheets.mainland;
+    }
+    return atlasPartCache.groundSheets;
   });
 }
 
 function loadWaterSheet() {
-  return loadRawImage("/assets/generated/tileset/tileset_water.png")
-    .then((canvas) => makeTileSheet(canvas, 4, 4))
-    .catch((error) => {
-      console.warn("Water sheet load failed: tileset/tileset_water.png", error);
-      return null;
-    });
+  if (atlasPartCache.waterSheet !== undefined) return Promise.resolve(atlasPartCache.waterSheet);
+  if (!atlasPartCache.waterPromise) {
+    atlasPartCache.waterPromise = loadRawImage("/assets/generated/tileset/tileset_water.png")
+      .then((canvas) => {
+        atlasPartCache.waterSheet = makeTileSheet(canvas, 4, 4);
+        return atlasPartCache.waterSheet;
+      })
+      .catch((error) => {
+        console.warn("Water sheet load failed: tileset/tileset_water.png", error);
+        atlasPartCache.waterSheet = null;
+        return null;
+      });
+  }
+  return atlasPartCache.waterPromise;
 }
 
-function loadTreeSheets() {
-  const urlMap = new Map();
-  for (const fileName of new Set(Object.values(TREE_SHEETS))) {
-    urlMap.set(fileName, loadChromaImage(`/assets/generated/${fileName}`).then(makeTreeSheet));
-  }
-
+function loadTreeSheets(manifest = buildFullRegionAssetManifest()) {
   return Promise.all(
-    Object.entries(TREE_SHEETS).map(([biomeId, fileName]) => (
-      urlMap.get(fileName)
+    manifest.treeSpecs.map(({ biomeId, fileName }) => {
+      if (atlasPartCache.treeSheets[biomeId]) {
+        return Promise.resolve([biomeId, atlasPartCache.treeSheets[biomeId]]);
+      }
+      if (!atlasPartCache.treePromises.has(biomeId)) {
+        atlasPartCache.treePromises.set(biomeId, loadChromaImage(`/assets/generated/${fileName}`).then(makeTreeSheet)
         .then((sheet) => [biomeId, sheet])
         .catch((error) => {
           console.warn(`Tree sheet load failed for ${biomeId}: ${fileName}`, error);
           return [biomeId, null];
-        })
-    )),
+        }));
+      }
+      return atlasPartCache.treePromises.get(biomeId);
+    }),
   ).then((entries) => {
-    const sheets = Object.fromEntries(entries);
-    const fallback = sheets.mainland;
-    for (const [id, sheet] of Object.entries(sheets)) {
-      if (!sheet) sheets[id] = fallback;
+    for (const [id, sheet] of entries) {
+      if (sheet) atlasPartCache.treeSheets[id] = sheet;
     }
-    return sheets;
+    const fallback = atlasPartCache.treeSheets.mainland;
+    for (const [id, sheet] of entries) {
+      if (!sheet && fallback) atlasPartCache.treeSheets[id] = fallback;
+    }
+    return atlasPartCache.treeSheets;
   });
 }
 
@@ -386,34 +618,30 @@ function normalizeFoliageSheetSpec(id, config, defaultGrid = 8) {
   };
 }
 
-function loadFoliageSheet() {
-  const regionAssetOverrides = collectRegionAssetOverrides(MAP_REGION_SETS);
-  const biomeSpecs = Object.entries(FOLIAGE_SHEETS).map(([id, config]) => normalizeFoliageSheetSpec(id, config, 8));
-  const customSpecs = regionAssetOverrides.foliageSheets.map((entry) => ({
-    id: entry.sheetId,
-    fileName: entry.fileName,
-    rows: entry.rows,
-    cols: entry.cols,
-  }));
-
+function loadFoliageSheet(manifest = buildFullRegionAssetManifest()) {
   return Promise.all(
-    [...biomeSpecs, ...customSpecs].map((spec) => (
-      loadChromaImage(`/assets/generated/${spec.fileName}`)
+    manifest.foliageSpecs.map((spec) => {
+      if (atlasPartCache.foliageSheets[spec.id]) {
+        return Promise.resolve([spec.id, atlasPartCache.foliageSheets[spec.id]]);
+      }
+      if (!atlasPartCache.foliagePromises.has(spec.id)) {
+        atlasPartCache.foliagePromises.set(spec.id, loadChromaImage(`/assets/generated/${spec.fileName}`)
         .then((canvas) => makeFoliageSheet(canvas, { rows: spec.rows, cols: spec.cols }))
         .then((sheet) => [spec.id, sheet])
         .catch((error) => {
           console.warn(`Foliage sheet load failed for ${spec.id}: ${spec.fileName}`, error);
           return [spec.id, null];
-        })
-    )),
+        }));
+      }
+      return atlasPartCache.foliagePromises.get(spec.id);
+    }),
   ).then((entries) => {
-    const sheets = Object.fromEntries(entries);
-    const fallback = sheets.mainland ?? Object.values(sheets).find(Boolean) ?? null;
-    for (const id of Object.keys(FOLIAGE_SHEETS)) {
-      if (!sheets[id]) sheets[id] = fallback;
+    for (const [id, sheet] of entries) {
+      if (sheet) atlasPartCache.foliageSheets[id] = sheet;
     }
+    const fallback = atlasPartCache.foliageSheets.mainland ?? Object.values(atlasPartCache.foliageSheets).find(Boolean) ?? null;
     return {
-      sheets,
+      sheets: atlasPartCache.foliageSheets,
       cells: fallback?.cells ?? [],
     };
   });
@@ -434,15 +662,19 @@ function loadArmorSheet() {
   return Promise.resolve(null);
 }
 
-function loadDecaySheets() {
-  const entries = Object.entries(DECAY_SET_DEFS ?? {});
-  if (!entries.length) return Promise.resolve({});
+function loadDecaySheets(manifest = buildFullRegionAssetManifest()) {
+  const entries = Object.entries(DECAY_SET_DEFS ?? {}).filter(([id]) => manifest.decayIds.has(id));
+  if (!entries.length) return Promise.resolve(atlasPartCache.decaySheets);
 
   return Promise.all(entries.map(([id, def]) => {
+    const sheetId = buildDecaySheetId(id);
+    if (atlasPartCache.decaySheets[sheetId]) {
+      return Promise.resolve([sheetId, atlasPartCache.decaySheets[sheetId]]);
+    }
+    if (atlasPartCache.decayPromises.has(sheetId)) return atlasPartCache.decayPromises.get(sheetId);
     const rows = Math.max(1, Math.floor(Number(def?.rows) || 4));
     const cols = Math.max(1, Math.floor(Number(def?.cols) || 4));
-    const sheetId = buildDecaySheetId(id);
-    return loadChromaImage(`/assets/generated/${def.fileName}`)
+    const promise = loadChromaImage(`/assets/generated/${def.fileName}`)
       .then((canvas) => [sheetId, {
         ...makeTileSheet(canvas, rows, cols),
         renderScale: Number.isFinite(Number(def?.renderScale)) ? Number(def.renderScale) : 1,
@@ -451,46 +683,45 @@ function loadDecaySheets() {
         console.warn(`Decay sheet load failed: ${id} (${def.fileName})`, error);
         return [sheetId, null];
       });
+    atlasPartCache.decayPromises.set(sheetId, promise);
+    return promise;
   })).then((loaded) => {
-    const sheets = {};
     for (const [sheetId, sheet] of loaded) {
-      if (sheet) sheets[sheetId] = sheet;
+      if (sheet) atlasPartCache.decaySheets[sheetId] = sheet;
     }
-    return sheets;
+    return atlasPartCache.decaySheets;
   });
 }
 
-function loadObjectSheets() {
+function loadObjectSheets(manifest = buildFullRegionAssetManifest()) {
   const mergedObjectSheets = {
     ...OBJECT_SHEETS,
     ...REGION_OBJECT_SHEETS,
   };
-  const urlMap = new Map();
-  for (const biomeSheets of Object.values(mergedObjectSheets)) {
-    for (const config of Object.values(biomeSheets)) {
-      const key = getObjectSheetConfigKey(config);
-      if (!urlMap.has(key)) {
-        urlMap.set(key, loadObjectSheetConfig(config));
-      }
-    }
-  }
-
   const entries = [];
   for (const [type, biomeSheets] of Object.entries(mergedObjectSheets)) {
+    if (!manifest.objectTypes.has(type)) continue;
     for (const [biomeId, config] of Object.entries(biomeSheets)) {
       const key = getObjectSheetConfigKey(config);
+      const cacheKey = `${type}:${biomeId}:${key}`;
+      if (atlasPartCache.objectSheets[type]?.[biomeId]) {
+        entries.push(Promise.resolve([type, biomeId, atlasPartCache.objectSheets[type][biomeId], config]));
+        continue;
+      }
+      if (!atlasPartCache.objectPromises.has(cacheKey)) {
+        atlasPartCache.objectPromises.set(cacheKey, loadObjectSheetConfig(config));
+      }
       entries.push(
-        urlMap.get(key).then((sheet) => [type, biomeId, sheet, config]),
+        atlasPartCache.objectPromises.get(cacheKey).then((sheet) => [type, biomeId, sheet, config]),
       );
     }
   }
 
   return Promise.all(entries).then((loaded) => {
-    const sheets = {};
     for (const [type, biomeId, sheet, config] of loaded) {
-      if (!sheets[type]) sheets[type] = {};
+      if (!atlasPartCache.objectSheets[type]) atlasPartCache.objectSheets[type] = {};
       if (sheet) {
-        sheets[type][biomeId] = {
+        atlasPartCache.objectSheets[type][biomeId] = {
           ...sheet,
           animated: config.animated ?? false,
           frameOffsets: config.frameOffsets,
@@ -498,7 +729,7 @@ function loadObjectSheets() {
         };
       }
     }
-    return sheets;
+    return atlasPartCache.objectSheets;
   });
 }
 

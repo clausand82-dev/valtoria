@@ -85,7 +85,7 @@ export function GameHud({
           </div>
           {!cityOpen && (
             <span>
-              Seed {snapshot.zone.seed} | Omraade L{snapshot.zone.level}
+              Weather: {snapshot.zone.weather?.label ?? "No weather"}
             </span>
           )}
         </div>
@@ -102,16 +102,18 @@ export function GameHud({
         </section>
       )}
 
-      <section className="combat-card">
-        <span>Skade {player.damage}</span>
-        <span>Armor {player.armor}</span>
-        <span>{player.mode}</span>
-        {snapshot.regionRun && snapshot.mobs?.total > 0 && (
-          <span>Mobs {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
-        )}
-      </section>
+      {!cityOpen && (
+        <section className="combat-card">
+          <span>Skade {player.damage}</span>
+          <span>Armor {player.armor}</span>
+          <span>{player.mode}</span>
+          {snapshot.regionRun && snapshot.mobs?.total > 0 && (
+            <span>Mobs {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
+          )}
+        </section>
+      )}
 
-      {trackedQuests.length > 0 && (
+      {!cityOpen && trackedQuests.length > 0 && (
         <section className="quest-tracker" aria-label="Aktive quests">
           {trackedQuests.slice(0, 8).map((quest) => (
             <div
@@ -194,7 +196,7 @@ export function GameHud({
         <button
           type="button"
           className="skill"
-          title={snapshot.regionRun ? "Til world map (progression nulstilles)" : "Aaben world map"}
+          title={snapshot.regionRun ? "Forlad map til byen" : "Aaben world map"}
           onClick={() => {
             if (snapshot.regionRun) {
               setConfirmMapAbandonOpen(true);
