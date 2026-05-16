@@ -32,6 +32,8 @@ export function GameHud({
   player,
   popularityPct,
   setConfirmMapAbandonOpen,
+  setCitySettingsOpen,
+  setCityStorageOpen,
   setHeroOpen,
   setInventoryOpen,
   setMapOpen,
@@ -41,6 +43,8 @@ export function GameHud({
   trackedQuests,
   xpPct,
 }) {
+  const questBadgeCount = Math.max(0, (snapshot.quests?.active ?? []).filter((quest) => quest.complete).length);
+
   return (
     <>
       <section className="hud hud-left" aria-live="polite">
@@ -132,7 +136,33 @@ export function GameHud({
         </section>
       )}
 
-      <section className="skillbar">
+      {cityOpen ? (
+        <section className="city-menu-bar" aria-label="City menu">
+          <button type="button" className="city-menu-button" onClick={() => setInventoryOpen((value) => !value)}>
+            <ImageIcon src="/assets/generated/icon_backpack.png" />
+            <span>Back Pack</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={() => setCityStorageOpen(true)}>
+            <ImageIcon src="/assets/generated/item/item_chest.png" />
+            
+            <span>Storage</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={() => setQuestOverviewOpen(true)}>
+            <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
+            <span>Questlog</span>
+            {questBadgeCount > 0 && <b className="city-menu-badge">{questBadgeCount}</b>}
+          </button>
+          <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
+            <ImageIcon src="/assets/generated/icon_map.png" />
+            <span>World map</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
+            <span className="city-menu-settings-icon" aria-hidden="true" />
+            <span>Setting</span>
+          </button>
+        </section>
+      ) : (
+      <section className="skillbar" aria-label="Battle quickbar">
         <span title={cityOpen ? "Ikke tilgaengelig i byen" : undefined}>
           <button
             type="button"
@@ -208,6 +238,7 @@ export function GameHud({
           <ImageIcon src={snapshot.regionRun ? QUICKBAR_WILDERNESS_ICON_URL : QUICKBAR_CITY_ICON_URL} />
         </button>
       </section>
+      )}
     </>
   );
 }

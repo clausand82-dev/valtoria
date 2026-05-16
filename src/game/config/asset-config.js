@@ -9,10 +9,10 @@
 // biodomes der bruger samme normal-fireplace animation, så filnavne kun skal
 // ændres ét sted.
 const FIREPLACE_NORMAL_FRAMES = [
-  "fireplace_normal_01.png",
-  "fireplace_normal_02.png",
-  "fireplace_normal_03.png",
-  "fireplace_normal_04.png",
+  "animated_object/fireplace_normal_01.png",
+  "animated_object/fireplace_normal_02.png",
+  "animated_object/fireplace_normal_03.png",
+  "animated_object/fireplace_normal_04.png",
 ];
 
 export const GROUND_SHEETS = {
@@ -109,14 +109,14 @@ export const OBJECT_SHEETS = {
     // biome-config.js sørger for at kun snow spawner "firebeacon".
     snow: {
       frameFiles: [
-        "firebeacon_snow_animated_001.png",
-        "firebeacon_snow_animated_002.png",
-        "firebeacon_snow_animated_003.png",
-        "firebeacon_snow_animated_004.png",
-        "firebeacon_snow_animated_005.png",
-        "firebeacon_snow_animated_006.png",
-        "firebeacon_snow_animated_007.png",
-        "firebeacon_snow_animated_008.png",
+        "animated_object/firebeacon_snow_animated_001.png",
+        "animated_object/firebeacon_snow_animated_002.png",
+        "animated_object/firebeacon_snow_animated_003.png",
+        "animated_object/firebeacon_snow_animated_004.png",
+        "animated_object/firebeacon_snow_animated_005.png",
+        "animated_object/firebeacon_snow_animated_006.png",
+        "animated_object/firebeacon_snow_animated_007.png",
+        "animated_object/firebeacon_snow_animated_008.png",
       ],
       animated: true,
       keyEdgeBlack: true,

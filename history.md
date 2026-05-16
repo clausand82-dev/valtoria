@@ -1,6 +1,13 @@
 History over changes
 
-* V 1.62
+* V. 1.63
+- added a new back pack/charater sheet - more graphic
+- changed default back pack slot count from 30 to 42
+- added settings for auto pickup (combine type of item with rarity)
+- repairlist i blacksmith will now show both equipt and items in back pack and have symbol for each
+- made a menu city mode menu at bottom instead of same quick iron menu as in battle maps
+
+* V. 1.62
 - added wolf_cub og wolf_fenris (last as boss)
 - moved food barrel recipes from code to config file
 - loading battle maps now only loads nessacery assets and base core, next map will load not allready nessecary assets

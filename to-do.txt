@@ -9,7 +9,7 @@ Ting at få gjort
 - forskellige udstyr til at klare forskellige opgaver
 - bedre mobs IQ (pathfinding)
 - grafik til start og stop
-- Pænere UI til karakter - SOON
+
 - Have map-region-config splittet op i mindre regioner! - Noget skal ændres til area maps. Måske kommentar hjælp skal være seperat fil
 
 - marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
@@ -17,10 +17,14 @@ Ting at få gjort
 
 
 - resource droprate skal nok sættes en del ned
-
 - marker equemp udstyr i repair listen
 
+- magi i equimt magi felt skal vise magi info i info panel
 
+
+
+- skal junk kunne veksles til forskellige ting som ironbar, wood plank, stone brick mm - måske et sandsynligheds tjek og chance for ingen drop
+12 junk, 1-3 ironbar (12%), 1-3 wood plank (14%), 1-2 stonebrick (6%) - roll for alt??? ellers er det jo bare weight der skal bruges istedet - tænker roll på alt der er muligt
 
 - overveje om progress skal "slettes" ved early battle map leave eller om det skal moderares lidt
 
@@ -132,7 +136,84 @@ Fractions systemet skal have konsekvens ind i handel og ind i chance for overfal
 - Måske Nethrendor starter med en vis styrke, og mobs, der er under hans kommando reducere i den styrke (måske fraction systemet skal bruges her). Quest kan tilføje elelr fjerne nethrendor army_styrke. Når army styrke er over en vis del af ens egen army styrke, kan der måske ske de her angreb på ens by - corruption skal have noget at sige her.
 
 
+--- NEXT ---
+Refactor map generation to remove the legacy `biodome` system entirely.
+
+Goal:
+`map-region-config` must be the single source of truth for each region's visual/gameplay environment. Do not rely on `BIOMES`, `biodome`, or `chunk.biome.id` for region generation, asset loading, object spawning, foliage, decay, water, mobs, or rendering.
+
+Remove / stop using:
+- `biodome`
+- `BIOMES`
+- biome-based object fallback
+- biome-based foliage fallback
+- biome-based decay fallback
+- biome-based mob fallback
+- biome-based spawn counts
+- biome fog rendering
+- `path`, `accent`, `tileColors`, and treeSet are not needed
+
+Keep / use region explicit config:
+- `tileset`
+- `objects`
+- `foliageSets`
+- `decay`
+- `mobs`
+- `ambient`
+- `weather`
+
+Add region-level spawn counts:
+```js
+spawnCounts: {
+  objects: 8,
+  foliage: 12,
+  decals: 6,
+  monsters: { min: 8, max: 12 },
+  water: 0,
+}
+Counts are per chunk, not total map counts. mapSize should continue to affect total amount indirectly by creating more/fewer chunks.
+
+Replace old weights.water with a new explicit water config, similar to foliageSets:
+
+js
+
+water: [
+  {
+    fileName: "tileset/tileset_water.png",
+    weight: 1,
+    x: [1, 2, 3],
+    y: [1, 2],
+  }
+]
+Water config rules:
+
+fileName points to a generated tileset image.
+If x/y are omitted, use random variants from all 16 tiles.
+x/y are optional 1-based selectors into a 4x4 sheet.
+weight controls which water sheet/config is selected per water placement.
+spawnCounts.water controls how much water is attempted per chunk.
+Water should no longer be controlled by weights.water.
+Implementation notes:
+
+Asset loader should load only assets referenced by the selected region config:
+region tileset
+region objects
+region foliageSets
+region decay
+region water
+region mobs
+Object weight, foliage weight, decay weight, mob weight, and water weight control distribution within their respective per-chunk spawn count. They do not determine count.
+Remove old biodome object fallback. Regions without objects should spawn no regular objects unless prefabs or other explicit systems add them.
+Regions without foliageSets should spawn no foliage.
+Regions without decay should spawn no decals.
+Regions without mobs should spawn no mobs, unless a quest/prefab/system explicitly adds them.
+Regions without water or with spawnCounts.water: 0 should spawn no water.
+Keep ambient particle fog as the only fog system. Remove or ignore biome fog overlay.
+Update UI labels/tooltips that show biodome so they show region id/label/environment info instead.
+Preserve existing save compatibility where possible by tolerating old saved biomeId, but new generation should not require it.
+
 --- IN WORK ---
+
 
 
 ---------------------------DONE------------------------------

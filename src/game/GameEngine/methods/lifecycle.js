@@ -23,6 +23,7 @@ import {
   isDestructibleObject
 } from "../helpers.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
+import { createAutoLootRules } from "./loot.js";
 
 function makeDevTestInventory() {
   if (!import.meta.env.DEV) return [];
@@ -55,6 +56,7 @@ export const lifecycleMethods = {
       skillTree: normalizeSkillTree(),
       unlockedSpells: ["ember_spark"],
       activeSpellId: "ember_spark",
+      autoLoot: createAutoLootRules(),
       statusEffects: [],
       stats: createHeroStats(),
       attackCooldown: 0,

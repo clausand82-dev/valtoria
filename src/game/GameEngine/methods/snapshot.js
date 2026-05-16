@@ -17,6 +17,7 @@ import {
   questSnapshot
 } from "../helpers.js";
 import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill-tree-config.js";
+import { normalizeAutoLootRules } from "./loot.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -126,6 +127,7 @@ export const snapshotMethods = {
           item: item ? { ...item, summary: this.itemSummary(item), iconIndex: itemIconIndex(item), iconSheet: itemIconSheet(item) } : null,
         };
       }),
+      autoLoot: normalizeAutoLootRules(this.player.autoLoot),
       hoverMonster: hoverMonster && !hoverMonster.dead ? {
         id: hoverMonster.id,
         name: hoverMonster.elite ? `${hoverMonster.elite.label} ${hoverMonster.typeName}` : hoverMonster.typeName,

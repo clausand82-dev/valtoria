@@ -79,6 +79,8 @@ export default function App() {
   const [viewedQuest, setViewedQuest] = useState(null);
   const [questOverviewOpen, setQuestOverviewOpen] = useState(false);
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
+  const [cityStorageOpen, setCityStorageOpen] = useState(false);
+  const [citySettingsOpen, setCitySettingsOpen] = useState(false);
   const [cityMinimapHero, setCityMinimapHero] = useState(null);
   const [cityProgressHud, setCityProgressHud] = useState(() => loadCityProgress());
   const [skipCityMobProgressReturnId, setSkipCityMobProgressReturnId] = useState(null);
@@ -390,6 +392,12 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [cityOpen]);
 
+  useEffect(() => {
+    if (cityOpen) return;
+    setCityStorageOpen(false);
+    setCitySettingsOpen(false);
+  }, [cityOpen]);
+
   useEngineModalLock({
     acceptedQuestNotice,
     cityOpen,
@@ -508,6 +516,8 @@ export default function App() {
     setViewedQuest(null);
     setQuestOverviewOpen(false);
     setConfirmMapAbandonOpen(false);
+    setCityStorageOpen(false);
+    setCitySettingsOpen(false);
     setCityMinimapHero(null);
     setCityProgressHud(loadCityProgress(normalizedSlot.cityStorageKey));
     setRegionCorruption(loadRegionCorruption(normalizedSlot.regionCorruptionStorageKey));
@@ -578,6 +588,8 @@ export default function App() {
         player={player}
         popularityPct={popularityPct}
         setConfirmMapAbandonOpen={setConfirmMapAbandonOpen}
+        setCitySettingsOpen={setCitySettingsOpen}
+        setCityStorageOpen={setCityStorageOpen}
         setHeroOpen={setHeroOpen}
         setInventoryOpen={setInventoryOpen}
         setMapOpen={setMapOpen}
@@ -612,6 +624,18 @@ export default function App() {
               >
                 Forlad til by
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {citySettingsOpen && cityOpen && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
+            <h2 id="city-settings-title">Setting</h2>
+            <p>Settings-panelet er reserveret til kommende valg.</p>
+            <div>
+              <button type="button" onClick={() => setCitySettingsOpen(false)}>Close</button>
             </div>
           </section>
         </div>
@@ -827,6 +851,8 @@ export default function App() {
           onStartCityMobBattle={startCityMobBattle}
           skipMobProgressForVisit={skipCityMobProgressReturnId === snapshot.mapReturn?.id}
           onMobProgressSkipConsumed={() => setSkipCityMobProgressReturnId(null)}
+          storageOpen={cityStorageOpen}
+          onCloseStorage={() => setCityStorageOpen(false)}
           onClose={openWorldMapFromCity}
         />
       )}

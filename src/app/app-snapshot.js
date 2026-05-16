@@ -39,6 +39,10 @@ export const emptySnapshot = {
   nearbyFoliageLoot: null,
   inventory: [],
   equipment: [],
+  autoLoot: {
+    types: {},
+    rarities: {},
+  },
   hoverMonster: null,
   quickActions: { healthPotions: 0, manaPotions: 0, potionCooldown: 0 },
   quests: { active: [], completed: [], cityFade: [], wildernessNpc: null, nearbyQuestgiver: null },

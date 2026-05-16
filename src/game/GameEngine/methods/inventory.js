@@ -52,6 +52,12 @@ import {
   ITEM_REPAIR_GOLD_PER_PCT,
   ITEM_REPAIR_JUNK_PER_PCT,
 } from "../../config/durability-config.js";
+import {
+  AUTO_LOOT_RARITY_IDS,
+  AUTO_LOOT_TYPE_IDS,
+  createAutoLootRules,
+  normalizeAutoLootRules,
+} from "./loot.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -60,6 +66,41 @@ function recipeRequiresResearchLab(recipe) {
 }
 
 export const inventoryMethods = {
+  setAutoLootRule(group, id, enabled) {
+    const groupId = group === "rarities" ? "rarities" : "types";
+    const allowed = groupId === "rarities" ? AUTO_LOOT_RARITY_IDS : AUTO_LOOT_TYPE_IDS;
+    const key = String(id ?? "");
+    if (!allowed.includes(key)) return false;
+    const current = normalizeAutoLootRules(this.player.autoLoot);
+    this.player.autoLoot = {
+      ...current,
+      [groupId]: {
+        ...current[groupId],
+        [key]: Boolean(enabled),
+      },
+    };
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  resetAutoLootRules() {
+    this.player.autoLoot = createAutoLootRules();
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  clearAutoLootRules() {
+    this.player.autoLoot = {
+      types: Object.fromEntries(AUTO_LOOT_TYPE_IDS.map((id) => [id, false])),
+      rarities: Object.fromEntries(AUTO_LOOT_RARITY_IDS.map((id) => [id, false])),
+    };
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
   levelUpIfNeeded() {
     let needed = this.xpForNextLevel();
     while (this.player.xp >= needed) {
@@ -243,6 +284,42 @@ export const inventoryMethods = {
     this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
     this.addToast(`Udstyret: ${item.name}`);
     this.publishSnapshot();
+  },
+
+  equipInventoryItemToSlot(index, slotId) {
+    const item = this.player.inventory[index];
+    if (!item || isResourceItem(item) || isPotionItem(item) || isReadableItem(item)) return false;
+    let targetSlotId = String(slotId ?? "");
+    if (targetSlotId === "ring1" || targetSlotId === "ring2") {
+      if (item.slot !== "ring") return false;
+    } else if (item.slot !== targetSlotId) {
+      return false;
+    }
+
+    const old = this.player.equipment[targetSlotId];
+    this.player.equipment[targetSlotId] = item;
+    this.player.inventory.splice(index, 1);
+    if (old) this.addInventoryItem(old);
+
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.addToast(`Udstyret: ${item.name}`);
+    this.publishSnapshot();
+    return true;
+  },
+
+  moveInventoryItem(fromIndex, toIndex) {
+    const from = Math.floor(Number(fromIndex));
+    const to = Math.floor(Number(toIndex));
+    if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
+    if (from < 0 || from >= this.player.inventory.length || to < 0 || to >= MAX_INVENTORY || from === to) return false;
+    const [item] = this.player.inventory.splice(from, 1);
+    const target = Math.min(to, this.player.inventory.length);
+    this.player.inventory.splice(target, 0, item);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
   },
 
   usePotion(type, preferredIndex = -1) {
@@ -997,6 +1074,43 @@ export const inventoryMethods = {
       this.player.gold = Math.max(0, goldHave - goldNeeded);
       consumeResourceInputs(this.player.inventory, { junk: junkNeeded });
     }
+    item.durability = 100;
+    this.addToast(`${item.name} repareret. Brugt: ${goldNeeded}x Guld, ${junkNeeded}x Skrot`);
+    this.publishSnapshot();
+    return true;
+  },
+
+  repairInventoryItem(index, options = {}) {
+    const item = this.player.inventory[index];
+    if (!item || isResourceItem(item) || isPotionItem(item) || isReadableItem(item)) {
+      this.addToast("Intet gear i den slot.");
+      return false;
+    }
+
+    const dur = Number(item.durability ?? 100);
+    const missing = Math.ceil(100 - dur);
+    if (missing <= 0) {
+      this.addToast(`${item.name} er allerede fuldt repareret.`);
+      return false;
+    }
+
+    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
+    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
+
+    if (!options?.prepaid) {
+      const goldHave = Math.max(0, Math.floor(Number(this.player.gold) || 0));
+      const junkHave = resourceCount(this.player.inventory, "junk");
+      const deficits = [];
+      if (goldHave < goldNeeded) deficits.push(`Guld ${goldNeeded} (har ${goldHave})`);
+      if (junkHave < junkNeeded) deficits.push(`Skrot ${junkNeeded} (har ${junkHave})`);
+      if (deficits.length > 0) {
+        this.addToast(`Kan ikke reparere: mangler ${deficits.join(", ")}`);
+        return false;
+      }
+      this.player.gold = Math.max(0, goldHave - goldNeeded);
+      consumeResourceInputs(this.player.inventory, { junk: junkNeeded });
+    }
+
     item.durability = 100;
     this.addToast(`${item.name} repareret. Brugt: ${goldNeeded}x Guld, ${junkNeeded}x Skrot`);
     this.publishSnapshot();

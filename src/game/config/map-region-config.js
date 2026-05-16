@@ -1,6 +1,6 @@
 const AREA_MAP_VIEW = {
-  aspect: "1122 / 1402",
-  maxWidth: "620px",
+  aspect: "1672 / 941",
+  maxWidth: "1180px",
 };
 
 const defaultRegionWeights = {
@@ -20,51 +20,93 @@ export const WORLD_MAP = {
   title: "World map",
   subtitle: "Elvindalen and surrounding areas",
   imageUrl: "/assets/generated/map/map_worldmap_elvindale_v2.png",
-  aspect: "1672 / 941",
-  maxWidth: "1180px",
+  ...AREA_MAP_VIEW,
 };
 
 export const AREA_MAPS = {
+  "sea-serpent": {
+    ...AREA_MAP_VIEW,
+    title: "Soslangen",
+    subtitle: "Waters of the sea serpent",
+    imageUrl: "/assets/generated/map/map_seasnake_v2.png",
+  },
+  "leviathans-waters": {
+    ...AREA_MAP_VIEW,
+    title: "Leviathans Farvand",
+    subtitle: "Deep leviathan waters",
+    imageUrl: "/assets/generated/map/map_leviathanswater_v2.png",
+  },
+  vortexen: {
+    ...AREA_MAP_VIEW,
+    title: "Vortexen",
+    subtitle: "The spinning waters",
+    imageUrl: "/assets/generated/map/map_vortexen_v2.png",
+  },
+  "kraken-waters": {
+    ...AREA_MAP_VIEW,
+    title: "Tentakelfarvand",
+    subtitle: "Kraken hunting grounds",
+    imageUrl: "/assets/generated/map/map_krakenwaters_v2.png",
+  },
   elvindale: {
+    ...AREA_MAP_VIEW,
     title: "Elvindalen",
     subtitle: "Forest region",
     imageUrl: "/assets/generated/map/map_elvindale_v2.png",
-    aspect: "1672 / 941",
-    maxWidth: "1180px",
   },
   "village-outskirts": {
+    ...AREA_MAP_VIEW,
     title: "Village Outskirts",
     subtitle: "Fields and roads around the village",
     imageUrl: "/assets/generated/map/map_villageoutskirts_v2.png",
-    aspect: "1672 / 941",
-    maxWidth: "1180px",
   },
   nethrendor: {
     ...AREA_MAP_VIEW,
     title: "Nethrendor",
     subtitle: "Eastern forest region",
-    imageUrl: "/assets/generated/map/map_nethrendor.png",
+    imageUrl: "/assets/generated/map/map_nethrendor_v2.png",
   },
   swampfield: {
     ...AREA_MAP_VIEW,
     title: "Swampfield",
     subtitle: "Mushroom marshes",
-    imageUrl: "/assets/generated/map/map_swampfield.png",
+    imageUrl: "/assets/generated/map/map_swampfield_v2.png",
+  },
+  "life-tree": {
+    ...AREA_MAP_VIEW,
+    title: "Livstraeet",
+    subtitle: "The ancient life tree",
+    imageUrl: "/assets/generated/map/map_treeoflife_v2.png",
+  },
+  eldiria: {
+    ...AREA_MAP_VIEW,
+    title: "Eldiria",
+    subtitle: "Fertile plains and forests",
+    imageUrl: "/assets/generated/map/map_eldiria_v2.png",
   },
   tornvalhed: {
     ...AREA_MAP_VIEW,
     title: "Tornvalhed",
     subtitle: "Troll island",
     imageUrl: "/assets/generated/map/map_tornvalhed_v2.png",
-          aspect: "1672 / 941",
-  maxWidth: "1180px",
+  },
+  "sunk-city": {
+    ...AREA_MAP_VIEW,
+    title: "Sunk City",
+    subtitle: "The drowned city",
+    imageUrl: "/assets/generated/map/map_sunkcity_v2.png",
   },
   sunkcity: {
     ...AREA_MAP_VIEW,
     title: "Sunk City",
     subtitle: "The drowned city",
-    imageUrl: "/assets/generated/map/map_sunkcity.png",
-
+    imageUrl: "/assets/generated/map/map_sunkcity_v2.png",
+  },
+  "eternal-mountains": {
+    ...AREA_MAP_VIEW,
+    title: "De Evige Bjerge",
+    subtitle: "Frozen mountain range",
+    imageUrl: "/assets/generated/map/map_eternalmountains_v2.png",
   },
 };
 
@@ -671,7 +713,7 @@ export const MAP_REGION_SETS = {
         minDistanceBetweenPrefabs: 8,
         anchors: ["clearing", "room"],
         pool: [
-          { id: "xx", weight: 1, max: 1 },
+          { id: "none", weight: 1, max: 1 }, // er beholdt for testing, kan fjernes senere for a sikre at det alltid spawner en prefab
         ],
       },
       // TODO:DELETE: weights: { tree: 2, rock: 2, foilage: 4, water: 8, fireplace: 1 }
@@ -682,7 +724,7 @@ export const MAP_REGION_SETS = {
         { id: "object_house_mainland", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },
         { id: "object_ruin_mainland", weight: 1 },
-        //{ id: "object_fireplace_mainland", weight: 1 },
+        { id: "object_fireplace_mainland", weight: 10 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
     }),

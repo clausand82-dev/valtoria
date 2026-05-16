@@ -97,7 +97,7 @@ import {
   socketText,
 } from "./city-panel-helpers.jsx";
 
-function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, onRepairEquippedItem }) {
+function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
@@ -114,6 +114,7 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
           snapshotRef={snapshotRef}
           resourceCount={resourceCount}
           onRepairEquippedItem={onRepairEquippedItem}
+          onRepairInventoryItem={onRepairInventoryItem}
         />
       )}
       {activeAddonId === "weapon_anvil" && (
@@ -156,11 +157,31 @@ function durabilityColor(dur) {
   return "#ff6b5f";
 }
 
-function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, onRepairEquippedItem }) {
+function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
   const equipment = snapshot.equipment ?? [];
-  const equippedItems = equipment.filter((slot) => slot.item != null);
+  const equippedItems = equipment
+    .filter((slot) => slot.item != null)
+    .map((slot) => ({
+      id: `equipped-${slot.id}`,
+      source: "equipped",
+      sourceLabel: "Equipped",
+      slotId: slot.id,
+      label: slot.label,
+      item: slot.item,
+    }));
+  const backpackItems = (snapshot.inventory ?? [])
+    .filter((item) => isEquippableItem(item))
+    .map((item) => ({
+      id: `backpack-${item.id}`,
+      source: "backpack",
+      sourceLabel: "Backpack",
+      inventoryIndex: item.index,
+      label: item.slot === "weapon" ? "Weapon" : item.slot === "ring" ? "Ring" : item.slot,
+      item,
+    }));
+  const repairItems = [...equippedItems, ...backpackItems];
 
-  if (equippedItems.length === 0) {
+  if (repairItems.length === 0) {
     return (
       <section className="blacksmith-station">
         <header><h4>Reparation</h4><span>Ingen udstyr udrustet</span></header>
@@ -176,7 +197,7 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
         <span>Klik på et item for at reparere det</span>
       </header>
       <div className="repair-slot-list">
-        {equippedItems.map((slot) => (
+        {repairItems.map((slot) => (
           <BlacksmithRepairSlot
             key={slot.id}
             slot={slot}
@@ -185,6 +206,7 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
             snapshotRef={snapshotRef}
             resourceCount={resourceCount}
             onRepairEquippedItem={onRepairEquippedItem}
+            onRepairInventoryItem={onRepairInventoryItem}
           />
         ))}
       </div>
@@ -192,7 +214,7 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
   );
 }
 
-function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, onRepairEquippedItem }) {
+function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
   const item = slot.item;
   const dur = Number(item.durability ?? 100);
   const missing = Math.ceil(100 - dur);
@@ -209,11 +231,12 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
   const canAfford = goldHave >= goldCost && junkHave >= junkCost;
 
   return (
-    <div className={`repair-slot${isFullyRepaired ? " repaired" : ""}`}>
+    <div className={`repair-slot repair-source-${slot.source}${isFullyRepaired ? " repaired" : ""}`}>
       <div className="repair-slot-info">
         <div className="repair-slot-header">
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
           <span className="repair-slot-name" style={{ color: item.rarityColor ?? "#f5f3ea" }}>{item.name}</span>
+          <span className={`repair-source-badge ${slot.source}`}>{slot.sourceLabel}</span>
           <span className="repair-slot-label" style={{ color: "#aaa" }}>{slot.label}</span>
         </div>
         <span className="repair-durability-bar-wrap">
@@ -247,8 +270,12 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
             disabled={!canAfford}
             onClick={() => (
               onRepairEquippedItem
-                ? onRepairEquippedItem(slot.id, { gold: goldCost, junk: junkCost })
-                : engineRef.current?.repairEquippedItem?.(slot.id)
+                ? slot.source === "backpack"
+                  ? onRepairInventoryItem?.(slot.inventoryIndex, { gold: goldCost, junk: junkCost })
+                  : onRepairEquippedItem(slot.slotId, { gold: goldCost, junk: junkCost })
+                : slot.source === "backpack"
+                  ? engineRef.current?.repairInventoryItem?.(slot.inventoryIndex)
+                  : engineRef.current?.repairEquippedItem?.(slot.slotId)
             )}
           >
             Reparer

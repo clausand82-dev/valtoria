@@ -18,6 +18,7 @@ import {
   rollLootCategory,
   isPotionItem,
   isQuestItem,
+  isReadableItem,
   isResourceItem,
   GROUND_LOOT_DESPAWN_SECONDS
 } from "../dependencies.js";
@@ -34,7 +35,74 @@ import {
 
 const FOLIAGE_LOOT_INTERACT_RANGE = 0.78;
 
+export const AUTO_LOOT_TYPE_IDS = [
+  "gold",
+  "resource",
+  "weapon",
+  "head",
+  "shoulder",
+  "neck",
+  "amulet",
+  "cape",
+  "chest",
+  "arms",
+  "hands",
+  "bracelet",
+  "ring",
+  "belt",
+  "legs",
+  "feet",
+  "relic",
+  "potion",
+  "readable",
+  "quest",
+];
+
+export const AUTO_LOOT_RARITY_IDS = ["poor", "normal", "upgraded", "rare", "epic", "legendary", "unique"];
+
+export function createAutoLootRules() {
+  return {
+    types: Object.fromEntries(AUTO_LOOT_TYPE_IDS.map((id) => [id, true])),
+    rarities: Object.fromEntries(AUTO_LOOT_RARITY_IDS.map((id) => [id, true])),
+  };
+}
+
+export function normalizeAutoLootRules(rules) {
+  const defaults = createAutoLootRules();
+  if (!rules || typeof rules !== "object") return defaults;
+  return {
+    types: Object.fromEntries(AUTO_LOOT_TYPE_IDS.map((id) => [id, rules.types?.[id] !== false])),
+    rarities: Object.fromEntries(AUTO_LOOT_RARITY_IDS.map((id) => [id, rules.rarities?.[id] !== false])),
+  };
+}
+
+function autoLootTypeFor(item, lootType) {
+  if (lootType === "gold") return "gold";
+  if (isResourceItem(item)) return "resource";
+  if (isPotionItem(item)) return "potion";
+  if (isQuestItem(item)) return "quest";
+  if (isReadableItem(item)) return "readable";
+  if (item?.slot === "weapon") return "weapon";
+  if (item?.slot === "ring1" || item?.slot === "ring2") return "ring";
+  return String(item?.slot ?? item?.mode ?? "item");
+}
+
+function autoLootRarityFor(item, lootType) {
+  if (lootType === "gold") return null;
+  if (item?.unique || item?.rarity === "unique") return "unique";
+  return item?.rarity ? String(item.rarity) : null;
+}
+
 export const lootMethods = {
+  autoLootAllows(loot) {
+    const rules = normalizeAutoLootRules(this.player.autoLoot);
+    const typeId = autoLootTypeFor(loot?.item, loot?.type);
+    if (rules.types[typeId] === false) return false;
+    const rarityId = autoLootRarityFor(loot?.item, loot?.type);
+    if (rarityId && rules.rarities[rarityId] === false) return false;
+    return true;
+  },
+
   updateLoot(dt) {
     for (let i = this.loots.length - 1; i >= 0; i -= 1) {
       const loot = this.loots[i];
@@ -49,6 +117,7 @@ export const lootMethods = {
       }
       loot.pickupDelay = Math.max(0, (loot.pickupDelay || 0) - dt);
       if (loot.pickupDelay > 0) continue;
+      if (!this.autoLootAllows(loot)) continue;
       if (distance(this.player, loot) < 0.62) {
         if (loot.type === "gold") {
           this.player.gold += loot.amount;

@@ -33,6 +33,7 @@ import {
   normalizeHeroStats,
   normalizeSavedQuestState
 } from "../helpers.js";
+import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
@@ -237,6 +238,7 @@ export const persistenceMethods = {
     this.player.skillTree = normalizeSkillTree(savedPlayer.skillTree);
     this.player.unlockedSpells = [...new Set(["ember_spark", ...(Array.isArray(savedPlayer.unlockedSpells) ? savedPlayer.unlockedSpells.map(String) : [])])];
     this.player.activeSpellId = savedPlayer.activeSpellId ? String(savedPlayer.activeSpellId) : this.player.unlockedSpells[0] ?? "ember_spark";
+    this.player.autoLoot = normalizeAutoLootRules(savedPlayer.autoLoot);
     this.player.statusEffects = [];
     this.player.stats = normalizeHeroStats(savedPlayer.stats);
     this.player.attackCooldown = Math.max(0, Number(savedPlayer.attackCooldown) || 0);
@@ -345,6 +347,7 @@ export const persistenceMethods = {
           unlockedSpells: [...(this.player.unlockedSpells ?? [])],
           activeSpellId: this.player.activeSpellId ?? null,
         } : {}),
+        autoLoot: normalizeAutoLootRules(this.player.autoLoot),
         ...(cfg.player.stats ? { stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } } } : {}),
         ...(cfg.player.vitals ? {
           hp: this.player.hp,

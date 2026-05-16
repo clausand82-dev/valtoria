@@ -62,7 +62,6 @@ export function InventoryItemDetail({ selectedItem, equipment }) {
           </span>
         </div>
       )}
-      <span>{selectedItem.summary}</span>
       {comparisonItem && diffs.length > 0 && (
         <div className="comparison-list">
           {diffs.map((diff) => (
@@ -72,6 +71,7 @@ export function InventoryItemDetail({ selectedItem, equipment }) {
           ))}
         </div>
       )}
+      <span>{selectedItem.summary}</span>
     </div>
   );
 }
