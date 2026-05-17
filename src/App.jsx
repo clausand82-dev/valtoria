@@ -5,7 +5,7 @@ import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { WORLD_MAP } from "./game/config/map-region-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
-import { SAVE_PERSIST_CONFIG } from "./game/config/save-persist-config.js";
+import { saveRepository } from "./storage/saveRepository.js";
 import {
   calcThreatFallOnMapExit,
   calcThreatRiseOnDeath,
@@ -270,12 +270,7 @@ export default function App() {
 
   useEffect(() => {
     if (!gameSession?.slot?.regionMapLastIdStorageKey) return;
-    if (!SAVE_PERSIST_CONFIG.storage.regionMapLastId) return;
-    try {
-      localStorage.setItem(gameSession.slot.regionMapLastIdStorageKey, regionMapInitialId);
-    } catch {
-      // Ignore storage-denied errors.
-    }
+    saveRepository.saveLastRegionMapIdSync(gameSession.slot.regionMapLastIdStorageKey, regionMapInitialId);
   }, [gameSession?.slot?.regionMapLastIdStorageKey, regionMapInitialId]);
 
   useEffect(() => {

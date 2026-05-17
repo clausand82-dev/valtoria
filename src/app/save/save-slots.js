@@ -1,58 +1,23 @@
-import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../../game/config/map-region-config.js";
-import { SAVE_STORAGE_KEY, SAVE_VERSION } from "../../game/config/game-engine-config.js";
-import { SAVE_PERSIST_CONFIG } from "../../game/config/save-persist-config.js";
+import { WORLD_MAP } from "../../game/config/map-region-config.js";
+import { SAVE_STORAGE_KEY } from "../../game/config/game-engine-config.js";
+import { saveRepository } from "../../storage/saveRepository.js";
 import {
   CITY_STORAGE_KEY,
   REGION_CORRUPTION_STORAGE_KEY,
   REGION_MAP_LAST_ID_STORAGE_KEY,
-  SAVE_INDEX_STORAGE_KEY,
-  regionStatusKey,
   saveSlotKeys,
 } from "./save-keys.js";
 
 export function loadRegionCorruption(storageKey = REGION_CORRUPTION_STORAGE_KEY) {
-  const initial = {};
-  for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
-    if (areaMapId === WORLD_MAP.id) continue;
-    for (const region of regions) {
-      initial[regionStatusKey(areaMapId, region.id)] = region.corrupted !== false;
-    }
-  }
-
-  if (!SAVE_PERSIST_CONFIG.storage.regionCorruption) return initial;
-
-  try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    if (saved && typeof saved === "object") {
-      for (const key of Object.keys(initial)) {
-        if (typeof saved[key] === "boolean") initial[key] = saved[key];
-      }
-    }
-  } catch {
-    // Keep default corruption state if localStorage is unavailable or invalid.
-  }
-  return initial;
+  return saveRepository.loadRegionCorruptionSync(storageKey);
 }
 
 export function loadRegionMapInitialId(storageKey = REGION_MAP_LAST_ID_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.regionMapLastId) return WORLD_MAP.id;
-  try {
-    const saved = String(localStorage.getItem(storageKey) || "").trim();
-    if (saved === WORLD_MAP.id) return WORLD_MAP.id;
-    if (saved && AREA_MAPS[saved]) return saved;
-  } catch {
-    // Fallback to world map when storage is unavailable.
-  }
-  return WORLD_MAP.id;
+  return saveRepository.loadLastRegionMapIdSync(storageKey);
 }
 
 export function saveRegionCorruption(regionCorruption, storageKey = REGION_CORRUPTION_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.regionCorruption) return;
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(regionCorruption));
-  } catch {
-    // Ignore quota or storage-denied errors.
-  }
+  saveRepository.saveRegionCorruptionSync(storageKey, regionCorruption);
 }
 
 export function normalizeSaveSlot(slot) {
@@ -74,36 +39,15 @@ export function normalizeSaveSlot(slot) {
 }
 
 function readSavePayloadAt(storageKey) {
-  if (!SAVE_PERSIST_CONFIG.storage.playerSave) return null;
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || parsed.version !== SAVE_VERSION) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  return saveRepository.loadSaveSync(storageKey);
 }
 
 function readSaveIndex() {
-  if (!SAVE_PERSIST_CONFIG.storage.saveIndex) return [];
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SAVE_INDEX_STORAGE_KEY) || "{}");
-    const rawSlots = Array.isArray(parsed) ? parsed : Array.isArray(parsed.slots) ? parsed.slots : [];
-    return rawSlots.map(normalizeSaveSlot).filter(Boolean);
-  } catch {
-    return [];
-  }
+  return saveRepository.readSaveIndexSync();
 }
 
 function writeSaveIndex(slots) {
-  if (!SAVE_PERSIST_CONFIG.storage.saveIndex) return;
-  try {
-    localStorage.setItem(SAVE_INDEX_STORAGE_KEY, JSON.stringify({ version: 1, slots }));
-  } catch {
-    // Save slot metadata is convenience data; the actual save payload is stored separately.
-  }
+  saveRepository.writeSaveIndexSync(slots);
 }
 
 export function upsertSaveSlot(slot) {

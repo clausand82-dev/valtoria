@@ -4,6 +4,7 @@ History over changes
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
 - changed a bit i particle system (leaves works on tree now also, not just as weather)
 - added new mobs (Spawn of Hydra, Hellhound, Gigant Troll, Mountain Troll, Shadwo Dragon, Infernus Minions, Spawn of Archnogrim, Flesheater) 
+- save system made more ready for server version - will still be driven by LocalStorage for now
 
 
 * V. 1.70

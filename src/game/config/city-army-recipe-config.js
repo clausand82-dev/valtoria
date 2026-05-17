@@ -1,5 +1,12 @@
 export const CITY_ARMY_TRAINING_RECIPES = [
   {
+    id: "train_peasant",
+    addonId: "melee_training",
+    unitId: "peasant",
+    count: 1,
+    cost: { junk: 1, gold: 25 },
+  },
+  {
     id: "train_sword_soldier",
     addonId: "melee_training",
     unitId: "sword_soldier",
@@ -26,6 +33,13 @@ export const CITY_ARMY_TRAINING_RECIPES = [
     unitId: "crossbow_soldier",
     count: 1,
     cost: { iron_piece: 1, hide: 1, junk: 3, wood_piece: 1, fruit: 1, gold: 100 },
+  },
+    {
+    id: "train_james_gray",
+    addonId: "melee_training",
+    unitId: "james_gray",
+    count: 1,
+    cost: { gold: 1 },
   },
 ];
 

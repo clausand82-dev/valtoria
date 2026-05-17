@@ -37,6 +37,7 @@ import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
+import { saveRepository } from "../../../storage/saveRepository.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -69,16 +70,10 @@ export const persistenceMethods = {
 
   readSavePayload() {
     if (!SAVE_PERSIST_CONFIG.storage.playerSave) return null;
-    try {
-      const raw = localStorage.getItem(this.currentSaveStorageKey());
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || parsed.version !== SAVE_VERSION) return null;
-      if (parsed.seed !== WORLD_SEED) return null;
-      return parsed;
-    } catch {
-      return null;
-    }
+    const parsed = saveRepository.loadSaveSync(this.currentSaveStorageKey());
+    if (!parsed || parsed.version !== SAVE_VERSION) return null;
+    if (parsed.seed !== WORLD_SEED) return null;
+    return parsed;
   },
 
   normalizeSavedItem(item) {
@@ -375,11 +370,9 @@ export const persistenceMethods = {
       loots: [],
     };
 
-    try {
-      localStorage.setItem(this.currentSaveStorageKey(), JSON.stringify(payload));
-      if (this.onSave) this.onSave(payload);
-    } catch {
-      // Ignore quota or storage-denied errors.
+    const saved = saveRepository.saveGameSync(this.currentSaveStorageKey(), payload);
+    if (saved && this.onSave) {
+      this.onSave(payload);
     }
     return true;
   }

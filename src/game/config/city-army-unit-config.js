@@ -1,4 +1,16 @@
 export const CITY_ARMY_UNIT_DEFS = {
+  peasant: {
+    label: "Peasant",
+    imageUrl: "",
+    category: "melee",
+    populationCost: 1,
+    armyValue: 1,
+    attack: 1,
+    armor: 1,
+    hp: 2,
+    range: 1,
+  },
+  
   sword_soldier: {
     label: "Sword Soldier",
     imageUrl: "",
@@ -43,15 +55,31 @@ export const CITY_ARMY_UNIT_DEFS = {
     hp: 8,
     range: 4,
   },
+    james_gray: {
+    label: "Legendary James Gray",
+    imageUrl: "",
+    category: "melee",
+    populationCost: 1,
+    armyValue: 20,
+    attack: 14,
+    armor: 10,
+    hp: 20,
+    range: 1,
+  },
+};
+
+const CITY_ARMY_UNIT_ALIASES = {
+  peasent: "peasant",
 };
 
 export function normalizeArmyUnits(armyUnits = {}) {
   const result = {};
   if (!armyUnits || typeof armyUnits !== "object") return result;
   for (const [unitId, count] of Object.entries(armyUnits)) {
-    if (!CITY_ARMY_UNIT_DEFS[unitId]) continue;
+    const normalizedUnitId = CITY_ARMY_UNIT_ALIASES[unitId] ?? unitId;
+    if (!CITY_ARMY_UNIT_DEFS[normalizedUnitId]) continue;
     const value = Math.max(0, Math.floor(Number(count) || 0));
-    if (value > 0) result[unitId] = value;
+    if (value > 0) result[normalizedUnitId] = (result[normalizedUnitId] ?? 0) + value;
   }
   return result;
 }

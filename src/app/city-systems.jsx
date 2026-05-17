@@ -85,6 +85,7 @@ import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
+import { saveRepository } from "../storage/saveRepository.js";
 
 
 const cityAssetCache = {
@@ -1336,13 +1337,7 @@ function getCityQuestOffset(spriteIndex) {
 }
 
 function loadCityProgress(storageKey = CITY_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.cityProgress) return {};
-  try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return saveRepository.loadCityProgressSync(storageKey);
 }
 
 function applyMapReturnPopulationProgress(progress = {}, mapReturn, wasCorrupted = true) {
@@ -1389,12 +1384,7 @@ function addCityPopulationLoss(progress = {}, amount = 0) {
 }
 
 function saveCityProgress(progress, storageKey = CITY_STORAGE_KEY) {
-  if (!SAVE_PERSIST_CONFIG.storage.cityProgress) return;
-  try {
-    localStorage.setItem(storageKey, JSON.stringify(serializeCityProgress(progress)));
-  } catch {
-    // Progress is a convenience layer; failing to persist should not break city play.
-  }
+  saveRepository.saveCityProgressSync(storageKey, serializeCityProgress(progress));
 }
 
 function serializeCityProgress(progress = {}) {

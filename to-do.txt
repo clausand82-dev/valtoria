@@ -83,8 +83,6 @@ Udfylde main quest for lidt flere regioner og så have en masse fyld quest også
 QUEST TO ADD:
 Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
 
-Annelise vil have en til at afleverer en note til Innkeeper. Ved indlevering ved innkeeper, ber innkeeper en om at afleverer en ring til Noble. Indlevering der får noble til at be en om at jagte en ulv, der har slugt et vigtigt stykke papir og samtidig åbner et nyt område, hvor den ulv kan jagtes (Elvbækken) - samtidig åbner noble også for at man skal dræbe x antal ulve OG nakke en ulve boss samme sted. Herefter skal det vigtige papir afleveres til noble, som underskriver det og starter en ny quest, hvor man skal tilbage til elis og afleverer dette papir. Dette er en questline, der kræver at en questgiver ikke er questtaker - spændende om det allerede er kodet. Nye items er ringen, ikke underskrevet dokument, underskrevet dokument.
-
 
 -- MAGI --
 - teleport item, der konsekvensløs kan hive en ud af map og tilbage til city (kan evt være et merge item, der skal samles fra forskellige ingredienser)
@@ -139,10 +137,39 @@ Fractions systemet skal have konsekvens ind i handel og ind i chance for overfal
 - bruge mobs ikoner (first idle frame) som ikoner for mobs gruppe på city map. Hp eller dm kan være repræsenteret af styrke. Hvis Nethrendor f.eks. har 50 i styrke, så placeres der mobs for tilsvarende styre i HP eller dm eller hvad jeg vælger, der skal matche.
 - Måske Nethrendor starter med en vis styrke, og mobs, der er under hans kommando reducere i den styrke (måske fraction systemet skal bruges her). Quest kan tilføje elelr fjerne nethrendor army_styrke. Når army styrke er over en vis del af ens egen army styrke, kan der måske ske de her angreb på ens by - corruption skal have noget at sige her.
 
+WorldState der dækker blandt andet:
+- er bestemte areas/regions unlocked
+- er bestemt mobs set 
+- hvilken boss er defeated
+- hvilken bygninger er bygget
 
---- NEXT ---
+ect.:
+worldState: {
+  "inn.cellar.cleared": true,
+  "river_creek.unlocked": true,
+  "nethrendor.army_seen": true,
+  "barn.boss_defeated": false,
+  "city.wall_breached_north": true
+}
+
+og så skal alle disse "flag" kunne bruges til betingelser for tileset, decay, weather, mobs, objects, foliage, prefeb, quests, unlock maps, unlock item drops.
+
+--- RANDOM EVENTS ---
+Hver region kan få et random event tag, der beskriver hvilke random event's der kan ske, og weight på det.
+Event skal komme fra en event-config, hvor det defineres om event er onetime, id, text, obejct det er relateret til, hvad event gør/giver/kræver osv.
+
 
 --- IN WORK ---
 
 
 ---------------------------DONE------------------------------
+
+ok - så lad os sige at vi skal have følgende worldstates:
+flags for om områder er corrupted/noncorrupted i den aktuelle stund
+Det samme med explored, cleared, unlocked på alle regions.
+Et flag for hvilke mobs man har set (seen/unseen)
+Et flag for om quest er tilgængelig, started, completed (måske vi allerede har mulighed for at se om quest er gennemført tror jeg)
+
+og så skal disse flag kunne bruges generelt på alt i map-region (på nær id og andre lignende para det ikke giver mening på)
+
+kan vi gøre det i et hug og evt hvordan - blot et svar
