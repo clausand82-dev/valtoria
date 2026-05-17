@@ -68,6 +68,18 @@ export const WEATHER_PRESETS = {
     },
   },
 
+  leaves: {
+    id: "leaves",
+    label: "Leaves",
+    particles: [
+      { type: "leaves", layer: "screen", density: 0.35 },
+    ],
+    ambience: {
+      lightTint: "#8a5a24",
+      fogAmount: 0.1,
+    },
+  },
+
   thunderstorm: {
     id: "thunderstorm",
     label: "Thunderstorm",

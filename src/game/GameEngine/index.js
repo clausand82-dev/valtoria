@@ -37,6 +37,7 @@ export class GameEngine {
     this.monsters = new Map();
     this.loots = [];
     this.projectiles = [];
+    this.groundHazards = [];
     this.particles = [];
     this.floaters = [];
     this.toasts = [];

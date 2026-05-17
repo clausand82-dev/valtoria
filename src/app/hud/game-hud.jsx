@@ -152,14 +152,15 @@ export function GameHud({
             <span>Questlog</span>
             {questBadgeCount > 0 && <b className="city-menu-badge">{questBadgeCount}</b>}
           </button>
+          <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
+            <ImageIcon src="/assets/generated/item/item_book_lore.png" />
+            <span>Setting</span>
+          </button>
           <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
             <ImageIcon src="/assets/generated/icon_map.png" />
             <span>World map</span>
           </button>
-          <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
-            <span className="city-menu-settings-icon" aria-hidden="true" />
-            <span>Setting</span>
-          </button>
+
         </section>
       ) : (
       <section className="skillbar" aria-label="Battle quickbar">

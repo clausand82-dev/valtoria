@@ -3,15 +3,13 @@ const AREA_MAP_VIEW = {
   maxWidth: "1180px",
 };
 
-const defaultRegionWeights = {
-  tree: 8,
-  pillar: 1,
-  house: 1,
-  foilage: 8,
-  rock: 4,
-  ruin: 1,
-  fireplace: 1,
-  firebeacon: 0,
+const DEFAULT_TILESET = { fileName: "tileset/tileset_grass.png" };
+const DEFAULT_WATER = [{ fileName: "tileset/tileset_water.png", weight: 1 }];
+const DEFAULT_SPAWN_COUNTS = {
+  objects: 15,
+  foliage: 28,
+  decals: 24,
+  monsters: { min: 8, max: 12 },
   water: 0,
 };
 
@@ -114,7 +112,7 @@ export const AREA_MAPS = {
 Region parameter guide:
 
 Required map/UI fields:
-- id: Unique stable region id in English kebab-case. Used for saved corruption state and future biodome/data hooks.
+- id: Unique stable region id in English kebab-case. Used for saved corruption state and region data hooks.
 - label: Display name shown on the map.
 - points: SVG polygon points in percentage coordinates: "x,y x,y x,y". These define the clickable/highlighted area.
 - labelX / labelY: Label position in percentage coordinates on the map.
@@ -133,14 +131,20 @@ Optional gameplay fields:
 - populationGain: How many citizens the city gains the first time this region is liberated.
   Later completed runs add ceil(populationGain * repeatRunPct) from city-stats-rules-config.js.
   If omitted, city stats use CITY_STATS_RULES.mapLiberation.defaultPopulationGain.
-- biodome: General biome/style key used by generation. Defaults to "mainland".
 - tileset: Optional ground tileset override for this region.
   Supported formats:
   - string: "my_tileset.png" (uses all 16 tiles in a 4x4 sheet)
   - object: { fileName: "my_tileset.png", x: 1, y: 1 } (locks to one 4x4 tile cell)
   Notes:
   - x/y are 1-based where x=1,y=1 is the first tile in the sheet.
-  - If tileset is missing, ground falls back to biome/biodome sheets as before.
+  - If tileset is missing, ground falls back to the default grass tileset.
+- water / waterSet / waterSets: Optional water tileset selection for this region.
+  Supported formats match foliage:
+  - string: "tileset/tileset_water.png" (uses all 16 cells)
+  - object: { fileName: "tileset/tileset_water.png", weight: 1, x: [1, 2], y: [1, 3] }
+  Notes:
+  - x/y are optional 1-based cell selectors on the 4x4 sheet.
+  - Water only appears when spawnCounts.water is above 0.
 - foliageSets / foliageSet: Optional foliage sheet override(s) for this region.
   Supported formats:
   - string: "my_foliage.png" (defaults to 4x4)
@@ -164,10 +168,20 @@ Optional gameplay fields:
   Format: array of object definitions:
   - { id: "object_tree_mainland", weight: 8 }
   - { id: "object_woodboxes_ground", weight: 2, destructible: true }
+  - { id: "object_tree_mainland", weight: 8, scale: 1.2 }
+  - { id: "object_stone_cluster", weight: 2, scale: { min: 0.8, max: 1.2 } }
   Fields:
   - id: Object id from region-object-config.js
   - weight: Relative spawn weight for this object id
   - destructible: Optional override. true forces destructible, false blocks destruction.
+  - scale: Optional size multiplier for placed instances.
+    Supported formats:
+    - number: Fixed scale value, for example scale: 1.2
+    - object with fixed: { fixed: 1.2 } (same as scale: 1.2)
+    - object with range: { min: 0.8, max: 1.2 } rolls randomly between min and max
+    Notes:
+    - If scale is omitted, objects use default scale 1.0 (no variation).
+    - scale: 1 means 100% size, scale: 0.5 means 50% size.
 - decay: Optional decay/decal sheet selection for this region.
   If set and non-empty, region decals use these sheet sets instead of the legacy
   biome decal list.
@@ -222,17 +236,14 @@ Optional gameplay fields:
 - mapSize: Optional. Controls the generated map size.
   Options: "small", "medium" (default), "large", "giga".
   medium = current 72x52 tiles. small ~40x29, large ~108x78, giga ~158x114.
-- weights: Object spawn weights for generated maps. Higher number means more of that feature; 0 disables it.
+- spawnCounts: Per-chunk spawn counts for generated maps.
   Available keys:
-  - tree: Trees.
-  - pillar: Pillars.
-  - house: Buildings/huts.
-  - foilage: Small foliage clusters.
-  - rock: Stones.
-  - ruin: Ruin objects.
-  - fireplace: Small fire/campfire points.
-  - firebeacon: Larger fire beacon points.
-  - water: Lake-like water patches. If omitted or 0, no water is generated. Water cannot be walked on.
+  - objects: Regular region objects per chunk.
+  - foliage: Foliage placements per chunk.
+  - decals: Decay/decal placements per chunk.
+  - water: Lake-like water patches per chunk. 0 disables water.
+  - monsters: { min, max } monster count range per chunk.
+  Legacy weights.foilage and weights.water are still migrated by region({...}) while old configs are cleaned up.
 - antiDrops: Drop blacklist for the region. This overrides normal drop rules.
   Available keys:
   - items: Item base names to block.
@@ -261,11 +272,37 @@ function normalizeMobs(mobs) {
   );
 }
 
-function region({ biodome = "mainland", mobs = ["Wolf", "Spider"], mapSize = "medium", weights = {}, antiDrops = {}, corrupted = true, ...regionConfig }) {
+function normalizeCount(value, fallback) {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+}
+
+function normalizeSpawnCounts(input = {}, weights = {}) {
+  const weightedFoliage = weights.foilage === undefined
+    ? DEFAULT_SPAWN_COUNTS.foliage
+    : Math.round(DEFAULT_SPAWN_COUNTS.foliage * Math.min(2.4, Math.max(0, Number(weights.foilage) || 0) / 8));
+  const monsterInput = input.monsters && typeof input.monsters === "object" ? input.monsters : {};
+  return {
+    objects: normalizeCount(input.objects, DEFAULT_SPAWN_COUNTS.objects),
+    foliage: normalizeCount(input.foliage ?? input.foilage, weightedFoliage),
+    decals: normalizeCount(input.decals ?? input.decay, DEFAULT_SPAWN_COUNTS.decals),
+    monsters: {
+      min: normalizeCount(monsterInput.min, DEFAULT_SPAWN_COUNTS.monsters.min),
+      max: normalizeCount(monsterInput.max, DEFAULT_SPAWN_COUNTS.monsters.max),
+    },
+    water: normalizeCount(input.water, normalizeCount(weights.water, DEFAULT_SPAWN_COUNTS.water)),
+  };
+}
+
+function region({ mobs = ["Wolf", "Spider"], mapSize = "medium", weights = {}, spawnCounts = {}, water, antiDrops = {}, corrupted = true, ...regionConfig }) {
+  const normalizedSpawnCounts = normalizeSpawnCounts(spawnCounts, weights);
   return {
     corrupted,
-    biodome,
     mapSize,
+    tileset: regionConfig.tileset ?? DEFAULT_TILESET,
+    water: water ?? (normalizedSpawnCounts.water > 0 ? DEFAULT_WATER : undefined),
+    spawnCounts: normalizedSpawnCounts,
     mobs: normalizeMobs(mobs),
     antiDrops: {
       items: [],
@@ -274,10 +311,6 @@ function region({ biodome = "mainland", mobs = ["Wolf", "Spider"], mapSize = "me
       named: [],
       categories: [],
       ...antiDrops,
-    },
-    weights: {
-      ...defaultRegionWeights,
-      ...weights,
     },
     ...regionConfig,
   };
@@ -292,8 +325,7 @@ export const MAP_REGION_SETS = {
       unlock: { locked: true, text: "Soslangen kraever en senere historiequest." },
       labelX: 11.44,
       labelY: 27.47,
-      biodome: "jungle",
-      mobs: ["Snake", "Ghost", "Scorpion"],
+      mobs: ["Snake", "Ghost", "Scorpion", { type: "Spawn of Hydre", weight: 0.8 }],
       // TODO:DELETE: weights: { tree: 0, house: 0, foilage: 1, rock: 7, ruin: 1, pillar: 1, water: 20 }
       weights: { foilage: 1, water: 20 },
       objects: [
@@ -311,8 +343,7 @@ export const MAP_REGION_SETS = {
       unlock: { locked: true, text: "Leviathans Farvand kraever en senere historiequest." },
       labelX: 29.74,
       labelY: 27.35,
-      biodome: "jungle",
-      mobs: ["Snake", "Ghost", "Scorpion"],
+      mobs: ["Snake", "Ghost", "Scorpion", { type: "Spawn of Hydre", weight: 0.8 }],
       // TODO:DELETE: weights: { tree: 0, house: 0, foilage: 2, rock: 8, ruin: 1, pillar: 2, water: 20 }
       weights: { foilage: 2, water: 20 },
       objects: [
@@ -330,8 +361,7 @@ export const MAP_REGION_SETS = {
       unlock: { locked: true, text: "Vortexen kraever en senere historiequest." },
       labelX: 48.41,
       labelY: 19.78,
-      biodome: "jungle",
-      mobs: ["Ghost", "Demon"],
+      mobs: ["Ghost", "Demon", { type: "Infernus Minion", weight: 1.2 }],
       // TODO:DELETE: weights: { tree: 0, house: 0, foilage: 1, rock: 5, ruin: 3, pillar: 4, water: 22 }
       weights: { foilage: 1, water: 22 },
       objects: [
@@ -349,8 +379,7 @@ export const MAP_REGION_SETS = {
       unlock: { locked: true, text: "Tentakelfarvand kraever en senere historiequest." },
       labelX: 86.14,
       labelY: 23.22,
-      biodome: "jungle",
-      mobs: ["Snake", "Demon", "Ghost"],
+      mobs: ["Snake", "Demon", "Ghost", { type: "Spawn of Hydre", weight: 0.7 }, { type: "Infernus Minion", weight: 0.8 }],
       // TODO:DELETE: weights: { tree: 0, house: 0, foilage: 1, rock: 5, ruin: 2, pillar: 3, water: 22 }
       weights: { foilage: 1, water: 22 },
       objects: [
@@ -520,8 +549,7 @@ export const MAP_REGION_SETS = {
       id: "eternal-mountains",
       label: "De Evige Bjerge",
       color: "#a6a0a0",
-      biodome: "rock",
-      mobs: ["Skeleton", "Ghost"],
+      mobs: ["Skeleton", "Ghost", { type: "Bjergtroll", weight: 1 }, { type: "Gigantisktroll", weight: 0.25 }],
       unlock: { locked: true, text: "De Evige Bjerge kraever en senere historiequest." },
       labelX: 90.01,
       labelY: 64.28,
@@ -639,22 +667,73 @@ export const MAP_REGION_SETS = {
       points: "66.99,87.14 87.32,72.26 70.57,57.39 56.22,74.39",
     }),
     region({
-      id: "river-creek",
-      label: "Elvbaekken",
-      color: "#7fb6d6",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
-      labelX: 49,
-      labelY: 79,
-      // TODO:DELETE: weights: { tree: 4, rock: 3, foilage: 7, water: 12 }
-      weights: { foilage: 7, water: 12 },
+      id: "river-creek", label: "Elvbaekken", color: "#7fb6d6",
+      unlock: { completedQuests: ["innkeeper_ring_for_noble"], text: "Kraever, at Noble har aabnet Elvbaekken." },
+      labelX: 49, labelY: 79,
+      mapSize: "medium",
+      tileset: ["tileset/tileset_grass.png", "tileset/tileset_swamp.png"],
+      spawnCounts: {objects: 50, foliage: 200, decals: 100, water: 25, monsters: { min: 32, max: 35 },},
+      weather: {
+      possible: [
+        { id: "leaves", weight: 60 },
+        { id: "thunderstorm", weight: 25 },
+        { id: "heavy_rain", weight: 15 },
+      ],
+      },
+      layout: { pool: [ { id: "central_clearing", weight: 3 }, { id: "linear_path", weight: 1 },],},
+      prefabRules: {maxTotal: 2, minDistanceBetweenPrefabs: 8, anchors: ["clearing", "room"], pool: [{ id: "old_well_clearing", weight: 4, max: 2 },],},
+      water: [ { fileName: "tileset/tileset_water.png", x: 2, y: 2, weight: 5 },],
+      ambient: {
+        particles: [
+          {
+            type: "smoke",
+            density: 0.52,
+            movement: "drift",
+            color: "#a9aaa0",
+            size: [110, 260],
+            alpha: [0.12, 0.24],
+            lifetime: [12, 20],
+            speed: [0.01, 0.05],
+            ambientScale: 1,
+            renderLayer: "aboveEntities",
+            avoidPlayerRadius: 1.8,
+            avoidPlayerMinAlpha: 0.12,
+            chance: 1,
+          },
+          {
+            type: "fogWisps",
+            density: 0.28,
+            movement: "drift",
+            color: "#d0d0c4",
+            size: [44, 118],
+            alpha: [0.08, 0.18],
+            lifetime: [6, 12],
+            speed: [0.04, 0.12],
+            renderLayer: "aboveEntities",
+            avoidPlayerRadius: 1.4,
+            avoidPlayerMinAlpha: 0.16,
+            chance: 1,
+          },
+        ],
+      },
+      foliageSet: [
+        { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
+        { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
+        //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
+        //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
+      ],
+      decay: [
+        { id: "decay_field", weight: 12 },
+      ],
       objects: [
-        { id: "object_tree_mainland", weight: 4 },
-        { id: "object_stone_cluster", weight: 3 },
-        { id: "object_house_mainland", weight: 1 },
-        { id: "object_pillar_stone", weight: 1 },
+        { id: "object_tree_mainland", weight: 10, scale: { min: 0.9, max: 1.5 },  },
+        { id: "object_tree_jungle", weight: 8, scale: { min: 0.9, max: 1.5 },  },
+        { id: "object_stone_cluster", weight: 3, scale: { min: 0.9, max: 1.5 },  },
         { id: "object_ruin_mainland", weight: 1 },
+        { id: "object_treestumps", weight: 3, scale: 0.5 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      mobs: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }, { type: "WolfFenris", weight: 1 }, { type: "Spawn of Hydre", weight: 0.35 }],
       points: "66.99,87.14 35.89,85.02 35.89,68.01 56.22,74.39",
     }),
     region({
@@ -727,13 +806,46 @@ export const MAP_REGION_SETS = {
         { id: "object_fireplace_mainland", weight: 10 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
+      mobs: ["Hellhound",],
     }),
     region({
       id: "inn-of-the-good-oak",
       label: "Kroen Den Gode Eg",
+      corrupted: true,
+      populationGain: 1,
       mapSize: "small",
       color: "#7fb172",
       tileset: "tileset/tileset_bricktiles.png",
+      spawnCounts: {
+        objects: 24,
+        foliage: 100,
+        decals: 56,
+        water: 10,
+        monsters: { min: 32, max: 35 },
+      },
+      weather: {
+      possible: [
+        { id: "none", weight: 60 },
+        { id: "fog", weight: 25 },
+      ],
+      },
+      layout: {
+      pool: [
+        { id: "central_clearing", weight: 2 },
+        { id: "linear_path", weight: 1 },
+      ],
+      },
+      prefabRules: {
+      maxTotal: 2,
+      minDistanceBetweenPrefabs: 8,
+      anchors: ["clearing", "room"],
+      pool: [
+        { id: "spider_nest", weight: 4, max: 2 },
+      ],
+    },
+      water: [
+        { fileName: "tileset/tileset_water.png", x: 1, y: 2, weight: 1 },
+      ],
       ambient: {
         particles: [
           {
@@ -767,17 +879,18 @@ export const MAP_REGION_SETS = {
           },
         ],
       },
-      //populationGain: 10,
       foliageSet: [
         { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
-        { fileName: "foilage/foilage_boneparts.png"},
+        { fileName: "foilage/foilage_boneparts.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
         { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
         { id: "object_woodboxes_ground", weight: 15, destructible: true },
-        { id: "object_shelfs", weight: 3, destructible: true },
+        { id: "object_bones", weight: 5, destructible: true },
+        { id: "object_barrels_ground", weight: 10, destructible: true },
+        //{ id: "object_shelfs", weight: 3, destructible: true },
         //{ id: "object_firebeacon_snow", weight: 1, destructible: false },
       ],
       decay: [
@@ -785,10 +898,11 @@ export const MAP_REGION_SETS = {
         { id: "decay_cracks", weight: 8 },
         { id: "decay_dust", weight: 10 },
         { id: "decay_basement", weight: 20 },
+        { id: "decay_blood", weight: 20 },
       ],
       labelX: 60,
       labelY: 31,
-      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 }],
+      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "Spawn of Archnogrim", weight: 1 }, { type: "Flesheater", weight: 0.55 }, { type: "MotherSpider", weight: 0.5 }],
       //weights: { house: 10, tree: 10, rock: 2, foilage: 9, fireplace: 1 },
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
@@ -820,7 +934,7 @@ export const MAP_REGION_SETS = {
       unlock: { completedQuests: ["clear_the_inn"] },
       labelX: 58,
       labelY: 59,
-      mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
+      mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden", { type: "Hellhound", weight: 0.85 }],
       antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: false },
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
@@ -957,10 +1071,10 @@ export const MAP_REGION_SETS = {
       mapSize: "large",
       tileset: { fileName: "tileset/tileset_grass.png" },
       foliageSet: [
-        { fileName: "foilage/foilage_forest.png", weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
+        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2 },
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
-        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5},],
+        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
       //unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       labelX: 54,
       labelY: 16,
@@ -1000,7 +1114,6 @@ export const MAP_REGION_SETS = {
     region({
       id: "to-the-drowned-city",
       label: "To The Drowned City",
-      biodome: "jungle",
       color: "#7fb6d6",
       labelX: 57,
       labelY: 6,
@@ -1370,7 +1483,6 @@ export const MAP_REGION_SETS = {
       color: "#d7a85b",
       labelX: 95,
       labelY: 42,
-      biodome: "rock",
       mobs: ["Skeleton", "Ghost"],
       // TODO:DELETE: weights: { tree: 1, rock: 10, pillar: 4, ruin: 2, foilage: 2, fireplace: 1 }
       weights: { foilage: 2 },
@@ -1390,7 +1502,6 @@ export const MAP_REGION_SETS = {
       color: "#a6a0a0",
       labelX: 86,
       labelY: 57,
-      biodome: "rock",
       mobs: ["Skeleton", "Ghost"],
       // TODO:DELETE: weights: { tree: 2, rock: 7, ruin: 7, pillar: 5, foilage: 3, fireplace: 1 }
       weights: { foilage: 3 },

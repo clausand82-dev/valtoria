@@ -116,7 +116,7 @@ export const regionMethods = {
     this.ensureWorldAroundPlayer();
     this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
-    this.addToast(`Rejst til ${this.region.mapRegion?.label ?? this.region.biome.name}`);
+    this.addToast(`Rejst til ${this.region.mapRegion?.label ?? "regionen"}`);
     this.publishSnapshot();
   },
 
@@ -132,7 +132,7 @@ export const regionMethods = {
     };
     this.activeMapRegion.mapSize = regionConfig.mapSize ?? "medium";
     this.mapReturn = null;
-    this.region = createRegion(this.regionIndex, seed, regionConfig.biodome, {
+    this.region = createRegion(this.regionIndex, seed, null, {
       ...regionConfig,
       areaMapId,
     });
@@ -238,6 +238,7 @@ export const regionMethods = {
     }
     this.loots = [];
     this.projectiles = [];
+    this.groundHazards = [];
     this.particles = [];
     this.floaters = [];
     this.hoverMonsterId = null;
@@ -386,6 +387,12 @@ export const regionMethods = {
     monster.allowElite = base.allowElite !== false;
     monster.isBoss = Boolean(base.isBoss);
     monster.boss = base.isBoss ? { ...BOSS_TINT } : null;
+    monster.noLoot = Boolean(base.noLoot);
+    monster.despawnOnDeath = Boolean(base.despawnOnDeath);
+    monster.onHitStatus = base.onHitStatus ? { ...base.onHitStatus } : null;
+    monster.leapAttack = base.leapAttack ? { ...base.leapAttack } : null;
+    monster.attackCooldownConfig = base.attackCooldown ? { ...base.attackCooldown } : null;
+    monster.meleeAreaDamage = base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null;
     monster.haveMinion = Boolean(base.haveMinion);
     monster.minions = base.minions ?? false;
     monster.minionCooldown = Math.max(0, Number(monster.minionCooldown) || 0);

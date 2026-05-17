@@ -14,7 +14,8 @@ import {
   normalizeReadableBonuses,
   readableMergeRecipesFor,
   resourceMergeRecipeFor,
-  questSnapshot
+  questSnapshot,
+  canNpcTurnInQuest
 } from "../helpers.js";
 import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill-tree-config.js";
 import { normalizeAutoLootRules } from "./loot.js";
@@ -64,7 +65,7 @@ export const snapshotMethods = {
         stats: { ...this.player.stats, killsByMonster: { ...this.player.stats.killsByMonster } },
       },
       zone: {
-        name: this.region.mapRegion?.label ?? chunk.biome.name,
+        name: this.region.mapRegion?.label ?? "Region",
         level: this.region.index,
         seed: this.region.seed,
         weather: this.region.mapRegion?.weather
@@ -75,7 +76,7 @@ export const snapshotMethods = {
           : { id: "none", label: "No weather" },
       },
       region: {
-        name: this.region.mapRegion?.label ?? this.region.biome.name,
+        name: this.region.mapRegion?.label ?? "Region",
         index: this.region.index,
         seed: this.region.seed,
         areaMapId: this.region.mapRegion?.areaMapId ?? null,
@@ -148,7 +149,7 @@ export const snapshotMethods = {
           npcId: this.questState.wildernessNpc.npcId,
           offers: this.collectQuestOffers(this.questState.wildernessNpc.npcId, "wilderness").map((quest) => questSnapshot(quest, this.player.inventory)),
           active: this.questState.active
-            .filter((quest) => quest.npcId === this.questState.wildernessNpc.npcId)
+            .filter((quest) => canNpcTurnInQuest(quest, this.questState.wildernessNpc.npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory)),
         } : null,
         nearbyQuestgiver: this.nearbyQuestgiver ? {
@@ -156,12 +157,12 @@ export const snapshotMethods = {
           npcId: this.nearbyQuestgiver.npcId,
           offers: this.collectQuestOffers(this.nearbyQuestgiver.npcId, "wilderness").map((quest) => questSnapshot(quest, this.player.inventory)),
           active: this.questState.active
-            .filter((quest) => quest.npcId === this.nearbyQuestgiver.npcId)
+            .filter((quest) => canNpcTurnInQuest(quest, this.nearbyQuestgiver.npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory)),
         } : null,
         cityNpcStates: Object.keys(QUEST_NPCS).map((npcId) => {
           const activeQuests = this.questState.active
-            .filter((quest) => quest.npcId === npcId)
+            .filter((quest) => canNpcTurnInQuest(quest, npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory));
           const offers = this.collectQuestOffers(npcId, "city").map((quest) => questSnapshot(quest, this.player.inventory));
           const hasComplete = activeQuests.some((quest) => quest.complete);

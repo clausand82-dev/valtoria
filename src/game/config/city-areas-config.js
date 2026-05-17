@@ -210,6 +210,7 @@ export const CITY_AREAS = [
     builtLayer: `${CITY_LAYER_BASE}/city_townhall.png`,
     buildings: [
       { id: "town_hall", x: 824, y: 474 },
+      { id: "library", x: 774, y: 450 },
     ],
   },
   {

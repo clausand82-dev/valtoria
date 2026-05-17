@@ -307,10 +307,12 @@ function applyDurabilityDegradationForVisit(progress) {
 
 function readableDialogFromItem(item) {
   if (!item || !isReadableItem(item)) return null;
+  const readableDef = item.readableId ? READABLE_DEF_BY_ID[item.readableId] : null;
+  const text = String(readableDef?.story ?? item.text ?? item.storyText ?? item.readableText ?? item.body ?? "").trim();
   return {
     type: "readable-text",
-    title: item.name,
-    body: item.readableText,
+    title: String(readableDef?.title ?? item.name ?? ""),
+    text,
     item,
   };
 }

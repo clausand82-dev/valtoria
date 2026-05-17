@@ -853,15 +853,68 @@ function payCityAreaUnlockCost(area, engine, snapshot) {
 }
 
 function payCityCostEntries(entries, engine, snapshot, progress = null, onChangeProgress = null) {
-  if (!engine) return entries.length === 0;
-  if (!entries.every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) >= amount)) return false;
-  for (const [resourceId, amount] of entries) {
-    const consumed = resourceId === "gold"
-      ? engine.consumeGold?.(amount) ?? 0
-      : consumeCityResourceWithStorage(resourceId, amount, engine, snapshot, progress, onChangeProgress);
+  const paymentPlan = buildCityCostPaymentPlan(entries, snapshot, progress);
+  if (!paymentPlan) return false;
+  if (!engine) return paymentPlan.gold <= 0
+    && Object.keys(paymentPlan.backpack).length === 0
+    && Object.keys(paymentPlan.storage).length === 0;
+  if (paymentPlan.gold > 0) {
+    const paidGold = engine.consumeGold?.(paymentPlan.gold) ?? 0;
+    if (paidGold < paymentPlan.gold) return false;
+  }
+  for (const [resourceId, amount] of Object.entries(paymentPlan.backpack)) {
+    const consumed = engine.consumeResource?.(resourceId, amount) ?? 0;
     if (consumed < amount) return false;
   }
+  const storageEntries = Object.entries(paymentPlan.storage);
+  if (storageEntries.length > 0) {
+    if (typeof onChangeProgress !== "function") return false;
+    onChangeProgress((current) => {
+      let next = current;
+      for (const [resourceId, amount] of storageEntries) {
+        next = consumeCityStoredResource(next, resourceId, amount).progress;
+      }
+      return next;
+    });
+    for (const [resourceId, amount] of storageEntries) {
+      engine.addToast?.(`Used ${amount}x ${RESOURCE_DEFS[resourceId]?.name ?? resourceId} from city storage`);
+    }
+  }
   return true;
+}
+
+function buildCityCostPaymentPlan(entries, snapshot, progress = null) {
+  const normalizedEntries = (entries ?? [])
+    .map(([resourceId, amount]) => [String(resourceId ?? ""), Math.max(0, Math.floor(Number(amount) || 0))])
+    .filter(([resourceId, amount]) => resourceId && amount > 0);
+  const goldAvailable = Math.max(0, Math.floor(Number(snapshot?.player?.gold) || 0));
+  let remainingGold = goldAvailable;
+  const backpackRemaining = new Map();
+  const storageRemaining = new Map();
+  const plan = { gold: 0, backpack: {}, storage: {} };
+  for (const [resourceId, amount] of normalizedEntries) {
+    if (resourceId === "gold") {
+      if (remainingGold < amount) return null;
+      remainingGold -= amount;
+      plan.gold += amount;
+      continue;
+    }
+    const backpackAvailable = backpackRemaining.has(resourceId)
+      ? backpackRemaining.get(resourceId)
+      : resourceCountFromSnapshot(snapshot, resourceId);
+    const fromBackpack = Math.min(backpackAvailable, amount);
+    const remainingAfterBackpack = amount - fromBackpack;
+    backpackRemaining.set(resourceId, backpackAvailable - fromBackpack);
+    if (fromBackpack > 0) plan.backpack[resourceId] = (plan.backpack[resourceId] ?? 0) + fromBackpack;
+    if (remainingAfterBackpack <= 0) continue;
+    const storageAvailable = storageRemaining.has(resourceId)
+      ? storageRemaining.get(resourceId)
+      : cityStoredResourceCount(progress, resourceId);
+    if (storageAvailable < remainingAfterBackpack) return null;
+    storageRemaining.set(resourceId, storageAvailable - remainingAfterBackpack);
+    plan.storage[resourceId] = (plan.storage[resourceId] ?? 0) + remainingAfterBackpack;
+  }
+  return plan;
 }
 
 function consumeCityResourceWithStorage(resourceId, amount, engine, snapshot, progress = null, onChangeProgress = null) {

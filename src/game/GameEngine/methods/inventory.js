@@ -12,6 +12,7 @@ import {
   isQuestItem,
   isReadableItem,
   isResourceItem,
+  READABLE_DEF_BY_ID,
   MAX_POTION_STACK,
   GROUND_LOOT_DESPAWN_SECONDS
 } from "../dependencies.js";
@@ -355,7 +356,8 @@ export const inventoryMethods = {
   readInventoryItem(index) {
     const item = this.player.inventory[index];
     if (!item || !isReadableItem(item) || item.readableStatus !== "readable") return null;
-    const text = String(item.storyText ?? "").trim();
+    const readableDef = item.readableId ? READABLE_DEF_BY_ID[item.readableId] : null;
+    const text = String(readableDef?.story ?? item.storyText ?? "").trim();
     if (!text) {
       this.addToast("Ingen tekst at laese");
       return null;
@@ -365,7 +367,7 @@ export const inventoryMethods = {
     this.publishSnapshot();
     return {
       type: "readable-text",
-      title: item.name,
+      title: String(readableDef?.title ?? item.name ?? ""),
       text,
       questStarted: startedQuest ? {
         title: startedQuest.title,

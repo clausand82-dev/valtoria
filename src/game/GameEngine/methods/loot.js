@@ -320,11 +320,11 @@ export const lootMethods = {
   dropChestLoot(chest) {
     let item = rollUniqueItem(Math.max(1, this.player.level), {
       source: "chest",
-      biomeId: this.region.biomeId,
+      biomeId: this.region.mapRegion?.id,
       chance: UNIQUE_DROP_CHANCES.chest,
     }) ?? rollNamedItem(Math.max(1, this.player.level), {
       source: "chest",
-      biomeId: this.region.biomeId,
+      biomeId: this.region.mapRegion?.id,
       chanceMult: 3,
     });
 
@@ -392,7 +392,7 @@ export const lootMethods = {
 
     const unique = rollUniqueItem(lootLevel, {
       source: gearDropSource,
-      biomeId: this.region.biomeId,
+      biomeId: this.region.mapRegion?.id,
       chance: UNIQUE_DROP_CHANCES.monster * (1 + stats.magicFind),
     });
     if (unique && !this.isDropBlocked(unique)) {
@@ -410,7 +410,7 @@ export const lootMethods = {
 
     const named = rollNamedItem(lootLevel, {
       source: gearDropSource,
-      biomeId: this.region.biomeId,
+      biomeId: this.region.mapRegion?.id,
       chanceMult: namedItemChanceMultiplier(monster) * (1 + stats.magicFind),
     });
     if (named && !this.isDropBlocked(named)) {

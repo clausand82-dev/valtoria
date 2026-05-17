@@ -149,7 +149,10 @@ function isValidPrefab(prefab) {
 
 function findPrefabAnchorCandidates(region, prefab, rules, size) {
   const allowedAnchors = new Set(Array.isArray(rules?.anchors) && rules.anchors.length ? rules.anchors : [prefab.anchor ?? "room"]);
-  const anchors = allowedAnchors.has(prefab.anchor) ? [prefab.anchor] : [...allowedAnchors];
+  const preferredAnchor = prefab.anchor ?? "room";
+  const anchors = allowedAnchors.has(preferredAnchor)
+    ? [preferredAnchor, ...[...allowedAnchors].filter((anchor) => anchor !== preferredAnchor)]
+    : [...allowedAnchors];
   const candidates = [];
 
   for (const anchor of anchors) {
@@ -291,23 +294,33 @@ function addLegendEntry(result, entry, x, y) {
     });
   }
   if (entry.foliage) {
+    const foliage = typeof entry.foliage === "object" && entry.foliage !== null
+      ? entry.foliage
+      : { id: entry.foliage };
     result.foliage.push({
       ...base,
-      id: entry.foliage,
-      variant: entry.variant,
-      size: entry.size,
-      rotation: entry.rotation,
-      visualScale: entry.visualScale,
+      ...foliage,
+      id: foliage.id,
+      variant: entry.variant ?? foliage.variant,
+      cell: entry.cell ?? foliage.cell,
+      size: entry.size ?? foliage.size,
+      scale: entry.scale ?? foliage.scale,
+      rotation: entry.rotation ?? foliage.rotation,
+      visualScale: entry.visualScale ?? foliage.visualScale,
     });
   }
   if (entry.decal) {
     result.decals.push({
       ...base,
       type: entry.decal,
-      id: entry.decayId,
+      decayId: entry.decayId,
+      variant: entry.variant,
+      cell: entry.cell,
       size: entry.size,
       rotation: entry.rotation,
       alpha: entry.alpha,
+      renderScale: entry.renderScale,
+      particles: entry.particles,
     });
   }
   if (entry.monster) {

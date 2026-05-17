@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CITY_BUILDINGS } from "../../game/config/city-buildings-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../../game/config/map-region-config.js";
 import { QUEST_DEFS } from "../../game/config/quest-config.js";
+import { getQuestStartNpcIds } from "../../game/GameEngine/helpers.js";
 import { regionStatusKey } from "../save/save-keys.js";
 const cityPrebuildCache = { layout: null };
 
@@ -272,7 +273,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
             <p className="map-note">
               {selectedRegion
                 ? regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy)
-                  ? `${selectedRegion.label} | id: ${selectedRegion.id} | biodome: ${selectedRegion.biodome ?? "not set"}`
+                  ? `${selectedRegion.label} | id: ${selectedRegion.id}`
                   : `${selectedRegion.label} er laast. ${regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}`
                 : `${activeMap.title} er aabnet som underkort. Klik et omraade for at vaelge det.`}
             </p>
@@ -368,7 +369,7 @@ function LockedRegionDialog({ region, completedQuestSet, army = 0, onClose }) {
 
 function LockedQuestRequirement({ questId }) {
   const quest = QUEST_DEFS[questId];
-  const npcId = quest?.npcIds?.[0];
+  const npcId = getQuestStartNpcIds(quest)?.[0];
   const npc = npcId ? QUEST_NPCS[npcId] : null;
   return (
     <article className="map-lock-quest">

@@ -38,6 +38,7 @@ export const RESOURCE_DEFS = {
   magic_essence: { name: "Magic Essence", stackMax: 1000, value: 45, sheet: "resources", iconIndex: 6, color: "#9f7dff", iconUrl: "/assets/generated/item/item_res_magicessens.png" },
   food: { name: "Food Barrel", stackMax: 1000, value: 120, sheet: "resources", iconIndex: 8, color: "#d49a58", iconUrl: "/assets/generated/item/item_res_food.png" },
   hide: { name: "Skind", stackMax: 100, value: 4, sheet: "resources", iconIndex: 8, color: "#a87a50", iconUrl: "/assets/generated/item/item_res_hide.png" },
+  bonedust: { name: "Bone Dust", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_res_bonedust.png" },
   
   // Plants / forageables
   red_rose: { name: "Rød rose", stackMax: 100, value: 1, sheet: "resources", iconIndex: 12, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },

@@ -18,6 +18,10 @@ import {
 import {
   hashToIndex,
   normalizeMonsterType,
+  getQuestStartNpcIds,
+  getQuestTurnInNpcIds,
+  canNpcStartQuest,
+  canNpcTurnInQuest,
   makeQuestItem,
   makeResourceItem,
   resourceCount,
@@ -78,12 +82,11 @@ export const questsMethods = {
       if (questSource !== "readable") return false;
     } else {
       if (questSource === "readable") return false;
-      if (!(def.npcIds ?? []).includes(npcId)) return false;
+      if (!canNpcStartQuest(def, npcId)) return false;
     }
     if (!def?.repeatable && this.questState.completed.includes(def.id)) return false;
     if (!def?.repeatable && this.questState.active.some((quest) => quest.questId === def.id)) return false;
     if (def?.repeatable && this.questState.active.some((quest) => quest.questId === def.id)) return false;
-    if (this.questState.active.some((quest) => quest.questId === def.id && quest.npcId === npcId)) return false;
 
     const regionIds = Array.isArray(def.regionIds) ? def.regionIds.map(String) : ["city"];
     const hasCityTag = regionIds.includes("city");
@@ -115,7 +118,7 @@ export const questsMethods = {
   monsterTypesForCurrentRegion() {
     const raw = this.region.mapRegion?.mobs?.length
       ? this.region.mapRegion.mobs
-      : this.region.biome.monsters ?? [];
+      : [];
     return raw.map((entry) => normalizeMonsterType(entry)).filter(Boolean);
   },
 
@@ -232,7 +235,7 @@ export const questsMethods = {
     if (!regionIds.includes("city")) return [];
     if (!this.questDemandsMet(def.demands)) return [];
 
-    return (def.npcIds ?? []).filter((npcId) => Boolean(QUEST_NPCS[npcId]));
+    return getQuestStartNpcIds(def).filter((npcId) => Boolean(QUEST_NPCS[npcId]));
   },
 
   rollCityRepeatableQuestOffers() {
@@ -252,7 +255,7 @@ export const questsMethods = {
   getNpcQuestInteractions(npcId, scope = "wilderness") {
     return {
       npcId,
-      active: this.questState.active.filter((quest) => quest.npcId === npcId),
+      active: this.questState.active.filter((quest) => canNpcTurnInQuest(quest, npcId)),
       offers: this.collectQuestOffers(npcId, scope),
     };
   },
@@ -267,7 +270,7 @@ export const questsMethods = {
   hasGuaranteedRegionQuestOffer() {
     return Object.values(QUEST_DEFS).some((def) => {
       if (Number(def.spawnChance ?? 0) < 1) return false;
-      return (def.npcIds ?? []).some((npcId) => this.questDefinitionCanOffer(def, npcId, "wilderness"));
+      return getQuestStartNpcIds(def).some((npcId) => this.questDefinitionCanOffer(def, npcId, "wilderness"));
     });
   },
 
@@ -304,6 +307,10 @@ export const questsMethods = {
       target: { ...(offer.target ?? {}) },
       rewards: { ...(offer.rewards ?? {}) },
     };
+    if (!this.grantQuestStartItems(quest)) {
+      this.publishSnapshot();
+      return false;
+    }
     this.questState.active.push(quest);
     if (source === "wilderness" && this.questState.wildernessNpc?.npcId === offer.npcId) {
       const interactions = this.getNpcQuestInteractions(offer.npcId, "wilderness");
@@ -320,11 +327,40 @@ export const questsMethods = {
     return true;
   },
 
+  grantQuestStartItems(quest) {
+    const giverTargets = questItemTargetsForQuest(quest).filter((target) => {
+      const source = String(target?.source ?? "monster");
+      return source === "giver" || source === "start";
+    });
+    if (!giverTargets.length) return true;
+
+    const pendingItems = [];
+    for (const target of giverTargets) {
+      const count = Math.max(1, Math.floor(Number(target?.count) || 1));
+      for (let i = 0; i < count; i += 1) {
+        const item = makeQuestItem(target.questItemId, quest.id);
+        if (item) pendingItems.push(item);
+      }
+    }
+    if (!pendingItems.length) return true;
+
+    const simulated = this.player.inventory.map((item) => ({ ...item }));
+    for (const item of pendingItems) {
+      if (!inventoryCanAccept(simulated, item)) {
+        this.addToast("Rygsaekken er fuld. Lav plads foer questen startes");
+        return false;
+      }
+      simulated.push(item);
+    }
+    for (const item of pendingItems) this.addInventoryItem(item);
+    return true;
+  },
+
   startReadableQuest(item) {
     const questId = item?.readableQuestId;
     if (!questId) return null;
     const def = resolveQuestDefById(questId);
-    const npcId = def?.npcIds?.[0];
+    const npcId = getQuestTurnInNpcIds(def)?.[0] ?? getQuestStartNpcIds(def)?.[0];
     if (!def || !npcId) {
       this.addToast("Readable quest mangler quest eller NPC");
       return null;
@@ -373,7 +409,42 @@ export const questsMethods = {
       if (!raw) return [];
       return raw.includes(",") ? raw.split(",").map((part) => norm(part)).filter(Boolean) : [norm(raw)];
     };
+    const currentRegionId = String(this.region?.mapRegion?.id ?? "");
+    const killObjectiveTargets = (quest) => (
+      Array.isArray(quest?.target?.killObjectives) ? quest.target.killObjectives : []
+    );
     for (const quest of this.questState.active) {
+      if (quest.type === "collect_quest_item") {
+        const objectives = killObjectiveTargets(quest);
+        if (objectives.length > 0) {
+          let objectiveChanged = false;
+          const nextKills = { ...(quest.progress?.killObjectives ?? {}) };
+          for (const objective of objectives) {
+            const objectiveTypes = Array.isArray(objective?.monsterTypes)
+              ? objective.monsterTypes.map((type) => norm(type)).filter(Boolean)
+              : normalizeMonsterTargetList(objective?.monsterType ?? objective?.monster ?? objective?.monsters);
+            if (objectiveTypes.length > 0 && !objectiveTypes.includes(killedType)) continue;
+            const objectiveRegionIds = Array.isArray(objective?.regionIds)
+              ? objective.regionIds.map(String)
+              : objective?.regionIds
+                ? [String(objective.regionIds)]
+                : [];
+            if (objectiveRegionIds.length > 0 && (!currentRegionId || !objectiveRegionIds.includes(currentRegionId))) continue;
+            if (objective?.eliteOnly && !monster?.elite) continue;
+            const key = String(objective?.id ?? objective?.key ?? objective?.monsterType ?? objective?.monster ?? "kill");
+            const needed = Math.max(1, Math.floor(Number(objective?.count) || 1));
+            const current = Math.max(0, Math.floor(Number(nextKills[key]) || 0));
+            if (current >= needed) continue;
+            nextKills[key] = Math.min(needed, current + 1);
+            objectiveChanged = true;
+          }
+          if (objectiveChanged) {
+            quest.progress = { ...(quest.progress ?? {}), killObjectives: nextKills };
+            changed = true;
+            if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
+          }
+        }
+      }
       if (quest.type === "clear_map") {
         const validTypes = Array.isArray(quest.target?.monsters)
           ? quest.target.monsters.map((type) => norm(type)).filter(Boolean)
@@ -408,6 +479,7 @@ export const questsMethods = {
       for (const target of questItemTargets) {
         if (!target?.questItemId) continue;
         if (!this.questItemCanDropInCurrentRegion(quest, target)) continue;
+        if (!this.questItemCanDropFromMonster(target, monster)) continue;
         const needed = Math.max(1, Math.floor(Number(target.count) || 1));
         const picked = questItemCount(this.player.inventory, quest.id, target.questItemId);
         if (picked >= needed) continue;
@@ -443,6 +515,7 @@ export const questsMethods = {
 
   questItemCanDropInCurrentRegion(quest, target) {
     let rawAllowed = target?.dropRegionIds;
+    if (target?.regionIds !== undefined) rawAllowed = target.regionIds;
 
     // Runtime hard guard: always prefer canonical dropRegionIds from QUEST_DEFS
     // for this questId + questItemId pair over potentially stale quest instance data.
@@ -453,10 +526,13 @@ export const questsMethods = {
       const fromList = Array.isArray(defTarget.questItems)
         ? defTarget.questItems.find((entry) => String(entry?.questItemId ?? "") === targetQuestItemId)
         : null;
-      if (fromList?.dropRegionIds !== undefined) {
+      if (fromList?.regionIds !== undefined) {
+        rawAllowed = fromList.regionIds;
+      } else if (fromList?.dropRegionIds !== undefined) {
         rawAllowed = fromList.dropRegionIds;
-      } else if (String(defTarget.questItemId ?? "") === targetQuestItemId && defTarget.dropRegionIds !== undefined) {
-        rawAllowed = defTarget.dropRegionIds;
+      } else if (String(defTarget.questItemId ?? "") === targetQuestItemId) {
+        if (defTarget.regionIds !== undefined) rawAllowed = defTarget.regionIds;
+        else if (defTarget.dropRegionIds !== undefined) rawAllowed = defTarget.dropRegionIds;
       }
     }
 
@@ -470,16 +546,34 @@ export const questsMethods = {
     return Boolean(currentRegionId && allowedRegions.map(String).includes(String(currentRegionId)));
   },
 
+  questItemCanDropFromMonster(target, monster) {
+    const configured = Array.isArray(target?.monsterTypes)
+      ? target.monsterTypes
+      : target?.monsterTypes
+        ? [target.monsterTypes]
+        : [];
+    if (!configured.length) return true;
+    const killedType = String(monster?.typeName ?? "").trim().toLowerCase();
+    if (!killedType) return false;
+    const allowed = configured.map((type) => String(type ?? "").trim().toLowerCase()).filter(Boolean);
+    return allowed.includes(killedType);
+  },
+
   applyQuestItemPickup(item) {
     const quest = this.questState.active.find((entry) => entry.id === item.questInstanceId);
     if (!quest || quest.type !== "collect_quest_item") return;
     if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
   },
 
-  completeQuest(instanceId) {
+  completeQuest(instanceId, npcId = null) {
     const index = this.questState.active.findIndex((quest) => quest.id === instanceId);
     if (index < 0) return false;
     const quest = this.questState.active[index];
+    if (npcId && !canNpcTurnInQuest(quest, npcId)) {
+      this.addToast("Denne NPC kan ikke modtage questen");
+      this.publishSnapshot();
+      return false;
+    }
     if (!isQuestComplete(quest, this.player.inventory)) {
       this.addToast(`${quest.title} er ikke faerdig endnu`);
       this.publishSnapshot();
@@ -499,7 +593,7 @@ export const questsMethods = {
     }
     if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];
     this.player.stats.questsCompleted += 1;
-    this.questState.cityFade.push({ npcId: quest.npcId, startedAt: Date.now() });
+    this.questState.cityFade.push({ npcId: String(quest.turnInNpcId ?? quest.npcId), startedAt: Date.now() });
     this.addToast(`${quest.title} indleveret`);
     this.levelUpIfNeeded();
     this.publishSnapshot();

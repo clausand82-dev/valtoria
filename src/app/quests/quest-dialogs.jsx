@@ -272,9 +272,9 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
 
 export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, cityOpen }) {
   if (!quest) return null;
-  const npc = QUEST_NPCS[quest.npcId];
+  const npc = QUEST_NPCS[quest.turnInNpcId ?? quest.npcId];
   const turnIn = async () => {
-    const result = engineRef.current?.completeQuest?.(quest.id);
+    const result = engineRef.current?.completeQuest?.(quest.id, quest.turnInNpcId ?? quest.npcId);
     if (result?.ok) {
       onQuestCompleted?.(result);
       onClose?.();
@@ -329,7 +329,7 @@ export function QuestOverviewDialog({ activeQuests, onClose, onToggleTracked, on
   }, [activeQuests, selectedQuestId]);
 
   const selectedQuest = activeQuests.find((quest) => quest.id === selectedQuestId) ?? activeQuests[0] ?? null;
-  const selectedNpc = selectedQuest ? QUEST_NPCS[selectedQuest.npcId] : null;
+  const selectedNpc = selectedQuest ? QUEST_NPCS[selectedQuest.turnInNpcId ?? selectedQuest.npcId] : null;
 
   return (
     <div className="confirm-backdrop" role="presentation">

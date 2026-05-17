@@ -196,7 +196,7 @@ export const CITY_BUILDINGS = [
     help: "Unlocks and teaches magic.",
     functionText: "Spell learning, magical training, and mana-focused unlocks will live here.",
     imageUrl: "/assets/generated/house/house_magetower.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 500, stone_brick: 250, orange_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 100, orange_gemstone: 1 },
     addons: [
       {
         id: "arcane_extractor",

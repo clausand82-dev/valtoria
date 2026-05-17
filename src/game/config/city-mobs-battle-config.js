@@ -19,7 +19,6 @@ export const CITY_MOB_BATTLE_PROFILES = [
     id: "city-nw-ruins",
     label: "City NW Ruins",
     spawnZoneIds: ["NW_SPAWN_BORDER", "NW_SPAWN_CORNER", "NW_SPAWN_BRIDGE", "NW_SPAWN_CLOSE"],
-    biodome: "mainland",
     tileset: [
       { fileName: "tileset/tileset_debris.png" },
       { fileName: "tileset/tileset_bricktiles.png" },
@@ -47,7 +46,6 @@ export const CITY_MOB_BATTLE_PROFILES = [
     id: "city-sw-fields",
     label: "City SW Fields",
     spawnZoneIds: ["SW_SPAWN_BORDER", "SW_SPAWN_BRIDGE", "SW_SPAWN_CLOSE", "W_SPAWN_EDGE"],
-    biodome: "mainland",
     tileset: [
       { fileName: "tileset/tileset_field.png" },
       { fileName: "tileset/tileset_grass.png" },
@@ -76,7 +74,6 @@ export const CITY_MOB_BATTLE_PROFILES = [
     id: "city-ne-flooded-road",
     label: "City NE Flooded Road",
     spawnZoneIds: ["NE_SPAWN_BORDER_UPPER", "NE_SPAWN_BORDER_LOWER", "NE_SPAWN_BRIDGE", "NE_SPAWN_CLOSE"],
-    biodome: "mainland",
     tileset: [
       { fileName: "tileset/tileset_swamp.png" },
       { fileName: "tileset/tileset_debris.png" },
@@ -104,10 +101,9 @@ export const CITY_MOB_BATTLE_PROFILES = [
     id: "city-se-broken-stones",
     label: "City SE Broken Stones",
     spawnZoneIds: ["SE_SPAWN_BORDER", "SE_SPAWN_CORNER", "SE_SPAWN_BRIDGE", "SE_SPAWN_CLOSE"],
-    biodome: "rock",
     tileset: [
       { fileName: "tileset/tileset_rock.png" },
-      { fileName: "tileset/tileset_debriswithblood.png" },
+      //{ fileName: "tileset/tileset_debriswithblood.png" },
     ],
     foliageSet: [
       { fileName: "foilage/foilage_smallstone.png" },
@@ -129,6 +125,41 @@ export const CITY_MOB_BATTLE_PROFILES = [
     mobs: ["Demon", "Skeleton", "Scorpion"],
   },
 ];
+
+const CITY_MOB_BASE_SPAWN_COUNTS_BY_MAP_SIZE = {
+  small: { objects: 12, foliage: 20, decals: 16, monsters: { min: 3, max: 6 }, water: 0 },
+  medium: { objects: 15, foliage: 28, decals: 24, monsters: { min: 4, max: 9 }, water: 0 },
+  large: { objects: 20, foliage: 36, decals: 30, monsters: { min: 6, max: 12 }, water: 0 },
+  giga: { objects: 26, foliage: 46, decals: 36, monsters: { min: 8, max: 14 }, water: 0 },
+};
+
+function normalizeCount(value, fallback) {
+  const parsed = Math.round(Number(value));
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, parsed);
+}
+
+function buildCityMobSpawnCounts(profile = {}, mapSize = "small") {
+  const sizeKey = String(mapSize || "small").toLowerCase();
+  const base = CITY_MOB_BASE_SPAWN_COUNTS_BY_MAP_SIZE[sizeKey] ?? CITY_MOB_BASE_SPAWN_COUNTS_BY_MAP_SIZE.small;
+  const input = (profile.spawnCounts && typeof profile.spawnCounts === "object") ? profile.spawnCounts : {};
+  const monsterInput = (input.monsters && typeof input.monsters === "object") ? input.monsters : {};
+  const legacyWeights = (profile.weights && typeof profile.weights === "object") ? profile.weights : {};
+  const weightedFoliage = legacyWeights.foilage === undefined
+    ? base.foliage
+    : Math.round(base.foliage * Math.min(2.4, Math.max(0, Number(legacyWeights.foilage) || 0) / 8));
+
+  return {
+    objects: normalizeCount(input.objects, base.objects),
+    foliage: normalizeCount(input.foliage ?? input.foilage, weightedFoliage),
+    decals: normalizeCount(input.decals ?? input.decay, base.decals),
+    monsters: {
+      min: normalizeCount(monsterInput.min, base.monsters.min),
+      max: normalizeCount(monsterInput.max, base.monsters.max),
+    },
+    water: normalizeCount(input.water, normalizeCount(legacyWeights.water, base.water)),
+  };
+}
 
 function normalizeMobEntries(mobs = []) {
   if (!Array.isArray(mobs)) return [];
@@ -156,6 +187,7 @@ export function cityMobBattleProfilesForArea(areaId) {
 
 export function buildCityMobBattleRegion(profile, { areaId, mobType, mapSize }) {
   if (!profile?.id || !mobType) return null;
+  const spawnCounts = buildCityMobSpawnCounts(profile, mapSize);
   const extraMobs = normalizeMobEntries(profile.mobs)
     .filter((mob) => mob.type.toLowerCase() !== String(mobType).toLowerCase());
   const extraTotal = extraMobs.reduce((sum, mob) => sum + mob.weight, 0);
@@ -169,6 +201,7 @@ export function buildCityMobBattleRegion(profile, { areaId, mobType, mapSize }) 
     label: profile.label ?? profile.id,
     citySpawnZoneId: areaId,
     mapSize,
+    spawnCounts,
     mobs: [
       { type: String(mobType), weight: 90 },
       ...weightedExtraMobs,

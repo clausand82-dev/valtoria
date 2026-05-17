@@ -1219,7 +1219,12 @@ function CityMobActionPopup({ mob, cityProgress, cityStats, onHeroBattle, onArmy
   return (
     <div className="city-mob-action-popup" style={cityMapPositionStyle(mob.x + 44, mob.y - 22)}>
       <header>
-        <b>{mob.mobType} Lv.{mob.level}</b>
+        <div className="city-mob-action-popup-title">
+          <div className="city-mob-action-popup-portrait" aria-hidden="true">
+            {mob.iconUrl ? <img src={mob.iconUrl} alt="" draggable="false" /> : <span>{String(mob.mobType || "M").slice(0, 1)}</span>}
+          </div>
+          <b>{mob.mobType} Lv.{mob.level}</b>
+        </div>
         <button type="button" onClick={onClose}>X</button>
       </header>
       <button type="button" onClick={onHeroBattle}>Fight with hero</button>
@@ -1624,7 +1629,7 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   if (!npc) return null;
 
   const turnIn = (quest) => {
-    const result = engineRef.current?.completeQuest?.(quest.id);
+    const result = engineRef.current?.completeQuest?.(quest.id, npcId);
     if (result?.ok) {
       onQuestCompleted?.(result);
     }

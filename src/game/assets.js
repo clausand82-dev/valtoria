@@ -6,7 +6,6 @@ import {
   OBJECT_SHEETS,
   TREE_SHEETS,
 } from "./config/asset-config.js";
-import { BIOMES } from "./config/biome-config.js";
 import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
 import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_DEFS, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
 import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
@@ -14,7 +13,7 @@ import { MAP_REGION_SETS } from "./config/map-region-config.js";
 import { MAP_PREFABS } from "./config/map-prefab-config.js";
 import { normalizePrefabContent } from "./world/map-prefab-placement.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
-import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset } from "./config/region-asset-config.js";
+import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
 import { RESOURCE_DEFS } from "./config/resource-config.js";
 
 export const ATLAS_FRAMES = {
@@ -61,6 +60,8 @@ const atlasPartCache = {
   treePromises: new Map(),
   waterSheet: undefined,
   waterPromise: null,
+  waterSheets: {},
+  waterPromises: new Map(),
   foliageSheets: {},
   foliagePromises: new Map(),
   decaySheets: {},
@@ -99,7 +100,7 @@ export function loadGeneratedAtlas(regionConfig = null) {
     loadAtlasCanvas(),
     loadGroundSheets(manifest),
     loadTreeSheets(manifest),
-    manifest.water ? loadWaterSheet() : Promise.resolve(atlasPartCache.waterSheet ?? null),
+    loadWaterSheets(manifest),
     loadFoliageSheet(manifest),
     loadDecaySheets(manifest),
     loadItemSheet(),
@@ -110,7 +111,7 @@ export function loadGeneratedAtlas(regionConfig = null) {
     canvas,
     groundSheets,
     treeSheets,
-    waterSheet,
+    waterSheets,
     foliageSheet,
     decaySheets,
     itemSheet,
@@ -124,7 +125,8 @@ export function loadGeneratedAtlas(regionConfig = null) {
       sprites: makeAtlasSprites(canvas, ATLAS_FRAMES),
       groundSheets,
       treeSheets,
-      waterSheet,
+      waterSheets,
+      waterSheet: waterSheets?.["water-custom:tileset/tileset_water.png"] ?? Object.values(waterSheets ?? {}).find(Boolean) ?? null,
       foliageSheet,
       decaySheets,
       itemSheet,
@@ -168,7 +170,6 @@ export function loadAnimationSheets(regionConfig = null) {
 function isRegionConfig(value) {
   return Boolean(value && typeof value === "object" && (
     value.id
-    || value.biodome
     || value.tileset
     || value.foliageSet
     || value.foliageSets
@@ -192,7 +193,11 @@ function buildFullRegionAssetManifest() {
   });
   return {
     full: true,
-    water: true,
+    waterSpecs: [{ sheetId: "water-custom:tileset/tileset_water.png", fileName: "tileset/tileset_water.png" }]
+      .concat(regionAssetOverrides.waterSheets.map((entry) => ({
+        sheetId: entry.sheetId,
+        fileName: entry.fileName,
+      }))),
     groundSpecs: Object.entries(GROUND_SHEETS).map(([biomeId, config]) => groundSpecFromConfig(biomeId, config))
       .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName))),
     treeSpecs: Object.entries(TREE_SHEETS).map(([biomeId, fileName]) => ({ biomeId, fileName })),
@@ -212,38 +217,49 @@ function buildRegionAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return buildFullRegionAssetManifest();
 
-  const biomeId = regionConfig.biodome ?? "mainland";
-  const biomeIds = new Set(["mainland", biomeId]);
-  const groundSpecs = [...biomeIds]
-    .map((id) => GROUND_SHEETS[id] ? groundSpecFromConfig(id, GROUND_SHEETS[id]) : null)
-    .filter(Boolean);
+  const groundSpecs = [];
   const normalizedTileset = normalizeRegionTileset(regionConfig.tileset);
   const tilesets = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : []);
   for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName));
+  if (!groundSpecs.length && GROUND_SHEETS.mainland) groundSpecs.push(groundSpecFromConfig("mainland", GROUND_SHEETS.mainland));
+
+  const waterSpecs = normalizeRegionWaterSets(regionConfig).map((entry) => ({
+    sheetId: entry.sheetId,
+    fileName: entry.fileName,
+  }));
 
   const foliageSets = normalizeRegionFoliageSets(regionConfig);
   const prefabDefs = prefabsForRegionConfig(regionConfig);
   const prefabFoliageIds = new Set();
+  const prefabFoliageSpecs = new Map();
   for (const prefab of prefabDefs) {
     const content = normalizePrefabContent(prefab);
     for (const item of content.foliage ?? []) {
+      const direct = normalizeRegionFoliageSets({ foliageSet: item })[0] ?? null;
+      if (direct) {
+        prefabFoliageSpecs.set(direct.sheetId, {
+          id: direct.sheetId,
+          fileName: direct.fileName,
+          rows: direct.rows,
+          cols: direct.cols,
+        });
+        continue;
+      }
       const id = String(item?.id ?? "").trim();
       if (id && FOLIAGE_SHEETS[id]) prefabFoliageIds.add(id);
     }
   }
-  const foliageSpecs = foliageSets.length
-    ? foliageSets.map((entry) => ({
+  const foliageSpecs = foliageSets.map((entry) => ({
       id: entry.sheetId,
       fileName: entry.fileName,
       rows: entry.rows,
       cols: entry.cols,
-    })).concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)))
-    : [...new Set(["mainland", biomeId, "bones"])]
-      .map((id) => FOLIAGE_SHEETS[id] ? normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8) : null)
-      .filter(Boolean);
+    }))
+    .concat([...prefabFoliageSpecs.values()])
+    .concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)));
 
   const objectTypes = new Set(["chest"]);
-  for (const entry of normalizeRegionObjects(regionConfig, biomeId)) {
+  for (const entry of normalizeRegionObjects(regionConfig)) {
     for (const spawnType of entry.spawnTypes ?? []) {
       const type = spawnType?.type;
       if (!type) continue;
@@ -251,11 +267,6 @@ function buildRegionAssetManifest(input) {
       const family = getRegionObjectFamily(type);
       if (family) objectTypes.add(family);
     }
-  }
-  for (const type of BIOMES[biomeId]?.objects ?? []) {
-    objectTypes.add(type);
-    const family = getRegionObjectFamily(type);
-    if (family) objectTypes.add(family);
   }
   for (const prefab of prefabDefs) {
     const content = normalizePrefabContent(prefab);
@@ -281,11 +292,9 @@ function buildRegionAssetManifest(input) {
 
   return {
     full: false,
-    water: (Number(regionConfig.weights?.water) || 0) > 0,
+    waterSpecs,
     groundSpecs,
-    treeSpecs: [...biomeIds]
-      .map((id) => TREE_SHEETS[id] ? { biomeId: id, fileName: TREE_SHEETS[id] } : null)
-      .filter(Boolean),
+    treeSpecs: [],
     foliageSpecs,
     decayIds,
     objectTypes,
@@ -296,8 +305,7 @@ function buildAnimationAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return { monsterIds: new Set(MONSTER_SHEETS.map((cfg) => cfg.id)) };
   const monsterIds = new Set();
-  const biomeId = regionConfig.biodome ?? "mainland";
-  const mobs = regionConfig.mobs?.length ? regionConfig.mobs : BIOMES[biomeId]?.monsters ?? [];
+  const mobs = regionConfig.mobs?.length ? regionConfig.mobs : [];
   for (const entry of mobs) {
     const type = typeof entry === "string" ? entry : entry?.type;
     if (!type) continue;
@@ -597,29 +605,46 @@ function loadGroundSheets(manifest = buildFullRegionAssetManifest()) {
     for (const [id, sheet] of entries) {
       if (sheet) atlasPartCache.groundSheets[id] = sheet;
     }
-    if (!atlasPartCache.groundSheets.mainland) throw new Error("Required mainland ground sheet failed to load");
+    const fallbackSheet = atlasPartCache.groundSheets.mainland
+      ?? Object.values(atlasPartCache.groundSheets).find(Boolean)
+      ?? null;
+    if (!fallbackSheet && entries.length) {
+      throw new Error("Required region ground sheet failed to load");
+    }
     for (const [id, sheet] of entries) {
-      if (!sheet) atlasPartCache.groundSheets[id] = atlasPartCache.groundSheets.mainland;
+      if (!sheet && fallbackSheet) atlasPartCache.groundSheets[id] = fallbackSheet;
     }
     return atlasPartCache.groundSheets;
   });
 }
 
-function loadWaterSheet() {
-  if (atlasPartCache.waterSheet !== undefined) return Promise.resolve(atlasPartCache.waterSheet);
-  if (!atlasPartCache.waterPromise) {
-    atlasPartCache.waterPromise = loadRawImage("/assets/generated/tileset/tileset_water.png")
-      .then((canvas) => {
-        atlasPartCache.waterSheet = makeTileSheet(canvas, 4, 4);
-        return atlasPartCache.waterSheet;
-      })
-      .catch((error) => {
-        console.warn("Water sheet load failed: tileset/tileset_water.png", error);
-        atlasPartCache.waterSheet = null;
-        return null;
-      });
-  }
-  return atlasPartCache.waterPromise;
+function loadWaterSheets(manifest = buildFullRegionAssetManifest()) {
+  const specs = manifest.waterSpecs ?? [];
+  if (!specs.length) return Promise.resolve(atlasPartCache.waterSheets);
+  return Promise.all(
+    specs.map((spec) => {
+      if (atlasPartCache.waterSheets[spec.sheetId]) {
+        return Promise.resolve([spec.sheetId, atlasPartCache.waterSheets[spec.sheetId]]);
+      }
+      if (!atlasPartCache.waterPromises.has(spec.sheetId)) {
+        atlasPartCache.waterPromises.set(spec.sheetId, loadRawImage(`/assets/generated/${spec.fileName}`)
+          .then((canvas) => [spec.sheetId, makeTileSheet(canvas, 4, 4)])
+          .catch((error) => {
+            console.warn(`Water sheet load failed for ${spec.sheetId}: ${spec.fileName}`, error);
+            return [spec.sheetId, null];
+          }));
+      }
+      return atlasPartCache.waterPromises.get(spec.sheetId);
+    }),
+  ).then((entries) => {
+    for (const [id, sheet] of entries) {
+      if (sheet) atlasPartCache.waterSheets[id] = sheet;
+    }
+    atlasPartCache.waterSheet = atlasPartCache.waterSheets["water-custom:tileset/tileset_water.png"]
+      ?? Object.values(atlasPartCache.waterSheets).find(Boolean)
+      ?? null;
+    return atlasPartCache.waterSheets;
+  });
 }
 
 function loadTreeSheets(manifest = buildFullRegionAssetManifest()) {
@@ -2262,7 +2287,7 @@ export function drawGroundTile(ctx, atlas, biomeId, variant, x, y, options = {})
 }
 
 function drawWaterTile(ctx, atlas, variant, x, y, options = {}) {
-  const sheet = atlas?.waterSheet;
+  const sheet = atlas?.waterSheets?.[options.waterSheetId] ?? atlas?.waterSheet;
   const frame = sheet?.cells?.[Math.abs(Math.floor(variant ?? 0)) % sheet.cells.length];
   const halfW = TILE_W * 0.5 + 1;
   const halfH = TILE_H * 0.5 + 1;

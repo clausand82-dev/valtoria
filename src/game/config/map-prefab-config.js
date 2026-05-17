@@ -19,12 +19,12 @@ export const MAP_PREFABS = {
       { id: "object_woodboxes_ground", x: 4, y: 2, blocking: true, variant: 9 },
     ],
     foliage: [
-      { id: "mainland", x: 1, y: 1, variant: 4, size: 0.75 },
-      { id: "mainland", x: 5, y: 4, variant: 9, size: 0.7 },
+      { fileName: "foilage/foilage_plants_mainland.png", x: 1, y: 1, variant: 4, size: 0.75 },
+      { fileName: "foilage/foilage_plants_mainland.png", x: 5, y: 4, variant: 9, size: 0.7 },
     ],
     decals: [
-      { type: "debris", x: 3, y: 4, size: 0.95 },
-      { type: "pebble", x: 5, y: 2, size: 0.8 },
+      { decayId: "decay_dust", x: 3, y: 4, cell: 5, size: 0.95 },
+      { decayId: "decay_cracks", x: 5, y: 2, cell: 3, size: 0.8 },
     ],
     monsters: [
       { type: "Wolf", x: 1, y: 4 },
@@ -50,12 +50,12 @@ export const MAP_PREFABS = {
       { id: "object_woodboxes_ground", x: 5, y: 1, blocking: true },
     ],
     foliage: [
-      { id: "mainland", x: 1, y: 3, variant: 11, size: 0.7 },
-      { id: "bones", x: 6, y: 3, variant: 5, size: 0.55 },
+      { fileName: "foilage/foilage_plants_mainland.png", x: 1, y: 3, variant: 11, size: 0.7 },
+      { fileName: "foilage/foilage_boneparts.png", x: 6, y: 3, variant: 5, size: 0.55 },
     ],
     decals: [
-      { type: "debris", x: 2, y: 2, size: 1.05 },
-      { type: "debris", x: 6, y: 2, size: 0.9 },
+      { decayId: "decay_dust", x: 2, y: 2, cell: 7, size: 1.05 },
+      { decayId: "decay_dust", x: 6, y: 2, cell: 11, size: 0.9 },
     ],
     monsters: [
       { type: "Wolf", x: 2, y: 3 },
@@ -82,12 +82,12 @@ export const MAP_PREFABS = {
       { id: "object_stone_cluster", x: 3, y: 5, blocking: true },
     ],
     foliage: [
-      { id: "bones", x: 1, y: 4, variant: 2, size: 0.5 },
-      { id: "mainland", x: 5, y: 5, variant: 12, size: 0.65 },
+      { fileName: "foilage/foilage_boneparts.png", x: 1, y: 4, variant: 2, size: 0.5 },
+      { fileName: "foilage/foilage_plants_mainland.png", x: 5, y: 5, variant: 12, size: 0.65 },
     ],
     decals: [
-      { type: "crack", x: 3, y: 3, size: 1.2 },
-      { type: "pebble", x: 2, y: 5, size: 0.8 },
+      { decayId: "decay_cracks", x: 3, y: 3, cell: 6, size: 1.2 },
+      { decayId: "decay_dust", x: 2, y: 5, cell: 2, size: 0.8 },
     ],
     monsters: [
       { type: "Ghost", x: 3, y: 1 },
@@ -116,14 +116,14 @@ export const MAP_PREFABS = {
     legend: {
       ".": { type: "keep" },
       "W": { object: "object_well", blocking: true },
-      "B": { foliage: "bones", variant: 4, size: 0.48 },
+      "B": { foliage: { fileName: "foilage/foilage_boneparts.png" }, variant: 4, size: 0.48 },
       "c": { chest: "basic_chest", blocking: true },
-      "g": { foliage: "mainland", variant: 6, size: 0.75 },
-      "p": { decal: "pebble", size: 0.85 },
-      "S": { monster: "MotherSpider" },
+      "g": { foliage: { fileName: "foilage/foilage_plants_mainland.png" }, variant: 6, size: 0.75 },
+      "p": { decal: "pebble", decayId: "decay_dust", cell: 4, size: 0.85 },
+      "S": { monster: "Spider" },
     },
     decals: [
-      { type: "crack", x: 2, y: 2, size: 0.95 },
+      { decayId: "decay_cracks", x: 2, y: 2, cell: 9, size: 0.95 },
     ],
   },
 
@@ -140,12 +140,15 @@ export const MAP_PREFABS = {
     avoidStart: 11,
     avoidExit: 7,
     foliage: [
-      { id: "bones", x: 2, y: 3, variant: 7, size: 1.55 },
-      { id: "bones", x: 4, y: 4, variant: 10, size: 1.55 },
+      { fileName: "foilage/foilage_boneparts.png", x: 2, y: 3, cell: 7, size: 1.0 },
+      { fileName: "foilage/foilage_boneparts.png", x: 4, y: 4, cell: 10, size: 1.0 },
     ],
     decals: [
-      { type: "debris", x: 2, y: 2, size: 0.9 },
-      { type: "bone", x: 4, y: 3, size: 0.75 },
+      { decayId: "decay_spiderweb", x: 2, y: 2, cell: 5, size: 0.9 },
+      { decayId: "decay_spiderweb", x: 1, y: 2, cell: 6, size: 0.9 },
+      { decayId: "decay_spiderweb", x: 1, y: 3, cell: 2, size: 0.9 },
+      { decayId: "decay_spiderweb", x: 3, y: 2, cell: 1, size: 0.9 },
+      { decayId: "decay_blood", x: 4, y: 3, cell: 2, size: 0.75 },
     ],
     monsters: [
       { type: "Spider", x: 2, y: 1 },
@@ -184,14 +187,14 @@ export const MAP_PREFABS = {
       ".": { type: "keep" },
       "W": { object: "object_woodboxes_ground", blocking: true, variant: 5 },
       "F": { object: "object_fireplace_mainland", variant: 6, size: 0.75 },
-      "B": { foliage: "bones", variant: 4, size: 0.48 },
+      "B": { foliage: { fileName: "foilage/foilage_boneparts.png" }, variant: 4, size: 0.48 },
       "c": { chest: "basic_chest", blocking: true },
-      "g": { foliage: "mainland", variant: 6, size: 0.75 },
-      "p": { decal: "pebble", size: 0.85 },
+      "g": { foliage: { fileName: "foilage/foilage_plants_mainland.png" }, variant: 6, size: 0.75 },
+      "p": { decal: "pebble", decayId: "decay_dust", cell: 4, size: 0.85 },
       "S": { monster: "MotherSpider" },
     },
     decals: [
-      { type: "crack", x: 2, y: 2, size: 0.95 },
+      { decayId: "decay_cracks", x: 2, y: 2, cell: 9, size: 0.95 },
     ],
   },
 };

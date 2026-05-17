@@ -3,6 +3,26 @@ import { QUEST_NPCS } from "./npc-config.js";
 export { QUEST_NPCS };
 
 export const QUEST_ITEM_DEFS = {
+  note: {
+    name: "Forseglet note",
+    iconUrl: "/assets/generated/item/item_quest_document.png",
+    placeholderColor: "#d7cfac",
+  },
+  ring: {
+    name: "Signetring",
+    iconUrl: "/assets/generated/item/item_quest_silverring.png",
+    placeholderColor: "#d8bb63",
+  },
+  unsigned_document: {
+    name: "Ikke underskrevet dokument",
+    iconUrl: "/assets/generated/item/item_quest_letter.png",
+    placeholderColor: "#d5d1bd",
+  },
+  signed_document: {
+    name: "Underskrevet dokument",
+    iconUrl: "/assets/generated/item/item_quest_letter.png",
+    placeholderColor: "#e3d4aa",
+  },
   lost_mug: {
     name: "Forsvundet krus",
     iconUrl: "/assets/generated/item/item_quest_mug.png",
@@ -73,7 +93,9 @@ Top-level quest fields:
 - titleTemplate: Repeatable/template title. Used by "vengeance"; supports placeholders like {monster}.
 - repeatable: false means the quest can only be completed once. true means it can appear again.
 - source: Optional. "npc" (default) means NPCs can offer it. "readable" means a readable item starts it.
-- npcIds: Array of QUEST_NPCS ids. For NPC quests they can offer/turn in. For readable quests they only turn in.
+- npcIds: Legacy NPC field. Backward-compatible fallback where the same NPC ids are both start and turn-in NPCs.
+- startNpcIds / giverNpcIds: Optional array of QUEST_NPCS ids that can offer/start the quest.
+- turnInNpcIds / completeNpcIds: Optional array of QUEST_NPCS ids that can receive/complete the quest.
 - regionIds: Optional array of tags for where a quest can be offered.
   - "city" only: quest can only be offered in city.
   - "city" + region ids: quest can be offered in city and in the listed wilderness regions.
@@ -122,9 +144,20 @@ Quest item drop fields:
   Supported values:
   - "monster": Any normal or elite monster can drop it.
   - "elite": Only elite monsters can drop it.
-  Specific monster-type restrictions such as only "Wolf" or only "Skeleton" are not implemented yet.
+  - "giver" / "start": The quest item is given immediately when the quest is accepted.
 - dropChance: Chance per eligible monster kill.
-- dropRegionIds: Optional array of region ids where the item can drop. Omit for global quest-item drops.
+- dropRegionIds or regionIds: Optional array of region ids where the item can drop. Omit for global quest-item drops.
+- monsterTypes: Optional array of monster type names allowed to drop this quest item.
+
+Kill objectives inside collect quests:
+- target.killObjectives: Optional array of kill requirements that are checked together with item/resource requirements.
+  Supported fields per objective:
+  - id or key: Stable progress key.
+  - label: Optional display label.
+  - count: Required kills.
+  - monsterTypes / monsterType / monster / monsters: Monster filters.
+  - regionIds: Optional region filter.
+  - eliteOnly: true means only elite kills count.
 
 Target shape for kill_monsters:
 - target.countMin / target.countMax: Random kill count range.
@@ -337,6 +370,112 @@ export const QUEST_DEFS = {
     acceptText: "Find 12 røde roser og bring dem tilbage til Annelise.",
     turnInText: "Oh, mine roser! Tak, du har gjort mig en stor tjeneste. Tag dette som tak.",
     rewards: { xp: 520, gold: 120 },
+  },
+
+  annelise_note_for_innkeeper: {
+    id: "annelise_note_for_innkeeper",
+    title: "Annelises Note",
+    repeatable: false,
+    startNpcIds: ["lady"],
+    turnInNpcIds: ["innkeeper"],
+    regionIds: ["city"],
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: {
+      questItems: [
+        { questItemId: "note", count: 1, source: "giver" },
+      ],
+    },
+    story: "Annelise rækker dig en forseglet note og beder dig bringe den sikkert til kroejeren.",
+    acceptText: "Tag noten til Innkeeper. Han venter pa beskeden.",
+    turnInText: "Godt, noten er fremme. Jeg sender noget videre til Noble.",
+    rewards: { xp: 220, gold: 40, questItems: [{ questItemId: "ring", count: 1 }] },
+  },
+
+  innkeeper_ring_for_noble: {
+    id: "innkeeper_ring_for_noble",
+    title: "Ring Til Noble",
+    repeatable: false,
+    startNpcIds: ["innkeeper"],
+    turnInNpcIds: ["noble"],
+    regionIds: ["city"],
+    demands: { completedQuests: ["annelise_note_for_innkeeper"] },
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: {
+      questItems: [
+        { questItemId: "ring", count: 1, source: "giver" },
+      ],
+    },
+    story: "Innkeeper giver dig en signetring, som kun Noble ma modtage personligt.",
+    acceptText: "Aflever ringen til Noble i byen.",
+    turnInText: "Perfekt. Nu kan jeg aabne vejen til Elvbaekken.",
+    rewards: { xp: 320, gold: 90 },
+  },
+
+  noble_wolf_document_hunt: {
+    id: "noble_wolf_document_hunt",
+    title: "Dokumentet I Elvbaekken",
+    repeatable: false,
+    startNpcIds: ["noble"],
+    turnInNpcIds: ["noble"],
+    regionIds: ["city"],
+    demands: { completedQuests: ["innkeeper_ring_for_noble"] },
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: {
+      questItems: [
+        {
+          questItemId: "unsigned_document",
+          count: 1,
+          source: "monster",
+          dropChance: 1,
+          monsterTypes: ["WolfFenris"],
+          regionIds: ["river-creek"],
+        },
+      ],
+      killObjectives: [
+        {
+          id: "river_creek_wolves",
+          label: "Almindelige ulve",
+          count: 10,
+          monsterTypes: ["Wolf", "WolfCub"],
+          regionIds: ["river-creek"],
+        },
+        {
+          id: "river_creek_wolf_boss",
+          label: "Ulveboss",
+          count: 1,
+          monsterTypes: ["WolfFenris"],
+          regionIds: ["river-creek"],
+        },
+      ],
+    },
+    story: "Noble har aabnet Elvbaekken. En ulv har slugt et vigtigt ikke-underskrevet dokument, og flokken skal samtidig holdes nede.",
+    acceptText: "Hent dokumentet fra ulvebossen i Elvbaekken, og ryd ulveflokken.",
+    turnInText: "Dokumentet er i sikkerhed. Jeg underskriver det nu.",
+    rewards: { xp: 900, gold: 260, questItems: [{ questItemId: "signed_document", count: 1 }] },
+  },
+
+  noble_signed_document_delivery: {
+    id: "noble_signed_document_delivery",
+    title: "Det Underskrevne Dokument",
+    repeatable: false,
+    startNpcIds: ["noble"],
+    turnInNpcIds: ["lady", "merchant"],
+    regionIds: ["city"],
+    demands: { completedQuests: ["noble_wolf_document_hunt"] },
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: {
+      questItems: [
+        { questItemId: "signed_document", count: 1, source: "reward" },
+      ],
+    },
+    story: "Noble overdrager det underskrevne dokument til dig. Bring det tilbage til Annelise eller Elis.",
+    acceptText: "Rejs tilbage til Annelise eller Elis med dokumentet.",
+    turnInText: "Dokumentet er modtaget. Questlinjen er fuldfoert.",
+    rewards: { xp: 720, gold: 320, resources: [{ resource: "yellow_gemstone", count: 1 }] },
   },
 
   find_annelises_rarepinkflowers: {

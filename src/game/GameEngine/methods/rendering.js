@@ -1,5 +1,4 @@
 import {
-  BIOMES,
   CHUNK_SIZE,
   TILE_H,
   TILE_W,
@@ -22,8 +21,11 @@ import {
   TERRAIN_LAYER_PAD_TOP,
   TERRAIN_LAYER_PAD_BOTTOM
 } from "../dependencies.js";
+
+const TERRAIN_GROUND_COLOR = "#3f6f34";
+const TERRAIN_WATER_COLOR = "#1f5f7f";
+const TERRAIN_PATH_COLOR = "rgba(112, 86, 48, 0.24)";
 import {
-  hasDifferentBiomeNeighbor,
   drawRegionMarkerIfInChunk,
   drawQuestgiver,
   isDestructibleObject,
@@ -307,8 +309,6 @@ export const renderingMethods = {
     gradient.addColorStop(1, "#151711");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.width, this.height);
-    ctx.fillStyle = chunk.biome.fog;
-    ctx.fillRect(0, 0, this.width, this.height);
   },
 
   drawTiles(ctx) {
@@ -343,24 +343,20 @@ export const renderingMethods = {
     const ctx = canvas.getContext("2d");
 
     const tiles = [...chunk.tiles].sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
-    const biomeByTile = new Map(chunk.tiles.map((tile) => [`${tile.x},${tile.y}`, tile.biomeId]));
     for (const tile of tiles) {
       const tx = tile.x - chunk.x;
       const ty = tile.y - chunk.y;
       const x = originX + (tx - ty) * (TILE_W / 2);
       const y = originY + (tx + ty) * (TILE_H / 2);
-      const biome = BIOMES[tile.biomeId] ?? chunk.biome;
-      const transitionTile = hasDifferentBiomeNeighbor(tile, biomeByTile);
-      drawGroundTile(ctx, this.atlas, tile.biomeId, tile.variant, x, y, {
+      drawGroundTile(ctx, this.atlas, tile.groundSheetId, tile.variant, x, y, {
         groundSheetId: tile.groundSheetId,
         water: tile.water,
         waterVariant: tile.waterVariant,
-        baseColor: biome.tile[0],
-        baseAlpha: tile.water ? 1 : transitionTile ? 0.08 : undefined,
-        edgeFeather: transitionTile ? 0.18 : undefined,
-        visualScale: transitionTile ? 1.24 : undefined,
+        waterSheetId: tile.waterSheetId,
+        baseColor: tile.water ? TERRAIN_WATER_COLOR : TERRAIN_GROUND_COLOR,
+        baseAlpha: tile.water ? 1 : undefined,
         path: !tile.water && tile.path,
-        pathColor: biome.path,
+        pathColor: TERRAIN_PATH_COLOR,
       });
     }
 
@@ -417,7 +413,7 @@ export const renderingMethods = {
           drawables.push({
             type: "object",
             object,
-            biome: BIOMES[object.renderBiomeId] ?? chunk.biome,
+            biome: object.renderBiomeId ? { id: object.renderBiomeId } : null,
             screen,
             alpha,
             layer: getRenderableLayer(depthMode, object.type === "foliage" ? 0 : 1),
@@ -540,9 +536,37 @@ export const renderingMethods = {
       const screen = p.screenSpace
         ? { x: p.screenX, y: p.screenY }
         : worldToScreen(p.x, p.y, p.z, this.camera);
-      const effectPad = p.visual === "expandingEnergyRing" ? Math.max(TILE_W, TILE_H) * (p.radiusWorld ?? 0) + 40 : 0;
+      const effectPad = ["expandingEnergyRing", "groundCloud", "groundPulse"].includes(p.visual)
+        ? Math.max(TILE_W, TILE_H) * (p.radiusWorld ?? 0) + 40
+        : 0;
       if (!visibleScreenPoint(screen, this.width, this.height, Math.max(90, effectPad, (p.r ?? 0) + 24))) continue;
       ctx.save();
+      if (p.visual === "groundCloud" || p.visual === "groundPulse") {
+        const progress = p.maxLife ? clamp((p.age ?? 0) / p.maxLife, 0, 1) : 1;
+        const alpha = (p.visual === "groundCloud" ? Math.min(progress * 3, 1) * clamp(p.life / 0.45, 0, 1) * 0.42 : (1 - progress) * 0.5) * fogAlpha;
+        const radiusWorld = (p.radiusWorld ?? 0) * (p.visual === "groundPulse" ? 0.35 + progress * 0.75 : 1);
+        const radiusX = Math.max(2, radiusWorld * TILE_W);
+        const radiusY = Math.max(1, radiusWorld * TILE_H);
+        ctx.globalAlpha = alpha;
+        if (p.visual === "groundCloud") {
+          const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radiusX);
+          gradient.addColorStop(0, p.color ?? "#87d65a");
+          gradient.addColorStop(0.55, p.color ?? "#87d65a");
+          gradient.addColorStop(1, "rgba(255,255,255,0)");
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.ellipse(screen.x, screen.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.strokeStyle = p.color ?? "#d8c091";
+          ctx.lineWidth = Math.max(2, 8 - progress * 5);
+          ctx.beginPath();
+          ctx.ellipse(screen.x, screen.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.restore();
+        continue;
+      }
       if (p.visual === "expandingEnergyRing") {
         const progress = p.maxLife ? clamp((p.age ?? 0) / p.maxLife, 0, 1) : 1;
         const alpha = (1 - progress) * fogAlpha;
@@ -743,9 +767,12 @@ export const renderingMethods = {
         for (const tile of chunk.tiles) {
           const px = center + (tile.x - this.player.x) * scale;
           const py = center + (tile.y - this.player.y) * scale;
-          const biome = BIOMES[tile.biomeId] ?? chunk.biome;
           ctx.globalAlpha = 1;
-          ctx.fillStyle = tile.edgeMask ? "rgba(245, 239, 227, 0.22)" : biome.tile[0];
+          ctx.fillStyle = tile.edgeMask
+            ? "rgba(245, 239, 227, 0.22)"
+            : tile.water
+              ? TERRAIN_WATER_COLOR
+              : TERRAIN_GROUND_COLOR;
           ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale) + 1, Math.ceil(scale) + 1);
         }
       }

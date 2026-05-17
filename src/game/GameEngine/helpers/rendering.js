@@ -8,19 +8,6 @@ import {
 
 const npcImageCache = new Map();
 
-export function hasDifferentBiomeNeighbor(tile, biomeByTile) {
-  const neighbors = [
-    `${tile.x + 1},${tile.y}`,
-    `${tile.x - 1},${tile.y}`,
-    `${tile.x},${tile.y + 1}`,
-    `${tile.x},${tile.y - 1}`,
-  ];
-  return neighbors.some((key) => {
-    const biomeId = biomeByTile.get(key);
-    return biomeId && biomeId !== tile.biomeId;
-  });
-}
-
 export function drawRegionMarkerIfInChunk(ctx, chunk, point, type, originX, originY) {
   const tileX = Math.floor(point.x);
   const tileY = Math.floor(point.y);

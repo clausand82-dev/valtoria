@@ -1,0 +1,108 @@
+.confirm-dialog.readable-dialog {
+  --readable-gutter: 48px;
+  --quest-ink: #2b1b10;
+  --quest-ink-soft: #4b321f;
+  --quest-red: #7c2118;
+  --quest-gold: #8b5d1f;
+  --frame-pad-x: 35px;
+  --frame-pad-y: clamp(90px, 8vh, 160px);
+  width: min(1100px, calc(100vw - 48px));
+  max-width: 1100px;
+  position: relative;
+  padding: 0;
+  background: transparent;
+  display: inline-block;
+  border-radius: 8px;
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.48);
+  border: none !important;
+}
+
+.readable-frame {
+  display: block;
+  width: 100%;
+  height: auto;
+  z-index: 0;
+}
+
+.readable-overlay {
+  position: absolute;
+  inset: 0;
+  padding: 100px 120px 100px 140px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  z-index: 1;
+}
+
+.readable-title {
+  color: var(--quest-red);
+  font-size: 18px;
+  margin: 0;
+  font-weight: 700;
+  text-align: left;
+  line-height: 1.0;
+}
+
+.readable-content {
+  columns: 2;
+  column-gap: 112px;
+  column-fill: auto;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.readable-text {
+  white-space: pre-wrap;
+  color: var(--quest-ink-soft);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.55;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  text-indent: 1.1em;
+  margin: 0;
+}
+
+.readable-text strong {
+  display: block;
+  color: var(--quest-red);
+  font-size: 18px;
+  line-height: 1.0;
+  text-indent: 0;
+  margin-bottom: 12px;
+}
+
+.readable-controls {
+  position: absolute;
+  right: 122px;
+  bottom: 92px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding-top: 0;
+}
+
+.readable-controls button {
+  border-color: rgba(84,47,19,0.36);
+  background: rgba(70,38,16,0.18);
+  color: var(--quest-ink);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.readable-controls button:hover {
+  background: rgba(70,38,16,0.28);
+}
+
+.readable-controls button:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+

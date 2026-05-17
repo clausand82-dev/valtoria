@@ -730,7 +730,7 @@ export default function App() {
             setQuestOffer(null);
           }}
           onTurnInQuest={(quest) => {
-            const result = engineRef.current?.completeQuest?.(quest.id);
+            const result = engineRef.current?.completeQuest?.(quest.id, questOffer.npcId);
             if (result?.ok) {
               setQuestRewardModal(result);
               setQuestOffer(null);
@@ -757,7 +757,7 @@ export default function App() {
             {acceptedQuestNotice.quest?.story && <p>{acceptedQuestNotice.quest.story}</p>}
             {acceptedQuestNotice.quest?.acceptText && <p>{acceptedQuestNotice.quest.acceptText}</p>}
             <QuestObjectiveMeta quest={acceptedQuestNotice.quest} />
-            <p>{QUEST_NPCS[acceptedQuestNotice.npcId]?.name ?? "Questgiver"} kan findes i byen, naar questen skal indleveres.</p>
+            <p>{QUEST_NPCS[acceptedQuestNotice.quest?.turnInNpcId ?? acceptedQuestNotice.npcId]?.name ?? "Questgiver"} kan findes i byen, naar questen skal indleveres.</p>
             <div>
               <button type="button" onClick={() => setAcceptedQuestNotice(null)}>OK</button>
             </div>

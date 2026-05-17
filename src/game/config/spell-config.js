@@ -80,6 +80,8 @@ export const SPELL_DEFS = {
     dotDamage: 5,
     dotDuration: 4,
     areaRadius: 0.95,
+    hazardDuration: 3.6,
+    hazardTick: 0.65,
     color: "#87d65a",
   },
   web_slow: {

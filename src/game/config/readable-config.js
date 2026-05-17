@@ -21,7 +21,7 @@
 // }
 //
 // questId/readableQuestId (optional): starts a QUEST_DEFS quest when the item is read.
-// The quest itself must use source: "readable"; its npcIds are still used for turn-in.
+// The quest itself must use source: "readable"; use turnInNpcIds/completeNpcIds (or legacy npcIds) for hand-in NPCs.
 
 export const READABLE_ITEM_DEFS = [
   {
@@ -243,7 +243,7 @@ export const READABLE_ITEM_DEFS = [
     mergeLocation: "library",
     dropTable: { monsters: [{ type: "Skeleton", chance: 0.01 }, { type: "Snake", chance: 0.012 }], chance: 0.008 },
     summary: "Historien om Lord Kealands forsvundne datter.",
-    story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev dræbt og hans datter bortført. Han søgte desperat efter hende i årevis, men uden held. Rygtet siger, at han til sidst blev så desperat, at han begyndte at opsøge fare, og at hans søgen førte ham til en by i udkanten af Elvindalen. Der hørte han om en quest, om troldenes skat, som vil gøre ham rig. Kort efter han begav sig afsted, mødte han Eelverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsøg på at konfronterer ham, endte Lord Kealand i Nethrendes fængsel, hvor han mødte Lady Lirian. De flygtede sammen og nåede til Troldenøen, hvor et mystisk smykke Lady Lirian bar, afslørede at hun var Lord Kealands forsvunde datter. Hendes første 'far' ord, smeltede hans hjerte. Sammen drog de på flere eventyr.",
+    story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev dræbt og hans datter bortført. \n\nHan søgte desperat efter hende i årevis, men uden held. Rygtet siger, at han til sidst blev så desperat, at han begyndte at opsøge fare, og at hans søgen førte ham til en by i udkanten af Elvindalen. Der hørte han om en quest, om troldenes skat, som vil gøre ham rig. \n\nKort efter han begav sig afsted, mødte han Elverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsøg på at konfronterer ham, endte Lord Kealand i Nethrendes fængsel, hvor han mødte Lady Lirian. \n\nDe flygtede sammen og nåede til Troldenøen, hvor et mystisk smykke Lady Lirian bar, afslørede at hun var Lord Kealands forsvunde datter. Hendes første 'far' ord, smeltede hans hjerte. Sammen drog de på flere eventyr.",
   },
 ];
 

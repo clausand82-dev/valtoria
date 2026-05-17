@@ -175,6 +175,7 @@ export const lifecycleMethods = {
       this.updateChests(dt);
       this.updateMonsters(dt, stats);
       this.updateProjectiles(dt);
+      this.updateGroundHazards(dt);
       this.updateLoot(dt);
     }
 

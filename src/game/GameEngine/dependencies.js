@@ -5,7 +5,6 @@ export {
   TILE_W,
   WORLD_SEED,
 } from "../config/game-constants-config.js";
-export { BIOMES } from "../config/biome-config.js";
 export { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "../config/monster-config.js";
 export { EQUIPMENT_SLOTS } from "../config/equipment-config.js";
 export { NAMED_ITEM_TEMPLATES, PREFIXES, UNIQUE_ITEMS } from "../config/item-config.js";

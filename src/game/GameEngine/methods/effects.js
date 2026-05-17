@@ -107,6 +107,11 @@ function spawnConfiguredParticle(engine, anchor, config, sourceKey, options = {}
     particle.vx *= 0.45;
     particle.vy *= 0.45;
     particle.z += Math.random() * 18;
+  } else if (config.movement === "fallDrift") {
+    particle.vx = Math.cos(angle) * speed / 320;
+    particle.vy = Math.sin(angle) * speed / 320;
+    particle.vz = -(6 + speed * 0.16);
+    particle.z += Math.random() * 18;
   } else if (config.movement === "float") {
     particle.vx *= 0.55;
     particle.vy *= 0.55;
@@ -218,6 +223,15 @@ function updateConfiguredParticle(particle, dt) {
     particle.x += (particle.vx + Math.cos(particle.wobble * 0.7) * 0.04) * dt;
     particle.y += (particle.vy + Math.sin(particle.wobble * 0.9) * 0.04) * dt;
     particle.z += Math.sin(particle.wobble * 0.8) * dt * 1.2;
+    return;
+  }
+
+  if (particle.movement === "fallDrift") {
+    particle.x += (particle.vx + Math.cos(particle.wobble * 1.2) * 0.045) * dt;
+    particle.y += (particle.vy + Math.sin(particle.wobble * 0.9) * 0.045) * dt;
+    particle.z += particle.vz * dt;
+    particle.vz *= Math.pow(0.96, dt);
+    if (particle.z <= 0) particle.life = 0;
     return;
   }
 
@@ -429,37 +443,8 @@ export const effectsMethods = {
   },
 
   updateAmbient(dt) {
-    this.ambientTimer -= dt;
-    if (this.ambientTimer > 0) return;
-    this.ambientTimer = 0.08;
-    const chunk = this.currentChunk();
-    if (Math.random() > 0.45) return;
-
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 3 + Math.random() * 8;
-    const x = this.player.x + Math.cos(angle) * radius;
-    const y = this.player.y + Math.sin(angle) * radius;
-    const cold = chunk.biome.id === "snow";
-    const hot = chunk.biome.id === "lava";
-    const jungle = chunk.biome.id === "jungle";
-    const color = cold
-      ? "rgba(170, 226, 255, 0.34)"
-      : hot
-        ? "rgba(255, 105, 42, 0.34)"
-        : jungle
-          ? "rgba(112, 210, 90, 0.28)"
-          : "rgba(214, 184, 94, 0.28)";
-    this.particles.push({
-      x,
-      y,
-      z: 28 + Math.random() * 70,
-      vx: (Math.random() - 0.5) * (cold ? 0.25 : 0.45),
-      vy: (Math.random() - 0.5) * (cold ? 0.25 : 0.45),
-      vz: cold ? Math.random() * 0.25 : 0.1 + Math.random() * 0.45,
-      r: cold || hot ? 1.5 + Math.random() * 2.5 : 1 + Math.random() * 2,
-      color,
-      life: 1.2 + Math.random() * 1.8,
-    });
+    // Legacy biome ambient particles are disabled. Region-specific ambience is
+    // driven by map-region-config ambient/weather particle configs.
   },
 
   updateWeatherOverlay(dt) {
@@ -545,6 +530,39 @@ export const effectsMethods = {
       life: duration,
       maxLife: duration,
     });
+  },
+
+  spawnGroundCloudEffect(x, y, radius, color, duration) {
+    this.particles.push({
+      effectParticle: true,
+      visual: "groundCloud",
+      renderLayer: "belowEntities",
+      x,
+      y,
+      z: 1,
+      radiusWorld: Math.max(0.05, Number(radius) || 0.05),
+      color: color ?? "#87d65a",
+      age: 0,
+      life: Math.max(0.2, Number(duration) || 1),
+      maxLife: Math.max(0.2, Number(duration) || 1),
+    });
+  },
+
+  spawnGroundPulseEffect(x, y, radius, options = {}) {
+    this.particles.push({
+      effectParticle: true,
+      visual: "groundPulse",
+      renderLayer: "belowEntities",
+      x,
+      y,
+      z: 1,
+      radiusWorld: Math.max(0.05, Number(radius) || 0.05),
+      color: options.color ?? "#d8c091",
+      age: 0,
+      life: Math.max(0.05, (Number(options.durationMs) || 350) / 1000),
+      maxLife: Math.max(0.05, (Number(options.durationMs) || 350) / 1000),
+    });
+    this.camera.shake = Math.max(this.camera.shake, Number(options.shake) || 0);
   },
 
   addFloater(x, y, text, color, life = 0.85) {

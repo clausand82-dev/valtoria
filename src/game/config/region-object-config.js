@@ -91,6 +91,14 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_tree_normal.png (tree sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.95 },
+    particles: {
+      type: "leaves",
+      count: [4, 14],
+      radius: 28,
+      heightOffset: -36,
+      chance: 1,
+      onlyWhenOnScreen: true
+    }
   },
   object_tree_snow: {
     spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
@@ -148,6 +156,14 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_tree_jungle.png (tree sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.95 },
+    particles: {
+      type: "leaves",
+      count: [4, 12],
+      radius: 28,
+      heightOffset: -36,
+      chance: 1,
+      onlyWhenOnScreen: true
+    }
   },
   object_tree_rock: {
     spawnTypes: [{ type: "object_tree_rock", weight: 1 }],
@@ -423,6 +439,28 @@ export const REGION_OBJECT_DEFS = {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.88 },
   },
+  object_barrels_ground: {
+    spawnTypes: [{ type: "object_barrels_ground", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#c99b5d",
+      loot: [
+        { resource: "health", min: 1, max: 3, chance: 0.1 },
+        { resource: "wheat", min: 1, max: 3, chance: 0.65 },
+        { resource: "paper", min: 1, max: 4, chance: 0.1 },
+        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
+      ],
+      rareLoot: [
+        { resource: "bonedust", min: 1, max: 1, chance: 0.01 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_barrels_ground.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.88 },
+  },
   object_hay01: {
     spawnTypes: [{ type: "object_hay01", weight: 1 }],
     defaultDestructible: true,
@@ -462,6 +500,44 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_hay02.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_bones: {
+    spawnTypes: [{ type: "object_bones", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#ffffff",
+      loot: [
+        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "foilage/foilage_bones.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_treestumps: {
+    spawnTypes: [{ type: "object_treestumps", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#ffffff",
+      loot: [
+        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_treestumps.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
@@ -574,6 +650,27 @@ function parseWeight(value) {
   return Math.max(0, parsed);
 }
 
+function normalizeScale(scale) {
+  if (!scale) return null;
+  // Fixed scale: { fixed: 1.2 } or just a number 1.2
+  if (typeof scale === "number" && Number.isFinite(scale) && scale > 0) {
+    return { type: "fixed", value: scale };
+  }
+  if (typeof scale === "object") {
+    // { fixed: 1.2 }
+    if (Number.isFinite(Number(scale.fixed)) && Number(scale.fixed) > 0) {
+      return { type: "fixed", value: Number(scale.fixed) };
+    }
+    // { min: 0.8, max: 1.2 }
+    const min = Number.isFinite(Number(scale.min)) && Number(scale.min) > 0 ? Number(scale.min) : null;
+    const max = Number.isFinite(Number(scale.max)) && Number(scale.max) > 0 ? Number(scale.max) : null;
+    if (min !== null && max !== null) {
+      return { type: "range", min: Math.min(min, max), max: Math.max(min, max) };
+    }
+  }
+  return null;
+}
+
 function normalizeSpawnTypes(def) {
   const list = Array.isArray(def?.spawnTypes) ? def.spawnTypes : [];
   const normalized = [];
@@ -615,7 +712,7 @@ export function getRegionObjectFamily(type) {
   return type ?? null;
 }
 
-function buildObjectEntry(objectId, weight, destructible = null) {
+function buildObjectEntry(objectId, weight, destructible = null, scale = null) {
   const def = REGION_OBJECT_DEFS[objectId];
   if (!def) return null;
   const resolvedWeight = parseWeight(weight);
@@ -634,6 +731,7 @@ function buildObjectEntry(objectId, weight, destructible = null) {
     depthMode: normalizeDepthMode(def.depthMode, "dynamic"),
     sortAnchor: normalizeSortAnchor(def.sortAnchor),
     depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
+    scale: normalizeScale(scale),
   };
 }
 
@@ -678,7 +776,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
   const entries = [];
   for (const entry of raw) {
     if (typeof entry === "string") {
-      const normalized = buildObjectEntry(entry, 1, null);
+      const normalized = buildObjectEntry(entry, 1, null, null);
       if (normalized) entries.push(normalized);
       continue;
     }
@@ -687,7 +785,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     if (!objectId) continue;
     const destructible = typeof entry.destructible === "boolean" ? entry.destructible : null;
     const weight = parseWeight(entry.weight) || 1;
-    const normalized = buildObjectEntry(objectId, weight, destructible);
+    const normalized = buildObjectEntry(objectId, weight, destructible, entry.scale);
     if (normalized && entry.particles) {
       normalized.particles = normalizeParticleConfigs(entry.particles);
     }

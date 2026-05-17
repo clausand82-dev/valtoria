@@ -55,13 +55,15 @@ export const combatMethods = {
         const spell = SPELL_DEFS[spellId];
         if (spell && d <= spell.range && monster.spellCooldown <= 0) {
           this.castMonsterSpell(monster, spellId);
+        } else if (this.tryMonsterLeapAttack(monster, d, n)) {
+          // Leap attack state is applied inside tryMonsterLeapAttack.
         } else if (d > monster.range + this.player.radius) {
           this.moveEntity(monster, n.x * monster.speed * this.statusSpeedMultiplier(monster) * dt, n.y * monster.speed * this.statusSpeedMultiplier(monster) * dt);
         } else if (monster.attackCooldown <= 0) {
-          monster.attackCooldown = 0.85 + Math.random() * 0.6;
+          monster.attackCooldown = this.rollMonsterAttackCooldown(monster);
           monster.attackAnim = 0.24;
           const critical = Math.random() < (Number(monster.critChance) || 0);
-          this.damagePlayer(critical ? monster.damage * (Number(monster.critDamage) || 1.5) : monster.damage, monster, critical);
+          this.applyMonsterMeleeHit(monster, critical);
         }
       } else if (Math.random() < 0.004) {
         const a = Math.random() * Math.PI * 2;
@@ -85,6 +87,83 @@ export const combatMethods = {
     }
   },
 
+  rollMonsterAttackCooldown(monster) {
+    const config = monster.attackCooldownConfig;
+    if (config) {
+      const min = Math.max(0.2, Number(config.min) || 0.85);
+      const max = Math.max(min, Number(config.max) || min);
+      return min + Math.random() * (max - min);
+    }
+    return 0.85 + Math.random() * 0.6;
+  },
+
+  tryMonsterLeapAttack(monster, distanceToPlayer, direction) {
+    const config = monster.leapAttack;
+    if (!config || monster.attackCooldown > 0) return false;
+    const minRange = Math.max(0.2, Number(config.minRange) || 1.2);
+    const maxRange = Math.max(minRange, Number(config.maxRange) || 3);
+    if (distanceToPlayer < minRange || distanceToPlayer > maxRange) return false;
+    const speed = Math.max(monster.speed, Number(config.speed) || monster.speed * 3.5);
+    monster.vx += direction.x * speed;
+    monster.vy += direction.y * speed;
+    monster.attackCooldown = Math.max(0.8, Number(config.cooldown) || 2.4);
+    monster.attackAnim = 0.24;
+    this.addParticles(monster.x, monster.y, monster.color, 10, 0.12);
+    return true;
+  },
+
+  applyMonsterMeleeHit(monster, critical = false) {
+    const amount = critical ? monster.damage * (Number(monster.critDamage) || 1.5) : monster.damage;
+    this.damagePlayer(amount, monster, critical);
+    this.applyMonsterOnHitStatus(monster, this.player);
+    this.applyMonsterMeleeAreaDamage(monster);
+  },
+
+  applyMonsterOnHitStatus(monster, target) {
+    const effect = monster.onHitStatus;
+    if (!effect || !target) return;
+    const chance = clamp(Number(effect.chance ?? 1), 0, 1);
+    if (chance <= 0 || Math.random() > chance) return;
+    target.statusEffects = Array.isArray(target.statusEffects) ? target.statusEffects : [];
+    if (effect.type === "root") {
+      const min = Math.max(0.1, Number(effect.minDuration) || Number(effect.duration) || 0.5);
+      const max = Math.max(min, Number(effect.maxDuration) || min);
+      target.statusEffects.push({
+        type: "root",
+        duration: min + Math.random() * (max - min),
+        color: effect.color ?? "#d7d4c7",
+      });
+      this.addFloater(target.x, target.y, "Root", effect.color ?? "#d7d4c7", 0.7);
+      return;
+    }
+    if (effect.type === "dot") {
+      target.statusEffects.push({
+        type: "dot",
+        damage: Math.max(1, Math.floor(Number(effect.damage) || 1)),
+        duration: Math.max(0.2, Number(effect.duration) || 3),
+        tick: Math.max(0.2, Number(effect.tick) || 1),
+        color: effect.color ?? monster.color,
+      });
+      if (effect.label) this.addFloater(target.x, target.y, effect.label, effect.color ?? monster.color, 0.65);
+    }
+  },
+
+  applyMonsterMeleeAreaDamage(monster) {
+    const effect = monster.meleeAreaDamage;
+    if (!effect) return;
+    const radius = Math.max(0.1, Number(effect.radius) || 0);
+    if (radius <= 0) return;
+    if (effect.visibleOnly && !this.isPointVisible(this.player)) return;
+    if (Math.hypot(this.player.x - monster.x, this.player.y - monster.y) > radius + this.player.radius) return;
+    const damage = Math.max(1, Math.floor(monster.damage * (Number(effect.damageMult) || 0.5)));
+    this.damagePlayer(damage, { typeName: `${monster.typeName} shockwave` }, false);
+    this.spawnGroundPulseEffect(monster.x, monster.y, radius, {
+      color: effect.color ?? "#d8c091",
+      durationMs: 420,
+      shake: Number(effect.shake) || 0,
+    });
+  },
+
   updateMonsterMinions(monster, dt) {
     const config = monster.minions;
     if (!monster.haveMinion || !config || monster.isMinion || monster.dead) return;
@@ -96,7 +175,11 @@ export const combatMethods = {
       .filter((entry) => entry.minionOwnerId === monster.id && !entry.dead).length;
     if (active >= maxActive) return;
 
-    const spawnCount = Math.min(maxActive - active, Math.max(1, Math.floor(Number(config.spawnCount) || 1)));
+    const countConfig = config.spawnCount;
+    const rolledCount = Array.isArray(countConfig)
+      ? Math.floor((Number(countConfig[0]) || 1) + Math.random() * (Math.max(Number(countConfig[0]) || 1, Number(countConfig[1]) || Number(countConfig[0]) || 1) - (Number(countConfig[0]) || 1) + 1))
+      : Math.max(1, Math.floor(Number(countConfig) || 1));
+    const spawnCount = Math.min(maxActive - active, rolledCount);
     let spawned = 0;
     for (let i = 0; i < spawnCount; i += 1) {
       if (this.spawnMonsterMinion(monster, config, i)) spawned += 1;
@@ -106,7 +189,8 @@ export const combatMethods = {
   },
 
   spawnMonsterMinion(owner, config, index = 0) {
-    const base = MONSTER_STATS[owner.typeName];
+    const minionType = config.typeName || owner.typeName;
+    const base = MONSTER_STATS[minionType];
     if (!base) return false;
     const scale = Math.max(0.1, Number(config.scale) || 0.45);
     const statsMult = config.statsMult ?? {};
@@ -124,35 +208,44 @@ export const combatMethods = {
     if (this.isBlocked(x, y, radius)) return false;
 
     const hp = Math.max(1, Math.floor(owner.maxHp * (Number(statsMult.hp) || 0.25)));
-    const speed = Math.max(0.2, owner.speed * (Number(statsMult.speed) || 1));
+    const speedBase = minionType === owner.typeName ? owner.speed : base.speed * (1 + Math.min(0.32, owner.level * 0.025));
+    const speed = Math.max(0.2, speedBase * (Number(statsMult.speed) || 1));
     const minion = {
       id: createId(),
-      typeName: owner.typeName,
+      typeName: minionType,
       x,
       y,
       vx: 0,
       vy: 0,
-      radius,
+      radius: Math.max(0.08, base.radius * scale),
       baseLevel: owner.baseLevel,
       level: owner.level,
       lootLevel: owner.lootLevel,
-      maxHp: hp,
-      hp,
-      damage: Math.max(1, Math.floor(owner.damage * (Number(statsMult.damage) || 0.3))),
+      maxHp: minionType === owner.typeName ? hp : Math.max(1, Math.floor(base.hp * (1 + owner.level * 0.12) * (Number(statsMult.hp) || 1))),
+      hp: minionType === owner.typeName ? hp : Math.max(1, Math.floor(base.hp * (1 + owner.level * 0.12) * (Number(statsMult.hp) || 1))),
+      damage: minionType === owner.typeName
+        ? Math.max(1, Math.floor(owner.damage * (Number(statsMult.damage) || 0.3)))
+        : Math.max(1, Math.floor(base.damage * (1 + owner.level * 0.1) * (Number(statsMult.damage) || 1))),
       speed,
       baseSpeed: speed,
-      range: Math.max(0.18, owner.range * 0.8),
-      magic: Math.max(0, Math.floor((Number(owner.magic) || 0) * (Number(statsMult.magic) || 0.25))),
-      critChance: Math.max(0, (Number(owner.critChance) || 0) * 0.5),
-      critDamage: Number(owner.critDamage) || 1.5,
-      blockChance: 0,
-      dodgeChance: Math.max(0, (Number(owner.dodgeChance) || 0) * 0.5),
+      range: minionType === owner.typeName ? Math.max(0.18, owner.range * 0.8) : base.range,
+      magic: minionType === owner.typeName ? Math.max(0, Math.floor((Number(owner.magic) || 0) * (Number(statsMult.magic) || 0.25))) : Math.floor(Number(base.magic) || 0),
+      critChance: minionType === owner.typeName ? Math.max(0, (Number(owner.critChance) || 0) * 0.5) : Number(base.critChance) || 0,
+      critDamage: minionType === owner.typeName ? Number(owner.critDamage) || 1.5 : Number(base.critDamage) || 1.5,
+      blockChance: Number(base.blockChance) || 0,
+      dodgeChance: minionType === owner.typeName ? Math.max(0, (Number(owner.dodgeChance) || 0) * 0.5) : Number(base.dodgeChance) || 0,
       spells: [],
       spellCooldown: 999,
       statusEffects: [],
       allowElite: false,
       isBoss: false,
       boss: null,
+      noLoot: Boolean(base.noLoot),
+      despawnOnDeath: Boolean(base.despawnOnDeath),
+      onHitStatus: base.onHitStatus ? { ...base.onHitStatus } : null,
+      leapAttack: base.leapAttack ? { ...base.leapAttack } : null,
+      attackCooldownConfig: base.attackCooldown ? { ...base.attackCooldown } : null,
+      meleeAreaDamage: base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null,
       haveMinion: false,
       minions: false,
       minionCooldown: 0,
@@ -386,6 +479,8 @@ export const combatMethods = {
       dotDuration: spell.dotDuration ?? 0,
       slowPct: spell.slowPct ?? 0,
       slowDuration: spell.slowDuration ?? 0,
+      hazardDuration: spell.hazardDuration ?? 0,
+      hazardTick: spell.hazardTick ?? 1,
       explodeOnEnd: Boolean(spell.explodeOnEnd),
     });
   },
@@ -415,6 +510,58 @@ export const combatMethods = {
       this.applyProjectileStatus(target, projectile);
     }
     this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08);
+    if (projectile.hazardDuration > 0 && projectile.areaRadius > 0) {
+      this.spawnGroundHazard(projectile, x, y);
+    }
+  },
+
+  spawnGroundHazard(projectile, x, y) {
+    const radius = Math.max(0.1, Number(projectile.areaRadius) || 0.1);
+    const hazard = {
+      id: createId(),
+      owner: projectile.owner,
+      spellId: projectile.spellId,
+      x,
+      y,
+      radius,
+      damage: Math.max(1, Math.floor(Number(projectile.dotDamage || projectile.areaDamage || 1))),
+      tickInterval: Math.max(0.2, Number(projectile.hazardTick) || 1),
+      tick: 0,
+      life: Math.max(0.2, Number(projectile.hazardDuration) || 1),
+      maxLife: Math.max(0.2, Number(projectile.hazardDuration) || 1),
+      color: projectile.color ?? "#87d65a",
+    };
+    this.groundHazards ??= [];
+    this.groundHazards.push(hazard);
+    this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life);
+  },
+
+  updateGroundHazards(dt) {
+    if (!Array.isArray(this.groundHazards) || this.groundHazards.length === 0) return;
+    for (let i = this.groundHazards.length - 1; i >= 0; i -= 1) {
+      const hazard = this.groundHazards[i];
+      hazard.life -= dt;
+      hazard.tick -= dt;
+      if (hazard.tick <= 0) {
+        hazard.tick += hazard.tickInterval;
+        this.applyGroundHazardTick(hazard);
+      }
+      if (hazard.life <= 0) this.groundHazards.splice(i, 1);
+    }
+  },
+
+  applyGroundHazardTick(hazard) {
+    if (hazard.owner === "player") {
+      for (const monster of this.nearbyMonsters(2)) {
+        if (monster.dead) continue;
+        if (Math.hypot(monster.x - hazard.x, monster.y - hazard.y) > hazard.radius + monster.radius) continue;
+        this.damageMonster(monster, hazard.damage, "magic", false);
+      }
+      return;
+    }
+    if (Math.hypot(this.player.x - hazard.x, this.player.y - hazard.y) <= hazard.radius + this.player.radius) {
+      this.damagePlayer(hazard.damage, { typeName: hazard.spellId ?? "hazard" }, false);
+    }
   },
 
   applyProjectileStatus(target, projectile) {
@@ -463,6 +610,8 @@ export const combatMethods = {
   },
 
   statusSpeedMultiplier(entity) {
+    const rooted = (entity.statusEffects ?? []).some((effect) => effect.type === "root" && effect.duration > 0);
+    if (rooted) return 0;
     const slow = (entity.statusEffects ?? [])
       .filter((effect) => effect.type === "slow" && effect.duration > 0)
       .reduce((max, effect) => Math.max(max, Number(effect.pct) || 0), 0);
@@ -566,8 +715,12 @@ export const combatMethods = {
     this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95);
     if (!monster.isMinion) this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
     this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
-    if (!monster.isMinion) this.dropLoot(monster);
+    if (!monster.isMinion && !monster.noLoot && !monster.despawnOnDeath) this.dropLoot(monster);
     if (!monster.isMinion) this.despawnMonsterMinions(monster.id);
+    if (monster.despawnOnDeath) {
+      this.addFloater(monster.x, monster.y, "Forsvinder", monster.color, 0.95);
+      this.addParticles(monster.x, monster.y, monster.color, 36, 0.18);
+    }
     this.levelUpIfNeeded();
   },
 

@@ -3,6 +3,7 @@ import { normalizeParticleConfigs } from "./particle-presets.js";
 
 const GENERATED_ASSET_PREFIX = "/assets/generated/";
 const DEFAULT_GROUND_GRID = 4;
+const DEFAULT_WATER_GRID = 4;
 
 const DEFAULT_FOLIAGE_GRID = 4;
 const LEGACY_FOLIAGE_GRID = 8;
@@ -56,6 +57,10 @@ function buildGroundSheetId(fileName) {
   return `ground-custom:${String(fileName).toLowerCase()}`;
 }
 
+function buildWaterSheetId(fileName) {
+  return `water-custom:${String(fileName).toLowerCase()}`;
+}
+
 function buildFoliageSheetId(fileName, rows, cols) {
   return `foliage-custom:${String(fileName).toLowerCase()}:${rows}x${cols}`;
 }
@@ -66,6 +71,25 @@ function resolveLockedTileVariant(tileset, grid = DEFAULT_GROUND_GRID) {
   const y = clampInt(tileset.y, 1, grid);
   if (!x || !y) return null;
   return (y - 1) * grid + (x - 1);
+}
+
+function normalizeAxisSelection(value, grid = DEFAULT_WATER_GRID) {
+  const values = toArray(value)
+    .map((entry) => clampInt(entry, 1, grid))
+    .filter(Boolean);
+  return values.length ? [...new Set(values)] : null;
+}
+
+function variantsFromAxisSelection(xSelection, ySelection, grid = DEFAULT_WATER_GRID) {
+  const xs = xSelection?.length ? xSelection : Array.from({ length: grid }, (_, index) => index + 1);
+  const ys = ySelection?.length ? ySelection : Array.from({ length: grid }, (_, index) => index + 1);
+  const variants = [];
+  for (const y of ys) {
+    for (const x of xs) {
+      variants.push((y - 1) * grid + (x - 1));
+    }
+  }
+  return variants;
 }
 
 function normalizeResourceDropEntry(resourceId, value) {
@@ -121,6 +145,42 @@ export function normalizeRegionTileset(tilesetInput) {
     return entries.length ? entries : null;
   }
   return normalizeRegionTilesetEntry(tilesetInput);
+}
+
+function normalizeWaterEntry(entry) {
+  const raw = toSpecObject(entry);
+  if (!raw) return null;
+  const fileName = normalizeFileName(raw.fileName ?? raw.png ?? raw.src);
+  if (!fileName) return null;
+  const parsedWeight = Number(raw.weight);
+  const weight = Number.isFinite(parsedWeight) ? Math.max(0, parsedWeight) : 1;
+  const x = normalizeAxisSelection(raw.x, DEFAULT_WATER_GRID);
+  const y = normalizeAxisSelection(raw.y, DEFAULT_WATER_GRID);
+  return {
+    fileName,
+    weight,
+    sheetId: buildWaterSheetId(fileName),
+    x,
+    y,
+    variants: variantsFromAxisSelection(x, y, DEFAULT_WATER_GRID),
+    variantCount: DEFAULT_WATER_GRID * DEFAULT_WATER_GRID,
+  };
+}
+
+export function normalizeRegionWaterSets(regionConfig = {}) {
+  const explicit = toArray(regionConfig.water ?? regionConfig.waterSets ?? regionConfig.waterSet);
+  const normalized = explicit
+    .map((entry) => normalizeWaterEntry(entry))
+    .filter(Boolean);
+  const deduped = [];
+  const seen = new Set();
+  for (const entry of normalized) {
+    const key = `${entry.sheetId}|${entry.weight}|${JSON.stringify(entry.x)}|${JSON.stringify(entry.y)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(entry);
+  }
+  return deduped;
 }
 
 function normalizeFoliageEntry(entry, defaults = {}) {
@@ -183,8 +243,10 @@ export function normalizeRegionFoliageSets(regionConfig = {}) {
 
 export function collectRegionAssetOverrides(mapRegionSets) {
   const groundSheets = [];
+  const waterSheets = [];
   const foliageSheets = [];
   const seenGround = new Set();
+  const seenWater = new Set();
   const seenFoliage = new Set();
 
   for (const regions of Object.values(mapRegionSets ?? {})) {
@@ -198,6 +260,16 @@ export function collectRegionAssetOverrides(mapRegionSets) {
         groundSheets.push({
           sheetId: t.sheetId,
           fileName: t.fileName,
+        });
+      }
+
+      const waterSets = normalizeRegionWaterSets(region ?? {});
+      for (const set of waterSets) {
+        if (seenWater.has(set.sheetId)) continue;
+        seenWater.add(set.sheetId);
+        waterSheets.push({
+          sheetId: set.sheetId,
+          fileName: set.fileName,
         });
       }
 
@@ -215,5 +287,5 @@ export function collectRegionAssetOverrides(mapRegionSets) {
     }
   }
 
-  return { groundSheets, foliageSheets };
+  return { groundSheets, waterSheets, foliageSheets };
 }

@@ -1,5 +1,21 @@
 History over changes
 
+* V 1.71
+- added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
+- changed a bit i particle system (leaves works on tree now also, not just as weather)
+- added new mobs (Spawn of Hydra, Hellhound, Gigant Troll, Mountain Troll, Shadwo Dragon, Infernus Minions, Spawn of Archnogrim, Flesheater) 
+
+
+* V. 1.70
+- removed old legacy biodome use (a fragment is still there to make system works with old saves, but it's less used)
+- changed prefabs to use new decay system instead of lagacy
+- made a better popup for city mobs attack (more prety, but can still use more work)
+- fix a error when buying unit took some resouce, stop when missing resource, so player didn't get used resource back and no units!
+- added book layout on readable lores
+- change demands chips layout and appearence
+- repair list now shows if item is equept or i back pack
+- city menu bottom now have texture picture (background)
+
 * V. 1.63
 - added a new back pack/charater sheet - more graphic
 - changed default back pack slot count from 30 to 42
