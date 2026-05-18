@@ -14,7 +14,7 @@ region({
   unlock: { completedQuests: ["first_hunt"], army: 10 },    // Optional map access requirements. locked/text/requiredArmy are also supported.
 
   corrupted: true,                                          // Default starting corruption. Existing regionCorruption save still controls current state.
-  populationGain: 5,                                        // Citizens gained the first time this region is cleared.
+  cityStats: { population: 5 },                             // Region city stat impact at corruptionLevel 0.
   mapSize: "medium",                                        // small, medium, large, or giga.
 
   tileset: ["tileset/tileset_grass.png"],                   // Old format: fixed tileset list.

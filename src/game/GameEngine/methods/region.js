@@ -199,6 +199,7 @@ export const regionMethods = {
   returnToAreaMap() {
     const active = this.activeMapRegion;
     if (!active) return;
+    const mobCounts = this.monsterCounterSnapshot();
     const cleared = this.allRegionMonstersCleared();
     // Mark clear_map quests complete per quest target, not by requiring all region monsters to be dead.
     for (const quest of this.questState.active) {
@@ -223,6 +224,12 @@ export const regionMethods = {
       regionId: active.regionId,
       label: active.label,
       cleared,
+      totalMobs: mobCounts.total,
+      killedMobs: mobCounts.killed,
+      remainingMobs: mobCounts.alive,
+      reachedExit: true,
+      playerDied: false,
+      abandoned: false,
     };
     this.mapReturn.mapSize = active.mapSize ?? "medium";
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
@@ -244,6 +251,7 @@ export const regionMethods = {
   abandonMapRegionToWorldMap() {
     const active = this.activeMapRegion;
     if (!active) return false;
+    const mobCounts = this.monsterCounterSnapshot();
     const currentState = captureAbandonState(this);
     // Roll back to the forced save taken when the map run started.
     this.loadProgress();
@@ -261,6 +269,11 @@ export const regionMethods = {
       label: active.label,
       cleared: false,
       abandoned: true,
+      totalMobs: mobCounts.total,
+      killedMobs: mobCounts.killed,
+      remainingMobs: mobCounts.alive,
+      reachedExit: false,
+      playerDied: false,
     };
     this.mapReturn.mapSize = active.mapSize ?? "medium";
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;

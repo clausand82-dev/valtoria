@@ -974,14 +974,15 @@ function cityAreaItemRequirementLabel(req) {
   return "Required item";
 }
 
-function calculateCityStats(progress = {}, snapshot = emptySnapshot) {
+function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
   const stats = {
     ...CITY_STATS_RULES.baseStats,
-    army: armyTotalPower(progress?.armyUnits),
     gold: Math.max(0, Math.floor(Number(snapshot?.player?.gold) || 0)),
     xp: Math.max(0, Math.floor(Number(snapshot?.player?.xp) || 0)),
     popularity: Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0)),
   };
+  const armyPower = armyTotalPower(progress?.armyUnits);
+  stats.defense = Math.max(0, Math.floor(Number(stats.defense) || 0)) + armyPower;
   applyCityStatEffects(stats, progress?.statBonuses);
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
@@ -998,20 +999,235 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot) {
       applyCityStatEffects(stats, addon.statEffects ?? addon.effects?.cityStats);
     }
   }
-  applyCityCitizenDerivedStats(stats);
+  applyRegionCityStats(stats, regionCorruption, snapshot);
+  applyCurrentCityStatEffects(stats, progress);
+  stats.army = stats.defense;
+  stats.city_defence = stats.defense;
+  stats.citizens_health = stats.health;
+  stats.happiness = stats.popularity;
   return stats;
 }
 
-function cityUsableSoldierCapacity(cityStats = {}) {
+function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
+  const breakdown = {};
+  const addEntry = (statId, label, amount, detail = "") => {
+    const normalized = normalizeCityStatId(statId);
+    if (!normalized) return;
+    const value = Math.floor(Number(amount) || 0);
+    if (value === 0 && !detail) return;
+    if (!breakdown[normalized]) breakdown[normalized] = [];
+    breakdown[normalized].push({ label, amount: value, detail });
+  };
+  for (const [statId, amount] of Object.entries(CITY_STATS_RULES.baseStats ?? {})) {
+    addEntry(statId, "Base", amount);
+  }
+  addEntry("popularity", "Hero popularity", Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0)));
+  addEntry("defense", "Army units", armyTotalPower(progress?.armyUnits));
+  for (const [statId, amount] of Object.entries(progress?.statBonuses ?? {})) {
+    addEntry(statId, "City progress", amount);
+  }
+  for (const area of CITY_AREAS) {
+    const state = getCityAreaState(progress, area);
+    if (!state.unlocked) continue;
+    for (const [statId, amount] of Object.entries(cityAreaActiveStatEffects(area, state.level))) {
+      addEntry(statId, area.title ?? area.id, amount, `Area level ${state.level}`);
+    }
+  }
+  for (const building of CITY_BUILDINGS) {
+    const state = getCityBuildingState(progress, building);
+    if ((state.level ?? 0) <= 0) continue;
+    for (const [statId, amount] of Object.entries(cityBuildingActiveStatEffects(building, state.level))) {
+      addEntry(statId, building.title ?? building.id, amount, `Building level ${state.level}`);
+    }
+    const purchasedAddons = new Set(state.addons ?? []);
+    for (const addon of building.addons ?? []) {
+      if (!purchasedAddons.has(addon.id)) continue;
+      const effects = mergeCityStatEffects([addon.statEffects ?? addon.effects?.cityStats]);
+      for (const [statId, amount] of Object.entries(effects)) {
+        addEntry(statId, addon.title ?? addon.id, amount, `${building.title ?? building.id} addon`);
+      }
+    }
+  }
+  const regionArmy = Math.max(0, Math.floor(Number(CITY_STATS_RULES.baseStats?.defense) || 0)) + armyTotalPower(progress?.armyUnits);
+  for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
+    if (areaMapId === WORLD_MAP.id) continue;
+    for (const region of regions ?? []) {
+      if (!cityStatsRegionIsUnlocked(region, snapshot, regionArmy)) continue;
+      if (region.cityImpactEnabled === false) continue;
+      const regionStats = getRegionCityStats(region);
+      const level = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region);
+      const multiplier = getRegionCityStatMultiplier(level);
+      if (multiplier <= 0) continue;
+      for (const [rawId, rawAmount] of Object.entries(regionStats)) {
+        const statId = rawId === "populationGain" ? "population" : rawId;
+        const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
+        addEntry(statId, region.label ?? region.id, amount, `Corruption ${level}/10`);
+      }
+    }
+  }
+  const finalStats = calculateCityStats(progress, snapshot, regionCorruption);
+  const cityMobs = normalizeCityMobs(progress?.cityMobs);
+  const totalCityMobLevels = cityMobs.reduce((sum, mob) => sum + Math.max(1, Math.floor(Number(mob.level) || 1)), 0);
+  if (totalCityMobLevels > 0) addEntry("safety", "City mobs", -(totalCityMobLevels * 2), `${totalCityMobLevels} total mob levels`);
+  const population = Math.max(0, Math.floor(Number(finalStats.population) || 0));
+  if (Math.max(0, Math.floor(Number(finalStats.provision) || 0)) < population) addEntry("health", "Low provision", -15);
+  if (Math.max(0, Math.floor(Number(finalStats.water) || 0)) < population) addEntry("health", "Low water", -15);
+  if (population > 0 && Math.max(0, Math.floor(Number(finalStats.knowledge) || 0)) >= population) addEntry("defense", "Knowledge threshold", 0, "+5% defense");
+  if (population > 0 && Math.max(0, Math.floor(Number(finalStats.culture) || 0)) >= population) addEntry("popularity", "Culture threshold", 0, "+10% popularity");
+  addEntry("maintenance", "Average durability", finalStats.maintenance, "Unlocked city areas and buildings");
+  return breakdown;
+}
+
+function cityEventFlags(cityStats = {}) {
   const population = Math.max(0, Math.floor(Number(cityStats.population) || 0));
-  const unavailable = Math.max(
-    Math.max(0, Math.floor(Number(cityStats.homeless_people) || 0)),
-    Math.max(0, Math.floor(Number(cityStats.hungry_people) || 0)),
-    Math.max(0, Math.floor(Number(cityStats.thirsty_people) || 0)),
-    Math.max(0, Math.floor(Number(cityStats.sick_people) || 0)),
-    Math.max(0, Math.floor(Number(cityStats.angry_people) || 0)),
-  );
-  return Math.max(0, population - unavailable);
+  const provision = Math.max(0, Math.floor(Number(cityStats.provision) || 0));
+  const water = Math.max(0, Math.floor(Number(cityStats.water) || 0));
+  const health = Math.max(0, Math.min(100, Number(cityStats.health) || 0));
+  const wealth = Math.max(0, Math.floor(Number(cityStats.wealth) || 0));
+  const safety = Math.max(0, Math.min(100, Number(cityStats.safety) || 0));
+  const famine = provision < population;
+  const waterShortage = water < population;
+  const diseaseOutbreak = health < 50;
+  const wealthRatio = wealth / Math.max(1, population);
+  const uprisingPoorness = wealthRatio < 0.5;
+  const fireRisk = Math.max(0, Math.min(100, (100 - safety) + (waterShortage ? 25 : 0)));
+  return {
+    famine: {
+      active: famine,
+      unavailablePopulationPct: 25,
+      futureEffect: "hero_food_drops_half",
+    },
+    water_shortage: {
+      active: waterShortage,
+      unavailablePopulationPct: 45,
+      futureEffect: "no_health_or_mana_potion_drops",
+    },
+    disease_outbreak: {
+      active: diseaseOutbreak,
+      futureEffect: "hero_max_hp_minus_25_pct",
+    },
+    uprising_poorness: {
+      active: uprisingPoorness,
+      risk: uprisingPoorness ? "high" : "low",
+      wealthRatio,
+      futureEffect: "hero_gold_drops_half",
+    },
+    fire: {
+      active: fireRisk >= 75,
+      risk: fireRisk,
+      waterShortage,
+    },
+  };
+}
+
+function clampCorruptionLevel(value) {
+  return Math.max(0, Math.min(10, Math.floor(Number(value) || 0)));
+}
+
+function normalizeRegionCorruptionEntry(value, regionDef = null) {
+  if (typeof value === "boolean") return value ? { corruptionLevel: 10 } : { corruptionLevel: 0 };
+  if (typeof value === "number") return { corruptionLevel: clampCorruptionLevel(value) };
+  if (value && typeof value === "object") {
+    if (typeof value.corruptionLevel === "boolean") return { ...value, corruptionLevel: value.corruptionLevel ? 10 : 0 };
+    if (value.corruptionLevel !== undefined) return { ...value, corruptionLevel: clampCorruptionLevel(value.corruptionLevel) };
+  }
+  if (regionDef?.corruptionLevel !== undefined) return { corruptionLevel: clampCorruptionLevel(regionDef.corruptionLevel) };
+  if (typeof regionDef?.corrupted === "boolean") return { corruptionLevel: regionDef.corrupted ? 10 : 0 };
+  return { corruptionLevel: 10 };
+}
+
+function getRegionCorruptionLevel(regionCorruption = {}, areaMapId, regionId, regionDef = null) {
+  const key = regionStatusKey(areaMapId, regionId);
+  return normalizeRegionCorruptionEntry(regionCorruption?.[key], regionDef).corruptionLevel;
+}
+
+function setRegionCorruptionLevel(regionCorruption = {}, areaMapId, regionId, level) {
+  if (!areaMapId || !regionId) return regionCorruption;
+  return {
+    ...(regionCorruption ?? {}),
+    [regionStatusKey(areaMapId, regionId)]: { corruptionLevel: clampCorruptionLevel(level) },
+  };
+}
+
+function getRegionCityStats(region = {}) {
+  const stats = region?.cityStats ?? region?.regionStats ?? {};
+  const normalized = stats && typeof stats === "object" && !Array.isArray(stats) ? { ...stats } : {};
+  if (normalized.population === undefined && normalized.populationGain !== undefined) {
+    normalized.population = normalized.populationGain;
+    delete normalized.populationGain;
+  }
+  if (normalized.population === undefined && region?.populationGain !== undefined) {
+    normalized.population = region.populationGain;
+  }
+  return normalized;
+}
+
+function getRegionCityStatMultiplier(corruptionLevel) {
+  return Math.max(0, Math.min(1, (10 - clampCorruptionLevel(corruptionLevel)) / 10));
+}
+
+function regionQuestCompleted(completedQuestSet, questId) {
+  const raw = String(questId ?? "");
+  if (!raw) return false;
+  const swapped = raw.includes("-") ? raw.replace(/-/g, "_") : raw.replace(/_/g, "-");
+  return completedQuestSet.has(raw) || completedQuestSet.has(swapped);
+}
+
+function cityStatsRegionIsUnlocked(region, snapshot = emptySnapshot, army = 0) {
+  if (region?.unlock?.locked) return false;
+  const requiredArmy = Math.max(0, Math.floor(Number(region?.unlock?.army ?? region?.unlock?.requiredArmy) || 0));
+  if (army < requiredArmy) return false;
+  const completedQuestSet = new Set((snapshot?.quests?.completed ?? []).map(String));
+  const requiredQuests = region?.unlock?.completedQuests ?? [];
+  return requiredQuests.every((questId) => regionQuestCompleted(completedQuestSet, questId));
+}
+
+function applyRegionCityStats(stats, regionCorruption = {}, snapshot = emptySnapshot) {
+  const army = Math.max(0, Math.floor(Number(stats.defense) || 0));
+  for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
+    if (areaMapId === WORLD_MAP.id) continue;
+    for (const region of regions ?? []) {
+      if (!cityStatsRegionIsUnlocked(region, snapshot, army)) continue;
+      if (region.cityImpactEnabled === false) continue;
+      const regionStats = getRegionCityStats(region);
+      if (!Object.keys(regionStats).length) continue;
+      const multiplier = getRegionCityStatMultiplier(getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region));
+      if (multiplier <= 0) continue;
+      for (const [rawId, rawAmount] of Object.entries(regionStats)) {
+        const statId = normalizeCityStatId(rawId === "populationGain" ? "population" : rawId);
+        if (!statId) continue;
+        const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
+        if (amount === 0) continue;
+        stats[statId] = Math.max(0, Math.floor(Number(stats[statId]) || 0) + amount);
+      }
+    }
+  }
+}
+
+function updateRegionCorruptionFromMapReturn(oldLevel, mapReturn = {}) {
+  const current = clampCorruptionLevel(oldLevel);
+  if (mapReturn?.cleared || (mapReturn?.reachedExit && !mapReturn?.playerDied && !mapReturn?.abandoned && Number(mapReturn?.remainingMobs) === 0)) return 0;
+  const totalMobs = Math.max(0, Math.floor(Number(mapReturn?.totalMobs) || 0));
+  if (totalMobs <= 0) return current;
+  const killedMobs = Math.max(0, Math.min(totalMobs, Math.floor(Number(mapReturn?.killedMobs) || 0)));
+  const remainingMobs = Math.max(0, Math.min(totalMobs, Math.floor(Number(mapReturn?.remainingMobs) || 0)));
+  const reduction = Math.floor((killedMobs / totalMobs) * 10);
+  const gain = Math.ceil((remainingMobs / totalMobs) * 10);
+  return clampCorruptionLevel(current - reduction + gain);
+}
+
+function cityUsableSoldierCapacity(cityStats = {}) {
+  return availablePopulationForRecruitment(cityStats);
+}
+
+function availablePopulationForRecruitment(cityStats = {}) {
+  const population = Math.max(0, Math.floor(Number(cityStats.population) || 0));
+  const events = cityStats.events ?? cityEventFlags(cityStats);
+  const unavailablePct = Math.min(75, (
+    (events.famine?.active ? 25 : 0)
+    + (events.water_shortage?.active ? 45 : 0)
+  ));
+  return Math.max(0, Math.floor(population * ((100 - unavailablePct) / 100)));
 }
 
 function cityArmyUnitCount(armyUnits = {}) {
@@ -1102,27 +1318,54 @@ function resolveCityArmyBattle({ progress = {}, cityStats = {}, mob, sentUnits =
   };
 }
 
-function applyCityCitizenDerivedStats(stats) {
+function applyCurrentCityStatEffects(stats, progress = {}) {
   const population = Math.max(0, Math.floor(Number(stats.population) || 0));
   const provision = Math.max(0, Math.floor(Number(stats.provision) || 0));
-  const housing = Math.max(0, Math.floor(Number(stats.housing) || 0));
   const water = Math.max(0, Math.floor(Number(stats.water) || 0));
-  stats.hungry_people = Math.min(population, Math.max(0, population - provision));
-  stats.homeless_people = Math.min(population, Math.max(0, population - housing));
-  stats.thirsty_people = Math.min(population, Math.max(0, population - water));
-  stats.camp_population = Math.max(stats.hungry_people, stats.homeless_people, stats.thirsty_people);
-  stats.sick_people = Math.min(population, cityWeightedPressure(CITY_STATS_RULES.pressureWeights.sick_people, stats));
-  stats.angry_people = Math.min(population, cityWeightedPressure(CITY_STATS_RULES.pressureWeights.angry_people, stats));
-  const happinessPenalty = population > 0
-    ? Math.ceil((cityWeightedPressure(CITY_STATS_RULES.pressureWeights.happiness, stats) / population) * 10)
-    : 0;
-  stats.happiness = Math.max(0, Math.min(100, Math.floor(Number(stats.happiness) || 0) - happinessPenalty));
+  const cityMobs = normalizeCityMobs(progress?.cityMobs);
+  const totalCityMobLevels = cityMobs.reduce((sum, mob) => sum + Math.max(1, Math.floor(Number(mob.level) || 1)), 0);
+  stats.safety = clampPct((Number(stats.safety) || 0) - totalCityMobLevels * 2);
+  let healthPenalty = 0;
+  if (provision < population) healthPenalty += 15;
+  if (water < population) healthPenalty += 15;
+  stats.health = clampPct((Number(stats.health) || 0) - healthPenalty);
+  if (Math.max(0, Math.floor(Number(stats.knowledge) || 0)) >= population && population > 0) {
+    stats.defense = Math.floor((Number(stats.defense) || 0) * 1.05);
+  }
+  if (Math.max(0, Math.floor(Number(stats.culture) || 0)) >= population && population > 0) {
+    stats.popularity = clampPct((Number(stats.popularity) || 0) * 1.1);
+  } else {
+    stats.popularity = clampPct(stats.popularity);
+  }
+  stats.nonUniqueDropRateBonus = Math.max(0, Math.floor(Number(stats.faith) || 0)) >= population && population > 0 ? 0.05 : 0;
+  stats.maintenance = calculateCityMaintenance(progress, stats.maintenance);
+  stats.safety = clampPct(stats.safety);
+  stats.health = clampPct(stats.health);
+  stats.events = cityEventFlags(stats);
 }
 
-function cityWeightedPressure(weights = {}, stats = {}) {
-  return Object.entries(weights ?? {}).reduce((sum, [statId, weight]) => (
-    sum + Math.max(0, Math.floor(Number(stats[normalizeCityStatId(statId)]) || 0)) * Math.max(0, Number(weight) || 0)
-  ), 0);
+function clampPct(value) {
+  return Math.max(0, Math.min(100, Math.floor(Number(value) || 0)));
+}
+
+function calculateCityMaintenance(progress = {}, rawMaintenance = 100) {
+  const baseMaintenance = Math.floor(Number(CITY_STATS_RULES.baseStats?.maintenance) || 100);
+  const modifier = Math.floor(Number(rawMaintenance) || 0) - baseMaintenance;
+  const durabilities = [];
+  for (const area of CITY_AREAS) {
+    const state = getCityAreaState(progress, area);
+    if (!state.unlocked) continue;
+    if (state.durability !== undefined) durabilities.push(Math.max(0, Math.min(100, Number(state.durability) || 0)));
+  }
+  for (const building of CITY_BUILDINGS) {
+    const state = getCityBuildingState(progress, building);
+    if ((state.level ?? 0) <= 0) continue;
+    if (state.durability !== undefined) durabilities.push(Math.max(0, Math.min(100, Number(state.durability) || 0)));
+  }
+  const average = durabilities.length
+    ? Math.floor(durabilities.reduce((sum, value) => sum + value, 0) / durabilities.length)
+    : 100;
+  return clampPct(average + modifier);
 }
 
 function cityAreaActiveStatEffects(area, level = 1) {
@@ -1338,20 +1581,6 @@ function getCityQuestOffset(spriteIndex) {
 
 function loadCityProgress(storageKey = CITY_STORAGE_KEY) {
   return saveRepository.loadCityProgressSync(storageKey);
-}
-
-function applyMapReturnPopulationProgress(progress = {}, mapReturn, wasCorrupted = true) {
-  if (!mapReturn?.cleared || !mapReturn.areaMapId || !mapReturn.regionId) return { progress, changed: false };
-  const region = findMapRegionConfig(mapReturn.areaMapId, mapReturn.regionId);
-  const firstGain = Math.max(0, Math.floor(Number(region?.populationGain ?? CITY_STATS_RULES.mapLiberation.defaultPopulationGain) || 0));
-  if (firstGain <= 0) return { progress, changed: false };
-  const gain = wasCorrupted
-    ? firstGain
-    : Math.max(1, Math.ceil(firstGain * (CITY_STATS_RULES.mapLiberation.repeatRunPct ?? 0.02)));
-  return {
-    progress: addCityPermanentStatBonus(progress, "population", gain),
-    changed: gain > 0,
-  };
 }
 
 function findMapRegionConfig(areaMapId, regionId) {
@@ -1603,6 +1832,16 @@ export {
   payCityAreaUnlockCost,
   payCityCostEntries,
   calculateCityStats,
+  calculateCityStatBreakdown,
+  cityEventFlags,
+  availablePopulationForRecruitment,
+  clampCorruptionLevel,
+  normalizeRegionCorruptionEntry,
+  getRegionCorruptionLevel,
+  setRegionCorruptionLevel,
+  getRegionCityStats,
+  getRegionCityStatMultiplier,
+  updateRegionCorruptionFromMapReturn,
   cityAreaActiveStatEffects,
   cityBuildingActiveStatEffects,
   mergeCityStatEffects,
@@ -1615,7 +1854,6 @@ export {
   loadCityAssets,
   loadCityAssetsOnce,
   loadCityProgress,
-  applyMapReturnPopulationProgress,
   saveCityProgress,
   serializeCityProgress,
   addCityPermanentStatBonus,

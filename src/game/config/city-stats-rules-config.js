@@ -1,13 +1,14 @@
 // City stat rules.
 //
 // Primary city stat ids supported by statEffects/statRequirements:
-// city_defence, population, housing, provision, water, army, happiness, citizens_health.
+// population, housing, provision, water, supply, wealth, trade, safety, health,
+// defense, popularity, knowledge, culture, faith, maintenance.
 //
 // Backwards-compatible aliases accepted by the stat system:
-// defence -> city_defence
-// cityDefence -> city_defence
-// citizensHealth -> citizens_health
+// city_defence/defence/cityDefence/army -> defense
+// citizensHealth/citizens_health -> health
 // food -> provision
+// happiness -> popularity
 //
 // Formula:
 // final primary stat =
@@ -23,42 +24,40 @@
 // current calculated city stat must be at least the configured value.
 // Example: statRequirements: { population: 100, water: 50 }
 //
-// Derived citizen condition stats:
-// hungry_people = max(0, population - provision)
-// homeless_people = max(0, population - housing)
-// thirsty_people = max(0, population - water)
-// camp_population = max(hungry_people, homeless_people, thirsty_people)
-// sick_people / angry_people are weighted pressure values from unmet needs.
-// happiness is reduced from base/effects by configured weighted pressure versus population.
 export const CITY_STATS_RULES = {
   baseStats: {
-    city_defence: 50,
-    population: 150,
-    housing: 1500,
-    provision: 1500,
-    water: 5000,
-    army: 0,
-    happiness: 50,
-    citizens_health: 50,
+    population: 10,
+    housing: 10,
+    provision: 10,
+    water: 10,
+    supply: 10,
+    wealth: 10,
+    trade: 10,
+    safety: 10,
+    health: 10,
+    defense: 10,
+    popularity: 10,
+    knowledge: 10,
+    culture: 10,
+    faith: 10,
+    maintenance: 100,
   },
   displayMax: {
-    city_defence: 500,
     population: 500,
     housing: 500,
     provision: 500,
     water: 500,
-    army: 500,
-    happiness: 100,
-    citizens_health: 100,
-    hungry_people: 500,
-    homeless_people: 500,
-    thirsty_people: 500,
-    sick_people: 500,
-    angry_people: 500,
-  },
-  mapLiberation: {
-    defaultPopulationGain: 10,
-    repeatRunPct: 0.02,
+    supply: 500,
+    wealth: 500,
+    trade: 500,
+    safety: 100,
+    health: 100,
+    defense: 500,
+    popularity: 100,
+    knowledge: 500,
+    culture: 500,
+    faith: 500,
+    maintenance: 100,
   },
   farmProvisionRecipes: [
     { resourceId: "meat", cost: 10, provision: 1, label: "Meat" },
@@ -86,22 +85,5 @@ export const CITY_STATS_RULES = {
     popularityStep: 10,
     // Input cost reduced for each discount step.
     discountPerStep: 5,
-  },
-  pressureWeights: {
-    sick_people: {
-      homeless_people: 3,
-      hungry_people: 1,
-      thirsty_people: 5,
-    },
-    angry_people: {
-      hungry_people: 3,
-      thirsty_people: 1,
-      homeless_people: 6,
-    },
-    happiness: {
-      hungry_people: 3,
-      homeless_people: 1,
-      thirsty_people: 4,
-    },
   },
 };

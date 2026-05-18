@@ -30,6 +30,7 @@ export {
   CITY_STAT_ICON_URLS,
   CITY_CITIZEN_CONDITION_DEFS,
   CityCitizenConditions,
+  CitySideStats,
   CityStatsTopBar,
   ResourceBar,
 } from "./hud/resource-bar.jsx";
@@ -70,6 +71,11 @@ export {
   loadCityProgress,
   saveCityProgress,
   normalizeCityMobs,
-  applyMapReturnPopulationProgress,
+  updateRegionCorruptionFromMapReturn,
+  normalizeRegionCorruptionEntry,
+  getRegionCorruptionLevel,
+  setRegionCorruptionLevel,
   calculateCityStats,
+  calculateCityStatBreakdown,
+  availablePopulationForRecruitment,
 } from "./city.jsx";

@@ -113,10 +113,28 @@ function initialRegionCorruption() {
   for (const [areaMapId, regions] of Object.entries(MAP_REGION_SETS)) {
     if (areaMapId === WORLD_MAP.id) continue;
     for (const region of regions) {
-      initial[regionStatusKey(areaMapId, region.id)] = region.corrupted !== false;
+      initial[regionStatusKey(areaMapId, region.id)] = {
+        corruptionLevel: region.corruptionLevel !== undefined
+          ? clampCorruptionLevel(region.corruptionLevel)
+          : region.corrupted === false ? 0 : 10,
+      };
     }
   }
   return initial;
+}
+
+function clampCorruptionLevel(value) {
+  return Math.max(0, Math.min(10, Math.floor(Number(value) || 0)));
+}
+
+function normalizeRegionCorruptionEntry(value, fallback) {
+  if (typeof value === "boolean") return { corruptionLevel: value ? 10 : 0 };
+  if (typeof value === "number") return { corruptionLevel: clampCorruptionLevel(value) };
+  if (value && typeof value === "object" && value.corruptionLevel !== undefined) {
+    if (typeof value.corruptionLevel === "boolean") return { ...value, corruptionLevel: value.corruptionLevel ? 10 : 0 };
+    return { ...value, corruptionLevel: clampCorruptionLevel(value.corruptionLevel) };
+  }
+  return fallback;
 }
 
 export const localSaveRepository = {
@@ -217,7 +235,7 @@ export const localSaveRepository = {
     const saved = readJson(storageKey, {});
     if (saved && typeof saved === "object") {
       for (const key of Object.keys(initial)) {
-        if (typeof saved[key] === "boolean") initial[key] = saved[key];
+        if (saved[key] !== undefined) initial[key] = normalizeRegionCorruptionEntry(saved[key], initial[key]);
       }
     }
     return initial;

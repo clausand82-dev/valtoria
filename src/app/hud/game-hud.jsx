@@ -1,9 +1,8 @@
 import React from "react";
 import {
   AtlasIcon,
-  CityCitizenConditions,
   CityStatsTopBar,
-  CityThreatMeter,
+  CitySideStats,
   ImageIcon,
   InventoryIcon,
   ITEM_MONEY_ICON_URL,
@@ -49,28 +48,33 @@ export function GameHud({
     <>
       <section className="hud hud-left" aria-live="polite">
         {cityOpen ? (
-          <div className="city-hero-cluster">
+          <>
+            <div className="city-left-stack">
+              <div className="portrait">
+                <b>{player.level}</b>
+              </div>
+              <CitySideStats
+                gold={player.gold}
+                threatLevel={cityThreatLevel}
+                popularity={derivedCityStats.popularity}
+                events={derivedCityStats.events}
+              />
+            </div>
+            <CityStatsTopBar stats={cityHudStats} />
+          </>
+        ) : (
+          <>
             <div className="portrait">
               <b>{player.level}</b>
             </div>
-            <CityCitizenConditions stats={derivedCityStats} />
-          </div>
-        ) : (
-          <div className="portrait">
-            <b>{player.level}</b>
-          </div>
+            <div className="resource-stack">
+              <ResourceBar type="health" value={hpPct} label={`HP ${player.hp} / ${player.maxHp}`} />
+              <ResourceBar type="mana" value={manaPct} label={`MANA ${player.mana} / ${player.maxMana}`} />
+              <ResourceBar type="xp" value={xpPct} label={`XP ${player.xp} / ${player.nextXp}`} />
+              <ResourceBar type="popularity" value={popularityPct} label={`POPULARITY ${Math.round(player.popularity ?? 0)}%`} />
+            </div>
+          </>
         )}
-        {cityOpen ? (
-          <CityStatsTopBar stats={cityHudStats} />
-        ) : (
-          <div className="resource-stack">
-            <ResourceBar type="health" value={hpPct} label={`HP ${player.hp} / ${player.maxHp}`} />
-            <ResourceBar type="mana" value={manaPct} label={`MANA ${player.mana} / ${player.maxMana}`} />
-            <ResourceBar type="xp" value={xpPct} label={`XP ${player.xp} / ${player.nextXp}`} />
-            <ResourceBar type="popularity" value={popularityPct} label={`POPULARITY ${Math.round(player.popularity ?? 0)}%`} />
-          </div>
-        )}
-        {cityOpen && <CityThreatMeter threatLevel={cityThreatLevel} />}
         {!cityOpen && (
           <div className="stat-chip">
             <span>Guld</span>

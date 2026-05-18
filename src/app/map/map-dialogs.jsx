@@ -47,8 +47,41 @@ function buildCityLayout() {
 }
 export function mapRegionColor(mapId, region, regionCorruption) {
   if (mapId === WORLD_MAP.id) return region.color;
-  const corrupted = regionCorruption[regionStatusKey(mapId, region.id)] ?? region.corrupted ?? true;
-  return corrupted ? "#d94343" : "#58d96d";
+  const corruptionLevel = regionCorruptionLevel(regionCorruption, mapId, region);
+  if (corruptionLevel <= 0) return "#58d96d";
+  if (corruptionLevel >= 10) return "#d94343";
+  return "#d99a43";
+}
+
+function clampCorruptionLevel(value) {
+  return Math.max(0, Math.min(10, Math.floor(Number(value) || 0)));
+}
+
+function regionCorruptionLevel(regionCorruption, mapId, region) {
+  const entry = regionCorruption?.[regionStatusKey(mapId, region.id)];
+  if (typeof entry === "boolean") return entry ? 10 : 0;
+  if (typeof entry === "number") return clampCorruptionLevel(entry);
+  if (entry?.corruptionLevel !== undefined) return clampCorruptionLevel(entry.corruptionLevel);
+  if (region.corruptionLevel !== undefined) return clampCorruptionLevel(region.corruptionLevel);
+  return region.corrupted === false ? 0 : 10;
+}
+
+function areaAverageCorruptionLevel(regionCorruption, areaMapId) {
+  const regions = MAP_REGION_SETS[areaMapId] ?? [];
+  if (!regions.length) return null;
+  const total = regions.reduce((sum, region) => sum + regionCorruptionLevel(regionCorruption, areaMapId, region), 0);
+  return total / regions.length;
+}
+
+function regionHoverCorruptionText(mapId, region, regionCorruption) {
+  if (mapId === WORLD_MAP.id) {
+    const areaMapId = region.targetMapId ?? region.id;
+    const average = AREA_MAPS[areaMapId] ? areaAverageCorruptionLevel(regionCorruption, areaMapId) : null;
+    if (average === null) return "No region corruption data";
+    return `Average corruption: ${average.toFixed(1)}/10`;
+  }
+  const level = regionCorruptionLevel(regionCorruption, mapId, region);
+  return `Corruption: ${level}/10`;
 }
 
 export function MinimapDialog({ engineRef, snapshot, cityOpen, cityMinimapHero, onClose }) {
@@ -154,6 +187,10 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
   };
   const completedQuestSet = new Set(completedQuests.map(String));
   const currentArmy = Math.max(0, Math.floor(Number(army) || 0));
+  const hoveredRegionEntry = activeRegions.find((entry) => entry.region.id === hoveredRegionId) ?? null;
+  const hoveredCorruptionText = hoveredRegionEntry
+    ? regionHoverCorruptionText(selectedMapId, hoveredRegionEntry.region, regionCorruption)
+    : "";
   const activateRegion = (regionEntry) => {
     const region = regionEntry?.region ?? regionEntry;
     const rawRegion = regionEntry?.rawRegion ?? region;
@@ -223,6 +260,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       const region = entry.region;
                       const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
                       const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
+                      const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
                       return (
                     <g
                       className={`world-map-region ${locked ? "locked" : ""} ${hoveredRegionId === region.id || selectedRegion?.id === region.id ? "hovered" : ""}`}
@@ -230,7 +268,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       key={region.id}
                       role="button"
                       tabIndex={0}
-                      aria-label={locked ? `${region.label} er laast` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
+                      aria-label={locked ? `${region.label} er laast. ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
                       onClick={() => activateRegion(entry)}
                       onKeyDown={(event) => handleRegionKeyDown(event, region)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
@@ -238,7 +276,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       onFocus={() => setHoveredRegionId(region.id)}
                       onBlur={() => setHoveredRegionId(null)}
                     >
-                      <title>{region.label}</title>
+                      <title>{region.label} | ${hoverText}</title>
                       <polygon points={region.points} />
                     </g>
                       );
@@ -249,6 +287,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                   const region = entry.region;
                   const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
                   const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
+                  const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
                   return (
                     <button
                       type="button"
@@ -259,8 +298,8 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                         top: `${region.labelY}%`,
                       }}
                       key={`${region.id}-label`}
-                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
-                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)}` : region.label}
+                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
+                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)} ${hoverText}` : `${region.label}. ${hoverText}`}
                       onClick={() => activateRegion(entry)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
                       onMouseLeave={() => setHoveredRegionId(null)}
@@ -290,6 +329,12 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                   : `${selectedRegion.label} er laast. ${regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}`
                 : `${activeMap.title} er aabnet som underkort. Klik et omraade for at vaelge det.`}
             </p>
+          )}
+          {hoveredRegionEntry && (
+            <div className="map-hover-card" aria-live="polite">
+              <b>{hoveredRegionEntry.region.label}</b>
+              <span>{hoveredCorruptionText}</span>
+            </div>
           )}
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy) && (
             <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}</p>

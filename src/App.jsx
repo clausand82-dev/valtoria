@@ -27,8 +27,8 @@ import {
   ReadableDialog,
   RegionMapDialog,
   StartMenu,
-  applyMapReturnPopulationProgress,
   calculateCityStats,
+  calculateCityStatBreakdown,
   collectSaveSlots,
   createSaveSlot,
   emptySnapshot,
@@ -38,9 +38,11 @@ import {
   loadRegionMapInitialId,
   normalizeSaveSlot,
   normalizeCityMobs,
-  regionStatusKey,
+  getRegionCorruptionLevel,
   saveCityProgress,
   saveRegionCorruption,
+  setRegionCorruptionLevel,
+  updateRegionCorruptionFromMapReturn,
   upsertSaveSlot,
   useEngineModalLock,
 } from "./app/index.jsx";
@@ -308,13 +310,11 @@ export default function App() {
       setSkipCityMobProgressReturnId(mapReturn.id);
     }
 
+    let nextRegionCorruption = regionCorruption;
     if (!isCityMobBattle) {
-      const wasCorrupted = regionCorruption[regionStatusKey(mapReturn.areaMapId, mapReturn.regionId)] ?? true;
-      const populationProgress = applyMapReturnPopulationProgress(nextProgress, mapReturn, wasCorrupted);
-      if (populationProgress.changed) {
-        nextProgress = populationProgress.progress;
-        cityProgressChanged = true;
-      }
+      const oldCorruptionLevel = getRegionCorruptionLevel(regionCorruption, mapReturn.areaMapId, mapReturn.regionId);
+      const nextCorruptionLevel = updateRegionCorruptionFromMapReturn(oldCorruptionLevel, mapReturn);
+      nextRegionCorruption = setRegionCorruptionLevel(regionCorruption, mapReturn.areaMapId, mapReturn.regionId, nextCorruptionLevel);
     }
 
     if (cityProgressChanged) {
@@ -323,10 +323,7 @@ export default function App() {
     }
 
     if (!isCityMobBattle) {
-      setRegionCorruption((current) => ({
-        ...current,
-        [regionStatusKey(mapReturn.areaMapId, mapReturn.regionId)]: !mapReturn.cleared,
-      }));
+      setRegionCorruption(nextRegionCorruption);
       setRegionMapInitialId(mapReturn.areaMapId ?? WORLD_MAP.id);
     }
     setRegionMapOpen(false);
@@ -428,18 +425,22 @@ export default function App() {
   const xpPct = Math.max(0, Math.min(100, (player.xp / player.nextXp) * 100));
   const popularityPct = Math.max(0, Math.min(100, player.popularity ?? 0));
   const derivedCityStats = useMemo(
-    () => calculateCityStats(cityProgressHud, snapshot),
-    [cityProgressHud, snapshot],
+    () => calculateCityStats(cityProgressHud, snapshot, regionCorruption),
+    [cityProgressHud, snapshot, regionCorruption],
   );
   const cityThreatLevel = Math.max(0, Math.min(100, Number(cityProgressHud?.threatLevel) || 0));
-  const cityHudStats = useMemo(() => CITY_STAT_DEFS.map((stat) => {
+  const cityStatBreakdown = useMemo(
+    () => calculateCityStatBreakdown(cityProgressHud, snapshot, regionCorruption),
+    [cityProgressHud, snapshot, regionCorruption],
+  );
+  const cityHudStats = useMemo(() => CITY_STAT_DEFS.filter((stat) => stat.id !== "popularity").map((stat) => {
     const value = Math.max(0, Math.floor(Number(derivedCityStats[stat.id]) || 0));
     const configuredMax = CITY_STATS_RULES.displayMax?.[stat.id] ?? 500;
     const max = Math.max(1, Math.floor(Number(typeof stat.max === "function" ? stat.max(snapshot) : stat.max ?? configuredMax) || 1));
     const pct = Math.max(0, Math.min(100, (value / max) * 100));
     const label = stat.id === "popularity" ? `${stat.label} ${Math.round(value)}%` : `${stat.label} ${value}`;
-    return { ...stat, value, max, pct, label, classId: stat.classId ?? stat.id };
-  }), [derivedCityStats, snapshot]);
+    return { ...stat, value, max, pct, label, classId: stat.classId ?? stat.id, breakdown: cityStatBreakdown[stat.id] ?? [] };
+  }), [cityStatBreakdown, derivedCityStats, snapshot]);
   const hoverMonster = snapshot.hoverMonster;
   const monsterHpPct = hoverMonster
     ? Math.max(0, Math.min(100, (hoverMonster.hp / hoverMonster.maxHp) * 100))
@@ -454,16 +455,12 @@ export default function App() {
   );
   const startPlayableMapRegion = async (areaMapId, region) => {
     if (!areaMapId || !region?.id) return;
-    const corrupted = regionCorruption[regionStatusKey(areaMapId, region.id)] ?? region.corrupted ?? true;
+    const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
     const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
     const ready = await preloadWildernessAssets("Loading map", preparedRegion);
     if (!ready) return;
     const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return;
-    setRegionCorruption((current) => ({
-      ...current,
-      [regionStatusKey(areaMapId, region.id)]: true,
-    }));
     setRegionMapOpen(false);
     setMapOpen(false);
     setCityOpen(false);
@@ -471,7 +468,7 @@ export default function App() {
 
   const startCityMobBattle = async ({ areaMapId, region, cityMobId, cityMobType, cityMobLevel }) => {
     if (!areaMapId || !region?.id) return false;
-    const corrupted = regionCorruption[regionStatusKey(areaMapId, region.id)] ?? region.corrupted ?? true;
+    const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
     const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
     const ready = await preloadWildernessAssets("Loading battle", preparedRegion);
     if (!ready) return false;
@@ -847,6 +844,7 @@ export default function App() {
           setSnapshot={setSnapshot}
           onQuestCompleted={(result) => setQuestRewardModal(result)}
           cityStorageKey={gameSession.slot.cityStorageKey}
+          regionCorruption={regionCorruption}
           onProgressChange={setCityProgressHud}
           onStartCityMobBattle={startCityMobBattle}
           skipMobProgressForVisit={skipCityMobProgressReturnId === snapshot.mapReturn?.id}

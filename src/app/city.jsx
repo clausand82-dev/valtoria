@@ -88,8 +88,12 @@ import {
 import {
   addCityPermanentStatBonus,
   applyCityMobProgressForVisit,
-  applyMapReturnPopulationProgress,
+  updateRegionCorruptionFromMapReturn,
   calculateCityStats,
+  calculateCityStatBreakdown,
+  normalizeRegionCorruptionEntry,
+  getRegionCorruptionLevel,
+  setRegionCorruptionLevel,
   cityAreaActiveStatEffects,
   cityAreaBuildingRefs,
   cityAreaCanUnlock,
@@ -122,6 +126,7 @@ import {
   cityArmyCanTrainUnit,
   cityArmyUnitCount,
   cityUsableSoldierCapacity,
+  availablePopulationForRecruitment,
   cityLevelCostEntries,
   cityMapMobRefs,
   cityMapPositionStyle,
@@ -179,6 +184,7 @@ function CityPage({
   setSnapshot,
   cityStorageKey = CITY_STORAGE_KEY,
   skipMobProgressForVisit = false,
+  regionCorruption = {},
   onMobProgressSkipConsumed,
   onClose,
   onQuestCompleted,
@@ -248,7 +254,7 @@ function CityPage({
   const cityMapNpcs = useMemo(() => (
     getCityMapQuestNpcs(snapshot.quests?.cityNpcStates ?? [], SHOW_INACTIVE_CITY_NPCS, npcPlacementSeedRef.current)
   ), [snapshot.quests?.cityNpcStates]);
-  const cityStats = useMemo(() => calculateCityStats(cityProgress, snapshot), [cityProgress, snapshot]);
+  const cityStats = useMemo(() => calculateCityStats(cityProgress, snapshot, regionCorruption), [cityProgress, snapshot, regionCorruption]);
   const cityMobs = useMemo(() => normalizeCityMobs(cityProgress?.cityMobs), [cityProgress?.cityMobs]);
   const attackableCityMobIds = useMemo(() => cityAttackableMobIds(cityMobs), [cityMobs]);
   const cityMobRefs = useMemo(() => cityMapMobRefs(cityMobs), [cityMobs]);
@@ -355,7 +361,7 @@ function CityPage({
 
   const unlockArea = (area) => {
     if (!area || isCityAreaUnlocked(cityProgressRef.current, area)) return;
-    const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current);
+    const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current, regionCorruption);
     if (!cityAreaCanUnlock(area, snapshotRef.current, stats, cityProgressRef.current)) return;
     const paid = payCityEntries(cityAreaCostEntries(area));
     if (!paid) return;
@@ -370,7 +376,7 @@ function CityPage({
 
   const upgradeArea = (area) => {
     if (!area || !isCityAreaUnlocked(cityProgressRef.current, area)) return;
-    const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current);
+    const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current, regionCorruption);
     const state = getCityAreaState(cityProgressRef.current, area);
     const nextLevel = cityAreaNextLevel(area, state.level);
     if (!nextLevel) return;
@@ -2773,23 +2779,23 @@ function CityStatEffectsSummary({ title, effects }) {
 }
 
 function CityCampStats({ cityStats }) {
-  const hungry = Math.max(0, Math.floor(Number(cityStats.hungry_people) || 0));
-  const homeless = Math.max(0, Math.floor(Number(cityStats.homeless_people) || 0));
-  const thirsty = Math.max(0, Math.floor(Number(cityStats.thirsty_people) || 0));
-  const camp = Math.max(0, Math.floor(Number(cityStats.camp_population) || 0));
-  const overlapText = camp > 0
-    ? `${Math.max(0, camp - hungry)} only homeless/other unmet | ${Math.min(hungry, camp)} also hungry`
-    : "No citizens are forced into camp.";
+  const events = cityStats.events ?? {};
+  const activeEntries = [
+    ["famine", "Famine"],
+    ["water_shortage", "Water shortage"],
+    ["disease_outbreak", "Disease outbreak"],
+    ["uprising_poorness", "Uprising risk"],
+    ["fire", "Fire risk"],
+  ].filter(([id]) => events[id]?.active || Number(events[id]?.risk) > 0);
   return (
     <div className="city-stat-effects">
-      <b>Camp</b>
+      <b>City events</b>
       <div>
-        <span title="Camp population"><b>{camp}</b> outside city</span>
-        <span title="Homeless"><CityStatIcon statId="homeless_people" /><b>{homeless}</b></span>
-        <span title="Hungry"><CityStatIcon statId="hungry_people" /><b>{hungry}</b></span>
-        <span title="Thirsty"><CityStatIcon statId="thirsty_people" /><b>{thirsty}</b></span>
+        {activeEntries.length ? activeEntries.map(([id, label]) => (
+          <span title={label} key={id}><b>{label}</b></span>
+        )) : <span><b>Stable</b></span>}
       </div>
-      <p>{overlapText}</p>
+      <p>Events are derived from current city stats and can be used by later combat, loot, and quest logic.</p>
     </div>
   );
 }
@@ -3138,6 +3144,11 @@ export {
   loadCityProgress,
   saveCityProgress,
   normalizeCityMobs,
-  applyMapReturnPopulationProgress,
-  calculateCityStats
+  updateRegionCorruptionFromMapReturn,
+  normalizeRegionCorruptionEntry,
+  getRegionCorruptionLevel,
+  setRegionCorruptionLevel,
+  calculateCityStats,
+  calculateCityStatBreakdown,
+  availablePopulationForRecruitment
 };

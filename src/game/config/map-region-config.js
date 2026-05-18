@@ -124,7 +124,7 @@ region({
   unlock: { completedQuests: ["first_hunt"], army: 10 },    // Optional map access requirements. locked/text/requiredArmy are also supported.
 
   corrupted: true,                                          // Default starting corruption. Existing regionCorruption save still controls current state.
-  populationGain: 5,                                        // Citizens gained the first time this region is cleared.
+  cityStats: { population: 5 },                             // Region city stat impact at corruptionLevel 0.
   mapSize: "medium",                                        // small, medium, large, or giga.
 
   tileset: ["tileset/tileset_grass.png"],                   // Old format: fixed tileset list.
@@ -650,6 +650,16 @@ export const MAP_REGION_SETS = {
       unlock: { completedQuests: ["innkeeper_ring_for_noble"], text: "Kraever, at Noble har aabnet Elvbaekken." },
       labelX: 49, labelY: 79,
       mapSize: "medium",
+      cityStats: {
+        population: 10,
+        water: 20,
+        provision: 5,
+        supply: 5,
+        trade: 0,
+        knowledge: 0,
+        culture: 0,
+        faith: 0,
+      },
       tileset: ["tileset/tileset_grass.png", "tileset/tileset_swamp.png"],
       spawnCounts: {objects: 50, foliage: 200, decals: 100, water: 25, monsters: { min: 32, max: 35 },},
       weather: {
@@ -791,7 +801,7 @@ export const MAP_REGION_SETS = {
       id: "inn-of-the-good-oak",
       label: "Kroen Den Gode Eg",
       corrupted: true,
-      populationGain: 1,
+      cityStats: { population: 1 },
       mapSize: "small",
       color: "#7fb172",
       tileset: "tileset/tileset_bricktiles.png",

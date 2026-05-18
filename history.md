@@ -2,6 +2,8 @@ History over changes
 
 * V. 1.72
 - added a new particle system, visuel better and can use png's
+- new city stats added, some old one removed and other replaced
+- regions now have a 10 level corruption system
 
 * V 1.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
