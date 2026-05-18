@@ -51,6 +51,16 @@ export const CITY_BUILDINGS = [
     ],
   },
   {
+    id: "armory",
+    title: "Armory",
+    prebuilt: true,
+    help: "Converts weapon and armor loot into armory points for future unit training.",
+    functionText: "Donate equipment to gain weaponPoints and armorPoints.",
+    imageUrl: "/assets/generated/house/house_blacksmith.png",
+    inventoryType: { type: "none", slots: 0 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 75, iron_bar: 20 },
+  },
+  {
     id: "blacksmith",
     title: "Blacksmith",
     prebuilt: true,

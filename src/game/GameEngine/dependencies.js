@@ -71,6 +71,7 @@ export {
   isQuestItem,
   isReadableItem,
   isResourceItem,
+  isStackableItem,
   withItemFlags,
   withItemIcon,
 } from "../item-system.js";

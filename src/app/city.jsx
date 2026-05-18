@@ -14,6 +14,13 @@ import { armyTrainingRecipesForAddon } from "../game/config/city-army-recipe-con
 import { CITY_ARMY_UNIT_DEFS, normalizeArmyUnits } from "../game/config/city-army-unit-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
+import {
+  getArmoryConversion,
+  getArmoryItemQuantity,
+  getArmoryPointTarget,
+  getArmoryPointValue,
+  canConvertItemToArmory,
+} from "../game/config/armory-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
 import { GEM_SOCKET_BONUSES, MAX_ITEM_SOCKETS, itemCanHaveSockets, normalizeSockets } from "../game/config/socket-config.js";
 import {
@@ -32,15 +39,12 @@ import {
   CITY_MOB_LEVELS,
   CITY_MOB_LEVEL_UP_CHANCE,
   CITY_MOB_MAX_LEVEL,
-  CITY_MOB_POOL,
   CITY_SPAWN_AREA_BUILDING_TARGETS,
   CITY_SPAWN_AREA_RULES,
   CITY_SPAWN_PATHS,
   CITY_SPAWN_SPREAD_TARGETS,
   CITY_THREAT_SPAWN_THRESHOLD,
   calcCitySpawnChance,
-  calcThreatFallOnMapExit,
-  calcThreatRiseOnDeath,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
 import {
@@ -87,6 +91,8 @@ import {
 
 import {
   addCityPermanentStatBonus,
+  addCityArmoryPoints,
+  cityArmoryPoints,
   applyCityMobProgressForVisit,
   updateRegionCorruptionFromMapReturn,
   calculateCityStats,
@@ -141,7 +147,6 @@ import {
   getCityMapQuestNpcs,
   isCityAreaUnlocked,
   addCityArmyUnit,
-  addCityPopulationLoss,
   loadCityAssets,
   loadCityAssetsOnce,
   loadCityProgress,
@@ -718,7 +723,6 @@ function CityPage({
     if (Object.keys(result.usedUnits ?? {}).length === 0) return;
     setCityProgress((current) => {
       let next = removeCityArmyUnits(current, result.losses);
-      if (result.populationLoss > 0) next = addCityPopulationLoss(next, result.populationLoss);
       if (result.won) {
         next = {
           ...next,
@@ -1281,7 +1285,6 @@ function CityArmyBattleResultModal({ result, onClose }) {
             <p>{result.won ? "Mob group removed from the city map." : "Mob group remains active."}</p>
             <p>Win chance: {Math.round((result.winChance ?? 0) * 100)}% | Morale x{Number(result.morale || 1).toFixed(2)}</p>
             <p>Army losses: {lossText}</p>
-            <p>Population lost: {result.populationLoss ?? 0}</p>
           </div>
         </div>
         <div className="city-popup-actions">
@@ -2036,6 +2039,22 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     onChangeProgress((current) => addCityArmyUnit(current, recipe.unitId, recipe.count ?? 1));
   };
 
+  const convertInventoryItemToArmory = (inventoryIndex, amount = 1) => {
+    if (!owned || building.id !== "armory") return;
+    const currentSnapshot = snapshotRef?.current ?? snapshot;
+    const item = currentSnapshot.inventory?.[inventoryIndex];
+    const conversion = getArmoryConversion(item, amount);
+    if (!conversion.ok) {
+      engineRef.current?.addToast?.(conversion.error || "Item cannot be converted.");
+      return;
+    }
+    const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, conversion.amount);
+    if (!taken) return;
+    onChangeProgress((current) => addCityArmoryPoints(current, conversion.target, conversion.points));
+    engineRef.current?.addToast?.(`Armory +${conversion.points} ${cityCostLabel(conversion.target)}`);
+    engineRef.current?.saveProgress?.({ force: true });
+  };
+
   const buyResearchRecipe = (recipeKey) => {
     const recipe = researchRecipeByKey(recipeKey);
     if (!recipe) return;
@@ -2347,6 +2366,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               cityStats={cityStats}
               snapshot={snapshot}
               onTrain={trainArmyUnit}
+            />
+          )}
+          {building.id === "armory" && owned && (
+            <CityArmoryPanel
+              inventory={snapshot.inventory}
+              progress={progress}
+              onConvert={convertInventoryItemToArmory}
             />
           )}
           {building.id === "research_lab" && owned && !activeAddonId && (
@@ -2760,6 +2786,47 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, onTra
   );
 }
 
+function CityArmoryPanel({ inventory, progress, onConvert }) {
+  const points = cityArmoryPoints(progress);
+  const convertibleItems = (inventory ?? [])
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => canConvertItemToArmory(item));
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Armory</h4>
+        <span>weaponPoints {points.weaponPoints} | armorPoints {points.armorPoints}</span>
+      </header>
+      {convertibleItems.length === 0 && (
+        <div className="blacksmith-row">
+          <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />
+          <div>
+            <b>No convertible equipment</b>
+            <span>Only weapon and armor loot can be sent to the Armory.</span>
+          </div>
+        </div>
+      )}
+      {convertibleItems.map(({ item, index }) => {
+        const target = getArmoryPointTarget(item);
+        const quantity = getArmoryItemQuantity(item);
+        const pointsPerItem = getArmoryPointValue(item);
+        const iconUrl = iconUrlFromKey(deriveIconKey(item));
+        return (
+          <div className="blacksmith-row" key={item.id ?? index}>
+            <InventoryIcon iconSheet="items" iconUrl={item.iconUrl ?? iconUrl} />
+            <div>
+              <b>{item.name ?? "Unnamed item"}</b>
+              <span>{item.rarity ?? "normal"} | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? ` each, ${quantity} available` : ""}</span>
+            </div>
+            <button type="button" onClick={() => onConvert(index, 1)}>Convert</button>
+            {quantity > 1 && <button type="button" onClick={() => onConvert(index, quantity)}>Convert all</button>}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function CityStatEffectsSummary({ title, effects }) {
   const entries = Object.entries(mergeCityStatEffects([effects]));
   if (!entries.length) return null;
@@ -2844,6 +2911,12 @@ function CityBuildPaymentModal({ building, buildingState, snapshot, progress, co
 function CityCostIcon({ resourceId }) {
   if (resourceId === "gold") {
     return <InventoryIcon iconSheet="items" iconUrl={ITEM_GOLD_ICON_URL} />;
+  }
+  if (resourceId === "weaponPoints") {
+    return <InventoryIcon iconSheet="items" iconUrl="/assets/generated/item/item_common_sword.png" />;
+  }
+  if (resourceId === "armorPoints") {
+    return <InventoryIcon iconSheet="items" iconUrl="/assets/generated/item/item_common_chestplate.png" />;
   }
   const def = RESOURCE_DEFS[resourceId];
   if (!def) return <i className="city-cost-missing-icon" aria-hidden="true" />;

@@ -3,6 +3,7 @@ import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { MAP_REGION_SETS } from "../../game/config/map-region-config.js";
 import { QUEST_ITEM_DEFS } from "../../game/config/quest-config.js";
 import { QUEST_NPCS } from "../../game/config/npc-config.js";
+import { resolveQuestDefById } from "../../game/GameEngine/helpers/quests.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 function normalizeQuestRegions(quest) {
@@ -316,19 +317,38 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
   );
 }
 
-export function QuestOverviewDialog({ activeQuests, onClose, onToggleTracked, onOpenQuest }) {
+export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onClose, onToggleTracked, onOpenQuest }) {
+  const [tab, setTab] = useState(activeQuests.length > 0 ? "active" : "completed");
   const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id ?? null);
 
+  // Build completed quest objects from IDs
+  const completedQuests = completedQuestIds
+    .map((questId) => {
+      const def = resolveQuestDefById(questId);
+      if (!def) return null;
+      const npcId = Array.isArray(def.npcIds) ? def.npcIds[0] : def.npcIds ?? def.startNpcIds?.[0] ?? def.turnInNpcIds?.[0] ?? null;
+      return {
+        ...def,
+        id: `completed-${questId}`,
+        questId: questId,
+        npcId: npcId,
+        complete: true,
+      };
+    })
+    .filter(Boolean);
+
+  const displayQuests = tab === "active" ? activeQuests : completedQuests;
+
   useEffect(() => {
-    if (!activeQuests.length) {
+    if (!displayQuests.length) {
       setSelectedQuestId(null);
       return;
     }
-    const stillExists = activeQuests.some((quest) => quest.id === selectedQuestId);
-    if (!stillExists) setSelectedQuestId(activeQuests[0].id);
-  }, [activeQuests, selectedQuestId]);
+    const stillExists = displayQuests.some((quest) => quest.id === selectedQuestId);
+    if (!stillExists) setSelectedQuestId(displayQuests[0]?.id);
+  }, [displayQuests, selectedQuestId]);
 
-  const selectedQuest = activeQuests.find((quest) => quest.id === selectedQuestId) ?? activeQuests[0] ?? null;
+  const selectedQuest = displayQuests.find((quest) => quest.id === selectedQuestId) ?? displayQuests[0] ?? null;
   const selectedNpc = selectedQuest ? QUEST_NPCS[selectedQuest.turnInNpcId ?? selectedQuest.npcId] : null;
 
   return (
@@ -336,15 +356,33 @@ export function QuestOverviewDialog({ activeQuests, onClose, onToggleTracked, on
       <section className="confirm-dialog quest-overview-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-overview-title">
         <header className="quest-overview-head">
           <h2 id="quest-overview-title">Questoversigt</h2>
+          {activeQuests.length > 0 && completedQuests.length > 0 && (
+            <div className="quest-overview-tabs">
+              <button
+                type="button"
+                className={`quest-tab ${tab === "active" ? "active" : ""}`}
+                onClick={() => setTab("active")}
+              >
+                Aktive ({activeQuests.length})
+              </button>
+              <button
+                type="button"
+                className={`quest-tab ${tab === "completed" ? "active" : ""}`}
+                onClick={() => setTab("completed")}
+              >
+                Fuldførte ({completedQuests.length})
+              </button>
+            </div>
+          )}
         </header>
 
         <div className="quest-overview-body">
-          {activeQuests.length <= 0 ? (
-            <p>Ingen aktive quests lige nu.</p>
+          {displayQuests.length <= 0 ? (
+            <p>{tab === "active" ? "Ingen aktive quests lige nu." : "Du har ikke fuldført nogen quests endnu."}</p>
           ) : (
             <div className="quest-overview-layout">
               <div className="quest-overview-list">
-                {activeQuests.map((quest) => (
+                {displayQuests.map((quest) => (
                   (() => {
                     const completionPct = questCompletionPercent(quest);
                     return (
@@ -362,14 +400,16 @@ export function QuestOverviewDialog({ activeQuests, onClose, onToggleTracked, on
                         <b className="quest-name-label">{quest.title}</b>
                       </span>
                     </button>
-                    <label className="quest-track-toggle">
-                      <input
-                        type="checkbox"
-                        checked={quest.tracked !== false}
-                        onChange={(event) => onToggleTracked?.(quest.id, event.target.checked)}
-                      />
-                      Track
-                    </label>
+                    {tab === "active" && (
+                      <label className="quest-track-toggle">
+                        <input
+                          type="checkbox"
+                          checked={quest.tracked !== false}
+                          onChange={(event) => onToggleTracked?.(quest.id, event.target.checked)}
+                        />
+                        Track
+                      </label>
+                    )}
                   </article>
                     );
                   })()

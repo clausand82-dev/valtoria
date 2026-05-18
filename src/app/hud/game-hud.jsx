@@ -50,9 +50,6 @@ export function GameHud({
         {cityOpen ? (
           <>
             <div className="city-left-stack">
-              <div className="portrait">
-                <b>{player.level}</b>
-              </div>
               <CitySideStats
                 gold={player.gold}
                 threatLevel={cityThreatLevel}

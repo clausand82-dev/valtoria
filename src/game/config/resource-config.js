@@ -71,9 +71,9 @@ export const RESOURCE_MERGE_RECIPES = [
   { inputs: { wood_piece: 2 }, output: "coal", count: 1, requiresFire: true },
   { inputs: { wood_piece: 10 }, output: "wood_plank", count: 1 },
   { inputs: { crystal_piece: 50 }, output: "crystal", count: 1 },
-  { inputs: { red_gemstone: 1, blue_gemstone: 1, green_gemstone: 1 }, output: "purple_gemstone", count: 1 },
-  { inputs: { red_gemstone: 1, yellow_gemstone: 1, blue_gemstone: 1 }, output: "pink_gemstone", count: 1 },
-  { inputs: { red_gemstone: 1, yellow_gemstone: 1, green_gemstone: 1 }, output: "orange_gemstone", count: 1 },
+  { inputs: { red_gemstone: 1, blue_gemstone: 1, green_gemstone: 1 }, output: "purple_gemstone", count: 1, station: "research_lab" },
+  { inputs: { red_gemstone: 1, yellow_gemstone: 1, blue_gemstone: 1 }, output: "pink_gemstone", count: 1, station: "research_lab" },
+  { inputs: { red_gemstone: 1, yellow_gemstone: 1, green_gemstone: 1 }, output: "orange_gemstone", count: 1, station: "research_lab" },
   { inputs: { blue_gemstone: 1, green_gemstone: 1, yellow_gemstone: 1 }, output: "turquoise_gemstone", count: 1 },
   { inputs: { coal: 1000 }, output: "diamond", count: 1, station: "research_lab" },
 ];

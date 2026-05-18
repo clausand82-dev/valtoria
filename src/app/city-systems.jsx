@@ -12,6 +12,10 @@ import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CIT
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
+import {
+  isArmoryPointId,
+  normalizeArmoryPoints,
+} from "../game/config/armory-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
 import { GEM_SOCKET_BONUSES, MAX_ITEM_SOCKETS, itemCanHaveSockets, normalizeSockets } from "../game/config/socket-config.js";
 import {
@@ -48,8 +52,6 @@ import {
   CITY_SPAWN_SPREAD_TARGETS,
   CITY_THREAT_SPAWN_THRESHOLD,
   calcCitySpawnChance,
-  calcThreatFallOnMapExit,
-  calcThreatRiseOnDeath,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
 import {
@@ -119,6 +121,7 @@ function buildCityLayout() {
     { gx: 2.35, gy: 2.35 },
     { gx: 7.1, gy: 2.35 },
     { gx: 11.85, gy: 2.35 },
+    { gx: 7.1, gy: 6.75 },
     { gx: 2.35, gy: 6.75 },
     { gx: 11.85, gy: 6.75 },
     { gx: 2.35, gy: 11.15 },
@@ -127,8 +130,21 @@ function buildCityLayout() {
     { gx: 14.65, gy: 8.15 },
     { gx: 14.65, gy: 12.75 },
   ];
+  const houseBuildingIds = [
+    "town_hall",
+    "barracks",
+    "armory",
+    "blacksmith",
+    "research_lab",
+    "bank",
+    "merchant",
+    "library",
+    "inn",
+    "mage_tower",
+    "sanctuary",
+  ];
   for (let i = 0; i < housePositions.length; i += 1) {
-    houses.push({ ...housePositions[i], spriteIndex: i, buildingId: CITY_BUILDINGS[i]?.id ?? null });
+    houses.push({ ...housePositions[i], spriteIndex: i, buildingId: houseBuildingIds[i] ?? null });
   }
 
   return {
@@ -858,7 +874,11 @@ function payCityCostEntries(entries, engine, snapshot, progress = null, onChange
   if (!paymentPlan) return false;
   if (!engine) return paymentPlan.gold <= 0
     && Object.keys(paymentPlan.backpack).length === 0
-    && Object.keys(paymentPlan.storage).length === 0;
+    && Object.keys(paymentPlan.storage).length === 0
+    && Object.keys(paymentPlan.armory).length === 0;
+  const storageEntries = Object.entries(paymentPlan.storage);
+  const armoryEntries = Object.entries(paymentPlan.armory);
+  if ((storageEntries.length > 0 || armoryEntries.length > 0) && typeof onChangeProgress !== "function") return false;
   if (paymentPlan.gold > 0) {
     const paidGold = engine.consumeGold?.(paymentPlan.gold) ?? 0;
     if (paidGold < paymentPlan.gold) return false;
@@ -867,18 +887,22 @@ function payCityCostEntries(entries, engine, snapshot, progress = null, onChange
     const consumed = engine.consumeResource?.(resourceId, amount) ?? 0;
     if (consumed < amount) return false;
   }
-  const storageEntries = Object.entries(paymentPlan.storage);
-  if (storageEntries.length > 0) {
-    if (typeof onChangeProgress !== "function") return false;
+  if (storageEntries.length > 0 || armoryEntries.length > 0) {
     onChangeProgress((current) => {
       let next = current;
       for (const [resourceId, amount] of storageEntries) {
         next = consumeCityStoredResource(next, resourceId, amount).progress;
       }
+      for (const [resourceId, amount] of armoryEntries) {
+        next = consumeCityArmoryPoints(next, resourceId, amount).progress;
+      }
       return next;
     });
     for (const [resourceId, amount] of storageEntries) {
       engine.addToast?.(`Used ${amount}x ${RESOURCE_DEFS[resourceId]?.name ?? resourceId} from city storage`);
+    }
+    for (const [resourceId, amount] of armoryEntries) {
+      engine.addToast?.(`Used ${amount} ${cityCostLabel(resourceId)}`);
     }
   }
   return true;
@@ -892,12 +916,18 @@ function buildCityCostPaymentPlan(entries, snapshot, progress = null) {
   let remainingGold = goldAvailable;
   const backpackRemaining = new Map();
   const storageRemaining = new Map();
-  const plan = { gold: 0, backpack: {}, storage: {} };
+  const plan = { gold: 0, backpack: {}, storage: {}, armory: {} };
   for (const [resourceId, amount] of normalizedEntries) {
     if (resourceId === "gold") {
       if (remainingGold < amount) return null;
       remainingGold -= amount;
       plan.gold += amount;
+      continue;
+    }
+    if (isArmoryPointId(resourceId)) {
+      const available = cityArmoryPointCount(progress, resourceId);
+      if (available < amount) return null;
+      plan.armory[resourceId] = (plan.armory[resourceId] ?? 0) + amount;
       continue;
     }
     const backpackAvailable = backpackRemaining.has(resourceId)
@@ -983,7 +1013,7 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   };
   const armyPower = armyTotalPower(progress?.armyUnits);
   stats.defense = Math.max(0, Math.floor(Number(stats.defense) || 0)) + armyPower;
-  applyCityStatEffects(stats, progress?.statBonuses);
+  applyCityStatEffects(stats, normalizeCityStatBonuses(progress?.statBonuses));
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
@@ -1023,7 +1053,7 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   }
   addEntry("popularity", "Hero popularity", Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0)));
   addEntry("defense", "Army units", armyTotalPower(progress?.armyUnits));
-  for (const [statId, amount] of Object.entries(progress?.statBonuses ?? {})) {
+  for (const [statId, amount] of Object.entries(normalizeCityStatBonuses(progress?.statBonuses))) {
     addEntry(statId, "City progress", amount);
   }
   for (const area of CITY_AREAS) {
@@ -1299,12 +1329,10 @@ function resolveCityArmyBattle({ progress = {}, cityStats = {}, mob, sentUnits =
   const lossRange = won ? CITY_ARMY_BATTLE_CONFIG.winLossPct : CITY_ARMY_BATTLE_CONFIG.loseLossPct;
   const lossPct = (Number(lossRange?.min) || 0) + rng() * Math.max(0, (Number(lossRange?.max) || 0) - (Number(lossRange?.min) || 0));
   const losses = {};
-  let populationLoss = 0;
   for (const [unitId, count] of Object.entries(usedUnits)) {
     const lost = Math.min(count, Math.max(won ? 0 : 1, Math.round(count * lossPct)));
     if (lost <= 0) continue;
     losses[unitId] = lost;
-    populationLoss += lost * Math.max(1, Number(CITY_ARMY_UNIT_DEFS[unitId]?.populationCost) || 1);
   }
   return {
     won,
@@ -1314,7 +1342,6 @@ function resolveCityArmyBattle({ progress = {}, cityStats = {}, mob, sentUnits =
     mobPower,
     usedUnits,
     losses,
-    populationLoss,
   };
 }
 
@@ -1580,7 +1607,7 @@ function getCityQuestOffset(spriteIndex) {
 }
 
 function loadCityProgress(storageKey = CITY_STORAGE_KEY) {
-  return saveRepository.loadCityProgressSync(storageKey);
+  return normalizeCityProgress(saveRepository.loadCityProgressSync(storageKey));
 }
 
 function findMapRegionConfig(areaMapId, regionId) {
@@ -1590,7 +1617,7 @@ function findMapRegionConfig(areaMapId, regionId) {
 function addCityPermanentStatBonus(progress = {}, statId, amount) {
   const normalized = normalizeCityStatId(statId);
   const value = Math.floor(Number(amount) || 0);
-  if (!normalized || value === 0) return progress;
+  if (!normalized || normalized === "population" || value === 0) return progress;
   return {
     ...progress,
     statBonuses: {
@@ -1600,31 +1627,53 @@ function addCityPermanentStatBonus(progress = {}, statId, amount) {
   };
 }
 
-function addCityPopulationLoss(progress = {}, amount = 0) {
-  const loss = Math.max(0, Math.floor(Number(amount) || 0));
-  if (loss <= 0) return progress;
-  return {
-    ...progress,
-    statBonuses: {
-      ...(progress.statBonuses ?? {}),
-      population: Math.floor(Number(progress.statBonuses?.population) || 0) - loss,
-    },
-  };
-}
-
 function saveCityProgress(progress, storageKey = CITY_STORAGE_KEY) {
   saveRepository.saveCityProgressSync(storageKey, serializeCityProgress(progress));
 }
 
+function normalizeCityStatBonuses(statBonuses = {}) {
+  if (!statBonuses || typeof statBonuses !== "object" || Array.isArray(statBonuses)) return {};
+  const normalized = {};
+  for (const [rawId, rawAmount] of Object.entries(statBonuses)) {
+    const statId = normalizeCityStatId(rawId);
+    if (!statId || statId === "population") continue;
+    const amount = Math.floor(Number(rawAmount) || 0);
+    if (amount === 0) continue;
+    normalized[statId] = amount;
+  }
+  return normalized;
+}
+
+function normalizeCityProgress(progress = {}) {
+  const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
+  const reserved = new Set(["areas", "statBonuses", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const normalized = {
+    areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
+  };
+  for (const [key, value] of Object.entries(raw)) {
+    if (reserved.has(key)) continue;
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    normalized[key] = { ...value };
+  }
+  normalized.statBonuses = normalizeCityStatBonuses(raw.statBonuses);
+  normalized.armoryPoints = normalizeArmoryPoints(raw.armoryPoints);
+  normalized.armyUnits = normalizeArmyUnits(raw.armyUnits);
+  normalized.threatLevel = Math.max(0, Math.min(100, Number(raw.threatLevel) || 0));
+  normalized.cityMobs = normalizeCityMobs(raw.cityMobs);
+  return normalized;
+}
+
 function serializeCityProgress(progress = {}) {
+  const normalized = normalizeCityProgress(progress);
   const cfg = SAVE_PERSIST_CONFIG.cityProgress;
   return {
-    ...(cfg.areas ? { areas: { ...(progress.areas ?? {}) } } : {}),
+    ...(cfg.areas ? { areas: { ...(normalized.areas ?? {}) } } : {}),
     ...(cfg.buildingStates
       ? Object.fromEntries(
-        Object.entries(progress).filter(([key, value]) => (
+        Object.entries(normalized).filter(([key, value]) => (
           key !== "areas"
           && key !== "statBonuses"
+          && key !== "armoryPoints"
           && key !== "armyUnits"
           && key !== "threatLevel"
           && key !== "cityMobs"
@@ -1634,10 +1683,11 @@ function serializeCityProgress(progress = {}) {
         )),
       )
       : {}),
-    ...(cfg.statBonuses ? { statBonuses: { ...(progress.statBonuses ?? {}) } } : {}),
-    ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(progress.armyUnits) } : {}),
-    ...(cfg.threatLevel ? { threatLevel: Math.max(0, Math.min(100, Number(progress.threatLevel) || 0)) } : {}),
-    ...(cfg.cityMobs ? { cityMobs: normalizeCityMobs(progress.cityMobs) } : {}),
+    ...(cfg.statBonuses ? { statBonuses: { ...(normalized.statBonuses ?? {}) } } : {}),
+    ...(cfg.armoryPoints ? { armoryPoints: normalizeArmoryPoints(normalized.armoryPoints) } : {}),
+    ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(normalized.armyUnits) } : {}),
+    ...(cfg.threatLevel ? { threatLevel: Math.max(0, Math.min(100, Number(normalized.threatLevel) || 0)) } : {}),
+    ...(cfg.cityMobs ? { cityMobs: normalizeCityMobs(normalized.cityMobs) } : {}),
   };
 }
 
@@ -1699,6 +1749,48 @@ function cityStoredResourceCount(progress = {}, resourceId) {
     }
   }
   return total;
+}
+
+function cityArmoryPoints(progress = {}) {
+  return normalizeArmoryPoints(progress?.armoryPoints);
+}
+
+function cityArmoryPointCount(progress = {}, resourceId) {
+  if (!isArmoryPointId(resourceId)) return 0;
+  return cityArmoryPoints(progress)[resourceId] ?? 0;
+}
+
+function addCityArmoryPoints(progress = {}, pointId, amount = 0) {
+  if (!isArmoryPointId(pointId)) return progress;
+  const value = Math.max(0, Math.floor(Number(amount) || 0));
+  if (value <= 0) return progress;
+  const current = cityArmoryPoints(progress);
+  return {
+    ...progress,
+    armoryPoints: {
+      ...current,
+      [pointId]: current[pointId] + value,
+    },
+  };
+}
+
+function consumeCityArmoryPoints(progress = {}, pointId, amount = 0) {
+  if (!isArmoryPointId(pointId)) return { progress, consumed: 0 };
+  const requested = Math.max(0, Math.floor(Number(amount) || 0));
+  if (requested <= 0) return { progress, consumed: 0 };
+  const current = cityArmoryPoints(progress);
+  const consumed = Math.min(current[pointId] ?? 0, requested);
+  if (consumed <= 0) return { progress, consumed: 0 };
+  return {
+    progress: {
+      ...progress,
+      armoryPoints: {
+        ...current,
+        [pointId]: Math.max(0, (current[pointId] ?? 0) - consumed),
+      },
+    },
+    consumed,
+  };
 }
 
 function consumeCityStoredResource(progress = {}, resourceId, amount = 0) {
@@ -1784,11 +1876,14 @@ function cityPaymentStorageBuildingIds() {
 
 function cityCostAvailable(snapshot, resourceId, progress = null) {
   if (resourceId === "gold") return Math.max(0, Math.floor(Number(snapshot?.player?.gold) || 0));
+  if (isArmoryPointId(resourceId)) return cityArmoryPointCount(progress, resourceId);
   return resourceCountFromSnapshot(snapshot, resourceId) + cityStoredResourceCount(progress, resourceId);
 }
 
 function cityCostLabel(resourceId) {
   if (resourceId === "gold") return "Gold";
+  if (resourceId === "weaponPoints") return "weaponPoints";
+  if (resourceId === "armorPoints") return "armorPoints";
   return RESOURCE_DEFS[resourceId]?.name ?? resourceId;
 }
 
@@ -1857,7 +1952,8 @@ export {
   saveCityProgress,
   serializeCityProgress,
   addCityPermanentStatBonus,
-  addCityPopulationLoss,
+  cityArmoryPoints,
+  addCityArmoryPoints,
   addCityArmyUnit,
   removeCityArmyUnits,
   resolveCityArmyBattle,

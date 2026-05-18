@@ -93,6 +93,8 @@ import {
   merchantTradeQuantity,
   parseCityDragPayload,
   popularityBonusStep,
+  researchRecipeCost,
+  researchRecipeKey,
   socketBonusText,
   socketText,
 } from "./city-panel-helpers.jsx";

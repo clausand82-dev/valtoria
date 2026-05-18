@@ -7,6 +7,7 @@ import { WORLD_MAP } from "./game/config/map-region-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import {
+  calcThreatDeltaFromCityStats,
   calcThreatFallOnMapExit,
   calcThreatRiseOnDeath,
 } from "./game/config/city-mobs-attack-config.js";
@@ -315,6 +316,16 @@ export default function App() {
       const oldCorruptionLevel = getRegionCorruptionLevel(regionCorruption, mapReturn.areaMapId, mapReturn.regionId);
       const nextCorruptionLevel = updateRegionCorruptionFromMapReturn(oldCorruptionLevel, mapReturn);
       nextRegionCorruption = setRegionCorruptionLevel(regionCorruption, mapReturn.areaMapId, mapReturn.regionId, nextCorruptionLevel);
+    }
+
+    const cityStatThreatDelta = calcThreatDeltaFromCityStats(calculateCityStats(nextProgress, snapshotRef.current, nextRegionCorruption));
+    if (cityStatThreatDelta !== 0) {
+      const prev = Math.max(0, Math.min(100, Number(nextProgress.threatLevel) || 0));
+      const next = Math.max(0, Math.min(100, prev + cityStatThreatDelta));
+      if (next !== prev) {
+        nextProgress = { ...nextProgress, threatLevel: next };
+        cityProgressChanged = true;
+      }
     }
 
     if (cityProgressChanged) {
@@ -640,6 +651,7 @@ export default function App() {
       {questOverviewOpen && (
         <QuestOverviewDialog
           activeQuests={activeQuests}
+          completedQuestIds={snapshot.quests?.completed ?? []}
           onClose={() => setQuestOverviewOpen(false)}
           onToggleTracked={(questId, tracked) => engineRef.current?.setQuestTracked?.(questId, tracked)}
           onOpenQuest={(quest) => {

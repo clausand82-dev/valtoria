@@ -196,8 +196,14 @@ function cityResearchRecipes() {
 }
 
 function cityRecipeRequiresResearchLab(recipe) {
+  if (recipe?.station === "research_lab") return true;
   const ids = [...Object.keys(recipe?.inputs ?? {}), recipe?.output].map(String);
-  return ids.some((id) => RESOURCE_DEFS[id]?.researchLabOnly || RESOURCE_DEFS[id]?.requiresResearchLab);
+  return ids.some((id) => (
+    id === "diamond"
+    || id.includes("gemstone")
+    || RESOURCE_DEFS[id]?.researchLabOnly
+    || RESOURCE_DEFS[id]?.requiresResearchLab
+  ));
 }
 
 function researchRecipeKey(recipe) {

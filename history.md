@@ -4,6 +4,10 @@ History over changes
 - added a new particle system, visuel better and can use png's
 - new city stats added, some old one removed and other replaced
 - regions now have a 10 level corruption system
+- city UI changed to show these new stats
+- hover system added to the new stats with more detail
+- questlog show both completed and active quest
+- new building: Armory - use to convert items (weapon and armor) to weaponPoint and armorPoints to be uses at payment for units
 
 * V 1.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)

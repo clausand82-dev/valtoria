@@ -12,6 +12,7 @@ import {
   isQuestItem,
   isReadableItem,
   isResourceItem,
+  isStackableItem,
   READABLE_DEF_BY_ID,
   MAX_POTION_STACK,
   GROUND_LOOT_DESPAWN_SECONDS
@@ -444,7 +445,7 @@ export const inventoryMethods = {
     const item = this.player.inventory[index];
     if (!item) return null;
     const requested = Math.max(1, Math.floor(Number(count) || 1));
-    if (!isResourceItem(item)) {
+    if (!isStackableItem(item)) {
       this.player.inventory.splice(index, 1);
       this.publishSnapshot();
       return item;

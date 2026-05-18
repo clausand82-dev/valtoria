@@ -4,7 +4,7 @@ export const CITY_ARMY_TRAINING_RECIPES = [
     addonId: "melee_training",
     unitId: "peasant",
     count: 1,
-    cost: { junk: 1, gold: 25 },
+    cost: { junk: 1, gold: 25, weaponPoints: 1, armorPoints: 1 },
   },
   {
     id: "train_sword_soldier",

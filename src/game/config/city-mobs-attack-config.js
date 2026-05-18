@@ -24,11 +24,33 @@ export const CITY_THREAT_SPAWN_THRESHOLD = 90;   // % hvorfra spawn kan ske
 export const CITY_THREAT_SPAWN_BASE_CHANCE = 10; // % chance ved præcis 90
 export const CITY_THREAT_SPAWN_CHANCE_PER_PCT = 5; // % ekstra per % over 90
 
+export const CITY_STAT_THREAT_DELTA_MIN = -5;
+export const CITY_STAT_THREAT_DELTA_MAX = 8;
+export const CITY_STAT_THREAT_WEIGHTS = {
+  corruption: 1.5,
+  provisionShortage: 3,
+  provisionSurplus: -0.8,
+  waterShortage: 3.5,
+  waterSurplus: -1,
+  healthLow: 2,
+  healthHigh: -1,
+  housingShortage: 2.5,
+  housingSurplus: -0.7,
+  popularityLow: 2,
+  popularityHigh: -1.2,
+  defenseLow: 2,
+  defenseHigh: -1,
+  maintenanceLow: 1.5,
+  maintenanceHigh: -0.7,
+};
+
 // --- Tilgængelige mobs i city mode ---
 // type svarer til monster typeName i GameEngine
 export const CITY_MOB_POOL = [
   { type: "Demon",    weight: 3, miniIcon: "/assets/generated/mini/mini_demon.png" },
   { type: "Skeleton", weight: 5, miniIcon: "/assets/generated/mini/mini_skeleton.png" },
+  { type: "Wolf", weight: 6, miniIcon: "/assets/generated/mini/mini_wolf.png" },
+  { type: "Spider", weight: 6, miniIcon: "/assets/generated/mini/mini_spider.png" },
 ];
 
 // --- Mob level regler ---
@@ -160,4 +182,74 @@ export function calcThreatRiseOnDeath(xpPct, rng = Math.random) {
 export function calcThreatFallOnMapExit(mapSize, rng = Math.random) {
   const range = CITY_THREAT_FALL_MAP_SIZE[mapSize] ?? CITY_THREAT_FALL_MAP_SIZE.medium;
   return Math.round(range.min + rng() * (range.max - range.min));
+}
+
+function statNumber(stats, keys, fallback = 0) {
+  for (const key of keys) {
+    const value = Number(stats?.[key]);
+    if (Number.isFinite(value)) return value;
+  }
+  return fallback;
+}
+
+function shortageRatio(available, needed) {
+  const target = Math.max(1, Number(needed) || 0);
+  return Math.max(-1, Math.min(1, (target - Math.max(0, Number(available) || 0)) / target));
+}
+
+function pctPressure(value, lowGoodAt, highBadAt) {
+  const current = Math.max(0, Math.min(100, Number(value) || 0));
+  if (current < lowGoodAt) return (lowGoodAt - current) / Math.max(1, lowGoodAt);
+  if (current > highBadAt) return -((current - highBadAt) / Math.max(1, 100 - highBadAt));
+  return 0;
+}
+
+export function calcThreatDeltaFromCityStats(cityStats = {}) {
+  const stats = cityStats && typeof cityStats === "object" && !Array.isArray(cityStats) ? cityStats : {};
+  const weights = CITY_STAT_THREAT_WEIGHTS;
+  const population = Math.max(0, Math.floor(statNumber(stats, ["population"], 0)));
+  const provision = Math.max(0, Math.floor(statNumber(stats, ["provision", "food"], 0)));
+  const water = Math.max(0, Math.floor(statNumber(stats, ["water"], 0)));
+  const housing = Math.max(0, Math.floor(statNumber(stats, ["housing"], population)));
+  const health = Math.max(0, Math.min(100, statNumber(stats, ["health", "citizens_health"], 70)));
+  const popularity = Math.max(0, Math.min(100, statNumber(stats, ["popularity", "morale", "order", "stability", "happiness"], 65)));
+  const defense = Math.max(0, Math.floor(statNumber(stats, ["defense", "city_defence"], 0)));
+  const maintenance = Math.max(0, Math.min(100, statNumber(stats, ["maintenance", "stability"], 75)));
+  const corruption = Math.max(0, Math.min(100, statNumber(stats, ["corruption", "corruptionPressure"], 50)));
+
+  let delta = 0;
+  delta += ((corruption - 50) / 50) * weights.corruption;
+
+  if (population > 0) {
+    const provisionPressure = shortageRatio(provision, population);
+    delta += provisionPressure >= 0
+      ? provisionPressure * weights.provisionShortage
+      : Math.abs(provisionPressure) * weights.provisionSurplus;
+
+    const waterPressure = shortageRatio(water, population);
+    delta += waterPressure >= 0
+      ? waterPressure * weights.waterShortage
+      : Math.abs(waterPressure) * weights.waterSurplus;
+
+    const housingPressure = shortageRatio(housing, population);
+    delta += housingPressure >= 0
+      ? housingPressure * weights.housingShortage
+      : Math.abs(housingPressure) * weights.housingSurplus;
+
+    const defensePressure = shortageRatio(defense, population);
+    delta += defensePressure >= 0
+      ? defensePressure * weights.defenseLow
+      : Math.abs(defensePressure) * weights.defenseHigh;
+  }
+
+  const healthPressure = pctPressure(health, 60, 85);
+  delta += healthPressure >= 0 ? healthPressure * weights.healthLow : Math.abs(healthPressure) * weights.healthHigh;
+
+  const popularityPressure = pctPressure(popularity, 50, 80);
+  delta += popularityPressure >= 0 ? popularityPressure * weights.popularityLow : Math.abs(popularityPressure) * weights.popularityHigh;
+
+  const maintenancePressure = pctPressure(maintenance, 60, 90);
+  delta += maintenancePressure >= 0 ? maintenancePressure * weights.maintenanceLow : Math.abs(maintenancePressure) * weights.maintenanceHigh;
+
+  return Math.max(CITY_STAT_THREAT_DELTA_MIN, Math.min(CITY_STAT_THREAT_DELTA_MAX, Math.round(delta)));
 }

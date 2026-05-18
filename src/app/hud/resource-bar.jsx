@@ -107,11 +107,11 @@ export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, event
   return (
     <div className="city-side-stats" aria-label="City summary stats">
       <CitySideStat icon={CITY_STAT_ICON_URLS.gold} label="Gold" value={Math.max(0, Math.floor(Number(gold) || 0))} />
-      <CitySideStat label="Threat" value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
+      <CitySideStat icon="/assets/generated/mini/mini_demon.png" label="Threat" value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
       <CitySideStat icon={CITY_STAT_ICON_URLS.popularity} label="Popularity" value={`${Math.max(0, Math.min(100, Math.floor(Number(popularity) || 0)))}%`} />
       {activeEvents.length > 0 && (
         <div className="city-side-events" aria-label="Active city events">
-          <b>Events</b>
+          <b>EVENT</b>
           {activeEvents.map((event) => (
             <span key={event.id} title={event.detail}>{event.label}</span>
           ))}

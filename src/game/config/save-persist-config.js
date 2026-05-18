@@ -36,6 +36,7 @@ export const SAVE_PERSIST_CONFIG = {
     areas: true,
     buildingStates: true,
     statBonuses: true,
+    armoryPoints: true,
     armyUnits: true,
     threatLevel: true,
     cityMobs: true,

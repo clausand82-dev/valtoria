@@ -101,7 +101,7 @@ export const CITY_AREAS = [
     points: "853,62 918,65 986,84 965,163 912,150 853,141 853,141",
     builtLayer: `${CITY_LAYER_BASE}/city_outer1.png`,
     buildings: [
-      { id: "field", x: 914, y: 113 },
+      { id: "farm", x: 914, y: 113 },
     ],
     statEffects: { provision: 50 },
     levels: [
@@ -210,18 +210,19 @@ export const CITY_AREAS = [
     builtLayer: `${CITY_LAYER_BASE}/city_townhall.png`,
     buildings: [
       { id: "town_hall", x: 824, y: 474 },
-      { id: "library", x: 774, y: 450 },
     ],
   },
   {
-    id: "south_empty",
-    title: "South Empty Plot",
-    category: "empty",
+    id: "training_grounds",
+    title: "Training Grounds",
+    category: "district",
     prebuilt: true,
     showLabel: true,
     points: "843,601 877,592 906,573 983,651 985,670 929,703 853,725 843,714",
+    builtLayer: `${CITY_LAYER_BASE}/city_traininggrounds.png`,
     buildings: [
-      { id: "barracks", x: 912, y: 654 },
+      { id: "barracks", x: 932, y: 654 },
+      { id: "armory", x: 880, y: 614 },
     ],
     unlock: { level: 2, cost: { gold: 650, wood_plank: 14, stone_brick: 10 } },
   },
@@ -233,10 +234,8 @@ export const CITY_AREAS = [
     showLabel: true,
     points: "740,574 764,590 801,601 803,711 790,725 719,703 660,668 657,650",
     builtLayer: `${CITY_LAYER_BASE}/city_housing.png`,
-    buildings: [
-      { id: "inn", x: 724, y: 656 },
-      { id: "farm", x: 769, y: 680 },
-    ],
+    statEffects: { population: 50 },
+
     unlock: { cost: { gold: 800, wood_plank: 30, wheat: 15 } },
   },
   {
@@ -244,29 +243,35 @@ export const CITY_AREAS = [
     title: "Park",
     category: "district",
     showLabel: true,
+    prebuilt: true,
     points: "691,488 698,518 717,550 637,629 619,630 585,577 559,497 571,488 571,488",
+        buildings: [
+      { id: "inn", x: 624, y: 556 },
+    ],
     builtLayer: `${CITY_LAYER_BASE}/city_park.png`,
     statEffects: { happiness: 100 },
     unlock: { cost: { gold: 500, wood_piece: 50, fruit: 20 } },
+  },
+  {
+    id: "empty_district_1",
+    title: "Empty District 1",
+    category: "empty",
+    showLabel: true,
+    points: "692,454 571,454 561,440 580,370 621,308 635,308 719,389 702,415 702,415",
+    unlock: { cost: { gold: 900, wood_plank: 15, stone_brick: 20, paper: 10 } },
   },
   {
     id: "education_area",
     title: "Education Area",
     category: "district",
     showLabel: true,
-    points: "692,454 571,454 561,440 580,370 621,308 635,308 719,389 702,415 702,415",
-    buildings: [
-      { id: "research_lab", x: 627, y: 392 },
-      { id: "library", x: 665, y: 425 },
-    ],
-    unlock: { cost: { gold: 900, wood_plank: 15, stone_brick: 20, paper: 10 } },
-  },
-  {
-    id: "northwest_empty",
-    title: "Northwest Empty Plot",
-    category: "empty",
-    showLabel: true,
+    prebuilt: true,
     points: "660,288 663,271 724,241 789,227 803,237 803,343 774,350 742,368 742,368",
+    builtLayer: `${CITY_LAYER_BASE}/city_education.png`,
+        buildings: [
+      { id: "research_lab", x: 727, y: 292 },
+      { id: "library", x: 765, y: 325 },
+    ],
     unlock: { level: 2, cost: { gold: 650, wood_plank: 14, stone_brick: 10 } },
   },
   {
