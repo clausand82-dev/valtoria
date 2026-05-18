@@ -730,6 +730,7 @@ export const MONSTER_STATS = Object.fromEntries(
       leapAttack: def.leapAttack ? { ...def.leapAttack } : null,
       attackCooldown: def.attackCooldown ? { ...def.attackCooldown } : null,
       meleeAreaDamage: def.meleeAreaDamage ? { ...def.meleeAreaDamage } : null,
+      shadow: def.shadow ? { ...def.shadow } : def.stats?.shadow ? { ...def.stats.shadow } : null,
       sprite: def.sprite,
       spriteUrl: def.spriteUrl,
     },

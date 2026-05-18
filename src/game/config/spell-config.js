@@ -12,6 +12,24 @@ export const SPELL_DEFS = {
     areaDamage: 5,
     areaRadius: 0.85,
     color: "#9de9ff",
+    visuals: {
+      castEffect: "cast_arcane",
+      projectileEffect: "trail_arcane",
+      impactEffect: "impact_arcane",
+      projectileTexture: "/assets/generated/particles/arcane_orb.png",
+      projectileTextureSize: 32,
+    },
+    particles: {
+      trail: {
+        type: "trail_arcane",
+        texture: "/assets/generated/particles/arcane_orb.png",
+        size: [8, 15],
+        endSize: [2, 6],
+        alpha: [0.18, 0.42],
+        lifetime: [0.18, 0.42],
+        spawnRate: 18,
+      },
+    },
   },
   fireball: {
     id: "fireball",
@@ -26,6 +44,26 @@ export const SPELL_DEFS = {
     dotDuration: 3,
     areaRadius: 0.55,
     color: "#ff7b38",
+    visuals: {
+      castEffect: "cast_fire",
+      projectileEffect: "trail_fire",
+      impactEffect: "fire_blast",
+      statusEffect: "status_burning",
+      projectileTexture: "/assets/generated/particles/fireball_trail.png",
+      projectileTextureSize: 42,
+      rotateProjectileTexture: true,
+      projectileTextureRotationOffset: -2.35619449,
+    },
+    particles: {
+      trail: {
+        type: "trail_fire",
+        size: [2, 5],
+        endSize: [1, 2],
+        alpha: [0.12, 0.28],
+        lifetime: [0.14, 0.32],
+        spawnRate: 12,
+      },
+    },
   },
   explosion: {
     id: "explosion",
@@ -40,6 +78,26 @@ export const SPELL_DEFS = {
     areaRadius: 1.45,
     explodeOnEnd: true,
     color: "#ffcf5c",
+    visuals: {
+      castEffect: "cast_fire",
+      projectileEffect: "trail_fire",
+      impactEffect: "smokey_explosion",
+      areaEffect: "burning_ground",
+      projectileTexture: "/assets/generated/particles/fireball_trail.png",
+      projectileTextureSize: 48,
+      rotateProjectileTexture: true,
+      projectileTextureRotationOffset: -2.35619449,
+    },
+    particles: {
+      trail: {
+        type: "trail_fire",
+        size: [3, 7],
+        endSize: [1, 3],
+        alpha: [0.14, 0.32],
+        lifetime: [0.18, 0.38],
+        spawnRate: 14,
+      },
+    },
   },
   ice_bolt: {
     id: "ice_bolt",
@@ -55,6 +113,12 @@ export const SPELL_DEFS = {
     slowPct: 0.35,
     slowDuration: 2.5,
     color: "#8bdfff",
+    visuals: {
+      castEffect: "cast_ice",
+      projectileEffect: "trail_ice",
+      impactEffect: "impact_ice",
+      statusEffect: "status_frozen",
+    },
   },
   energy_beam: {
     id: "energy_beam",
@@ -67,6 +131,13 @@ export const SPELL_DEFS = {
     magicScale: 1.6,
     radius: 0.16,
     color: "#b8a4ff",
+    visuals: {
+      castEffect: "cast_arcane",
+      projectileEffect: null,
+      impactEffect: "impact_arcane",
+      beam: true,
+      beamWidth: 8,
+    },
   },
   poison_cloud: {
     id: "poison_cloud",
@@ -83,6 +154,13 @@ export const SPELL_DEFS = {
     hazardDuration: 3.6,
     hazardTick: 0.65,
     color: "#87d65a",
+    visuals: {
+      castEffect: "cast_poison",
+      projectileEffect: "trail_poison",
+      impactEffect: "impact_poison",
+      areaEffect: "poison_cloud_lingering",
+      statusEffect: "status_poisoned",
+    },
   },
   web_slow: {
     id: "web_slow",
@@ -97,5 +175,11 @@ export const SPELL_DEFS = {
     slowPct: 0.45,
     slowDuration: 2.2,
     color: "#d7d4c7",
+    visuals: {
+      castEffect: "cast_shadow",
+      projectileEffect: "trail_shadow",
+      impactEffect: "impact_shadow",
+      statusEffect: "status_stunned",
+    },
   },
 };

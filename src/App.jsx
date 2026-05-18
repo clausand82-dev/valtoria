@@ -454,9 +454,11 @@ export default function App() {
   );
   const startPlayableMapRegion = async (areaMapId, region) => {
     if (!areaMapId || !region?.id) return;
-    const ready = await preloadWildernessAssets("Loading map", region);
+    const corrupted = regionCorruption[regionStatusKey(areaMapId, region.id)] ?? region.corrupted ?? true;
+    const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
+    const ready = await preloadWildernessAssets("Loading map", preparedRegion);
     if (!ready) return;
-    const started = engineRef.current?.startMapRegion?.(areaMapId, region);
+    const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return;
     setRegionCorruption((current) => ({
       ...current,
@@ -469,9 +471,11 @@ export default function App() {
 
   const startCityMobBattle = async ({ areaMapId, region, cityMobId, cityMobType, cityMobLevel }) => {
     if (!areaMapId || !region?.id) return false;
-    const ready = await preloadWildernessAssets("Loading battle", region);
+    const corrupted = regionCorruption[regionStatusKey(areaMapId, region.id)] ?? region.corrupted ?? true;
+    const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
+    const ready = await preloadWildernessAssets("Loading battle", preparedRegion);
     if (!ready) return false;
-    const started = engineRef.current?.startMapRegion?.(areaMapId, region);
+    const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return false;
     if (engineRef.current?.activeMapRegion) {
       engineRef.current.activeMapRegion.cityMobId = cityMobId;
@@ -818,6 +822,7 @@ export default function App() {
         <RegionMapDialog
           initialMapId={regionMapInitialId}
           regionCorruption={regionCorruption}
+          worldState={snapshot.worldState}
           completedQuests={snapshot.quests?.completed ?? []}
           army={snapshot.player?.stats?.army ?? 0}
           onPlayableRegionSelected={startPlayableMapRegion}

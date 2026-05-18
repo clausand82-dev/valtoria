@@ -250,7 +250,7 @@ export const lifecycleMethods = {
     const rawSpeed = dt > 0 ? travelled / dt : 0;
     this.player.moveSpeed = lerp(this.player.moveSpeed, rawSpeed, moved ? 0.45 : 0.18);
     if (this.player.moveSpeed > 0.02) this.player.gait += dt * (7.5 + this.player.moveSpeed * 2.3);
-    if (moved && Math.random() < 0.18) this.addDust(this.player.x, this.player.y, 1);
+    if (moved && Math.random() < (this.footstepDustChance?.(0.18) ?? 0.18)) this.addDust(this.player.x, this.player.y, 1);
 
     const attackTarget = this.monsters.get(this.player.attackTargetId);
     if (!attackTarget || attackTarget.dead) {

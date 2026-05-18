@@ -11,6 +11,8 @@ import { persistenceMethods } from "./methods/persistence.js";
 import { renderingMethods } from "./methods/rendering.js";
 import { inputMethods } from "./methods/input.js";
 import { snapshotMethods } from "./methods/snapshot.js";
+import { normalizeWorldState } from "../world-state.js";
+import { ParticleEngine } from "../particles/ParticleEngine.js";
 
 function applyMethodGroup(prototype, methods) {
   Object.defineProperties(prototype, Object.getOwnPropertyDescriptors(methods));
@@ -39,6 +41,11 @@ export class GameEngine {
     this.projectiles = [];
     this.groundHazards = [];
     this.particles = [];
+    this.particleEngine = new ParticleEngine({
+      maxParticles: options.maxParticles ?? 900,
+      quality: options.particleQuality ?? "high",
+      enabled: options.particlesEnabled !== false,
+    });
     this.floaters = [];
     this.toasts = [];
     this.potionCooldown = 0;
@@ -76,6 +83,7 @@ export class GameEngine {
       wildernessNpc: null,
       cityFade: [],
     };
+    this.worldState = normalizeWorldState();
     if (!this.newGame) this.loadProgress();
     this.prepareRegionQuestgiver();
     this.regionStartPlayerLevel = this.player.level;

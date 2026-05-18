@@ -32,6 +32,7 @@ export const emptySnapshot = {
   zone: { name: "Stonewake Wilds", level: 1, seed: 7341, weather: { id: "none", label: "No weather" } },
   region: { name: "Stonewake Wilds", index: 1, seed: 7341, weather: { id: "none", label: "No weather" } },
   regionRun: null,
+  worldState: { flags: {}, counters: {}, values: {} },
   mapReturn: null,
   lastDeath: null,
   mobs: { total: 0, alive: 0, killed: 0 },

@@ -15,6 +15,19 @@ const ATTACHED_PARTICLE_SCAN_INTERVAL = 0.12;
 const AMBIENT_PARTICLE_INTERVAL = 0.1;
 const WEATHER_PARTICLE_INTERVAL = 0.05;
 
+function particleContext(engine) {
+  return {
+    width: engine.width,
+    height: engine.height,
+    camera: engine.camera,
+    player: engine.player,
+    projectiles: engine.projectiles,
+    monsters: engine.monsters,
+    nearbyMonsters: () => engine.nearbyMonsters(2),
+    fogPointAlpha: (point) => engine.fogPointAlpha(point),
+  };
+}
+
 function countConfiguredParticles(particles) {
   return particles.reduce((sum, particle) => sum + (particle.configParticle ? 1 : 0), 0);
 }
@@ -277,6 +290,7 @@ export const effectsMethods = {
       this.toasts[i].life -= dt;
       if (this.toasts[i].life <= 0) this.toasts.splice(i, 1);
     }
+    this.particleEngine?.update(dt, particleContext(this));
   },
 
   updateConfiguredParticles(dt) {
@@ -327,6 +341,13 @@ export const effectsMethods = {
         delay: rollRange(event.thunderDelayMs) / 1000,
       };
     }
+    this.particleEngine?.emitOneShot("lightning_flash", 0, 0, {
+      layer: "screenOverlay",
+      area: "screen",
+      colors: [event.flashColor ?? "#dbe9ff"],
+      alpha: event.flashAlpha ?? [0.35, 0.75],
+      lifetime: [duration, duration],
+    });
   },
 
   createLightningBolt(duration) {
@@ -353,25 +374,18 @@ export const effectsMethods = {
     for (let index = 0; index < configs.length; index += 1) {
       const config = configs[index];
       if (Math.random() > config.chance) continue;
-      const density = Math.max(0.01, Number(config.density) || 0.08);
       const key = `ambient:${this.region?.id ?? "world"}:${index}`;
-      const target = Math.max(1, Math.min(80, Math.round(density * 120)));
-      const missing = target - particlesForKey(this.particles, key);
-      if (missing <= 0) continue;
-
-      const spawnBudget = Math.min(4, missing);
-      let spawned = 0;
-      let attempts = 0;
-      while (spawned < spawnBudget && attempts < 16) {
-        attempts += 1;
-        const screenX = Math.random() * this.width;
-        const screenY = Math.random() * this.height;
-        const world = screenToWorld(screenX, screenY, this.camera);
-        if (!isRegionPointPlayable(this.region, world.x, world.y, 0.1)) continue;
-        if (this.fogPointAlpha(world) <= 0.08) continue;
-        spawnConfiguredParticle(this, world, config, key, { ambient: true });
-        spawned += 1;
-      }
+      this.__ambientParticleEmitters ??= new Map();
+      if (this.__ambientParticleEmitters.get(key)) continue;
+      const density = Math.max(0.01, Number(config.density) || 0.08);
+      const emitterId = this.particleEngine?.addEmitter({
+        ...config,
+        area: config.area === "screen" ? "screen" : "map",
+        layer: config.layer ?? config.renderLayer ?? "aboveGround",
+        intensity: config.intensity ?? Math.max(0.25, density / 0.14),
+        maxParticles: config.maxParticles ?? Math.max(8, Math.min(80, Math.round(density * 150))),
+      }, { id: key, scope: "ambient" });
+      if (emitterId) this.__ambientParticleEmitters.set(key, emitterId);
     }
   },
 
@@ -382,33 +396,18 @@ export const effectsMethods = {
       const config = configs[index];
       if (Math.random() > config.chance) continue;
       const key = `weather:${this.region?.id ?? "world"}:${index}`;
-      const layer = config.layer ?? "screen";
-      if (layer === "world") {
-        // TODO: Add named weather areas/world masks later. For now weather world-layer
-        // reuses ambient viewport spawning so it stays visual-only and bounded.
-        const density = Math.max(0.01, Number(config.density) || 0.08);
-        const target = Math.max(1, Math.min(80, Math.round(density * 120)));
-        const missing = target - particlesForKey(this.particles, key);
-        if (missing <= 0) continue;
-        const spawnBudget = Math.min(3, missing);
-        for (let spawned = 0, attempts = 0; spawned < spawnBudget && attempts < 14; attempts += 1) {
-          const world = screenToWorld(Math.random() * this.width, Math.random() * this.height, this.camera);
-          if (!isRegionPointPlayable(this.region, world.x, world.y, 0.1)) continue;
-          if (this.fogPointAlpha(world) <= 0.08) continue;
-          spawnConfiguredParticle(this, world, config, key, { ambient: true });
-          spawned += 1;
-        }
-        continue;
-      }
-
+      this.__weatherParticleEmitters ??= new Map();
+      if (this.__weatherParticleEmitters.get(key)) continue;
       const density = Math.max(0.01, Number(config.density) || 0.12);
-      const target = Math.max(1, Math.min(WEATHER_PARTICLE_MAX, Math.round(density * WEATHER_PARTICLE_MAX)));
-      const missing = target - particlesForKey(this.particles, key);
-      if (missing <= 0) continue;
-      const spawnBudget = Math.min(12, missing);
-      for (let spawned = 0; spawned < spawnBudget; spawned += 1) {
-        spawnScreenParticle(this, config, key);
-      }
+      const layer = config.layer === "world" ? "aboveGround" : (config.layer ?? "weatherOverlay");
+      const emitterId = this.particleEngine?.addEmitter({
+        ...config,
+        area: layer === "aboveGround" ? "map" : "screen",
+        layer,
+        intensity: config.intensity ?? Math.max(0.25, density / 0.35),
+        maxParticles: config.maxParticles ?? Math.max(12, Math.min(WEATHER_PARTICLE_MAX, Math.round(density * WEATHER_PARTICLE_MAX))),
+      }, { id: key, scope: "weather" });
+      if (emitterId) this.__weatherParticleEmitters.set(key, emitterId);
     }
   },
 
@@ -421,9 +420,17 @@ export const effectsMethods = {
           const config = configs[index];
           if (!isAnchorVisible(this, object, config)) continue;
           const key = particleKey(object.id, index);
-          const target = getParticleTarget(object, config, key);
-          if (particlesForKey(this.particles, key) >= target) continue;
-          spawnConfiguredParticle(this, object, config, key);
+          object.__particleEmitterIds ??= {};
+          if (object.__particleEmitterIds[key]) continue;
+          object.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
+            ...config,
+            x: object.x,
+            y: object.y,
+            followTarget: object.id,
+            attachTo: "object",
+            layer: config.layer ?? config.renderLayer ?? "aboveObjects",
+            maxParticles: config.maxParticles ?? Math.max(4, randomIntInRange(config.count) || 8),
+          }, object);
         }
       }
 
@@ -434,9 +441,17 @@ export const effectsMethods = {
           const config = configs[index];
           if (!isAnchorVisible(this, decal, config, 140)) continue;
           const key = particleKey(decal.id, index);
-          const target = getParticleTarget(decal, config, key);
-          if (particlesForKey(this.particles, key) >= target) continue;
-          spawnConfiguredParticle(this, decal, config, key);
+          decal.__particleEmitterIds ??= {};
+          if (decal.__particleEmitterIds[key]) continue;
+          decal.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
+            ...config,
+            x: decal.x,
+            y: decal.y,
+            followTarget: decal.id,
+            attachTo: "object",
+            layer: config.layer ?? config.renderLayer ?? "aboveGround",
+            maxParticles: config.maxParticles ?? Math.max(4, randomIntInRange(config.count) || 8),
+          }, decal);
         }
       }
     }
@@ -445,6 +460,31 @@ export const effectsMethods = {
   updateAmbient(dt) {
     // Legacy biome ambient particles are disabled. Region-specific ambience is
     // driven by map-region-config ambient/weather particle configs.
+  },
+
+  setParticlesEnabled(enabled) {
+    if (!this.particleEngine) return;
+    this.particleEngine.enabled = Boolean(enabled);
+    if (!this.particleEngine.enabled) this.particleEngine.clearAll();
+  },
+
+  toggleParticles() {
+    this.setParticlesEnabled(!this.particleEngine?.enabled);
+    return this.particleEngine?.enabled ?? false;
+  },
+
+  setParticleQuality(quality = "high") {
+    if (!this.particleEngine) return;
+    this.particleEngine.quality = ["low", "medium", "high"].includes(quality) ? quality : "high";
+  },
+
+  particleDebugStats() {
+    return {
+      enabled: this.particleEngine?.enabled ?? false,
+      quality: this.particleEngine?.quality ?? "high",
+      emitters: this.particleEngine?.emitters.size ?? 0,
+      particles: this.particleEngine?.particles.length ?? 0,
+    };
   },
 
   updateWeatherOverlay(dt) {
@@ -482,37 +522,34 @@ export const effectsMethods = {
   },
 
   addParticles(x, y, color, count, upward = 0.08) {
-    for (let i = 0; i < count; i += 1) {
-      const a = Math.random() * Math.PI * 2;
-      const speed = 0.5 + Math.random() * 2.4;
-      this.particles.push({
-        x,
-        y,
-        z: 10 + Math.random() * 18,
-        vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed,
-        vz: upward * 90 + Math.random() * 1.6,
-        r: 2 + Math.random() * 3,
-        color,
-        life: 0.25 + Math.random() * 0.6,
-      });
-    }
+    this.particleEngine?.emitOneShot("hit_sparks", x, y, {
+      colors: [color],
+      oneShotCount: Math.max(1, Math.floor(Number(count) || 1)),
+      speed: [24, 120],
+      size: [2, 5],
+      lifetime: [0.25, 0.85],
+      layer: "effects",
+      gravity: upward > 0.12 ? -8 : 0,
+    });
   },
 
   addDust(x, y, count = 1) {
-    for (let i = 0; i < count; i += 1) {
-      this.particles.push({
-        x: x + (Math.random() - 0.5) * 0.35,
-        y: y + (Math.random() - 0.5) * 0.35,
-        z: 5 + Math.random() * 5,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: (Math.random() - 0.5) * 0.25,
-        vz: 0.35 + Math.random() * 0.4,
-        r: 2 + Math.random() * 4,
-        color: "rgba(174, 148, 105, 0.55)",
-        life: 0.32 + Math.random() * 0.28,
-      });
-    }
+    const dustConfig = this.region?.mapRegion?.ambient?.footstepDust ?? {};
+    const configuredCount = dustConfig.oneShotCount ?? randomIntInRange(dustConfig.count ?? [count, count]);
+    this.particleEngine?.emitOneShot(dustConfig.type ?? "dust_motes", x, y, {
+      ...dustConfig,
+      oneShotCount: Math.max(1, Math.floor(Number(configuredCount) || count || 1)),
+      layer: dustConfig.layer ?? dustConfig.renderLayer ?? "belowUnits",
+      lifetime: dustConfig.lifetime ?? [0.32, 0.7],
+      size: dustConfig.size ?? [2, 6],
+      alpha: dustConfig.alpha ?? [0.12, 0.35],
+    });
+  },
+
+  footstepDustChance(fallback = 0.18) {
+    const dustConfig = this.region?.mapRegion?.ambient?.footstepDust ?? {};
+    const configured = Number(dustConfig.stepChance ?? dustConfig.chancePerStep);
+    return Number.isFinite(configured) ? Math.max(0, Math.min(1, configured)) : fallback;
   },
 
   spawnExpandingEnergyRingEffect(x, y, radius, options = {}) {

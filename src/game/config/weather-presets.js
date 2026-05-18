@@ -1,17 +1,35 @@
 import { normalizeParticleConfigs } from "./particle-presets.js";
 
 export const WEATHER_PRESETS = {
+  clear: {
+    id: "clear",
+    label: "Clear",
+    particles: [],
+  },
+
   none: {
     id: "none",
     label: "No weather",
     particles: [],
   },
 
+  rain: {
+    id: "rain",
+    label: "Rain",
+    particles: [
+      { type: "rain", layer: "weatherOverlay", area: "screen", density: 0.55 },
+    ],
+    ambience: {
+      lightTint: "#7f8f95",
+      fogAmount: 0.12,
+    },
+  },
+
   light_rain: {
     id: "light_rain",
     label: "Light rain",
     particles: [
-      { type: "rain", layer: "screen", density: 0.35 },
+      { type: "rain", layer: "weatherOverlay", area: "screen", density: 0.35 },
     ],
     ambience: {
       lightTint: "#7f8f95",
@@ -23,8 +41,8 @@ export const WEATHER_PRESETS = {
     id: "heavy_rain",
     label: "Heavy rain",
     particles: [
-      { type: "rain", layer: "screen", density: 0.75 },
-      { type: "fogWisps", layer: "screen", density: 0.12 },
+      { type: "rain", layer: "weatherOverlay", area: "screen", density: 0.75 },
+      { type: "fog", layer: "weatherOverlay", area: "screen", density: 0.12 },
     ],
     ambience: {
       lightTint: "#6f7f86",
@@ -36,7 +54,7 @@ export const WEATHER_PRESETS = {
     id: "fog",
     label: "Fog",
     particles: [
-      { type: "fogWisps", layer: "screen", density: 0.25 },
+      { type: "fog", layer: "weatherOverlay", area: "screen", density: 0.25 },
     ],
     ambience: {
       lightTint: "#8f9992",
@@ -48,7 +66,7 @@ export const WEATHER_PRESETS = {
     id: "ashfall",
     label: "Ashfall",
     particles: [
-      { type: "ash", layer: "screen", density: 0.25 },
+      { type: "ash_weather", layer: "weatherOverlay", area: "screen", density: 0.25 },
     ],
     ambience: {
       lightTint: "#a27b6a",
@@ -60,7 +78,7 @@ export const WEATHER_PRESETS = {
     id: "snow",
     label: "Snow",
     particles: [
-      { type: "snow", layer: "screen", density: 0.35 },
+      { type: "snow", layer: "weatherOverlay", area: "screen", density: 0.35 },
     ],
     ambience: {
       lightTint: "#b8c9d6",
@@ -72,7 +90,7 @@ export const WEATHER_PRESETS = {
     id: "leaves",
     label: "Leaves",
     particles: [
-      { type: "leaves", layer: "screen", density: 0.35 },
+      { type: "wind_leaves", layer: "weatherOverlay", area: "screen", density: 0.35 },
     ],
     ambience: {
       lightTint: "#8a5a24",
@@ -84,8 +102,9 @@ export const WEATHER_PRESETS = {
     id: "thunderstorm",
     label: "Thunderstorm",
     particles: [
-      { type: "rain", layer: "screen", density: 0.8, angle: 14 },
-      { type: "fogWisps", layer: "screen", density: 0.12 },
+      { type: "storm_rain", layer: "weatherOverlay", area: "screen", density: 0.8, angle: 14 },
+      { type: "fog", layer: "weatherOverlay", area: "screen", density: 0.12 },
+      { type: "wind_leaves", layer: "weatherOverlay", area: "screen", density: 0.08 },
     ],
     ambience: {
       lightTint: "#59636d",
@@ -105,6 +124,9 @@ export const WEATHER_PRESETS = {
     ],
   },
 };
+
+WEATHER_PRESETS.storm = WEATHER_PRESETS.thunderstorm;
+WEATHER_PRESETS.ash = WEATHER_PRESETS.ashfall;
 
 const warnedWeatherIds = new Set();
 

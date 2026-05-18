@@ -1,10 +1,16 @@
 History over changes
 
+* V. 1.72
+- added a new particle system, visuel better and can use png's
+
 * V 1.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
 - changed a bit i particle system (leaves works on tree now also, not just as weather)
 - added new mobs (Spawn of Hydra, Hellhound, Gigant Troll, Mountain Troll, Shadwo Dragon, Infernus Minions, Spawn of Archnogrim, Flesheater) 
 - save system made more ready for server version - will still be driven by LocalStorage for now
+- worldState introduced (many things is flagged)
+- condition system introduced (using worldstate). If nothing is change system use old system and all is fine in old entries
+- conditon system only om map-region config for now.
 
 
 * V. 1.70

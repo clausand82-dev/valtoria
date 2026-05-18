@@ -1,4 +1,5 @@
 import { drawAtlasFrame, drawShadow } from "./assets-ground.js";
+import { TILE_H, TILE_W } from "./config/game-constants-config.js";
 
 const customItemImageCache = new Map();
 const GOLD_ICON_URL = "/assets/generated/item/item_gold.png";
@@ -159,8 +160,25 @@ function getCustomItemImage(iconUrl) {
   return null;
 }
 
-export function drawProjectile(ctx, screen, projectile, atlas) {
+export function drawProjectile(ctx, screen, projectile, atlas, beamStartScreen = null) {
   const projectileFrame = projectile.type === "magic" || projectile.type === "burst" || projectile.owner ? "orb" : "arrow";
+  if (projectile.beam && beamStartScreen) {
+    drawEnergyBeam(ctx, beamStartScreen, screen, projectile);
+    return;
+  }
+  const projectileImage = getCustomItemImage(projectile.texture);
+  if (projectileImage) {
+    const size = Math.max(4, Number(projectile.textureSize) || (projectile.owner ? 28 : 22));
+    ctx.save();
+    ctx.globalAlpha = projectile.alpha ?? 0.95;
+    ctx.shadowColor = projectile.color ?? "#9de9ff";
+    ctx.shadowBlur = projectile.glow === false ? 0 : 12;
+    ctx.translate(screen.x, screen.y - 8);
+    if (projectile.rotateTexture) ctx.rotate(projectileScreenAngle(projectile) + (Number(projectile.textureRotationOffset) || 0));
+    ctx.drawImage(projectileImage, -size * 0.5, -size * 0.5, size, size);
+    ctx.restore();
+    return;
+  }
   if (projectile.owner) {
     ctx.save();
     ctx.globalAlpha = 0.9;
@@ -176,4 +194,57 @@ export function drawProjectile(ctx, screen, projectile, atlas) {
   drawAtlasFrame(ctx, atlas, projectileFrame, screen.x, screen.y - 8, {
     scale: projectileFrame === "orb" ? 0.18 : 0.16,
   });
+}
+
+function projectileScreenAngle(projectile) {
+  const vx = Number(projectile.vx) || 0;
+  const vy = Number(projectile.vy) || 0;
+  const screenDx = (vx - vy) * (TILE_W / 2);
+  const screenDy = (vx + vy) * (TILE_H / 2);
+  return Math.atan2(screenDy, screenDx);
+}
+
+function drawEnergyBeam(ctx, start, end, projectile) {
+  const color = projectile.color ?? "#b8a4ff";
+  const sx = start.x;
+  const sy = start.y - 18;
+  const ex = end.x;
+  const ey = end.y - 8;
+  const width = Math.max(3, Number(projectile.beamWidth) || 7);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  ctx.globalAlpha = 0.22;
+  ctx.strokeStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 22;
+  ctx.lineWidth = width * 3.2;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.72;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.95;
+  ctx.strokeStyle = "rgba(255,255,255,0.82)";
+  ctx.lineWidth = Math.max(1.2, width * 0.34);
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.lineTo(ex, ey);
+  ctx.stroke();
+
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.arc(ex, ey, width * 0.95, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }

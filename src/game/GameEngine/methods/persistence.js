@@ -38,6 +38,7 @@ import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 import { saveRepository } from "../../../storage/saveRepository.js";
+import { normalizeWorldState } from "../../world-state.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -249,6 +250,7 @@ export const persistenceMethods = {
     this.player.attackTargetId = null;
 
     this.questState = normalizeSavedQuestState(payload.quests);
+    this.worldState = normalizeWorldState(payload.worldState);
 
     if (Array.isArray(savedPlayer.inventory)) {
       const normalizedInventory = savedPlayer.inventory
@@ -367,6 +369,7 @@ export const persistenceMethods = {
           : [],
         completed: cfg.quests.completed ? [...this.questState.completed] : [],
       },
+      ...(cfg.worldState ? { worldState: normalizeWorldState(this.worldState) } : {}),
       loots: [],
     };
 

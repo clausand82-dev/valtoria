@@ -32,6 +32,24 @@ import {
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
 
+function spellParticleVisuals(spell = {}) {
+  const particles = spell.particles ?? {};
+  const visuals = spell.visuals ?? {};
+  return {
+    cast: particles.cast ?? (visuals.castEffect ? { type: visuals.castEffect } : null),
+    trail: particles.trail ?? (visuals.projectileEffect ? { type: visuals.projectileEffect } : null),
+    impact: particles.impact ?? (visuals.impactEffect ? { type: visuals.impactEffect } : null),
+    area: particles.area ?? (visuals.areaEffect ? { type: visuals.areaEffect } : null),
+    status: particles.status ?? (visuals.statusEffect ? { type: visuals.statusEffect } : null),
+    projectileTexture: particles.projectileTexture ?? visuals.projectileTexture ?? null,
+    projectileTextureSize: particles.projectileTextureSize ?? visuals.projectileTextureSize ?? null,
+    rotateProjectileTexture: particles.rotateProjectileTexture ?? visuals.rotateProjectileTexture ?? false,
+    projectileTextureRotationOffset: particles.projectileTextureRotationOffset ?? visuals.projectileTextureRotationOffset ?? 0,
+    beam: particles.beam ?? visuals.beam ?? false,
+    beamWidth: particles.beamWidth ?? visuals.beamWidth ?? null,
+  };
+}
+
 export const combatMethods = {
   updateMonsters(dt) {
     this.processStatusEffects(this.player, dt, true);
@@ -83,7 +101,7 @@ export const combatMethods = {
       const rawSpeed = dt > 0 ? Math.hypot(monster.x - beforeX, monster.y - beforeY) / dt : 0;
       monster.moveSpeed = lerp(monster.moveSpeed || 0, rawSpeed, monster.moving ? 0.42 : 0.15);
       if (monster.moveSpeed > 0.02) monster.gait += dt * (6.4 + monster.moveSpeed * 2.1);
-      if (monster.moving && Math.random() < 0.035) this.addDust(monster.x, monster.y, 1);
+      if (monster.moving && Math.random() < (this.footstepDustChance?.(0.035) ?? 0.035)) this.addDust(monster.x, monster.y, 1);
     }
   },
 
@@ -246,6 +264,7 @@ export const combatMethods = {
       leapAttack: base.leapAttack ? { ...base.leapAttack } : null,
       attackCooldownConfig: base.attackCooldown ? { ...base.attackCooldown } : null,
       meleeAreaDamage: base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null,
+      shadow: base.shadow ? { ...base.shadow } : null,
       haveMinion: false,
       minions: false,
       minionCooldown: 0,
@@ -302,7 +321,10 @@ export const combatMethods = {
       if (expired && projectile.explodeOnEnd) {
         this.applySpellImpact(projectile, projectile.x, projectile.y, null);
       }
-      if (remove) this.projectiles.splice(i, 1);
+      if (remove) {
+        this.particleEngine?.removeEmittersByOwner(projectile.id);
+        this.projectiles.splice(i, 1);
+      }
     }
   },
 
@@ -435,8 +457,14 @@ export const combatMethods = {
     this.player.spellCooldown = spell.cooldown;
     this.player.castAnim = 0.38;
     this.setFacing(n.x, n.y);
+    const visuals = spellParticleVisuals(spell);
+    if (visuals.cast?.type) {
+      this.particleEngine?.emitOneShot(visuals.cast.type, this.player.x, this.player.y, {
+        ...visuals.cast,
+        layer: visuals.cast.layer ?? "effects",
+      });
+    }
     this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats });
-    this.addParticles(this.player.x, this.player.y, spell.color, 16, 0.08);
   },
 
   castMonsterSpell(monster, spellId) {
@@ -446,6 +474,13 @@ export const combatMethods = {
     if (!n.x && !n.y) return;
     monster.spellCooldown = spell.cooldown + Math.random() * 0.8;
     monster.attackAnim = 0.24;
+    const visuals = spellParticleVisuals(spell);
+    if (visuals.cast?.type) {
+      this.particleEngine?.emitOneShot(visuals.cast.type, monster.x, monster.y, {
+        ...visuals.cast,
+        layer: visuals.cast.layer ?? "effects",
+      });
+    }
     this.launchSpellProjectile({
       spell,
       caster: monster,
@@ -459,13 +494,16 @@ export const combatMethods = {
   launchSpellProjectile({ spell, caster, owner, x, y, stats }) {
     const n = normalize(x - caster.x, y - caster.y);
     const rolled = this.rollPlayerDamage(stats, (spell.hitDamage ?? 0) + (Number(stats.magic) || 0) * (spell.magicScale ?? 0));
-    this.projectiles.push({
+    const visuals = spellParticleVisuals(spell);
+    const projectile = {
       id: createId(),
       type: spell.id,
       spellId: spell.id,
       owner,
       x: caster.x + n.x * 0.5,
       y: caster.y + n.y * 0.5,
+      beamStartX: caster.x + n.x * 0.18,
+      beamStartY: caster.y + n.y * 0.18,
       vx: n.x * spell.speed,
       vy: n.y * spell.speed,
       radius: spell.radius ?? 0.22,
@@ -473,6 +511,12 @@ export const combatMethods = {
       critical: rolled.critical,
       life: spell.range / spell.speed,
       color: spell.color,
+      texture: visuals.projectileTexture,
+      textureSize: visuals.projectileTextureSize,
+      rotateTexture: visuals.rotateProjectileTexture,
+      textureRotationOffset: visuals.projectileTextureRotationOffset,
+      beam: Boolean(visuals.beam),
+      beamWidth: visuals.beamWidth,
       areaRadius: spell.areaRadius ?? 0,
       areaDamage: spell.areaDamage ?? 0,
       dotDamage: spell.dotDamage ?? 0,
@@ -482,7 +526,16 @@ export const combatMethods = {
       hazardDuration: spell.hazardDuration ?? 0,
       hazardTick: spell.hazardTick ?? 1,
       explodeOnEnd: Boolean(spell.explodeOnEnd),
-    });
+      particleVisuals: visuals,
+    };
+    this.projectiles.push(projectile);
+    if (visuals.trail?.type) {
+      this.particleEngine?.attachEmitterToProjectile(projectile.id, {
+        ...visuals.trail,
+        layer: visuals.trail.layer ?? "effects",
+        radius: visuals.trail.radius ?? 8,
+      });
+    }
   },
 
   applySpellImpact(projectile, x, y, directTarget = null) {
@@ -509,7 +562,16 @@ export const combatMethods = {
       else this.damageMonster(target, damage, "magic", projectile.critical && direct);
       this.applyProjectileStatus(target, projectile);
     }
-    this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08);
+    const impact = projectile.particleVisuals?.impact;
+    if (impact?.type) {
+      this.particleEngine?.emitOneShot(impact.type, x, y, {
+        ...impact,
+        layer: impact.layer ?? "effects",
+        oneShotCount: impact.oneShotCount ?? (projectile.areaRadius > 0 ? 30 : 14),
+      });
+    } else {
+      this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08);
+    }
     if (projectile.hazardDuration > 0 && projectile.areaRadius > 0) {
       this.spawnGroundHazard(projectile, x, y);
     }
@@ -534,6 +596,17 @@ export const combatMethods = {
     this.groundHazards ??= [];
     this.groundHazards.push(hazard);
     this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life);
+    const area = projectile.particleVisuals?.area;
+    if (area?.type) {
+      hazard.particleEmitterId = this.particleEngine?.addEmitter({
+        ...area,
+        x,
+        y,
+        radius: Math.max(18, radius * 42),
+        duration: hazard.life,
+        layer: area.layer ?? "belowUnits",
+      }, { id: hazard.id, scope: "hazard" });
+    }
   },
 
   updateGroundHazards(dt) {
@@ -546,7 +619,10 @@ export const combatMethods = {
         hazard.tick += hazard.tickInterval;
         this.applyGroundHazardTick(hazard);
       }
-      if (hazard.life <= 0) this.groundHazards.splice(i, 1);
+      if (hazard.life <= 0) {
+        if (hazard.particleEmitterId) this.particleEngine?.removeEmitter(hazard.particleEmitterId);
+        this.groundHazards.splice(i, 1);
+      }
     }
   },
 
@@ -574,6 +650,7 @@ export const combatMethods = {
         duration: projectile.dotDuration,
         tick: 1,
         color: projectile.color,
+        particle: projectile.particleVisuals?.status ?? null,
       });
     }
     if (projectile.slowPct > 0 && projectile.slowDuration > 0) {
@@ -581,6 +658,7 @@ export const combatMethods = {
         type: "slow",
         pct: projectile.slowPct,
         duration: projectile.slowDuration,
+        particle: projectile.particleVisuals?.status ?? null,
       });
     }
   },
@@ -588,6 +666,13 @@ export const combatMethods = {
   processStatusEffects(entity, dt, isPlayer = false) {
     if (!Array.isArray(entity.statusEffects) || entity.statusEffects.length === 0) return;
     for (const effect of entity.statusEffects) {
+      if (effect.duration > 0 && effect.particle?.type && !effect.particleEmitterId && entity.id) {
+        effect.particleEmitterId = this.particleEngine?.attachEmitterToEntity(entity.id, {
+          ...effect.particle,
+          layer: effect.particle.layer ?? "aboveUnits",
+          radius: effect.particle.radius ?? 18,
+        });
+      }
       effect.duration -= dt;
       if (effect.type === "dot") {
         effect.tick -= dt;
@@ -605,6 +690,10 @@ export const combatMethods = {
           }
         }
       }
+    }
+    for (const effect of entity.statusEffects) {
+      if (effect.duration > 0) continue;
+      if (effect.particleEmitterId) this.particleEngine?.removeEmitter(effect.particleEmitterId);
     }
     entity.statusEffects = entity.statusEffects.filter((effect) => effect.duration > 0);
   },
@@ -648,6 +737,7 @@ export const combatMethods = {
   },
 
   damageMonster(monster, amount, sourceType, critical = false) {
+    this.markMobSeen?.(monster?.typeName);
     if (Math.random() < (Number(monster.dodgeChance) || 0)) {
       this.addFloater(monster.x, monster.y, "Dodge", "#9ee8a4");
       return;
@@ -689,6 +779,7 @@ export const combatMethods = {
     const chunk = this.getChunk(cx, cy);
     const index = chunk.objects.findIndex((entry) => entry.id === object.id);
     if (index < 0) return;
+    this.particleEngine?.removeEmittersByOwner(object.id);
     chunk.objects.splice(index, 1);
     this.player.stats.objectsDestroyed += 1;
     incrementStatMap(this.player.stats.objectsDestroyedByType, object.type);

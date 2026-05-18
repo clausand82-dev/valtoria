@@ -11,6 +11,14 @@ import {
 } from "../dependencies.js";
 import { rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
 import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.js";
+import {
+  mobWorldStateKey,
+  normalizeWorldState,
+  resolveMapRegionConfig,
+  setWorldFlag,
+  withRegionVisitWorldState,
+  regionWorldStateKey,
+} from "../../world-state.js";
 
 function cloneAbandonValue(value) {
   if (value === null || value === undefined) return value;
@@ -122,18 +130,22 @@ export const regionMethods = {
 
   startMapRegion(areaMapId, regionConfig) {
     if (!areaMapId || !regionConfig?.id) return false;
+    const preparedRegionConfig = regionConfig.__worldStateResolved
+      ? regionConfig
+      : this.prepareMapRegionConfig(areaMapId, regionConfig, { markVisit: true });
+    if (!preparedRegionConfig?.id) return false;
     this.saveProgress({ force: true });
     this.regionIndex += 1;
     const seed = Math.floor(Math.random() * 1000000000);
     this.activeMapRegion = {
       areaMapId,
-      regionId: regionConfig.id,
-      label: regionConfig.label ?? regionConfig.id,
+      regionId: preparedRegionConfig.id,
+      label: preparedRegionConfig.label ?? preparedRegionConfig.id,
     };
-    this.activeMapRegion.mapSize = regionConfig.mapSize ?? "medium";
+    this.activeMapRegion.mapSize = preparedRegionConfig.mapSize ?? "medium";
     this.mapReturn = null;
     this.region = createRegion(this.regionIndex, seed, null, {
-      ...regionConfig,
+      ...preparedRegionConfig,
       areaMapId,
     });
     this.resetRegionRuntime();
@@ -145,13 +157,42 @@ export const regionMethods = {
     // Set total spawned count for active clear_map quests targeting this region
     for (const quest of this.questState.active) {
       if (quest.type !== "clear_map") continue;
-      if (quest.target?.regionId !== regionConfig.id) continue;
+      if (quest.target?.regionId !== preparedRegionConfig.id) continue;
       const validTypes = quest.target?.monsters ?? [];
       const total = [...this.monsters.values()].filter((m) => validTypes.includes(m.typeName)).length;
       quest.progress = { ...(quest.progress ?? {}), total, kills: 0, cleared: false };
     }
     this.addToast(`${this.activeMapRegion.label} startet. Find den gyldne exit mod nordoest.`);
     this.publishSnapshot();
+    return true;
+  },
+
+  prepareMapRegionConfig(areaMapId, regionConfig, options = {}) {
+    if (!regionConfig?.id) return regionConfig;
+    const currentWorldState = normalizeWorldState(this.worldState);
+    this.worldState = options.markVisit === false
+      ? currentWorldState
+      : withRegionVisitWorldState(currentWorldState, areaMapId, regionConfig, { corrupted: options.corrupted });
+    if (options.markVisit !== false) this.saveProgress({ force: true });
+    return {
+      ...resolveMapRegionConfig(regionConfig, this.worldState, {
+        areaMapId,
+        regionId: regionConfig.id,
+        stats: {
+          player: this.player,
+          worldState: this.worldState,
+        },
+      }),
+      __worldStateResolved: true,
+    };
+  },
+
+  markMobSeen(typeName) {
+    const id = String(typeName ?? "").trim();
+    if (!id) return false;
+    const key = mobWorldStateKey(id, "seen");
+    if (this.worldState?.flags?.[key]) return false;
+    this.worldState = setWorldFlag(this.worldState, key, true);
     return true;
   },
 
@@ -187,6 +228,8 @@ export const regionMethods = {
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
     if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
+    this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "cleared"), cleared);
+    this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "corrupted"), !cleared);
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -240,6 +283,9 @@ export const regionMethods = {
     this.projectiles = [];
     this.groundHazards = [];
     this.particles = [];
+    this.particleEngine?.clearMapEmitters();
+    this.__ambientParticleEmitters = new Map();
+    this.__weatherParticleEmitters = new Map();
     this.floaters = [];
     this.hoverMonsterId = null;
     this.nearbyQuestgiver = null;
@@ -393,6 +439,7 @@ export const regionMethods = {
     monster.leapAttack = base.leapAttack ? { ...base.leapAttack } : null;
     monster.attackCooldownConfig = base.attackCooldown ? { ...base.attackCooldown } : null;
     monster.meleeAreaDamage = base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null;
+    monster.shadow = base.shadow ? { ...base.shadow } : null;
     monster.haveMinion = Boolean(base.haveMinion);
     monster.minions = base.minions ?? false;
     monster.minionCooldown = Math.max(0, Number(monster.minionCooldown) || 0);

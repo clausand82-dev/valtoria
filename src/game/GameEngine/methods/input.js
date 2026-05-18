@@ -27,6 +27,7 @@ export const inputMethods = {
     this.pointer.worldY = world.y;
     const hovered = this.monsterAtScreen(this.pointer.x, this.pointer.y);
     const hoverMonsterId = hovered?.id ?? null;
+    if (hovered) this.markMobSeen?.(hovered.typeName);
     if (hoverMonsterId !== this.hoverMonsterId) {
       this.hoverMonsterId = hoverMonsterId;
       this.publishSnapshot();
@@ -51,6 +52,7 @@ export const inputMethods = {
     this.pointer.down = true;
     const monster = this.monsterAtScreen(this.pointer.x, this.pointer.y);
     if (monster) {
+      this.markMobSeen?.(monster.typeName);
       this.player.attackTargetId = monster.id;
       this.player.attackObjectId = null;
       const stats = this.calcStats();

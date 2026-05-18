@@ -291,13 +291,21 @@ export const renderingMethods = {
     ctx.clearRect(0, 0, this.width, this.height);
     ctx.translate(shakeX, shakeY);
     this.drawBackdrop(ctx);
+    this.drawParticles(ctx, "backgroundParticles");
     this.drawTiles(ctx);
+    this.drawParticles(ctx, "aboveGround");
+    this.drawParticles(ctx, "belowUnits");
     this.drawParticles(ctx, "belowEntities");
     this.drawWorldObjects(ctx);
+    this.drawParticles(ctx, "aboveObjects");
+    this.drawParticles(ctx, "aboveUnits");
+    this.drawParticles(ctx, "effects");
     this.drawParticles(ctx, "aboveEntities");
     this.drawFloaters(ctx);
+    this.drawParticles(ctx, "weatherOverlay");
     this.drawWeatherEvents(ctx);
     this.drawFogOfWar(ctx);
+    this.drawParticles(ctx, "screenOverlay");
     this.drawVignette(ctx);
     ctx.restore();
   },
@@ -437,7 +445,10 @@ export const renderingMethods = {
       if (alpha <= 0.02) continue;
       const screen = worldToScreen(projectile.x, projectile.y, 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 130)) {
-        drawables.push({ type: "projectile", projectile, screen, alpha, layer: 1, depth: screen.y + 8 });
+        const beamStartScreen = projectile.beam
+          ? worldToScreen(projectile.beamStartX ?? projectile.x, projectile.beamStartY ?? projectile.y, 0, this.camera)
+          : null;
+        drawables.push({ type: "projectile", projectile, screen, beamStartScreen, alpha, layer: 1, depth: screen.y + 8 });
       }
     }
 
@@ -480,7 +491,7 @@ export const renderingMethods = {
         this.drawObjectHealthBar(ctx, item.object, item.screen);
       }
       if (item.type === "loot") drawLoot(ctx, item.screen, item.loot, this.atlas);
-      if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas);
+      if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas, item.beamStartScreen);
       if (item.type === "questgiver") drawQuestgiver(ctx, item.screen, item.questgiver, this.time);
       if (item.type === "monster") drawMonster(ctx, item.screen, item.monster, this.atlas, this.time, this.animationSheets);
       if (item.type === "hero") {
@@ -528,6 +539,13 @@ export const renderingMethods = {
   },
 
   drawParticles(ctx, layer = "aboveEntities") {
+    this.particleEngine?.render(ctx, layer, {
+      width: this.width,
+      height: this.height,
+      camera: this.camera,
+      fogPointAlpha: (point) => this.fogPointAlpha(point),
+      debugParticles: this.debugParticles,
+    });
     for (const p of this.particles) {
       const particleLayer = p.configParticle || p.effectParticle ? (p.renderLayer ?? "aboveEntities") : "aboveEntities";
       if (particleLayer !== layer) continue;

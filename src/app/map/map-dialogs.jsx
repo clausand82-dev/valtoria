@@ -3,6 +3,7 @@ import { CITY_BUILDINGS } from "../../game/config/city-buildings-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../../game/config/map-region-config.js";
 import { QUEST_DEFS } from "../../game/config/quest-config.js";
 import { getQuestStartNpcIds } from "../../game/GameEngine/helpers.js";
+import { resolveMapRegionConfig } from "../../game/world-state.js";
 import { regionStatusKey } from "../save/save-keys.js";
 const cityPrebuildCache = { layout: null };
 
@@ -119,14 +120,22 @@ function renderCityMinimap(canvas, heroPosition) {
   ctx.strokeRect(1, 1, width - 2, height - 2);
 }
 
-export function RegionMapDialog({ initialMapId, regionCorruption, completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
+export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
   const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
   const [hoveredRegionId, setHoveredRegionId] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [lockedRegion, setLockedRegion] = useState(null);
   const isWorldMap = selectedMapId === WORLD_MAP.id;
   const activeMap = isWorldMap ? WORLD_MAP : AREA_MAPS[selectedMapId] ?? WORLD_MAP;
-  const activeRegions = MAP_REGION_SETS[selectedMapId] ?? [];
+  const activeRegions = useMemo(() => (
+    (MAP_REGION_SETS[selectedMapId] ?? []).map((rawRegion) => ({
+      rawRegion,
+      region: resolveMapRegionConfig(rawRegion, worldState, {
+        areaMapId: selectedMapId,
+        regionId: rawRegion.id,
+      }),
+    }))
+  ), [selectedMapId, worldState]);
   useEffect(() => {
     setSelectedMapId(initialMapId ?? WORLD_MAP.id);
     setHoveredRegionId(null);
@@ -145,7 +154,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
   };
   const completedQuestSet = new Set(completedQuests.map(String));
   const currentArmy = Math.max(0, Math.floor(Number(army) || 0));
-  const activateRegion = (region) => {
+  const activateRegion = (regionEntry) => {
+    const region = regionEntry?.region ?? regionEntry;
+    const rawRegion = regionEntry?.rawRegion ?? region;
     if (!regionIsUnlocked(region, completedQuestSet, currentArmy)) {
       setSelectedRegion(region);
       setLockedRegion(region);
@@ -159,7 +170,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
       return;
     }
     setSelectedRegion(region);
-    onPlayableRegionSelected?.(selectedMapId, region);
+    onPlayableRegionSelected?.(selectedMapId, rawRegion);
   };
   const handleRegionKeyDown = (event, region) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -207,8 +218,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
             {activeRegions.length > 0 && (
               <>
                 <svg className="world-map-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={`Klikbare omraader paa ${activeMap.title}`}>
-                  {activeRegions.map((region) => (
+                  {activeRegions.map((entry) => (
                     (() => {
+                      const region = entry.region;
                       const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
                       const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                       return (
@@ -219,7 +231,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
                       role="button"
                       tabIndex={0}
                       aria-label={locked ? `${region.label} er laast` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
-                      onClick={() => activateRegion(region)}
+                      onClick={() => activateRegion(entry)}
                       onKeyDown={(event) => handleRegionKeyDown(event, region)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
                       onMouseLeave={() => setHoveredRegionId(null)}
@@ -233,7 +245,8 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
                     })()
                   ))}
                 </svg>
-                {activeRegions.map((region) => {
+                {activeRegions.map((entry) => {
+                  const region = entry.region;
                   const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
                   const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                   return (
@@ -248,7 +261,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, completedQuest
                       key={`${region.id}-label`}
                       aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}`}
                       title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)}` : region.label}
-                      onClick={() => activateRegion(region)}
+                      onClick={() => activateRegion(entry)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
                       onMouseLeave={() => setHoveredRegionId(null)}
                       onFocus={() => setHoveredRegionId(region.id)}

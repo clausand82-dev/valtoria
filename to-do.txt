@@ -137,39 +137,143 @@ Fractions systemet skal have konsekvens ind i handel og ind i chance for overfal
 - bruge mobs ikoner (first idle frame) som ikoner for mobs gruppe på city map. Hp eller dm kan være repræsenteret af styrke. Hvis Nethrendor f.eks. har 50 i styrke, så placeres der mobs for tilsvarende styre i HP eller dm eller hvad jeg vælger, der skal matche.
 - Måske Nethrendor starter med en vis styrke, og mobs, der er under hans kommando reducere i den styrke (måske fraction systemet skal bruges her). Quest kan tilføje elelr fjerne nethrendor army_styrke. Når army styrke er over en vis del af ens egen army styrke, kan der måske ske de her angreb på ens by - corruption skal have noget at sige her.
 
-WorldState der dækker blandt andet:
-- er bestemte areas/regions unlocked
-- er bestemt mobs set 
-- hvilken boss er defeated
-- hvilken bygninger er bygget
 
-ect.:
-worldState: {
-  "inn.cellar.cleared": true,
-  "river_creek.unlocked": true,
-  "nethrendor.army_seen": true,
-  "barn.boss_defeated": false,
-  "city.wall_breached_north": true
-}
+REGIONS STATS
+- hver region skal have stats data (refuge, health osv) der påvirker byen. Og udfra wolrdstates (corrupted, non corrupted), så bidrage hver region med X af den stats. Skal enten have et day system, eller blot være fixed og så skal noget andet styre variablerne (eller påvirkning sker ved hvert besøg?)
 
-og så skal alle disse "flag" kunne bruges til betingelser for tileset, decay, weather, mobs, objects, foliage, prefeb, quests, unlock maps, unlock item drops.
+QUEST DER KOMMER FRA TOWN HALL
+Flytte repeat quest over til Town Hall by tavle noget
+
+MAP QUEST
+Quest der er tilknyttet maps og starter første gang man er på map! Lidt mere kompleks system.
+Kan være random evensts quest (udfra en serie af quest), kan være repeatable, måske quest tied up på prefabs
+Skal quest så i prefab i stedet, ligesom events kan komme det?
+
+CITY STATS
+Hvilke stats skal byen have mere end dem der er nu? Alle stats skal give mening og have betydning
 
 --- RANDOM EVENTS ---
 Hver region kan få et random event tag, der beskriver hvilke random event's der kan ske, og weight på det.
 Event skal komme fra en event-config, hvor det defineres om event er onetime, id, text, obejct det er relateret til, hvad event gør/giver/kræver osv.
+
+WORLDSTATES 
+Tracke meget mere end i dag - også mere end jeg måske behøver - det er billig data til statistik.
+
+QUESTLOG 
+Skal vise alle completed og active quest.
+
+STATISTIK SIDE
+Skal vises pænere og mere. Hænger sammen med worldstate.
+
+DONATION 
+Hvis man nu kan donere våben udefra vildmarken til en form for sværd, spyd osv til en slags armory, hvor de så kan bruges til at få soldater med (pris er noget fra armory)
+
+FRACTIONER - NY IDE:
+Hvis fractioner nu er de grundlæggende (som også findes på samlekort), så kan hvert map være knyttet op på hvilken fraction region styres af (kan også bruges i betingelser) - evt. rulles der efter hvert map besøg?
+
+CITY STATS
+population
+antal borgere; påvirker antal units man kan træne til hæren
+Hver cleared region øger population med de forskellige maps populationGain pr gang
+
+housing
+boligkapacitet; sætter loft for population (flere borgere end population giver flere problemHomeless)
+Housing opnåes ved at bygge housing areas og opgraderer de områder
+
+food (provision)
+fødevarestatus; påvirker morale, health og befolkningsvækst.
+forbedres med bygninger og marker, og regioner kan bidrage til mad
+hver region kan give X i food
+
+water
+vandforsyning; påvirker health, cleanliness, diseaseRisk og fireRisk.
+forbedres med bygninger og marker, og regioner kan bidrage til mad
+hver region kan give X i water
+
+supply
+generel forsyning - forbedres ved flere cleared regions, forværres af dårlig safety
+hver region kan give X i supply
+
+wealth
+rigdom; forbedres af trade og supply
+
+trade
+handelsaktivitet; påvirker wealth
+Hver region kan bidrage til at forbedre trade
+
+safety
+er som udgangspunkt 100%, men for hver mobs lvl tilstede ved city, forværres med 2%
+
+health
+folkesundhed; påvirkes af water og food 
+Hvis water og food ikke matcher population, falder health med 15%
+
+defense
+samlet forsvar (den gamle armypower) defence er byens samlede armyValue fra units
+
+popularity
+spillerens ry; påvirker priser, NPC adgang og quests. og endda regions unlocks
+forbedres af handlinger i battle (mobs giver eller koster popularity)
+
+knowledge
+viden; øges af readable lore books samlet og mobs info og visse events
+Hvis knowledge matcher population, så forbedres byens defence med 5%
+hver region kan give X i knowledge
+
+culture
+kultur; øges af readable lore books samlet og mobs info og visse events
+Hvis culture matcher population siger popularity med 10%
+hver region kan give X i culture
+
+faith
+tro/åndelig styrke; øges af readable lore books samlet og mobs info og visse events
+Hvis faith matcher population, stiger heros droprate på ikke unieque drops med 5%
+hver region kan give X i faith
+
+maintenance
+Det gennemsnitlige durability niveau (procenttal) af alle byens byggede arealer og bygninger
+
+City events der kan opstår, hvis visse betingelser er opfyldt:
+
+
+Uprising (poorness):
+Uprising skal bekæmpes med hero eller army som var det mobs (mobs er villages)
+Når wealth og population er for langt fra hinanden øges chancen for uprising.
+Når uprising er bekæmpet, kan x antal population risikere at forsvinde
+Så længe der er uprising pga poorness, får hero 50% færre guld i drop
+Uprising vises med grafik ligesom mini mobs (skal have tilføjet den grafik)
+
+Hungersnød:
+Sker hvis food er lavere end population.
+Så længe der er hungersnød, kan 25% af population ikke bruges til rekruttering af army og hero får 50% mindre kød, fruit og wheat i drop
+
+Vandmangel:
+Sker hvis vandforsyning er lavere end population
+Så længe der er vandmangel, kan 45 % af population ikke bruges til rekruttering af army. Hero får ingen health og mana portion drops
+
+Sygdomsudbrud:
+Sker hvis health er lavere end population
+Sygdomsudbrud kan kun forbedres med udvidelse af sygehusvæsen.
+Sygdomsudbrud bliver værre og værre, hvis ikke der sker nogen forbedring.
+Sygdomsudbrud sænker heros maks hp med 25%
+
+Brand:
+Hvis safety er for lav kan brand opstå - hvis der samtidig er vandmangel, er chancen endnu større.
+Brand fjerner midlertidig 20% af byens resterende vandforsyning.
+Brand slukkes, når vand nivaeu igen matcher population
+
+Der kan komme flere City events senere.
+
+REGIONS STATS
+Regions kan give bonuser i supply, populationGain, water, food, knowledge, culture, faith
+
+En region kan være corrupted i lvl 0-10, hver lvl er 10%. I starten er alle region 100% corrupted. Bliver et map clearet for alle mobs, er map på corruption 0%, dvs cleared. Hvis man forlader map før tid, så stiger corruption med den procentdel af mobs der er tilbage (der var 100 mobs, og man klarede 80 inden man forlod map, så stiger corroption med 20% - dvs 2 lvl). Der rundes altid op til hele procent, så 18% bliver til 2 lvl. 11 procent bliver til 2 lvl.
+Den bonus et map giver i regions stats er altid med udgangspunkt i total cleared. Har man 2 lvl corruption, så får man 20% mindre i den bonus.
+
+
 
 
 --- IN WORK ---
 
 
 ---------------------------DONE------------------------------
-
-ok - så lad os sige at vi skal have følgende worldstates:
-flags for om områder er corrupted/noncorrupted i den aktuelle stund
-Det samme med explored, cleared, unlocked på alle regions.
-Et flag for hvilke mobs man har set (seen/unseen)
-Et flag for om quest er tilgængelig, started, completed (måske vi allerede har mulighed for at se om quest er gennemført tror jeg)
-
-og så skal disse flag kunne bruges generelt på alt i map-region (på nær id og andre lignende para det ikke giver mening på)
-
-kan vi gøre det i et hug og evt hvordan - blot et svar

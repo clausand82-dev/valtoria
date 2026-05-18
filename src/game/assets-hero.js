@@ -46,7 +46,7 @@ function drawAnimatedHeroSheet(ctx, screen, hero, sheet, castSheet) {
 		}
 		: heroAnchor;
 
-	drawShadow(ctx, screen.x, screen.y + 17, 29 + speed * 7, 11 + speed * 2, 0.42);
+	drawShadow(ctx, screen.x, screen.y + 17, 29 + speed * 7, 11 + speed * 2, 0.42, hero.shadow);
 	drawSheetFrame(ctx, activeSheet, activeRow, col, screen.x, screen.y + 30 + bob, {
 		scale: finalScale,
 		flipX,

@@ -46,7 +46,7 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 		: Math.sin(time * monster.breathSpeed + monster.animSeed) * 1.2;
 	const scale = cfg.scale * (monster.visualScale || 1);
 
-	drawShadow(ctx, screen.x, screen.y + (cfg.shadowY ?? 17), cfg.shadowW, cfg.shadowH, cfg.shadowAlpha);
+	drawShadow(ctx, screen.x, screen.y + (cfg.shadowY ?? 17), cfg.shadowW, cfg.shadowH, cfg.shadowAlpha, monster.shadow ?? cfg.shadow);
 	drawSheetFrame(ctx, sheet, seq.row, col, screen.x, screen.y + cfg.yOffset + bob, {
 		scale,
 		flipX,

@@ -19,6 +19,7 @@ import {
 } from "../helpers.js";
 import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill-tree-config.js";
 import { normalizeAutoLootRules } from "./loot.js";
+import { normalizeWorldState } from "../../world-state.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -89,6 +90,7 @@ export const snapshotMethods = {
           : { id: "none", label: "No weather" },
       },
       regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
+      worldState: normalizeWorldState(this.worldState),
       mobs: this.monsterCounterSnapshot(),
       mapReturn: this.mapReturn ? { ...this.mapReturn } : null,
       lastDeath: this.lastDeath ? { ...this.lastDeath } : null,

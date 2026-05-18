@@ -15,6 +15,7 @@ import { normalizePrefabContent } from "./world/map-prefab-placement.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
 import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
 import { RESOURCE_DEFS } from "./config/resource-config.js";
+import { normalizeShadowConfig } from "./config/shadow-config.js";
 
 export const ATLAS_FRAMES = {
   grassTile: { x: 8, y: 24, w: 296, h: 174 },
@@ -2436,11 +2437,32 @@ function traceGroundDiamond(ctx, x, centerY, halfW, halfH) {
   ctx.closePath();
 }
 
-export function drawShadow(ctx, x, y, width, height, alpha = 0.32) {
+export function drawShadow(ctx, x, y, width, height, alpha = 0.32, shadow = null) {
+  const fallbackOpacity = Math.min(0.3, Math.max(0.08, (Number(alpha) || 0.25) * 0.68));
+  const config = normalizeShadowConfig(shadow, {
+    width: Math.max(1, (Number(width) || 20) * 2),
+    height: Math.max(1, (Number(height) || 8) * 2),
+    opacity: fallbackOpacity,
+    blur: 2,
+  });
+  if (config.type === "none") return;
+
+  const radiusX = config.width * 0.5;
+  const radiusY = config.height * 0.5;
+  const cx = x + config.offsetX;
+  const cy = y + config.offsetY;
   ctx.save();
-  ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+  if (config.blur > 0) ctx.filter = `blur(${config.blur}px)`;
+  ctx.translate(cx, cy);
+  if (config.skewX) ctx.transform(1, 0, Math.tan(config.skewX), 1, 0, 0);
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(radiusX, radiusY));
+  gradient.addColorStop(0, `rgba(0, 0, 0, ${config.opacity})`);
+  gradient.addColorStop(0.36, `rgba(0, 0, 0, ${config.opacity * 0.62})`);
+  gradient.addColorStop(0.72, `rgba(0, 0, 0, ${config.opacity * 0.18})`);
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = gradient;
   ctx.beginPath();
-  ctx.ellipse(x, y, width, height, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 }

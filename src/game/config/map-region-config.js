@@ -111,160 +111,134 @@ export const AREA_MAPS = {
 /*
 Region parameter guide:
 
-Required map/UI fields:
-- id: Unique stable region id in English kebab-case. Used for saved corruption state and region data hooks.
-- label: Display name shown on the map.
-- points: SVG polygon points in percentage coordinates: "x,y x,y x,y". These define the clickable/highlighted area.
-- labelX / labelY: Label position in percentage coordinates on the map.
-- color: Base polygon color. World map uses this color directly; area maps are tinted red/green by corruption state.
+Example region with old and conditional formats:
 
-Optional navigation fields:
-- targetMapId: Area map id to open when clicking a world-map region. If omitted, the region id is used as the target map id.
-- unlock: Access requirements before the region can be opened.
-  Available keys:
-  - locked: true keeps the region locked even without quest requirements. Useful for areas whose quest is not implemented yet.
-  - text: Custom lock text shown on the map.
-  - completedQuests: Quest ids that must be completed first.
+region({
+  id: "example-copse",                                      // Unique stable id. Used for region worldState keys and saved corruption.
+  label: "Example Copse",                                  // Display name shown on maps and run UI.
+  points: "12,20 28,18 31,35 15,39",                       // SVG polygon points in percent coordinates for map click/hover.
+  labelX: 21,                                               // Map label x position in percent.
+  labelY: 28,                                               // Map label y position in percent.
+  color: "#5f8f5f",                                         // World-map polygon color. Area maps still tint corrupted/cleared red/green.
+  targetMapId: "elvindale",                                // Optional world-map navigation target. Omit to use region id.
+  unlock: { completedQuests: ["first_hunt"], army: 10 },    // Optional map access requirements. locked/text/requiredArmy are also supported.
 
-Optional gameplay fields:
-- corrupted: Boolean starting corruption state. Defaults to true. Corrupted regions show red; cleared/noncorrupted regions show green.
-- populationGain: How many citizens the city gains the first time this region is liberated.
-  Later completed runs add ceil(populationGain * repeatRunPct) from city-stats-rules-config.js.
-  If omitted, city stats use CITY_STATS_RULES.mapLiberation.defaultPopulationGain.
-- tileset: Optional ground tileset override for this region.
-  Supported formats:
-  - string: "my_tileset.png" (uses all 16 tiles in a 4x4 sheet)
-  - object: { fileName: "my_tileset.png", x: 1, y: 1 } (locks to one 4x4 tile cell)
-  Notes:
-  - x/y are 1-based where x=1,y=1 is the first tile in the sheet.
-  - If tileset is missing, ground falls back to the default grass tileset.
-- water / waterSet / waterSets: Optional water tileset selection for this region.
-  Supported formats match foliage:
-  - string: "tileset/tileset_water.png" (uses all 16 cells)
-  - object: { fileName: "tileset/tileset_water.png", weight: 1, x: [1, 2], y: [1, 3] }
-  Notes:
-  - x/y are optional 1-based cell selectors on the 4x4 sheet.
-  - Water only appears when spawnCounts.water is above 0.
-- foliageSets / foliageSet: Optional foliage sheet override(s) for this region.
-  Supported formats:
-  - string: "my_foliage.png" (defaults to 4x4)
-  - object: { fileName: "my_foliage.png", rows: 4, cols: 4 }
-  - object with fixed scale: { fileName: "my_foliage.png", scale: 1.1 }
-  - object with loot: { fileName: "my_foliage.png", resourceDrop: { wood_piece: 0.04 } }
-  - object with attached visual particles:
-    { fileName: "foilage/foilage_deadanimal_small.png", particles: { type: "flies", chance: 0.75 } }
-  - array of strings/objects to mix multiple sheets.
-  Notes:
-  - If set, region foliage uses these sheets instead of biome+bones logic.
-  - Legacy 8x8 sheets can be used by setting rows/cols to 8.
-  - scale is per foliage sheet entry. If omitted, foliage keeps its current varied scale.
-  - resourceDrop maps resource ids from resource-config.js to a per-foliage chance.
-    The chance is rolled when each foliage piece is placed. No rolled resource means no E prompt.
-  - For amounts, use resourceDrop: { wood_piece: { chance: 0.04, min: 1, max: 2 } }.
-  - particles is visual-only and never creates gameplay entities. particles.type
-    must match a key in particle-presets.js / PARTICLE_PRESETS.
-- objects: Optional explicit object spawn list for this region.
-  If set and non-empty, this list overrides normal weight-based object selection.
-  Format: array of object definitions:
-  - { id: "object_tree_mainland", weight: 8 }
-  - { id: "object_woodboxes_ground", weight: 2, destructible: true }
-  - { id: "object_tree_mainland", weight: 8, scale: 1.2 }
-  - { id: "object_stone_cluster", weight: 2, scale: { min: 0.8, max: 1.2 } }
-  Fields:
-  - id: Object id from region-object-config.js
-  - weight: Relative spawn weight for this object id
-  - destructible: Optional override. true forces destructible, false blocks destruction.
-  - scale: Optional size multiplier for placed instances.
-    Supported formats:
-    - number: Fixed scale value, for example scale: 1.2
-    - object with fixed: { fixed: 1.2 } (same as scale: 1.2)
-    - object with range: { min: 0.8, max: 1.2 } rolls randomly between min and max
-    Notes:
-    - If scale is omitted, objects use default scale 1.0 (no variation).
-    - scale: 1 means 100% size, scale: 0.5 means 50% size.
-- decay: Optional decay/decal sheet selection for this region.
-  If set and non-empty, region decals use these sheet sets instead of the legacy
-  biome decal list.
-  Supported formats:
-  - string: "decay_spiderweb" (uses all 4x4 cells)
-  - object: { id: "decay_spiderweb", weight: 2, x: [1, 2, 4], y: [1, 2] }
-  - array: mix strings/objects to blend multiple decay sets
-  Notes:
-  - x/y are 1-based cell selectors on the 4x4 grid.
-  - If x/y are omitted, all cells from the decay set are used.
-  - particles can be attached to placed decals, for example blood/slim with flies.
-- ambient: Optional visual-only region atmosphere.
-  Example:
-  ambient: {
-    particles: [
-      { type: "fireflies", density: 0.2, area: "wholeMap", chance: 1 },
-      { type: "fogWisps", density: 0.1, area: "wholeMap", chance: 0.5 },
+  corrupted: true,                                          // Default starting corruption. Existing regionCorruption save still controls current state.
+  populationGain: 5,                                        // Citizens gained the first time this region is cleared.
+  mapSize: "medium",                                        // small, medium, large, or giga.
+
+  tileset: ["tileset/tileset_grass.png"],                   // Old format: fixed tileset list.
+  tileset: {                                                // New format: conditional field.
+    value: ["tileset/tileset_grass.png"],                   // Default value when no variant matches.
+    variants: [
+      {
+        requires: { flag: "region.example-copse.corrupted" }, // First matching variant wins.
+        value: ["tileset/tileset_swamp.png"],               // value replaces the whole default field.
+      },
+      {
+        requires: { counter: "region.example-copse.visits", gte: 3 }, // Counter condition.
+        patch: [{ fileName: "tileset/tileset_grass.png", x: 2, y: 2 }], // patch merges by fileName for tilesets.
+      },
     ],
-  }
-  TODO: area currently behaves as viewport/whole-map spawning. Add advanced
-  area rules later if region-specific masks or named zones become necessary.
-  Examples:
-  - swamp: { type: "fogWisps", density: 0.16, area: "wholeMap" }
-  - forest: { type: "fireflies", density: 0.14, area: "wholeMap" }
-  - dead animals foliage: { type: "flies", chance: 0.75, count: [4, 10], radius: 24 }
-  - campfires/bonfires: configured on object_fireplace_mainland with smoke + embers.
-- weather: Optional visual-only dynamic weather using the same particle system.
-  Missing weather means "none". active wins over possible.
-  Fixed weather:
-  weather: {
-    active: "light_rain",
-  }
-  Stable weighted weather for a generated battle map:
-  weather: {
+  },
+
+  water: [{ fileName: "tileset/tileset_water.png", weight: 1, x: [1, 2], y: [1, 3] }], // Water tiles. Water only appears when spawnCounts.water > 0.
+
+  foliageSet: [                                            // Old format: fixed foliage sheets.
+    { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // resourceDrop is chance per placed foliage.
+    { fileName: "foilage/foilage_roots.png", scale: 0.75 }, // fileName is the patch key for foliageSet.
+  ],
+  foliageSet: {                                             // New format: conditional foliage.
+    value: [
+      { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // Default foliage entry.
+      { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05 } }, // rows/cols/particles/depthMode also supported.
+    ],
+    variants: [
+      {
+        requires: { flag: "region.example-copse.corrupted" }, // Only applies while corrupted flag is true.
+        patch: [
+          { fileName: "foilage/foilage_roots.png", scale: 1.1, resourceDrop: { bonedust: 0.15 } }, // Deep-merges into matching default entry.
+          { fileName: "foilage/foilage_deadanimal_small.png", particles: { type: "flies", chance: 0.75 } }, // Adds entry if fileName is new.
+        ],
+      },
+    ],
+  },
+
+  objects: [                                                // Object ids come from region-object-config.js.
+    { id: "object_tree_mainland", weight: 8, destructible: true }, // weight is relative spawn chance.
+    { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
+  ],
+
+  decay: [                                                  // Decal/decay ids come from decay-config.js.
+    { id: "decay_spiderweb", weight: 2, x: [1, 2, 4], y: [1, 2] }, // x/y select 1-based cells in the 4x4 decay sheet.
+  ],
+
+  ambient: {                                                // Visual-only atmosphere.
+    particles: [{ type: "fireflies", density: 0.14, area: "wholeMap", chance: 1 }], // Particle types come from particle-presets.js.
+  },
+
+  weather: {                                                // Visual-only weather.
     possible: [
-      { id: "none", weight: 60 },
-      { id: "light_rain", weight: 25 },
+      { id: "none", weight: 60 },                           // Weighted stable roll for the generated map.
+      { id: "light_rain", weight: 25 },                     // active: "light_rain" can be used for fixed weather.
       { id: "fog", weight: 15 },
     ],
-  }
-  Notes:
-  - Weather presets live in weather-presets.js.
-  - Weather is visual-only in this version; gameplay fields are reserved for later.
-  - Particle layer "screen" is for rain/snow/ash over the viewport.
-  - Particle layer "world" reuses bounded world ambient spawning for low fog/magic haze.
-  - Unknown weather ids fall back to none and unknown particle types are skipped.
-- mobs: Array of monster types allowed in this region. Defaults to ["Wolf", "Spider"].
-  Supports plain strings (equal weight) and weighted objects:
-  - "Wolf"                           plain string, weight 1
-  - { type: "Spider", weight: 3 }    spawns 3x as often as weight-1 types
-  - Mix: ["Wolf", { type: "Spider", weight: 2 }, { type: "MiniSpider", weight: 1 }]
-- mapSize: Optional. Controls the generated map size.
-  Options: "small", "medium" (default), "large", "giga".
-  medium = current 72x52 tiles. small ~40x29, large ~108x78, giga ~158x114.
-- spawnCounts: Per-chunk spawn counts for generated maps.
-  Available keys:
-  - objects: Regular region objects per chunk.
-  - foliage: Foliage placements per chunk.
-  - decals: Decay/decal placements per chunk.
-  - water: Lake-like water patches per chunk. 0 disables water.
-  - monsters: { min, max } monster count range per chunk.
-  Legacy weights.foilage and weights.water are still migrated by region({...}) while old configs are cleaned up.
-- antiDrops: Drop blacklist for the region. This overrides normal drop rules.
-  Available keys:
-  - items: Item base names to block.
-  - resources: Resource ids to block.
-  - uniques: Unique item ids to block.
-  - named: Named item ids to block.
-  - categories: Loot categories to block, for example "weapon", "armor", "health", "mana".
-  - rarities: Rarity ids to block. Blocks the listed rarity AND all higher rarities.
-    Rarity order (lowest to highest): poor, normal, upgraded, rare, epic, legendary.
-    Example: rarities: ["rare"] blocks rare, epic, and legendary items.
-  - allItems: true blocks all equipment items (poor through legendary).
-  - allResources: true blocks all resource drops.
-  - allUniques: true blocks all unique item drops.
-  - allNamed: true blocks all named item drops.
-  - allPotions: true blocks all potion drops.
-  - allQuestItems: true blocks all quest item drops.
-  - allReadables: true blocks readable drops. Readables ignore rarity blocks.
+  },
+
+  prefabRules: {                                            // Prefabs come from map-prefab-config.js.
+    maxTotal: 2,                                            // Maximum prefab instances for the region.
+    minDistanceBetweenPrefabs: 8,                            // Minimum distance between prefab anchors.
+    anchors: ["clearing", "room"],                          // Allowed layout anchors.
+    pool: [{ id: "old_well_clearing", weight: 4, max: 2 }], // pool patching uses id.
+  },
+
+  mobs: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }], // Old format: fixed mob pool. Strings also work.
+  mobs: {                                                   // New format: conditional mob pool.
+    value: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }], // Default mob pool.
+    variants: [
+      {
+        requires: { all: [                                  // all means every nested condition must pass.
+          { flag: "region.example-copse.cleared" },         // Flag must be true.
+          { not: { flag: "mob.Skeleton.seen" } },           // not means the nested condition must fail.
+        ] },
+        patch: [{ type: "Wolf", weight: 1 }, { type: "WolfFenris", weight: 0.5 }], // patch merges by id/type for mobs.
+      },
+      {
+        blockedBy: { flag: "region.example-copse.cleared" }, // blockedBy removes this variant when the condition is true.
+        value: [{ type: "Skeleton", weight: 2 }],           // value replaces the whole mob pool.
+      },
+    ],
+  },
+
+  spawnCounts: {                                            // Per chunk spawn counts.
+    objects: 15,                                            // Regular objects.
+    foliage: 28,                                            // Foliage placements.
+    decals: 24,                                             // Decay/decal placements.
+    water: 0,                                               // Lake-like water patches. 0 disables water.
+    monsters: { min: 8, max: 12 },                          // Monster count range.
+  },
+
+  antiDrops: {                                              // Region drop blacklist.
+    resources: ["magic_essence"],                           // Blocks resource ids.
+    categories: ["weapon"],                                 // Blocks loot categories.
+    rarities: ["rare"],                                     // Blocks rare and all higher rarities.
+    allPotions: true,                                       // Also supports allItems/allResources/allUniques/allNamed/allQuestItems/allReadables.
+  },
+})
+
+Conditional config notes:
+- Old values still work unchanged. Only objects with { value, variants } use worldState resolution.
+- variants are checked in order; the first matching variant wins.
+- variant.value replaces the whole field.
+- variant.patch merges into the default field. Lists merge by id/type/fileName depending on field.
+- requires must pass. blockedBy must not pass.
+- Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
+- Automatic worldState currently tracks region.{id}.unlocked/explored/corrupted, region.{id}.visits, region.{id}.cleared on return, and mob.{typeName}.seen on hover/combat.
 
 Any extra fields passed to region({...}) are preserved on the region object for later use.
 */
 function normalizeMobs(mobs) {
+  if (!Array.isArray(mobs)) return mobs;
   return mobs.map((m) =>
     typeof m === "string"
       ? { type: m, weight: 1 }
@@ -295,14 +269,19 @@ function normalizeSpawnCounts(input = {}, weights = {}) {
   };
 }
 
+function isConditionalConfig(value) {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.variants) && Object.prototype.hasOwnProperty.call(value, "value"));
+}
+
 function region({ mobs = ["Wolf", "Spider"], mapSize = "medium", weights = {}, spawnCounts = {}, water, antiDrops = {}, corrupted = true, ...regionConfig }) {
   const normalizedSpawnCounts = normalizeSpawnCounts(spawnCounts, weights);
+  const conditionalSpawnCounts = isConditionalConfig(spawnCounts);
   return {
     corrupted,
     mapSize,
     tileset: regionConfig.tileset ?? DEFAULT_TILESET,
-    water: water ?? (normalizedSpawnCounts.water > 0 ? DEFAULT_WATER : undefined),
-    spawnCounts: normalizedSpawnCounts,
+    water: water ?? (conditionalSpawnCounts || normalizedSpawnCounts.water > 0 ? DEFAULT_WATER : undefined),
+    spawnCounts: conditionalSpawnCounts ? spawnCounts : normalizedSpawnCounts,
     mobs: normalizeMobs(mobs),
     antiDrops: {
       items: [],
@@ -685,7 +664,7 @@ export const MAP_REGION_SETS = {
       water: [ { fileName: "tileset/tileset_water.png", x: 2, y: 2, weight: 5 },],
       ambient: {
         particles: [
-          {
+            {
             type: "smoke",
             density: 0.52,
             movement: "drift",
@@ -816,7 +795,9 @@ export const MAP_REGION_SETS = {
       mapSize: "small",
       color: "#7fb172",
       tileset: "tileset/tileset_bricktiles.png",
-      spawnCounts: {
+
+      spawnCounts: 
+      {
         objects: 24,
         foliage: 100,
         decals: 56,
@@ -847,36 +828,47 @@ export const MAP_REGION_SETS = {
         { fileName: "tileset/tileset_water.png", x: 1, y: 2, weight: 1 },
       ],
       ambient: {
+        footstepDust: {
+          type: "dust_motes",
+          color: "#8b6d6d",
+          count: [10, 25],
+          stepChance: 0.95,
+          alpha: [0.15, 0.36],
+          size: [2, 6],
+          lifetime: [0.18, 0.32],
+          speed: [2, 5],
+          layer: "belowUnits",
+        },
         particles: [
-          {
-            type: "smoke",
-            density: 0.52,
-            movement: "drift",
-            color: "#a9aaa0",
-            size: [110, 260],
-            alpha: [0.12, 0.24],
-            lifetime: [12, 20],
-            speed: [0.01, 0.05],
-            ambientScale: 1,
-            renderLayer: "aboveEntities",
-            avoidPlayerRadius: 1.8,
-            avoidPlayerMinAlpha: 0.12,
-            chance: 1,
-          },
-          {
-            type: "fogWisps",
-            density: 0.28,
-            movement: "drift",
-            color: "#d0d0c4",
-            size: [44, 118],
-            alpha: [0.08, 0.18],
-            lifetime: [6, 12],
-            speed: [0.04, 0.12],
-            renderLayer: "aboveEntities",
-            avoidPlayerRadius: 1.4,
-            avoidPlayerMinAlpha: 0.16,
-            chance: 1,
-          },
+              {
+                type: "ground_fog",
+                density: 1.8,
+                movement: "drift",
+                color: "#c6c6b8",
+                size: [180, 340],
+                endSize: [280, 520],
+                alpha: [0.16, 0.34],
+                lifetime: [18, 36],
+                speed: [0.025, 0.08],
+                renderLayer: "aboveGround",
+                chance: 1,
+              },
+            {
+              type: "fogWisps",
+              density: 0.82,
+              movement: "drift",
+              color: "#deded2",
+              size: [70, 150],
+              endSize: [120, 240],
+              alpha: [0.08, 0.20],
+              lifetime: [8, 18],
+              speed: [0.04, 0.12],
+              renderLayer: "aboveEntities",
+              avoidPlayerRadius: 0,
+              avoidPlayerMinAlpha: 0,
+              chance: 1,
+            },
+            
         ],
       },
       foliageSet: [
@@ -902,7 +894,7 @@ export const MAP_REGION_SETS = {
       ],
       labelX: 60,
       labelY: 31,
-      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "Spawn of Archnogrim", weight: 1 }, { type: "Flesheater", weight: 0.55 }, { type: "MotherSpider", weight: 0.5 }],
+      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 }, "Ghost"],
       //weights: { house: 10, tree: 10, rock: 2, foilage: 9, fireplace: 1 },
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
