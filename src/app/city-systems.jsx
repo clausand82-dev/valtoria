@@ -1545,7 +1545,10 @@ function collectCityLayerUrlsFrom(entry, urls) {
 function loadCityHouseImages() {
   const entries = [];
   for (const building of CITY_BUILDINGS) {
-    if (building.imageUrl) entries.push([cityBuildingImageKey(building), building.imageUrl]);
+    if (building.imageUrl) {
+      entries.push([cityBuildingImageKey(building), building.imageUrl]);
+      entries.push([cityBuildingRuinImageKey(building), cityRuinImageUrl(building.imageUrl)]);
+    }
     for (const addon of building.addons ?? []) {
       if (addon.imageUrl) entries.push([cityAddonImageKey(building, addon), addon.imageUrl]);
     }
@@ -1561,8 +1564,17 @@ function cityBuildingImageKey(building) {
   return `building:${building.id}`;
 }
 
+function cityBuildingRuinImageKey(building) {
+  return `building:${building.id}:ruin`;
+}
+
 function cityAddonImageKey(building, addon) {
   return `addon:${building.id}:${addon.id}`;
+}
+
+function cityRuinImageUrl(imageUrl) {
+  if (!imageUrl || typeof imageUrl !== "string") return "";
+  return imageUrl.replace(/(\.[a-z0-9]+)$/i, "_ruin$1");
 }
 
 function isCityBuildingOwned(progress, building) {
@@ -1573,14 +1585,23 @@ function cityBuildingFromHouse(house) {
   return CITY_BUILDINGS.find((building) => building.id === house?.buildingId) ?? CITY_BUILDINGS[house?.spriteIndex];
 }
 
-function cityImageForBuilding(houseImages, building) {
+function cityImageForBuilding(houseImages, building, progress) {
   if (!building) return null;
+  if (progress) {
+    const state = getCityBuildingState(progress, building);
+    const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
+    const durability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
+    if (durability <= 50) {
+      const ruinImage = houseImages?.[cityBuildingRuinImageKey(building)];
+      if (ruinImage) return ruinImage;
+    }
+  }
   return houseImages?.[cityBuildingImageKey(building)] ?? null;
 }
 
-function cityImageForAddon(houseImages, building, addon) {
-  if (!building || !addon) return cityImageForBuilding(houseImages, building);
-  return houseImages?.[cityAddonImageKey(building, addon)] ?? cityImageForBuilding(houseImages, building);
+function cityImageForAddon(houseImages, building, addon, progress) {
+  if (!building || !addon) return cityImageForBuilding(houseImages, building, progress);
+  return houseImages?.[cityAddonImageKey(building, addon)] ?? cityImageForBuilding(houseImages, building, progress);
 }
 
 function imageSourceWidth(image) {
@@ -1899,6 +1920,7 @@ export {
   cityImageForBuilding,
   cityImageForAddon,
   cityBuildingImageKey,
+  cityBuildingRuinImageKey,
   cityBuildingFromHouse,
   cityAddonImageKey,
   cityAssetCache,

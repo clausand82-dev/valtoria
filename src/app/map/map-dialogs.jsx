@@ -191,6 +191,12 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
   const hoveredCorruptionText = hoveredRegionEntry
     ? regionHoverCorruptionText(selectedMapId, hoveredRegionEntry.region, regionCorruption)
     : "";
+  const mapCorruptionText = isWorldMap
+    ? ""
+    : `Average corruption: ${(areaAverageCorruptionLevel(regionCorruption, selectedMapId) ?? 0).toFixed(1)}/10`;
+  const statusRegion = hoveredRegionEntry?.region ?? selectedRegion;
+  const statusTitle = statusRegion?.label ?? activeMap.title;
+  const statusCorruptionText = hoveredCorruptionText || (statusRegion ? regionHoverCorruptionText(selectedMapId, statusRegion, regionCorruption) : mapCorruptionText);
   const activateRegion = (regionEntry) => {
     const region = regionEntry?.region ?? regionEntry;
     const rawRegion = regionEntry?.rawRegion ?? region;
@@ -322,18 +328,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
             )}
           </div>
           {!isWorldMap && (
-            <p className="map-note">
-              {selectedRegion
-                ? regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy)
-                  ? `${selectedRegion.label} | id: ${selectedRegion.id}`
-                  : `${selectedRegion.label} er laast. ${regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}`
-                : `${activeMap.title} er aabnet som underkort. Klik et omraade for at vaelge det.`}
-            </p>
-          )}
-          {hoveredRegionEntry && (
             <div className="map-hover-card" aria-live="polite">
-              <b>{hoveredRegionEntry.region.label}</b>
-              <span>{hoveredCorruptionText}</span>
+              <b>{statusTitle}</b>
+              <span>{statusCorruptionText}</span>
             </div>
           )}
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy) && (

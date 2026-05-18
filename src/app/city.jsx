@@ -127,6 +127,7 @@ import {
   cityBuildingIconText,
   cityBuildingLayerUrls,
   cityBuildingNextLevel,
+  cityBuildingRuinImageKey,
   cityCostAvailable,
   cityCostLabel,
   cityArmyCanTrainUnit,
@@ -182,6 +183,17 @@ import {
   researchRecipeKey,
 } from "./city-panel-helpers.jsx";
 
+const CITY_DAMAGE_SMOKE_TEXTURES = [
+  "/assets/generated/particles/chimney_smoke.png",
+  "/assets/generated/particles/smoke_puff.png",
+  "/assets/generated/particles/smokey_explosion.png",
+];
+const CITY_DAMAGE_FIRE_TEXTURES = [
+  "/assets/generated/particles/flame_01.png",
+  "/assets/generated/particles/flame_02.png",
+  "/assets/generated/particles/flame_03.png",
+  "/assets/generated/particles/flame_04.png",
+];
 
 function CityPage({
   engineRef,
@@ -242,7 +254,6 @@ function CityPage({
       : []
   ), [hoveredArea, cityProgress]);
   const visibleAreaBuildingGroups = useMemo(() => {
-    if (!CITY_BUILDING_CHIPS_ALWAYS_VISIBLE) return [];
     return interactiveAreas
       .filter((area) => isCityAreaUnlocked(cityProgress, area))
       .map((area) => ({
@@ -251,6 +262,9 @@ function CityPage({
       }))
       .filter((group) => group.buildingRefs.length > 0);
   }, [interactiveAreas, cityProgress]);
+  const visibleDamageAreas = useMemo(() => (
+    interactiveAreas.filter((area) => isCityAreaUnlocked(cityProgress, area))
+  ), [interactiveAreas, cityProgress]);
   const activeAreaPanelBuildings = useMemo(() => (
     activeAreaPanel && isCityAreaUnlocked(cityProgress, activeAreaPanel)
       ? cityAreaBuildingRefs(activeAreaPanel)
@@ -795,10 +809,16 @@ function CityPage({
               />
             )];
           })}
+          <CityBuildingDamageEffects
+            areas={visibleDamageAreas}
+            buildingGroups={visibleAreaBuildingGroups}
+            progress={cityProgress}
+          />
           {CITY_BUILDING_CHIPS_ALWAYS_VISIBLE && visibleAreaBuildingGroups.map(({ area, buildingRefs }) => (
             <CityMapHoverIcons
               area={area}
               buildingRefs={buildingRefs}
+              progress={cityProgress}
               npcRefs={[]}
               buildingImageUrls={cityBuildingImageUrls}
               onOpenBuilding={openBuilding}
@@ -810,6 +830,7 @@ function CityPage({
             <CityMapHoverIcons
               area={hoveredArea}
               buildingRefs={hoverAreaBuildings}
+              progress={cityProgress}
               npcRefs={[]}
               buildingImageUrls={cityBuildingImageUrls}
               onOpenBuilding={openBuilding}
@@ -848,6 +869,7 @@ function CityPage({
             progress={cityProgress}
             cityStats={cityStats}
             buildingRefs={activeAreaPanelBuildings}
+            buildingImageUrls={cityBuildingImageUrls}
             onUnlock={() => unlockArea(activeAreaPanel)}
             onUpgrade={() => upgradeArea(activeAreaPanel)}
             onRepair={(area, percent) => repairArea(area, percent)}
@@ -944,7 +966,7 @@ function CityAreaLabel({ area, unlocked }) {
   );
 }
 
-function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, onUnlock, onUpgrade, onRepair }) {
+function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, buildingImageUrls = {}, onUnlock, onUpgrade, onRepair }) {
   const unlocked = isCityAreaUnlocked(progress, area);
   const areaState = getCityAreaState(progress, area);
   const nextLevel = unlocked ? cityAreaNextLevel(area, areaState.level) : null;
@@ -957,7 +979,9 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
   const gates = cityAreaGateEntries(area, snapshot, cityStats);
   const costEntries = cityAreaCostEntries(area);
   const activeEffects = cityAreaActiveStatEffects(area, areaState.level);
-  const panelImageUrl = buildingRefs[0]?.building?.imageUrl ?? CITY_MAP_IMAGE.src;
+  const panelImageUrl = buildingRefs[0]?.building
+    ? cityBuildingMapImageUrl(buildingImageUrls, buildingRefs[0].building, progress)
+    : CITY_MAP_IMAGE.src;
   const durabilityValue = Math.max(0, Math.min(100, Number(areaState.durability ?? DURABILITY_DEFAULT) || 0));
   const repairPct = Math.max(0, Math.ceil(100 - durabilityValue));
   const repairCostEntries = computeRepairCostEntries(area.unlock?.cost ?? area.cost ?? {}, repairPct);
@@ -981,10 +1005,10 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
           </CityPanelSection>
           {buildingRefs.length > 0 && (
             <CityPanelSection title="Buildings">
-              <CityBuildingIconList buildingRefs={buildingRefs} />
+              <CityBuildingIconList buildingRefs={buildingRefs} buildingImageUrls={buildingImageUrls} progress={progress} />
             </CityPanelSection>
           )}
-          {area.id === "outer_5" && <CityCampStats cityStats={cityStats} />}
+          {area.id === "town_center" && <CityCampStats cityStats={cityStats} />}
           <CityPanelSection title="Durability">
             <div className="city-durability-meter" style={{ "--city-durability": `${durabilityValue}%` }}>
               <div className="city-durability-meter-head">
@@ -1030,7 +1054,7 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, on
           </CityPanelSection>
           {buildingRefs.length > 0 && (
             <CityPanelSection title="Buildings">
-              <CityBuildingIconList buildingRefs={buildingRefs} />
+              <CityBuildingIconList buildingRefs={buildingRefs} buildingImageUrls={buildingImageUrls} progress={progress} />
             </CityPanelSection>
           )}
           <CityPanelSection title="Unlock">
@@ -1060,16 +1084,19 @@ function CityPanelSection({ title, children }) {
   );
 }
 
-function CityBuildingIconList({ buildingRefs }) {
+function CityBuildingIconList({ buildingRefs, buildingImageUrls = {}, progress }) {
   if (!buildingRefs?.length) return null;
   return (
     <div className="city-area-building-icons">
-      {buildingRefs.map(({ building }) => (
-        <span className="city-area-building-chip" title={building.title} key={building.id}>
-          {building.imageUrl ? <img src={building.imageUrl} alt="" draggable="false" /> : <i>{cityBuildingIconText(building)}</i>}
-          <b>{building.title}</b>
-        </span>
-      ))}
+      {buildingRefs.map(({ building }) => {
+        const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
+        return (
+          <span className="city-area-building-chip" title={building.title} key={building.id}>
+            {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <i>{cityBuildingIconText(building)}</i>}
+            <b>{building.title}</b>
+          </span>
+        );
+      })}
     </div>
   );
 }
@@ -1119,11 +1146,158 @@ function CityCostGrid({ entries, snapshot, progress, emptyText = "No price confi
   );
 }
 
-function CityMapHoverIcons({ area, buildingRefs, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, onOpenBuilding, onOpenNpc }) {
+function CityBuildingDamageEffects({ areas, buildingGroups, progress }) {
+  const [flameFrameTick, setFlameFrameTick] = useState(0);
+  const areaEffects = (areas ?? []).flatMap((area) => {
+    const effect = cityAreaDamageEffect(progress, area);
+    if (!effect) return [];
+    const center = cityAreaCenter(area);
+    return [{
+      ...effect,
+      key: `${area.id}-area`,
+      title: area.title,
+      x: center.x,
+      y: center.y,
+    }];
+  });
+  const buildingEffects = (buildingGroups ?? []).flatMap(({ area, buildingRefs }) => (
+    (buildingRefs ?? []).flatMap(({ building, x, y }) => {
+      const effect = cityBuildingDamageEffect(progress, building);
+      if (!effect) return [];
+      return [{
+        ...effect,
+        key: `${area?.id ?? "city"}-${building.id}`,
+        title: building.title,
+        x,
+        y,
+      }];
+    })
+  ));
+  const effects = [...areaEffects, ...buildingEffects];
+  useEffect(() => {
+    if (effects.length === 0 || CITY_DAMAGE_FIRE_TEXTURES.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setFlameFrameTick((current) => (current + 1) % Math.max(1, CITY_DAMAGE_FIRE_TEXTURES.length * 24));
+    }, 135);
+    return () => window.clearInterval(timer);
+  }, [effects.length]);
+  if (effects.length === 0) return null;
+  return (
+    <div className="city-building-damage-effects" aria-hidden="true">
+      {effects.map((effect) => (
+        <span
+          className={`city-building-damage-effect ${effect.burning ? "burning" : "smoking"}`}
+          style={cityBuildingDamageEffectStyle(effect)}
+          title={`${effect.title} durability ${Math.round(effect.durability)}%`}
+          key={effect.key}
+        >
+          <img className="city-building-smoke smoke-a" src={CITY_DAMAGE_SMOKE_TEXTURES[0]} alt="" draggable="false" />
+          <img className="city-building-smoke smoke-b" src={CITY_DAMAGE_SMOKE_TEXTURES[1]} alt="" draggable="false" />
+          <img className="city-building-smoke smoke-c" src={CITY_DAMAGE_SMOKE_TEXTURES[2]} alt="" draggable="false" />
+          {effect.burning && (
+            <>
+              <CityDamageFlame className="fire-main" frameTick={flameFrameTick} seed={effect.key} offset={0} />
+              <CityDamageFlame className="fire-left" frameTick={flameFrameTick} seed={effect.key} offset={1} />
+              <CityDamageFlame className="fire-right" frameTick={flameFrameTick} seed={effect.key} offset={2} />
+              <CityDamageFlame className="fire-back" frameTick={flameFrameTick} seed={effect.key} offset={3} />
+              <CityDamageFlame className="fire-top-left" frameTick={flameFrameTick} seed={effect.key} offset={4} />
+              <CityDamageFlame className="fire-top-right" frameTick={flameFrameTick} seed={effect.key} offset={5} />
+              <CityDamageFlame className="fire-low" frameTick={flameFrameTick} seed={effect.key} offset={6} />
+            </>
+          )}
+          {effect.burning && (
+            <>
+              <i className="city-building-ember ember-a" />
+              <i className="city-building-ember ember-b" />
+              <i className="city-building-ember ember-c" />
+            </>
+          )}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CityDamageFlame({ className, frameTick, seed, offset = 0 }) {
+  const frameCount = CITY_DAMAGE_FIRE_TEXTURES.length;
+  if (frameCount <= 0) return null;
+  const seedOffset = Math.floor(cityEffectRange(seed, `${className}-frame`, 0, frameCount));
+  const frameIndex = (frameTick + seedOffset + offset) % frameCount;
+  return (
+    <img
+      className={`city-building-fire-sprite ${className}`}
+      src={CITY_DAMAGE_FIRE_TEXTURES[frameIndex]}
+      alt=""
+      draggable="false"
+      aria-hidden="true"
+    />
+  );
+}
+
+function cityAreaDamageEffect(progress, area) {
+  if (!area?.id) return null;
+  const state = getCityAreaState(progress, area);
+  if (!state.unlocked) return null;
+  const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
+  const durability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
+  if (durability > 75) return null;
+  return {
+    durability,
+    burning: durability <= 50,
+  };
+}
+
+function cityBuildingDamageEffect(progress, building) {
+  if (!building?.id) return null;
+  const state = getCityBuildingState(progress, building);
+  if ((Number(state.level) || 0) <= 0) return null;
+  const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
+  const durability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
+  if (durability > 75) return null;
+  return {
+    durability,
+    burning: durability <= 50,
+  };
+}
+
+function cityBuildingDamageEffectStyle(effect) {
+  const seedKey = effect.key ?? `${effect.x}:${effect.y}`;
+  return {
+    ...cityMapPositionStyle(effect.x, effect.y),
+    "--damage-scale": cityEffectRange(seedKey, "scale", 0.86, 1.18).toFixed(2),
+    "--smoke-a-delay": `${-cityEffectRange(seedKey, "smoke-a-delay", 0.1, 3.1).toFixed(2)}s`,
+    "--smoke-b-delay": `${-cityEffectRange(seedKey, "smoke-b-delay", 0.4, 3.6).toFixed(2)}s`,
+    "--smoke-c-delay": `${-cityEffectRange(seedKey, "smoke-c-delay", 0.2, 2.8).toFixed(2)}s`,
+    "--smoke-a-duration": `${cityEffectRange(seedKey, "smoke-a-duration", 2.6, 4.1).toFixed(2)}s`,
+    "--smoke-b-duration": `${cityEffectRange(seedKey, "smoke-b-duration", 3.2, 4.8).toFixed(2)}s`,
+    "--smoke-c-duration": `${cityEffectRange(seedKey, "smoke-c-duration", 2.3, 3.6).toFixed(2)}s`,
+    "--smoke-a-drift": `${cityEffectRange(seedKey, "smoke-a-drift", -18, 8).toFixed(1)}px`,
+    "--smoke-b-drift": `${cityEffectRange(seedKey, "smoke-b-drift", -10, 18).toFixed(1)}px`,
+    "--smoke-c-drift": `${cityEffectRange(seedKey, "smoke-c-drift", -22, 12).toFixed(1)}px`,
+    "--fire-delay": `${-cityEffectRange(seedKey, "fire-delay", 0, 0.7).toFixed(2)}s`,
+    "--ember-delay": `${-cityEffectRange(seedKey, "ember-delay", 0, 1.8).toFixed(2)}s`,
+  };
+}
+
+function cityEffectRange(key, salt, min, max) {
+  return min + (max - min) * cityEffectUnit(`${key}:${salt}`);
+}
+
+function cityEffectUnit(value) {
+  let hash = 2166136261;
+  const text = String(value ?? "");
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 4294967295;
+}
+
+function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, onOpenBuilding, onOpenNpc }) {
   return (
     <div className="city-map-hover-icons" aria-label={`${area.title} actions`}>
       {buildingRefs.map(({ building, x, y }) => {
-        const imageUrl = buildingImageUrls[cityBuildingImageKey(building)] || building.imageUrl || "";
+        const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
         return (
           <button
             type="button"
@@ -1170,6 +1344,31 @@ function CityMapHoverIcons({ area, buildingRefs, npcRefs, npcImageUrls = {}, bui
       ))}
     </div>
   );
+}
+
+function cityBuildingMapImageUrl(buildingImageUrls, building, progress) {
+  if (!building) return "";
+  const state = getCityBuildingState(progress, building);
+  const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
+  const durability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
+  if (durability <= 50) {
+    const ruinUrl = buildingImageUrls?.[cityBuildingRuinImageKey(building)];
+    if (ruinUrl) return ruinUrl;
+  }
+  return buildingImageUrls?.[cityBuildingImageKey(building)] || building.imageUrl || "";
+}
+
+function cityImageElementSrc(image, fallback = "") {
+  if (!image) return fallback || "";
+  if (typeof image === "string") return image;
+  if (typeof image.toDataURL === "function") {
+    try {
+      return image.toDataURL("image/png");
+    } catch {
+      return fallback || "";
+    }
+  }
+  return image.src || fallback || "";
 }
 
 function CityThreatMeter({ threatLevel }) {
@@ -1732,7 +1931,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const canBuyBuilding = remainingCostEntries.every(([resourceId, remaining]) => (
     remaining <= 0 || buildingResourceAvailable(resourceId) >= remaining
   )) && statRequirementsMet;
-  const sprite = cityImageForBuilding(houseImages, building);
+  const sprite = cityImageForBuilding(houseImages, building, progress);
+  const buildingImageSrc = cityImageElementSrc(sprite, building.imageUrl);
   const purchasedAddons = new Set(buildingState.addons ?? []);
   const activeAddon = (building.addons ?? []).find((addon) => addon.id === activeAddonId && purchasedAddons.has(addon.id)) ?? null;
   const storageSections = cityInventorySections(building, buildingState, owned);
@@ -2173,7 +2373,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
         <div className="city-popup-summary">
           <div className="city-building-thumb">
-            {building.imageUrl && <img src={building.imageUrl} alt="" draggable="false" />}
+            {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
           </div>
           <div>
             <p>{building.help}</p>
@@ -2256,7 +2456,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   onClick={() => setActiveAddonId(null)}
                   title="Repair equipped gear"
                 >
-                  {building.imageUrl && <img src={building.imageUrl} alt="" draggable="false" />}
+                  {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
                   <span>Repair</span>
                   <b>Base</b>
                 </button>
@@ -2268,7 +2468,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   onClick={() => setActiveAddonId(null)}
                   title={`${building.title} storage`}
                 >
-                  {building.imageUrl && <img src={building.imageUrl} alt="" draggable="false" />}
+                  {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
                   <span>{building.title}</span>
                   <b>{cityInventorySlotCount(building.inventoryType)} slots</b>
                 </button>
@@ -2278,8 +2478,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 const prebuiltAddon = Boolean(addon.prebuilt);
                 const unlocked = cityAddonIsUnlocked(addon, snapshot);
                   const affordable = (snapshot?.player?.gold ?? 0) >= (addon.cost?.gold ?? 0);
-                  const iconSprite = cityImageForAddon(houseImages, building, addon);
-                  const addonIconUrl = addon.imageUrl ?? building.imageUrl;
+                  const iconSprite = cityImageForAddon(houseImages, building, addon, progress);
+                  const addonIconUrl = cityImageElementSrc(iconSprite, addon.imageUrl ?? buildingImageSrc);
                   return (
                     <button
                       type="button"

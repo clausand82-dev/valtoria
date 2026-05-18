@@ -154,12 +154,9 @@ Event skal komme fra en event-config, hvor det defineres om event er onetime, id
 WORLDSTATES 
 Tracke meget mere end i dag - også mere end jeg måske behøver - det er billig data til statistik.
 
-
 STATISTIK SIDE
 Skal vises pænere og mere. Hænger sammen med worldstate.
 
-DONATION 
-Hvis man nu kan donere våben udefra vildmarken til en form for sværd, spyd osv til en slags armory, hvor de så kan bruges til at få soldater med (pris er noget fra armory)
 
 FRACTIONER - NY IDE:
 Hvis fractioner nu er de grundlæggende (som også findes på samlekort), så kan hvert map være knyttet op på hvilken fraction region styres af (kan også bruges i betingelser) - evt. rulles der efter hvert map besøg?

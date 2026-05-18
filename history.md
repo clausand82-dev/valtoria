@@ -8,6 +8,7 @@ History over changes
 - hover system added to the new stats with more detail
 - questlog show both completed and active quest
 - new building: Armory - use to convert items (weapon and armor) to weaponPoint and armorPoints to be uses at payment for units
+- added durability visual effect to city (smoke, flames and ruin pictures of buildings)
 
 * V 1.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)

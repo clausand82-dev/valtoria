@@ -132,6 +132,259 @@
   filter: saturate(0.95) brightness(1.08);
 }
 
+.city-building-damage-effects {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.city-building-damage-effect {
+  position: absolute;
+  width: clamp(62px, 6.4vw, 104px);
+  height: clamp(70px, 7.2vw, 118px);
+  transform: translate(-50%, -70%) scale(var(--damage-scale, 1));
+  pointer-events: none;
+}
+
+.city-building-smoke,
+.city-building-fire-sprite,
+.city-building-ember {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+}
+
+.city-building-smoke {
+  bottom: 12%;
+  width: 40%;
+  height: auto;
+  object-fit: contain;
+  filter: blur(0.4px) saturate(0.6) brightness(0.82);
+  mix-blend-mode: screen;
+  opacity: 0;
+  animation: city-building-smoke-rise var(--smoke-a-duration, 3.2s) ease-in-out infinite;
+}
+
+.city-building-damage-effect.smoking .city-building-smoke {
+  opacity: 0;
+  filter: blur(0.7px) saturate(0.5) brightness(0.78);
+}
+
+.city-building-damage-effect.burning .city-building-smoke {
+  filter: blur(0.5px) saturate(0.58) brightness(0.72);
+}
+
+.city-building-smoke.smoke-a {
+  left: 31%;
+  --smoke-drift: var(--smoke-a-drift, -10px);
+  animation-delay: var(--smoke-a-delay, -0.4s);
+  animation-duration: var(--smoke-a-duration, 3.2s);
+}
+
+.city-building-smoke.smoke-b {
+  left: 45%;
+  width: 50%;
+  --smoke-drift: var(--smoke-b-drift, 8px);
+  animation-duration: var(--smoke-b-duration, 3.8s);
+  animation-delay: var(--smoke-b-delay, -1.6s);
+}
+
+.city-building-smoke.smoke-c {
+  left: 15%;
+  width: 50%;
+  --smoke-drift: var(--smoke-c-drift, -15px);
+  filter: blur(0.7px) saturate(0.55) brightness(0.68);
+  mix-blend-mode: screen;
+  animation-duration: var(--smoke-c-duration, 2.8s);
+  animation-delay: var(--smoke-c-delay, -2.4s);
+}
+
+.city-building-fire-sprite {
+  z-index: 2;
+  aspect-ratio: 1;
+  height: auto;
+  opacity: 0.9;
+  filter:
+    saturate(1.65)
+    contrast(1.16)
+    drop-shadow(0 0 7px rgba(255, 92, 24, 0.78))
+    drop-shadow(0 0 13px rgba(255, 164, 40, 0.32));
+  mix-blend-mode: screen;
+  transform-origin: 50% 88%;
+  animation: city-building-fire-flicker 0.72s ease-in-out infinite alternate;
+  animation-delay: var(--fire-delay, 0s);
+  will-change: opacity, transform, filter;
+}
+
+.city-building-fire-sprite.fire-main {
+  left: 35%;
+  bottom: 22%;
+  width: 30%;
+  z-index: 4;
+  animation-duration: 0.64s;
+}
+
+.city-building-fire-sprite.fire-left {
+  left: 13%;
+  bottom: 20%;
+  z-index: 3;
+  width: 28%;
+  opacity: 0.88;
+  filter:
+    saturate(1.62)
+    contrast(1.2)
+    drop-shadow(0 0 8px rgba(255, 148, 38, 0.9));
+  transform-origin: 50% 78%;
+  animation-duration: 0.56s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.22s);
+}
+
+.city-building-fire-sprite.fire-right {
+  left: 61%;
+  bottom: 20%;
+  z-index: 3;
+  width: 27%;
+  opacity: 0.84;
+  filter:
+    saturate(1.55)
+    contrast(1.16)
+    drop-shadow(0 0 8px rgba(255, 115, 32, 0.82));
+  transform-origin: 50% 78%;
+  animation-duration: 0.62s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.36s);
+}
+
+.city-building-fire-sprite.fire-back {
+  left: 43%;
+  bottom: 41%;
+  z-index: 2;
+  width: 24%;
+  opacity: 0.62;
+  filter:
+    saturate(1.35)
+    brightness(0.95)
+    contrast(1.08)
+    drop-shadow(0 0 7px rgba(255, 94, 26, 0.52));
+  transform-origin: 50% 78%;
+  animation-duration: 0.76s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.45s);
+}
+
+.city-building-fire-sprite.fire-top-left {
+  left: 23%;
+  bottom: 38%;
+  z-index: 5;
+  width: 22%;
+  opacity: 0.76;
+  animation-duration: 0.52s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.15s);
+}
+
+.city-building-fire-sprite.fire-top-right {
+  left: 55%;
+  bottom: 36%;
+  z-index: 5;
+  width: 23%;
+  opacity: 0.78;
+  animation-duration: 0.58s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.48s);
+}
+
+.city-building-fire-sprite.fire-low {
+  left: 40%;
+  bottom: 9%;
+  z-index: 2;
+  width: 34%;
+  opacity: 0.66;
+  animation-duration: 0.82s;
+  animation-delay: calc(var(--fire-delay, 0s) - 0.3s);
+}
+
+.city-building-ember {
+  bottom: 20%;
+  z-index: 4;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #ffd45a;
+  box-shadow: 0 0 7px rgba(255, 137, 37, 0.95);
+  opacity: 0;
+  animation: city-building-ember-rise 1.65s ease-out infinite;
+  animation-delay: var(--ember-delay, -0.5s);
+}
+
+.city-building-ember.ember-a {
+  left: 42%;
+}
+
+.city-building-ember.ember-b {
+  left: 53%;
+  animation-duration: 1.25s;
+  animation-delay: calc(var(--ember-delay, -0.5s) - 0.55s);
+}
+
+.city-building-ember.ember-c {
+  left: 35%;
+  width: 3px;
+  height: 3px;
+  animation-duration: 1.95s;
+  animation-delay: calc(var(--ember-delay, -0.5s) - 1.05s);
+}
+
+@keyframes city-building-smoke-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 8px) scale(0.36) rotate(-4deg);
+  }
+  18% {
+    opacity: 0.54;
+  }
+  58% {
+    opacity: 0.28;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--smoke-drift, -10px), -58px) scale(1.45) rotate(7deg);
+  }
+}
+
+@keyframes city-building-fire-flicker {
+  0% {
+    transform: rotate(-2deg) skewX(-1deg) scale(0.9, 0.98);
+    opacity: 0.62;
+    filter:
+      saturate(1.35)
+      contrast(1.08)
+      drop-shadow(0 0 5px rgba(255, 92, 24, 0.58))
+      drop-shadow(0 0 10px rgba(255, 164, 40, 0.24));
+  }
+  46% {
+    transform: rotate(2deg) skewX(1deg) scale(1.06, 1.02);
+    opacity: 0.95;
+  }
+  100% {
+    transform: rotate(-1deg) skewX(0.5deg) scale(0.98, 1.08);
+    opacity: 0.82;
+  }
+}
+
+@keyframes city-building-ember-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 8px) scale(0.55);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(10px, -34px) scale(0.1);
+  }
+}
+
 .city-area-label {
   position: absolute;
   z-index: 4;
