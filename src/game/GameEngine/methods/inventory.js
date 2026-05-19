@@ -60,11 +60,22 @@ import {
   createAutoLootRules,
   normalizeAutoLootRules,
 } from "./loot.js";
+import {
+  canUnlockClassNode,
+  getUnlockedClassNodes,
+  normalizeClassId,
+  normalizeClassNodes,
+  unlockClassNode,
+} from "../../config/class-config.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
   const ids = [...Object.keys(recipe?.inputs ?? {}), recipe?.output].map(String);
   return ids.some((id) => id === "diamond" || id.includes("gemstone"));
+}
+
+function weaponHands(item) {
+  return item?.slot === "weapon" ? Math.max(1, Math.min(2, Math.floor(Number(item.hands) || 1))) : 1;
 }
 
 export const inventoryMethods = {
@@ -185,6 +196,47 @@ export const inventoryMethods = {
     return true;
   },
 
+  canEquipItemInSlot(item, slotId) {
+    if (!item) return { ok: false, reason: "No item" };
+    const classId = normalizeClassId(this.player.classId);
+    if (Array.isArray(item.classReq) && item.classReq.length && !item.classReq.map(String).includes(classId)) {
+      return { ok: false, reason: `Kraever class: ${item.classReq.join(", ")}` };
+    }
+    if (item.levelReq && (Number(this.player.level) || 1) < Number(item.levelReq)) {
+      return { ok: false, reason: `Kraever level ${item.levelReq}` };
+    }
+    if (item.requiresClassNode && !getUnlockedClassNodes(this.player).includes(String(item.requiresClassNode))) {
+      return { ok: false, reason: `Kraever class node ${item.requiresClassNode}` };
+    }
+    if (slotId === "offhand" && weaponHands(this.player.equipment?.weapon) >= 2) {
+      return { ok: false, reason: "Two-handed weapon blokerer offhand" };
+    }
+    if (slotId === "weapon" && weaponHands(item) >= 2 && this.player.equipment?.offhand) {
+      return { ok: false, reason: "Two-handed weapon kan ikke bruges med offhand" };
+    }
+    return { ok: true, reason: "" };
+  },
+
+  unlockClassNode(nodeId) {
+    const result = unlockClassNode(this.player, nodeId);
+    if (!result.ok) {
+      this.addToast(result.reason);
+      return false;
+    }
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.player.classNodes = normalizeClassNodes(this.player.classNodes);
+    this.addToast(`Class node: ${nodeId}`);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  canUnlockClassNode(nodeId) {
+    return canUnlockClassNode(this.player, nodeId);
+  },
+
   socketAddCost(item) {
     const sockets = normalizeSockets(item?.sockets);
     return 500 * (sockets.length + 1);
@@ -275,11 +327,19 @@ export const inventoryMethods = {
     if (slotId === "ring") {
       slotId = !this.player.equipment.ring1 ? "ring1" : !this.player.equipment.ring2 ? "ring2" : "ring1";
     }
+    const validation = this.canEquipItemInSlot(item, slotId);
+    if (!validation.ok) {
+      this.addToast(validation.reason);
+      return;
+    }
 
     const old = this.player.equipment[slotId];
+    const removedOffhand = slotId === "weapon" && weaponHands(item) >= 2 ? this.player.equipment.offhand : null;
     this.player.equipment[slotId] = item;
+    if (removedOffhand) this.player.equipment.offhand = null;
     this.player.inventory.splice(index, 1);
     if (old) this.addInventoryItem(old);
+    if (removedOffhand) this.addInventoryItem(removedOffhand);
 
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
@@ -297,11 +357,19 @@ export const inventoryMethods = {
     } else if (item.slot !== targetSlotId) {
       return false;
     }
+    const validation = this.canEquipItemInSlot(item, targetSlotId);
+    if (!validation.ok) {
+      this.addToast(validation.reason);
+      return false;
+    }
 
     const old = this.player.equipment[targetSlotId];
+    const removedOffhand = targetSlotId === "weapon" && weaponHands(item) >= 2 ? this.player.equipment.offhand : null;
     this.player.equipment[targetSlotId] = item;
+    if (removedOffhand) this.player.equipment.offhand = null;
     this.player.inventory.splice(index, 1);
     if (old) this.addInventoryItem(old);
+    if (removedOffhand) this.addInventoryItem(removedOffhand);
 
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
@@ -1008,12 +1076,32 @@ export const inventoryMethods = {
       if (item.critChance) parts.push(`+${pct(item.critChance)} crit chance`);
       if (item.critDamage) parts.push(`+${pct(item.critDamage)} crit damage`);
       if (item.blockChance) parts.push(`+${pct(item.blockChance)} block`);
+      if (item.blockAmount) parts.push(`+${item.blockAmount} block amount`);
       if (item.dodgeChance) parts.push(`+${pct(item.dodgeChance)} dodge`);
       if (item.lifeSteal) parts.push(`+${pct(item.lifeSteal)} life steal`);
       if (item.magicFind) parts.push(`+${pct(item.magicFind)} magic find`);
       if (item.goldFind) parts.push(`+${pct(item.goldFind)} gold find`);
       if (item.resourceFind) parts.push(`+${pct(item.resourceFind)} resource find`);
       if (item.xpGain) parts.push(`+${pct(item.xpGain)} XP gain`);
+      const resistLabels = [
+        ["physicalResist", "physical resist"], ["fireResist", "fire resist"], ["iceResist", "ice resist"],
+        ["lightningResist", "lightning resist"], ["poisonResist", "poison resist"], ["arcaneResist", "arcane resist"],
+        ["holyResist", "holy resist"], ["shadowResist", "shadow resist"], ["natureResist", "nature resist"],
+        ["allResist", "all resist"],
+      ];
+      for (const [key, label] of resistLabels) {
+        if (item[key]) parts.push(`${item[key] > 0 ? "+" : ""}${item[key]} ${label}`);
+      }
+      const damageBonusLabels = [
+        ["physicalDamageBonus", "physical damage"], ["fireDamageBonus", "fire damage"], ["iceDamageBonus", "ice damage"],
+        ["lightningDamageBonus", "lightning damage"], ["poisonDamageBonus", "poison damage"], ["arcaneDamageBonus", "arcane damage"],
+        ["holyDamageBonus", "holy damage"], ["shadowDamageBonus", "shadow damage"], ["natureDamageBonus", "nature damage"],
+        ["spellDamageBonus", "spell damage"], ["directDamageBonus", "direct damage"], ["areaDamageBonus", "area damage"],
+        ["dotDamageBonus", "DoT damage"], ["hazardDamageBonus", "hazard damage"],
+      ];
+      for (const [key, label] of damageBonusLabels) {
+        if (item[key]) parts.push(`+${pct(item[key])} ${label}`);
+      }
     };
     if (isResourceItem(item)) {
       parts.push(`Resource stack ${item.count ?? 1} / ${resourceStackMax(item.resourceId)}`);
@@ -1031,6 +1119,7 @@ export const inventoryMethods = {
       parts.push(`${item.damageMin}-${item.damageMax} skade`);
       parts.push(`${item.range} range`);
       parts.push(item.mode);
+      if (item.hands) parts.push(`${weaponHands(item)}H`);
       if (Array.isArray(item.effects?.onHit) && item.effects.onHit.length) parts.push(`on-hit ${item.effects.onHit.length}`);
       pushGearBonuses({ includeDamage: false });
     } else {
@@ -1040,6 +1129,9 @@ export const inventoryMethods = {
     if (sockets.length) {
       parts.push(`Sockets ${sockets.filter(Boolean).length}/${sockets.length}`);
     }
+    if (Array.isArray(item.classReq) && item.classReq.length) parts.push(`Class: ${item.classReq.join(", ")}`);
+    if (item.levelReq) parts.push(`Requires level ${item.levelReq}`);
+    if (item.requiresClassNode) parts.push(`Requires ${item.requiresClassNode}`);
     parts.push(`${item.value ?? itemValue(item)} g`);
     return parts.join(" | ");
   },

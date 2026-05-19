@@ -14,6 +14,8 @@ export const EQUIPMENT_SLOTS = [
   { id: "legs", label: "Legs", emptyIconKey: "common_legs" },
   { id: "feet", label: "Feet", emptyIconKey: "common_feet" },
   { id: "weapon", label: "Weapon", emptyIconKey: "common_sword" },
+  // TODO: Replace common_relic fallback with common_shield/common_offhand when that asset exists.
+  { id: "offhand", label: "Offhand", emptyIconKey: "common_relic" },
   { id: "relic", label: "Relic", emptyIconKey: "common_relic" },
 ];
 
@@ -31,16 +33,19 @@ export const ARMOR_BASES = [
   { slot: "legs", name: "Greaves", armor: 8, speed: 0.08 },
   { slot: "feet", name: "Boots", armor: 5, speed: 0.14 },
   { slot: "belt", name: "Belt", armor: 4, life: 12 },
-  { slot: "relic", name: "Relic", armor: 1, mana: 12, magic: 2 },
+  { slot: "relic", name: "Relic", type: "relic", armor: 1, mana: 12, magic: 2 },
+  { slot: "offhand", name: "Wooden Shield", type: "shield", armor: 5, blockChance: 0.03, blockAmount: 2 },
+  { slot: "offhand", name: "Iron Shield", type: "shield", armor: 9, blockChance: 0.05, blockAmount: 4 },
+  { slot: "offhand", name: "Frostguard Shield", type: "shield", armor: 7, blockChance: 0.04, blockAmount: 3, iceResist: 8, fireResist: -3 },
 ];
 
 export const WEAPON_BASES = [
-  { name: "Sword", mode: "melee", min: 7, max: 13, range: 1.25, cooldown: 0.52 },
-  { name: "Spear", mode: "melee", min: 8, max: 16, range: 1.65, cooldown: 0.72 },
-  { name: "Dagger", mode: "melee", min: 5, max: 10, range: 1.05, cooldown: 0.35 },
-  { name: "Crossbow", mode: "ranged", min: 9, max: 17, range: 5.3, cooldown: 0.86 },
-  { name: "Bow", mode: "ranged", min: 7, max: 14, range: 5.8, cooldown: 0.62 },
-  { name: "Javelin", mode: "ranged", min: 10, max: 20, range: 4.7, cooldown: 0.95 },
-  { name: "Rune Staff", mode: "magic", min: 8, max: 15, range: 5.2, cooldown: 0.74 },
-  { name: "Spell Mask", mode: "magic", min: 6, max: 12, range: 4.6, cooldown: 0.48 },
+  { name: "Sword", mode: "melee", min: 7, max: 13, range: 1.25, cooldown: 0.52, hands: 1 },
+  { name: "Spear", mode: "melee", min: 8, max: 16, range: 1.65, cooldown: 0.72, hands: 2 },
+  { name: "Dagger", mode: "melee", min: 5, max: 10, range: 1.05, cooldown: 0.35, hands: 1 },
+  { name: "Crossbow", mode: "ranged", min: 9, max: 17, range: 5.3, cooldown: 0.86, hands: 2 },
+  { name: "Bow", mode: "ranged", min: 7, max: 14, range: 5.8, cooldown: 0.62, hands: 2 },
+  { name: "Javelin", mode: "ranged", min: 10, max: 20, range: 4.7, cooldown: 0.95, hands: 1 },
+  { name: "Rune Staff", mode: "magic", min: 8, max: 15, range: 5.2, cooldown: 0.74, hands: 2 },
+  { name: "Spell Mask", mode: "magic", min: 6, max: 12, range: 4.6, cooldown: 0.48, hands: 1 },
 ];

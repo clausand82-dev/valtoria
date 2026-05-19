@@ -23,6 +23,7 @@ import {
   isDestructibleObject
 } from "../helpers.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
+import { DEFAULT_CLASS_ID } from "../../config/class-config.js";
 import { createAutoLootRules } from "./loot.js";
 
 function makeDevTestInventory() {
@@ -54,6 +55,9 @@ export const lifecycleMethods = {
       potions: { health: 0, mana: 0 },
       readableBonuses: createReadableBonuses(),
       skillTree: normalizeSkillTree(),
+      classId: DEFAULT_CLASS_ID,
+      classPoints: 0,
+      classNodes: [],
       unlockedSpells: ["ember_spark"],
       activeSpellId: "ember_spark",
       autoLoot: createAutoLootRules(),

@@ -402,7 +402,7 @@ export const MONSTER_DEFS = {
   "Shard Crawler": {
     sprite: "ghost",
     spriteUrl: sheetUrl("ghost"),
-    stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24 },
+    stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
   },
   "Deep Guard": {
     sprite: "skeleton",
@@ -506,7 +506,7 @@ export const MONSTER_DEFS = {
   Hellhound: {
     sprite: "hellhound",
     spriteUrl: sheetUrl("hellhound"),
-    stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18 },
+    stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18, fireResist: 30, iceResist: -20 },
     lootProfile: { goldChance: 0.5, goldMult: 0.95, weights: { health: 10, mana: 2, weapon: 12, armor: 14, none: 62 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.18 }, { resource: "coal", min: 1, max: 2, chance: 0.12 }] },
     popularity: { change: 0.9 },
@@ -514,7 +514,7 @@ export const MONSTER_DEFS = {
   Flesheater: {
     sprite: "flesheater",
     spriteUrl: sheetUrl("flesheater"),
-    stats: { hp: 168, damage: 46, speed: 0.34, range: 1.35, radius: 0.44, color: "#6b9f42", xp: 46 },
+    stats: { hp: 168, damage: 46, speed: 0.34, range: 1.35, radius: 0.44, color: "#6b9f42", xp: 46, poisonResist: 25 },
     lootProfile: { goldChance: 0.25, goldMult: 0.7, weights: { health: 16, mana: 8, weapon: 4, armor: 4, none: 68 } },
     resources: { loot: [{ resource: "fruit", min: 1, max: 2, chance: 0.18 }, { resource: "magic_essence", min: 1, max: 1, chance: 0.025 }] },
     popularity: { change: 0.75 },

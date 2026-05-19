@@ -44,6 +44,14 @@ const MODE_FLAG_PRESETS = {
     equippable: true,
     mergeable: true,
   },
+  shield: {
+    equippable: true,
+    mergeable: true,
+  },
+  relic: {
+    equippable: true,
+    mergeable: true,
+  },
   melee: {
     equippable: true,
     mergeable: true,
@@ -92,6 +100,10 @@ const COMMON_BASE_ICON_KEYS = {
   Cape: "common_cape",
   Belt: "common_belt",
   Relic: "common_relic",
+  // TODO: Use common_shield/common_offhand when a dedicated offhand icon asset exists.
+  "Wooden Shield": "common_relic",
+  "Iron Shield": "common_relic",
+  "Frostguard Shield": "common_relic",
 };
 
 const RESOURCE_ICON_KEYS = {

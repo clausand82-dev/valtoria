@@ -52,6 +52,7 @@ export const AUTO_LOOT_TYPE_IDS = [
   "belt",
   "legs",
   "feet",
+  "offhand",
   "relic",
   "potion",
   "readable",

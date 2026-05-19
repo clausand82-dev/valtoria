@@ -57,6 +57,7 @@ const CHARACTER_SLOT_LAYOUT = [
   "feet",
   "ring2",
   "weapon",
+  "offhand",
   "magic",
 ];
 
@@ -64,6 +65,7 @@ const AUTO_LOOT_TYPE_OPTIONS = [
   { id: "gold", label: "Gold" },
   { id: "resource", label: "Resources" },
   { id: "weapon", label: "Weapons" },
+  { id: "offhand", label: "Offhand" },
   { id: "head", label: "Head" },
   { id: "shoulder", label: "Shoulder" },
   { id: "neck", label: "Neck" },

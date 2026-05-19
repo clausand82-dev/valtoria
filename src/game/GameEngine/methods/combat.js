@@ -22,6 +22,7 @@ import {
 } from "../helpers.js";
 import { skillTreeBonuses } from "../../config/skill-tree-config.js";
 import { socketBonusesForItem } from "../../config/socket-config.js";
+import { getClassNodeBonuses } from "../../config/class-config.js";
 import {
   ITEM_DURABILITY_WEAPON_PER_ATTACK,
   ITEM_DURABILITY_ARMOR_PER_HIT,
@@ -31,6 +32,41 @@ import {
   ITEM_DURABILITY_DEATH_THRESHOLD,
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
+
+const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
+const BONUS_STAT_KEYS = [
+  "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
+  "magic", "critChance", "critDamage", "blockChance", "blockAmount", "dodgeChance",
+  "lifeSteal", "magicFind", "goldFind", "resourceFind", "xpGain",
+  "physicalResist", "fireResist", "iceResist", "lightningResist", "poisonResist",
+  "arcaneResist", "holyResist", "shadowResist", "natureResist", "allResist",
+  "physicalDamageBonus", "fireDamageBonus", "iceDamageBonus", "lightningDamageBonus",
+  "poisonDamageBonus", "arcaneDamageBonus", "holyDamageBonus", "shadowDamageBonus",
+  "natureDamageBonus", "spellDamageBonus", "directDamageBonus", "areaDamageBonus",
+  "dotDamageBonus", "hazardDamageBonus", "dotDurationBonus", "statusDurationBonus",
+];
+
+function safeElement(element, fallback = "physical") {
+  const value = String(element ?? fallback).toLowerCase();
+  return ELEMENTS.includes(value) ? value : fallback;
+}
+
+function resistKeyForElement(element) {
+  return `${safeElement(element)}Resist`;
+}
+
+function damageBonusKeyForElement(element) {
+  return `${safeElement(element)}DamageBonus`;
+}
+
+function damageKindBonusKey(damageKind) {
+  const kind = String(damageKind ?? "direct");
+  return `${kind}DamageBonus`;
+}
+
+function damageDebugEnabled() {
+  return typeof window !== "undefined" && window.VALTORIA_DEBUG_DAMAGE === true;
+}
 
 function spellParticleVisuals(spell = {}) {
   const particles = spell.particles ?? {};
@@ -279,6 +315,16 @@ export const combatMethods = {
       critDamage: minionType === owner.typeName ? Number(owner.critDamage) || 1.5 : Number(base.critDamage) || 1.5,
       blockChance: Number(base.blockChance) || 0,
       dodgeChance: minionType === owner.typeName ? Math.max(0, (Number(owner.dodgeChance) || 0) * 0.5) : Number(base.dodgeChance) || 0,
+      physicalResist: Number(base.physicalResist) || 0,
+      fireResist: Number(base.fireResist) || 0,
+      iceResist: Number(base.iceResist) || 0,
+      lightningResist: Number(base.lightningResist) || 0,
+      poisonResist: Number(base.poisonResist) || 0,
+      arcaneResist: Number(base.arcaneResist) || 0,
+      holyResist: Number(base.holyResist) || 0,
+      shadowResist: Number(base.shadowResist) || 0,
+      natureResist: Number(base.natureResist) || 0,
+      allResist: Number(base.allResist) || 0,
       spells: [],
       spellCooldown: 999,
       statusEffects: [],
@@ -384,7 +430,16 @@ export const combatMethods = {
     if (stats.mode === "melee") {
       this.player.stats.meleeAttacks += 1;
       const { damage, critical } = this.rollPlayerDamage(stats);
-      this.damageMonster(target, damage, "melee", critical);
+      const finalDamage = this.calculateDamage({
+        caster: this.player,
+        casterStats: stats,
+        target,
+        baseDamage: damage,
+        element: "physical",
+        damageKind: "direct",
+        source: "melee",
+      }).damage;
+      this.damageMonster(target, finalDamage, "melee", critical);
       this.triggerWeaponOnHitEffects({
         weapon: this.player.equipment?.weapon,
         player: this.player,
@@ -404,6 +459,9 @@ export const combatMethods = {
     if (stats.mode === "magic") this.player.stats.spellProjectiles += 1;
     if (stats.mode === "ranged") this.player.stats.rangedAttacks += 1;
     const color = stats.mode === "magic" ? "#8bdfff" : "#e4c27a";
+    const projectileBaseDamage = this.rollDamage(stats.damageMin, stats.damageMax) + (stats.mode === "magic" ? Math.floor(stats.magic * 0.45) : 0);
+    const projectileCritical = Math.random() < (Number(stats.critChance) || 0);
+    const projectileDamage = projectileCritical ? Math.floor(projectileBaseDamage * (Number(stats.critDamage) || 1.5)) : projectileBaseDamage;
     this.projectiles.push({
       id: createId(),
       type: stats.mode,
@@ -414,9 +472,15 @@ export const combatMethods = {
       vx: n.x * speed,
       vy: n.y * speed,
       radius: stats.mode === "magic" ? 0.18 : 0.1,
-      ...this.rollPlayerDamage(stats, stats.mode === "magic" ? Math.floor(stats.magic * 0.45) : 0),
+      damage: Math.max(1, projectileDamage),
+      critical: projectileCritical,
       life: stats.range / speed,
       color,
+      element: stats.mode === "magic" ? "arcane" : "physical",
+      baseDamage: projectileBaseDamage,
+      hitMagicScale: 0,
+      casterStats: { ...stats },
+      casterLevel: this.player.level,
     });
     this.drainWeaponDurability();
   },
@@ -440,8 +504,6 @@ export const combatMethods = {
     const center = this.weaponEffectCenter(effect, context);
     if (!center) return;
     const stats = context.stats ?? this.calcStats();
-    const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
-    const damage = Math.max(1, Math.floor((Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0)));
     const damageType = String(effect.damageType || "magic");
     const damaged = new Set();
 
@@ -449,6 +511,16 @@ export const combatMethods = {
       if (monster.dead || damaged.has(monster.id)) continue;
       if (Math.hypot(monster.x - center.x, monster.y - center.y) > radius + monster.radius) continue;
       damaged.add(monster.id);
+      const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
+      const damage = this.calculateDamage({
+        caster: context.player ?? this.player,
+        casterStats: stats,
+        target: monster,
+        baseDamage: (Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0),
+        element: effect.element ?? "arcane",
+        damageKind: "area",
+        source: effect.id ?? "weapon_effect",
+      }).damage;
       this.damageMonster(monster, damage, damageType, false);
     }
 
@@ -466,6 +538,96 @@ export const combatMethods = {
     if (effect.center === "player") return context.player ?? this.player;
     if (context.target) return context.target;
     return context.player ?? this.player;
+  },
+
+  getElementResist(targetStats = {}, element = "physical") {
+    const key = resistKeyForElement(element);
+    const resistBeforeClamp = (Number(targetStats?.[key]) || 0) + (Number(targetStats?.allResist) || 0);
+    return {
+      resistBeforeClamp,
+      resistAfterClamp: clamp(resistBeforeClamp, -100, 75),
+    };
+  },
+
+  applyResist(damage, targetStats = {}, element = "physical") {
+    const { resistBeforeClamp, resistAfterClamp } = this.getElementResist(targetStats, element);
+    const damageAfterResist = Math.max(1, Math.floor((Number(damage) || 0) * (1 - resistAfterClamp / 100)));
+    return { damage: damageAfterResist, resistBeforeClamp, resistAfterClamp };
+  },
+
+  statsForDamageTarget(target) {
+    if (target === this.player) return this.calcStats();
+    return target ?? {};
+  },
+
+  calculateDamage({
+    caster = this.player,
+    casterStats = null,
+    target = null,
+    targetStats = null,
+    baseDamage = 0,
+    element = "physical",
+    damageKind = "direct",
+    magicScale = 0,
+    levelScale = 0,
+    canCrit = false,
+    criticalOverride = null,
+    source = "attack",
+    debug = false,
+  } = {}) {
+    const stats = casterStats ?? (caster === this.player ? this.calcStats() : caster ?? {});
+    const targetFinalStats = targetStats ?? this.statsForDamageTarget(target);
+    const sourceType = typeof source === "object" ? source?.type : source;
+    const sourceId = typeof source === "object" ? source?.id : source;
+    const resolvedElement = safeElement(element, sourceType === "spell" ? "arcane" : "physical");
+    const base = Math.max(0, Number(baseDamage) || 0);
+    const magicContribution = (Number(stats?.magic) || 0) * (Number(magicScale) || 0);
+    const levelContribution = (Number(caster?.level) || 0) * (Number(levelScale) || 0);
+    const spellDamageBonus = sourceType === "spell" || sourceType === "magic" ? Number(stats?.spellDamageBonus) || 0 : 0;
+    const elementDamageBonus = Number(stats?.[damageBonusKeyForElement(resolvedElement)]) || 0;
+    const kindDamageBonus = Number(stats?.[damageKindBonusKey(damageKind)]) || 0;
+    const damageBeforeCrit = Math.max(0, base + magicContribution + levelContribution);
+    const damageBeforeResistRaw = damageBeforeCrit * (1 + spellDamageBonus + elementDamageBonus + kindDamageBonus);
+    const critical = criticalOverride === null
+      ? Boolean(canCrit && Math.random() < (Number(stats?.critChance) || 0))
+      : Boolean(criticalOverride);
+    const damageBeforeResist = critical
+      ? Math.floor(damageBeforeResistRaw * (Number(stats?.critDamage) || 1.5))
+      : Math.floor(damageBeforeResistRaw);
+    const resisted = this.applyResist(damageBeforeResist, targetFinalStats, resolvedElement);
+    const finalDamage = Math.max(1, resisted.damage);
+
+    if (debug || damageDebugEnabled()) {
+      console.debug("[Valtoria Damage]", {
+        sourceId,
+        element: resolvedElement,
+        damageKind,
+        baseDamage: base,
+        magicScale: Number(magicScale) || 0,
+        magicContribution,
+        levelContribution,
+        spellDamageBonus,
+        elementDamageBonus,
+        kindDamageBonus,
+        resistBeforeClamp: resisted.resistBeforeClamp,
+        resistAfterClamp: resisted.resistAfterClamp,
+        damageBeforeResist,
+        damageAfterResist: resisted.damage,
+        blocked: false,
+        blockAmount: 0,
+        finalDamage,
+      });
+    }
+
+    return { damage: finalDamage, critical };
+  },
+
+  applyIncomingBlock(amount, targetStats = {}) {
+    const blocked = Math.random() < (Number(targetStats.blockChance) || 0);
+    if (!blocked) return { damage: Math.max(1, Math.floor(Number(amount) || 1)), blocked, blockAmount: 0 };
+    const blockAmount = Math.max(0, Number(targetStats.blockAmount) || 0);
+    const reduced = blockAmount > 0 ? (Number(amount) || 0) - blockAmount : (Number(amount) || 0) * 0.5;
+    return { damage: Math.max(1, Math.floor(reduced)), blocked, blockAmount };
   },
 
   castSpellAt(x, y, spellId = null) {
@@ -527,7 +689,8 @@ export const combatMethods = {
 
   launchSpellProjectile({ spell, caster, owner, x, y, stats }) {
     const n = normalize(x - caster.x, y - caster.y);
-    const rolled = this.rollPlayerDamage(stats, (spell.hitDamage ?? 0) + (Number(stats.magic) || 0) * (spell.magicScale ?? 0));
+    const baseHitDamage = this.rollDamage(stats.damageMin, stats.damageMax) + (Number(spell.hitDamage) || 0);
+    const critical = Math.random() < (Number(stats.critChance) || 0);
     const visuals = spellParticleVisuals(spell);
     const projectile = {
       id: createId(),
@@ -541,8 +704,16 @@ export const combatMethods = {
       vx: n.x * spell.speed,
       vy: n.y * spell.speed,
       radius: spell.radius ?? 0.22,
-      damage: rolled.damage,
-      critical: rolled.critical,
+      damage: Math.max(1, Math.floor(baseHitDamage + (Number(stats.magic) || 0) * (Number(spell.hitMagicScale ?? spell.magicScale) || 0))),
+      baseDamage: baseHitDamage,
+      hitMagicScale: spell.hitMagicScale ?? spell.magicScale ?? 0,
+      areaMagicScale: spell.areaMagicScale ?? 0,
+      dotMagicScale: spell.dotMagicScale ?? 0,
+      hazardMagicScale: spell.hazardMagicScale ?? spell.dotMagicScale ?? spell.areaMagicScale ?? 0,
+      element: spell.element ?? (owner === "player" ? "arcane" : "physical"),
+      critical,
+      casterStats: { ...stats },
+      casterLevel: caster.level,
       life: spell.range / spell.speed,
       color: spell.color,
       texture: visuals.projectileTexture,
@@ -588,7 +759,8 @@ export const combatMethods = {
       const impactX = center.x + Math.cos(angle) * dist;
       const impactY = center.y + Math.sin(angle) * dist;
       const stagger = i * 0.045;
-      const rolled = this.rollPlayerDamage(stats, (spell.hitDamage ?? 0) + (Number(stats.magic) || 0) * (spell.magicScale ?? 0));
+      const baseHitDamage = this.rollDamage(stats.damageMin, stats.damageMax) + (Number(spell.hitDamage) || 0);
+      const critical = Math.random() < (Number(stats.critChance) || 0);
       const projectile = {
         id: createId(),
         type: spell.id,
@@ -599,8 +771,16 @@ export const combatMethods = {
         vx: fallDirection.x * speed,
         vy: fallDirection.y * speed,
         radius: spell.radius ?? 0.16,
-        damage: rolled.damage,
-        critical: rolled.critical,
+        damage: Math.max(1, Math.floor(baseHitDamage + (Number(stats.magic) || 0) * (Number(spell.hitMagicScale ?? spell.magicScale) || 0))),
+        baseDamage: baseHitDamage,
+        hitMagicScale: spell.hitMagicScale ?? spell.magicScale ?? 0,
+        areaMagicScale: spell.areaMagicScale ?? 0,
+        dotMagicScale: spell.dotMagicScale ?? 0,
+        hazardMagicScale: spell.hazardMagicScale ?? spell.dotMagicScale ?? spell.areaMagicScale ?? 0,
+        element: spell.element ?? (owner === "player" ? "arcane" : "physical"),
+        critical,
+        casterStats: { ...stats },
+        casterLevel: caster.level,
         life: (fallDistance + stagger * speed) / speed,
         color: spell.color,
         texture: visuals.projectileTexture,
@@ -649,8 +829,27 @@ export const combatMethods = {
     for (const target of targets) {
       const direct = target === directTarget;
       const damage = direct
-        ? projectile.damage
-        : Math.max(1, Math.floor((projectile.areaDamage || projectile.damage * 0.55)));
+        ? this.calculateDamage({
+          caster: { level: projectile.casterLevel },
+          casterStats: projectile.casterStats,
+          target,
+          baseDamage: projectile.baseDamage ?? projectile.damage,
+          element: projectile.element,
+          damageKind: "direct",
+          magicScale: projectile.hitMagicScale ?? 0,
+          criticalOverride: projectile.critical,
+          source: { type: "spell", id: projectile.spellId ?? "spell" },
+        }).damage
+        : this.calculateDamage({
+          caster: { level: projectile.casterLevel },
+          casterStats: projectile.casterStats,
+          target,
+          baseDamage: projectile.areaDamage || (projectile.baseDamage ?? projectile.damage) * 0.55,
+          element: projectile.element,
+          damageKind: "area",
+          magicScale: projectile.areaMagicScale ?? 0,
+          source: { type: "spell", id: projectile.spellId ?? "spell" },
+        }).damage;
       if (target === this.player) this.damagePlayer(damage, { typeName: projectile.spellId }, projectile.critical && direct);
       else this.damageMonster(target, damage, "magic", projectile.critical && direct);
       this.applyProjectileStatus(target, projectile);
@@ -679,7 +878,11 @@ export const combatMethods = {
       x,
       y,
       radius,
-      damage: Math.max(1, Math.floor(Number(projectile.dotDamage || projectile.areaDamage || 1))),
+      baseDamage: Math.max(1, Number(projectile.dotDamage || projectile.areaDamage || 1)),
+      magicScale: projectile.hazardMagicScale ?? 0,
+      element: projectile.element,
+      casterStats: projectile.casterStats ? { ...projectile.casterStats } : null,
+      casterLevel: projectile.casterLevel,
       tickInterval: Math.max(0.2, Number(projectile.hazardTick) || 1),
       tick: 0,
       life: Math.max(0.2, Number(projectile.hazardDuration) || 1),
@@ -724,12 +927,32 @@ export const combatMethods = {
       for (const monster of this.nearbyMonsters(2)) {
         if (monster.dead) continue;
         if (Math.hypot(monster.x - hazard.x, monster.y - hazard.y) > hazard.radius + monster.radius) continue;
-        this.damageMonster(monster, hazard.damage, "magic", false);
+        const damage = this.calculateDamage({
+          caster: { level: hazard.casterLevel },
+          casterStats: hazard.casterStats,
+          target: monster,
+          baseDamage: hazard.baseDamage,
+          element: hazard.element,
+          damageKind: "hazard",
+          magicScale: hazard.magicScale,
+          source: { type: "spell", id: hazard.spellId ?? "hazard" },
+        }).damage;
+        this.damageMonster(monster, damage, "magic", false);
       }
       return;
     }
     if (Math.hypot(this.player.x - hazard.x, this.player.y - hazard.y) <= hazard.radius + this.player.radius) {
-      this.damagePlayer(hazard.damage, { typeName: hazard.spellId ?? "hazard" }, false);
+      const damage = this.calculateDamage({
+        caster: { level: hazard.casterLevel },
+        casterStats: hazard.casterStats,
+        target: this.player,
+        baseDamage: hazard.baseDamage,
+        element: hazard.element,
+        damageKind: "hazard",
+        magicScale: hazard.magicScale,
+        source: { type: "spell", id: hazard.spellId ?? "hazard" },
+      }).damage;
+      this.damagePlayer(damage, { typeName: hazard.spellId ?? "hazard" }, false);
     }
   },
 
@@ -740,7 +963,13 @@ export const combatMethods = {
       target.statusEffects.push({
         type: "dot",
         damage: projectile.dotDamage,
-        duration: projectile.dotDuration,
+        baseDamage: projectile.dotDamage,
+        magicScale: projectile.dotMagicScale ?? 0,
+        element: projectile.element,
+        sourceId: projectile.spellId,
+        casterStats: projectile.casterStats ? { ...projectile.casterStats } : null,
+        casterLevel: projectile.casterLevel,
+        duration: projectile.dotDuration * (1 + (Number(projectile.casterStats?.dotDurationBonus) || 0)),
         tick: 1,
         color: projectile.color,
         particle: projectile.particleVisuals?.status ?? null,
@@ -750,7 +979,7 @@ export const combatMethods = {
       target.statusEffects.push({
         type: "slow",
         pct: projectile.slowPct,
-        duration: projectile.slowDuration,
+        duration: projectile.slowDuration * (1 + (Number(projectile.casterStats?.statusDurationBonus) || 0)),
         particle: projectile.particleVisuals?.status ?? null,
       });
     }
@@ -771,7 +1000,18 @@ export const combatMethods = {
         effect.tick -= dt;
         if (effect.tick <= 0) {
           effect.tick += 1;
-          const damage = Math.max(1, Math.floor(Number(effect.damage) || 1));
+          const damage = effect.casterStats
+            ? this.calculateDamage({
+              caster: { level: effect.casterLevel },
+              casterStats: effect.casterStats,
+              target: entity,
+              baseDamage: effect.baseDamage ?? effect.damage,
+              element: effect.element,
+              damageKind: "dot",
+              magicScale: effect.magicScale,
+              source: { type: "spell", id: effect.sourceId ?? "dot" },
+            }).damage
+            : Math.max(1, Math.floor(Number(effect.damage) || 1));
           if (isPlayer) {
             entity.hp = Math.max(0, entity.hp - damage);
             entity.hurtCooldown = 0.2;
@@ -806,14 +1046,14 @@ export const combatMethods = {
       this.addFloater(this.player.x, this.player.y, "Dodge", "#9ee8a4");
       return;
     }
-    const blocked = Math.random() < stats.blockChance;
-    const blockedAmount = blocked ? amount * 0.5 : amount;
-    const mitigated = Math.max(1, Math.floor(blockedAmount * (100 / (100 + stats.armor * 7))));
+    const block = this.applyIncomingBlock(amount, stats);
+    const mitigated = Math.max(1, Math.floor(block.damage * (100 / (100 + stats.armor * 7))));
+    if (damageDebugEnabled()) console.debug("[Valtoria Damage Block]", { target: "player", blocked: block.blocked, blockAmount: block.blockAmount, damageBeforeBlock: amount, damageAfterBlock: block.damage, finalDamage: mitigated });
     this.player.hp = Math.max(0, this.player.hp - mitigated);
     this.player.stats.damageTaken += mitigated;
     this.player.hurtCooldown = 0.2;
     this.camera.shake = Math.max(this.camera.shake, 4);
-    this.addFloater(this.player.x, this.player.y, blocked ? `Block -${mitigated}` : critical ? `CRIT -${mitigated}` : `-${mitigated}`, "#ff7272");
+    this.addFloater(this.player.x, this.player.y, block.blocked ? `Block -${mitigated}` : critical ? `CRIT -${mitigated}` : `-${mitigated}`, "#ff7272");
     this.addParticles(this.player.x, this.player.y, "#cc3c3c", 9, 0.1);
     this.drainArmorDurability();
     if (this.player.hp <= 0) {
@@ -835,13 +1075,14 @@ export const combatMethods = {
       this.addFloater(monster.x, monster.y, "Dodge", "#9ee8a4");
       return;
     }
-    const blocked = Math.random() < (Number(monster.blockChance) || 0);
-    const damage = Math.max(1, Math.floor(blocked ? amount * 0.5 : amount));
+    const block = this.applyIncomingBlock(amount, monster);
+    const damage = block.damage;
+    if (damageDebugEnabled()) console.debug("[Valtoria Damage Block]", { target: monster?.typeName, blocked: block.blocked, blockAmount: block.blockAmount, damageBeforeBlock: amount, damageAfterBlock: block.damage, finalDamage: damage });
     const beforeHp = Math.max(0, Math.floor(Number(monster.hp) || 0));
     monster.hp = Math.max(0, monster.hp - damage);
     this.player.stats.damageDealt += Math.min(beforeHp, damage);
     monster.hurt = 0.18;
-    this.addFloater(monster.x, monster.y, blocked ? `Block -${damage}` : critical ? `CRIT -${damage}` : `-${damage}`, critical ? "#ffdf5f" : sourceType === "magic" ? "#9de9ff" : "#f1d08d");
+    this.addFloater(monster.x, monster.y, block.blocked ? `Block -${damage}` : critical ? `CRIT -${damage}` : `-${damage}`, critical ? "#ffdf5f" : sourceType === "magic" ? "#9de9ff" : "#f1d08d");
     const stats = this.calcStats();
     if (stats.lifeSteal > 0 && damage > 0) {
       const heal = Math.max(1, Math.floor(damage * stats.lifeSteal));
@@ -952,23 +1193,43 @@ export const combatMethods = {
   },
 
   applyStatBonuses(stats, bonuses) {
-    stats.maxHp *= 1 + (bonuses.maxHpPct ?? 0);
-    stats.maxMana *= 1 + (bonuses.maxManaPct ?? 0);
-    stats.armor += bonuses.armorFlat ?? 0;
-    stats.damageMin *= 1 + (bonuses.damagePct ?? 0);
-    stats.damageMax *= 1 + (bonuses.damagePct ?? 0);
-    stats.speed *= 1 + (bonuses.speedPct ?? 0);
-    stats.cooldown *= Math.max(0.55, 1 - (bonuses.attackSpeed ?? 0));
-    stats.magic += bonuses.magic ?? 0;
-    stats.critChance += bonuses.critChance ?? 0;
-    stats.critDamage += bonuses.critDamage ?? 0;
-    stats.blockChance += bonuses.blockChance ?? 0;
-    stats.dodgeChance += bonuses.dodgeChance ?? 0;
-    stats.lifeSteal += bonuses.lifeSteal ?? 0;
-    stats.magicFind += bonuses.magicFind ?? 0;
-    stats.goldFind += bonuses.goldFind ?? 0;
-    stats.resourceFind += bonuses.resourceFind ?? 0;
-    stats.xpGain += bonuses.xpGain ?? 0;
+    if (!bonuses || typeof bonuses !== "object") return;
+    const n = (key) => Number(bonuses[key]) || 0;
+    stats.maxHp += n("maxHp");
+    stats.maxMana += n("maxMana");
+    stats.armor += n("armor");
+    stats.damageMin += n("damageMin");
+    stats.damageMax += n("damageMax");
+    stats.range += n("range");
+    stats.speed += n("speed");
+    stats.maxHp *= 1 + n("maxHpPct");
+    stats.maxMana *= 1 + n("maxManaPct");
+    stats.armor += n("armorFlat");
+    stats.damageMin *= 1 + n("damagePct");
+    stats.damageMax *= 1 + n("damagePct");
+    stats.speed *= 1 + n("speedPct");
+    stats.cooldown *= Math.max(0.55, 1 - n("attackSpeed"));
+    stats.magic += n("magic");
+    stats.critChance += n("critChance");
+    stats.critDamage += n("critDamage");
+    stats.blockChance += n("blockChance");
+    stats.dodgeChance += n("dodgeChance");
+    stats.lifeSteal += n("lifeSteal");
+    stats.magicFind += n("magicFind");
+    stats.goldFind += n("goldFind");
+    stats.resourceFind += n("resourceFind");
+    stats.xpGain += n("xpGain");
+    for (const key of BONUS_STAT_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(stats, key) || key.endsWith("Resist") || key.endsWith("DamageBonus") || key.endsWith("DurationBonus")) {
+        if (![
+          "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
+          "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
+          "magicFind", "goldFind", "resourceFind", "xpGain",
+        ].includes(key)) {
+          stats[key] = (stats[key] ?? 0) + (Number(bonuses[key]) || 0);
+        }
+      }
+    }
   },
 
   calcStats() {
@@ -986,15 +1247,43 @@ export const combatMethods = {
       critChance: 0,
       critDamage: 1.5,
       blockChance: 0,
+      blockAmount: 0,
       dodgeChance: 0,
       lifeSteal: 0,
       magicFind: 0,
       goldFind: 0,
       resourceFind: 0,
       xpGain: 0,
+      physicalResist: 0,
+      fireResist: 0,
+      iceResist: 0,
+      lightningResist: 0,
+      poisonResist: 0,
+      arcaneResist: 0,
+      holyResist: 0,
+      shadowResist: 0,
+      natureResist: 0,
+      allResist: 0,
+      physicalDamageBonus: 0,
+      fireDamageBonus: 0,
+      iceDamageBonus: 0,
+      lightningDamageBonus: 0,
+      poisonDamageBonus: 0,
+      arcaneDamageBonus: 0,
+      holyDamageBonus: 0,
+      shadowDamageBonus: 0,
+      natureDamageBonus: 0,
+      spellDamageBonus: 0,
+      directDamageBonus: 0,
+      areaDamageBonus: 0,
+      dotDamageBonus: 0,
+      hazardDamageBonus: 0,
+      dotDurationBonus: 0,
+      statusDurationBonus: 0,
       mode: "melee",
     };
     const skillBonus = skillTreeBonuses(this.player.skillTree);
+    const classBonus = getClassNodeBonuses(this.player);
 
     stats.maxHp += readableBonus.maxHp;
     stats.maxMana += readableBonus.maxMana;
@@ -1034,6 +1323,16 @@ export const combatMethods = {
       stats.goldFind += s(item.goldFind);
       stats.resourceFind += s(item.resourceFind);
       stats.xpGain += s(item.xpGain);
+      const genericItemBonuses = {};
+      for (const key of BONUS_STAT_KEYS) {
+        if ([
+          "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
+          "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
+          "magicFind", "goldFind", "resourceFind", "xpGain",
+        ].includes(key)) continue;
+        genericItemBonuses[key] = s(item[key]);
+      }
+      this.applyStatBonuses(stats, genericItemBonuses);
       if (item.slot === "weapon") {
         stats.damageMin += s(item.damageMin);
         stats.damageMax += s(item.damageMax);
@@ -1048,6 +1347,7 @@ export const combatMethods = {
     }
 
     this.applyStatBonuses(stats, skillBonus);
+    this.applyStatBonuses(stats, classBonus);
     stats.maxHp = Math.floor(stats.maxHp);
     stats.maxMana = Math.floor(stats.maxMana);
     stats.damageMin = Math.max(1, Math.floor(stats.damageMin));
@@ -1056,6 +1356,7 @@ export const combatMethods = {
     stats.critChance = clamp(stats.critChance, 0, 0.75);
     stats.critDamage = Math.max(1, stats.critDamage);
     stats.blockChance = clamp(stats.blockChance, 0, 0.55);
+    stats.blockAmount = Math.max(0, Math.floor(stats.blockAmount));
     stats.dodgeChance = clamp(stats.dodgeChance, 0, 0.55);
     stats.lifeSteal = clamp(stats.lifeSteal, 0, 0.25);
     return stats;

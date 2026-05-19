@@ -2204,6 +2204,10 @@ button {
   grid-column: 1;
   grid-row: 5 / 7;
 }
+.equipment-offhand {
+  grid-column: 7;
+  grid-row: 5 / 7;
+}
 .equipment-relic {
   grid-column: 7;
   grid-row: 2;

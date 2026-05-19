@@ -44,12 +44,39 @@ const ITEM_BONUS_STAT_KEYS = [
   "critChance",
   "critDamage",
   "blockChance",
+  "blockAmount",
   "dodgeChance",
   "lifeSteal",
   "magicFind",
   "goldFind",
   "resourceFind",
   "xpGain",
+  "physicalResist",
+  "fireResist",
+  "iceResist",
+  "lightningResist",
+  "poisonResist",
+  "arcaneResist",
+  "holyResist",
+  "shadowResist",
+  "natureResist",
+  "allResist",
+  "physicalDamageBonus",
+  "fireDamageBonus",
+  "iceDamageBonus",
+  "lightningDamageBonus",
+  "poisonDamageBonus",
+  "arcaneDamageBonus",
+  "holyDamageBonus",
+  "shadowDamageBonus",
+  "natureDamageBonus",
+  "spellDamageBonus",
+  "directDamageBonus",
+  "areaDamageBonus",
+  "dotDamageBonus",
+  "hazardDamageBonus",
+  "dotDurationBonus",
+  "statusDurationBonus",
 ];
 
 function cloneItemEffects(effects) {
@@ -109,6 +136,7 @@ export function makeStarterWeapon() {
     rarityColor: "#f5f3ea",
     slot: "weapon",
     mode: "melee",
+    hands: 1,
     level: 1,
     damageMin: 7,
     damageMax: 12,
@@ -193,12 +221,37 @@ export function itemValue(item) {
     (Number(item.critChance) || 0) * 220 +
     (Number(item.critDamage) || 0) * 90 +
     (Number(item.blockChance) || 0) * 180 +
+    (Number(item.blockAmount) || 0) * 18 +
     (Number(item.dodgeChance) || 0) * 180 +
     (Number(item.lifeSteal) || 0) * 260 +
     (Number(item.magicFind) || 0) * 85 +
     (Number(item.goldFind) || 0) * 65 +
     (Number(item.resourceFind) || 0) * 70 +
-    (Number(item.xpGain) || 0) * 75;
+    (Number(item.xpGain) || 0) * 75 +
+    (Number(item.allResist) || 0) * 9 +
+    (Number(item.physicalResist) || 0) * 5 +
+    (Number(item.fireResist) || 0) * 5 +
+    (Number(item.iceResist) || 0) * 5 +
+    (Number(item.lightningResist) || 0) * 5 +
+    (Number(item.poisonResist) || 0) * 5 +
+    (Number(item.arcaneResist) || 0) * 5 +
+    (Number(item.holyResist) || 0) * 5 +
+    (Number(item.shadowResist) || 0) * 5 +
+    (Number(item.natureResist) || 0) * 5 +
+    (Number(item.spellDamageBonus) || 0) * 150 +
+    (Number(item.directDamageBonus) || 0) * 120 +
+    (Number(item.areaDamageBonus) || 0) * 120 +
+    (Number(item.dotDamageBonus) || 0) * 120 +
+    (Number(item.hazardDamageBonus) || 0) * 120 +
+    (Number(item.physicalDamageBonus) || 0) * 100 +
+    (Number(item.fireDamageBonus) || 0) * 100 +
+    (Number(item.iceDamageBonus) || 0) * 100 +
+    (Number(item.lightningDamageBonus) || 0) * 100 +
+    (Number(item.poisonDamageBonus) || 0) * 100 +
+    (Number(item.arcaneDamageBonus) || 0) * 100 +
+    (Number(item.holyDamageBonus) || 0) * 100 +
+    (Number(item.shadowDamageBonus) || 0) * 100 +
+    (Number(item.natureDamageBonus) || 0) * 100;
   return Math.max(1, Math.floor((8 + level * 6 + power) * rarity.mult));
 }
 
@@ -210,7 +263,7 @@ function withItemValue(item) {
 }
 
 function withRandomSockets(item) {
-  if (!item || item.unique || item.named || (item.slot !== "weapon" && item.mode !== "armor")) return item;
+  if (!item || item.unique || item.named || (item.slot !== "weapon" && item.mode !== "armor" && item.slot !== "offhand")) return item;
   const rarityIndex = RARITIES.findIndex((rarity) => rarity.id === item.rarity);
   const chance = Math.max(0, 0.03 + rarityIndex * 0.035 + Math.max(0, Number(item.level) || 1) * 0.003);
   if (Math.random() >= chance) return item;
@@ -248,6 +301,7 @@ export function makeItem(level, weaponBias = Math.random()) {
       rarityColor: rarity.color,
       slot: "weapon",
       mode: base.mode,
+      hands: base.hands ?? 1,
       level,
       damageMin: Math.max(1, Math.floor(base.min * multiplier)),
       damageMax: Math.max(2, Math.floor(base.max * multiplier + level)),
@@ -270,7 +324,8 @@ export function makeItem(level, weaponBias = Math.random()) {
     rarityLabel: rarity.label,
     rarityColor: rarity.color,
     slot: base.slot,
-    mode: "armor",
+    mode: base.type === "shield" ? "shield" : "armor",
+    type: base.type,
     level,
     damageMin: base.damage ? Math.floor(base.damage * multiplier) : 0,
     damageMax: base.damage ? Math.floor(base.damage * multiplier + level * 0.5) : 0,
@@ -281,6 +336,7 @@ export function makeItem(level, weaponBias = Math.random()) {
     maxMana: Math.floor((base.mana || 0) * multiplier),
     speed: Number(((base.speed || 0) * multiplier).toFixed(2)),
     magic: Math.floor((base.magic || 0) * multiplier),
+    ...itemBonusStats(base),
   });
 }
 
@@ -318,7 +374,12 @@ export function makeUniqueItem(definition, level = 1) {
     rarityColor: rarity.color,
     slot: definition.slot,
     mode: definition.mode,
+    type: definition.type,
+    hands: definition.hands ?? (definition.slot === "weapon" ? 1 : undefined),
     level: itemLevel,
+    classReq: Array.isArray(definition.classReq) ? [...definition.classReq] : undefined,
+    levelReq: definition.levelReq,
+    requiresClassNode: definition.requiresClassNode,
     damageMin: Math.max(0, Math.floor((stats.damageMin ?? 0) * scale)),
     damageMax: Math.max(0, Math.floor((stats.damageMax ?? 0) * scale)),
     range: Number(stats.range ?? 0),
@@ -372,7 +433,12 @@ export function makeNamedItem(definition, level = 1) {
     rarityColor: rarity.color,
     slot: definition.slot,
     mode: definition.mode,
+    type: definition.type,
+    hands: definition.hands ?? (definition.slot === "weapon" ? 1 : undefined),
     level: itemLevel,
+    classReq: Array.isArray(definition.classReq) ? [...definition.classReq] : undefined,
+    levelReq: definition.levelReq,
+    requiresClassNode: definition.requiresClassNode,
     damageMin: Math.max(0, Math.floor((stats.damageMin ?? 0) * scale * rarityScale)),
     damageMax: Math.max(0, Math.floor((stats.damageMax ?? 0) * scale * rarityScale + itemLevel * 0.5)),
     range: Number(stats.range ?? 0),
@@ -1286,6 +1352,16 @@ function addPrefabMonsters(chunk, instance) {
       critDamage: Number(base.critDamage) || 1.5,
       blockChance: Number(base.blockChance) || 0,
       dodgeChance: Number(base.dodgeChance) || 0,
+      physicalResist: Number(base.physicalResist) || 0,
+      fireResist: Number(base.fireResist) || 0,
+      iceResist: Number(base.iceResist) || 0,
+      lightningResist: Number(base.lightningResist) || 0,
+      poisonResist: Number(base.poisonResist) || 0,
+      arcaneResist: Number(base.arcaneResist) || 0,
+      holyResist: Number(base.holyResist) || 0,
+      shadowResist: Number(base.shadowResist) || 0,
+      natureResist: Number(base.natureResist) || 0,
+      allResist: Number(base.allResist) || 0,
       spells: [...(base.spells ?? [])],
       spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 8000 + i) * 1.5,
       statusEffects: [],
@@ -1686,6 +1762,16 @@ function addMonsters(chunk, safeChunk) {
       critDamage: Number(base.critDamage) || 1.5,
       blockChance: Number(base.blockChance) || 0,
       dodgeChance: Number(base.dodgeChance) || 0,
+      physicalResist: Number(base.physicalResist) || 0,
+      fireResist: Number(base.fireResist) || 0,
+      iceResist: Number(base.iceResist) || 0,
+      lightningResist: Number(base.lightningResist) || 0,
+      poisonResist: Number(base.poisonResist) || 0,
+      arcaneResist: Number(base.arcaneResist) || 0,
+      holyResist: Number(base.holyResist) || 0,
+      shadowResist: Number(base.shadowResist) || 0,
+      natureResist: Number(base.natureResist) || 0,
+      allResist: Number(base.allResist) || 0,
       spells: [...(base.spells ?? [])],
       spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + i) * 1.5,
       statusEffects: [],

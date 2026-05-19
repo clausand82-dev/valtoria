@@ -186,7 +186,7 @@ function socketText(item) {
 function socketBonusText(resourceId) {
   const bonuses = GEM_SOCKET_BONUSES[resourceId]?.bonuses ?? {};
   return Object.entries(bonuses).map(([key, value]) => {
-    const pct = ["damagePct", "maxHpPct", "maxManaPct", "speedPct", "critChance", "dodgeChance", "goldFind", "magicFind", "xpGain", "lifeSteal"].includes(key);
+    const pct = ["damagePct", "maxHpPct", "maxManaPct", "speedPct", "critChance", "dodgeChance", "goldFind", "magicFind", "xpGain", "lifeSteal", "spellDamageBonus", "directDamageBonus", "areaDamageBonus", "dotDamageBonus", "hazardDamageBonus", "physicalDamageBonus", "fireDamageBonus", "iceDamageBonus", "lightningDamageBonus", "poisonDamageBonus", "arcaneDamageBonus", "holyDamageBonus", "shadowDamageBonus", "natureDamageBonus"].includes(key);
     return `${key} ${pct ? `${Math.round(value * 100)}%` : `+${value}`}`;
   }).join(", ");
 }

@@ -7,6 +7,10 @@ History over changes
 - added tag and aviodtags to better use of big objects
 - shorthanded condition is implemented (makes it easy to make condition)
 - added NEW spell blizzard
+- added new player stats like resist and more magic 
+- added new player slot called offhand for shield, orb and så on
+- added new player class system
+- 
 
 * V. 1.72
 * added a new particle system, visuel better and can use png's

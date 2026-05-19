@@ -35,6 +35,7 @@ import {
 } from "../helpers.js";
 import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
+import { DEFAULT_CLASS_ID, normalizeClassId, normalizeClassNodes } from "../../config/class-config.js";
 import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config.js";
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 import { saveRepository } from "../../../storage/saveRepository.js";
@@ -48,6 +49,10 @@ function normalizeItemEffects(effects) {
       .map((effect) => ({ ...effect }))
     : [];
   return onHit.length ? { onHit } : undefined;
+}
+
+function savedWeaponHands(item) {
+  return item?.slot === "weapon" ? Math.max(1, Math.min(2, Math.floor(Number(item.hands) || 1))) : 1;
 }
 
 export const persistenceMethods = {
@@ -96,6 +101,8 @@ export const persistenceMethods = {
       iconUrl: item.iconUrl ? String(item.iconUrl) : undefined,
       slot: String(item.slot ?? "weapon"),
       mode: String(item.mode ?? "melee"),
+      type: item.type ? String(item.type) : undefined,
+      hands: Number.isFinite(Number(item.hands)) ? Math.max(1, Math.min(2, Math.floor(Number(item.hands)))) : undefined,
       level: Math.max(1, Math.floor(Number(item.level) || 1)),
       damageMin: Math.floor(Number(item.damageMin) || 0),
       damageMax: Math.floor(Number(item.damageMax) || 0),
@@ -115,12 +122,42 @@ export const persistenceMethods = {
       critChance: Number(item.critChance) || 0,
       critDamage: Number(item.critDamage) || 0,
       blockChance: Number(item.blockChance) || 0,
+      blockAmount: Number(item.blockAmount) || 0,
       dodgeChance: Number(item.dodgeChance) || 0,
       lifeSteal: Number(item.lifeSteal) || 0,
       magicFind: Number(item.magicFind) || 0,
       goldFind: Number(item.goldFind) || 0,
       resourceFind: Number(item.resourceFind) || 0,
       xpGain: Number(item.xpGain) || 0,
+      physicalResist: Number(item.physicalResist) || 0,
+      fireResist: Number(item.fireResist) || 0,
+      iceResist: Number(item.iceResist) || 0,
+      lightningResist: Number(item.lightningResist) || 0,
+      poisonResist: Number(item.poisonResist) || 0,
+      arcaneResist: Number(item.arcaneResist) || 0,
+      holyResist: Number(item.holyResist) || 0,
+      shadowResist: Number(item.shadowResist) || 0,
+      natureResist: Number(item.natureResist) || 0,
+      allResist: Number(item.allResist) || 0,
+      physicalDamageBonus: Number(item.physicalDamageBonus) || 0,
+      fireDamageBonus: Number(item.fireDamageBonus) || 0,
+      iceDamageBonus: Number(item.iceDamageBonus) || 0,
+      lightningDamageBonus: Number(item.lightningDamageBonus) || 0,
+      poisonDamageBonus: Number(item.poisonDamageBonus) || 0,
+      arcaneDamageBonus: Number(item.arcaneDamageBonus) || 0,
+      holyDamageBonus: Number(item.holyDamageBonus) || 0,
+      shadowDamageBonus: Number(item.shadowDamageBonus) || 0,
+      natureDamageBonus: Number(item.natureDamageBonus) || 0,
+      spellDamageBonus: Number(item.spellDamageBonus) || 0,
+      directDamageBonus: Number(item.directDamageBonus) || 0,
+      areaDamageBonus: Number(item.areaDamageBonus) || 0,
+      dotDamageBonus: Number(item.dotDamageBonus) || 0,
+      hazardDamageBonus: Number(item.hazardDamageBonus) || 0,
+      dotDurationBonus: Number(item.dotDurationBonus) || 0,
+      statusDurationBonus: Number(item.statusDurationBonus) || 0,
+      classReq: Array.isArray(item.classReq) ? item.classReq.map(String) : undefined,
+      levelReq: Math.max(0, Math.floor(Number(item.levelReq) || 0)) || undefined,
+      requiresClassNode: item.requiresClassNode ? String(item.requiresClassNode) : undefined,
       durability: Number.isFinite(Number(item.durability))
         ? clamp(Number(item.durability), 0, 100)
         : undefined,
@@ -232,6 +269,9 @@ export const persistenceMethods = {
     };
     this.player.readableBonuses = normalizeReadableBonuses(savedPlayer.readableBonuses);
     this.player.skillTree = normalizeSkillTree(savedPlayer.skillTree);
+    this.player.classId = normalizeClassId(savedPlayer.classId ?? DEFAULT_CLASS_ID);
+    this.player.classPoints = Math.max(0, Math.floor(Number(savedPlayer.classPoints) || 0));
+    this.player.classNodes = normalizeClassNodes(savedPlayer.classNodes);
     this.player.unlockedSpells = [...new Set(["ember_spark", ...(Array.isArray(savedPlayer.unlockedSpells) ? savedPlayer.unlockedSpells.map(String) : [])])];
     this.player.activeSpellId = savedPlayer.activeSpellId ? String(savedPlayer.activeSpellId) : this.player.unlockedSpells[0] ?? "ember_spark";
     this.player.autoLoot = normalizeAutoLootRules(savedPlayer.autoLoot);
@@ -273,6 +313,11 @@ export const persistenceMethods = {
       }
     }
     this.player.equipment = nextEquipment;
+    if (savedWeaponHands(this.player.equipment.weapon) >= 2 && this.player.equipment.offhand) {
+      const offhand = this.player.equipment.offhand;
+      this.player.equipment.offhand = null;
+      this.addInventoryItem(offhand);
+    }
 
     if (Array.isArray(payload.loots)) {
       // If we're replacing active loots during load, ensure any existing loots
@@ -340,6 +385,9 @@ export const persistenceMethods = {
         ...(cfg.player.potions ? { potions: { ...this.player.potions } } : {}),
         ...(cfg.player.readableBonuses ? { readableBonuses: { ...this.player.readableBonuses } } : {}),
         ...(cfg.player.skillTree ? { skillTree: normalizeSkillTree(this.player.skillTree) } : {}),
+        classId: normalizeClassId(this.player.classId),
+        classPoints: Math.max(0, Math.floor(Number(this.player.classPoints) || 0)),
+        classNodes: normalizeClassNodes(this.player.classNodes),
         ...(cfg.player.spells ? {
           unlockedSpells: [...(this.player.unlockedSpells ?? [])],
           activeSpellId: this.player.activeSpellId ?? null,
