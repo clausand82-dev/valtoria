@@ -836,8 +836,11 @@ export const MAP_REGION_SETS = {
       cityStats: { population: 1 },
       mapSize: "small",
       color: "#7fb172",
-      tileset: "tileset/tileset_bricktiles.png",
-
+      //tileset: "tileset/tileset_bricktiles.png",
+      tileset: [
+        { id: "tileset/tileset_bricktiles.png", weight: 8 },
+        { id: "tileset/tileset_debriswithblood.png", weight: 20, corruption: { min: 5 } },
+      ],
       spawnCounts: 
       {
         objects: 24,
@@ -916,8 +919,8 @@ export const MAP_REGION_SETS = {
       foliageSet: [
         { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
         { fileName: "foilage/foilage_boneparts.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
-        { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
-        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
+        { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
+        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true }, corruption: { min: 5 } },
       ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
@@ -932,7 +935,7 @@ export const MAP_REGION_SETS = {
         { id: "decay_cracks", weight: 8 },
         { id: "decay_dust", weight: 10 },
         { id: "decay_basement", weight: 20 },
-        { id: "decay_blood", weight: 20 },
+        { id: "decay_blood", weight: 20, corruption: { min: 5 } },
       ],
       labelX: 60,
       labelY: 31,

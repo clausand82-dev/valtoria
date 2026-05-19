@@ -50,6 +50,33 @@ function spellParticleVisuals(spell = {}) {
   };
 }
 
+function randomIntInRange(value, fallbackMin = 1, fallbackMax = fallbackMin) {
+  if (Array.isArray(value)) {
+    const min = Math.floor(Number(value[0]) || fallbackMin);
+    const max = Math.max(min, Math.floor(Number(value[1]) || value[0] || fallbackMax));
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+  if (value && typeof value === "object") {
+    const min = Math.floor(Number(value.min) || fallbackMin);
+    const max = Math.max(min, Math.floor(Number(value.max) || fallbackMax));
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+  const fixed = Math.floor(Number(value));
+  return Number.isFinite(fixed) && fixed > 0 ? fixed : fallbackMin;
+}
+
+function targetPointInSpellRange(caster, x, y, range) {
+  const n = normalize(x - caster.x, y - caster.y);
+  if (!n.x && !n.y) return null;
+  const distanceToTarget = Math.hypot(x - caster.x, y - caster.y);
+  const clampedDistance = Math.min(Math.max(0.1, Number(range) || distanceToTarget), distanceToTarget);
+  return {
+    x: caster.x + n.x * clampedDistance,
+    y: caster.y + n.y * clampedDistance,
+    direction: n,
+  };
+}
+
 export const combatMethods = {
   updateMonsters(dt) {
     this.processStatusEffects(this.player, dt, true);
@@ -303,17 +330,18 @@ export const combatMethods = {
       this.addParticles(projectile.x, projectile.y, projectile.color, projectile.type === "burst" ? 1 : 0, 0.04);
 
       const expired = projectile.life <= 0;
-      let remove = expired || this.isBlocked(projectile.x, projectile.y, 0.12);
+      let remove = expired || (!projectile.ignoreBlocking && this.isBlocked(projectile.x, projectile.y, 0.12));
       if (!remove) {
         for (const monster of this.nearbyMonsters(2)) {
           if (monster.dead || projectile.owner === "monster") continue;
+          if (projectile.noCollision) continue;
           if (Math.hypot(monster.x - projectile.x, monster.y - projectile.y) <= monster.radius + projectile.radius) {
             this.applySpellImpact(projectile, projectile.x, projectile.y, monster);
             remove = true;
             break;
           }
         }
-        if (!remove && projectile.owner === "monster" && Math.hypot(this.player.x - projectile.x, this.player.y - projectile.y) <= this.player.radius + projectile.radius) {
+        if (!remove && !projectile.noCollision && projectile.owner === "monster" && Math.hypot(this.player.x - projectile.x, this.player.y - projectile.y) <= this.player.radius + projectile.radius) {
           this.applySpellImpact(projectile, projectile.x, projectile.y, this.player);
           remove = true;
         }
@@ -464,7 +492,11 @@ export const combatMethods = {
         layer: visuals.cast.layer ?? "effects",
       });
     }
-    this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats });
+    if (spell.castMode === "skyfall") {
+      this.launchSpellSkyfall({ spell, caster: this.player, owner: "player", x, y, stats });
+    } else {
+      this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats });
+    }
   },
 
   castMonsterSpell(monster, spellId) {
@@ -481,14 +513,16 @@ export const combatMethods = {
         layer: visuals.cast.layer ?? "effects",
       });
     }
-    this.launchSpellProjectile({
+    const spellContext = {
       spell,
       caster: monster,
       owner: "monster",
       x: this.player.x,
       y: this.player.y,
       stats: { damageMin: monster.damage, damageMax: monster.damage, magic: monster.magic ?? 0, critChance: monster.critChance ?? 0, critDamage: monster.critDamage ?? 1.5 },
-    });
+    };
+    if (spell.castMode === "skyfall") this.launchSpellSkyfall(spellContext);
+    else this.launchSpellProjectile(spellContext);
   },
 
   launchSpellProjectile({ spell, caster, owner, x, y, stats }) {
@@ -535,6 +569,65 @@ export const combatMethods = {
         layer: visuals.trail.layer ?? "effects",
         radius: visuals.trail.radius ?? 8,
       });
+    }
+  },
+
+  launchSpellSkyfall({ spell, caster, owner, x, y, stats }) {
+    const center = targetPointInSpellRange(caster, x, y, spell.range);
+    if (!center) return;
+    const count = randomIntInRange(spell.shardCount, 5, 8);
+    const scatterRadius = Math.max(0, Number(spell.shardScatterRadius) || 1.4);
+    const fallDistance = Math.max(1, Number(spell.shardFallDistance) || 5);
+    const speed = Math.max(1, Number(spell.speed) || 10);
+    const visuals = spellParticleVisuals(spell);
+    const fallDirection = normalize(1, 0);
+
+    for (let i = 0; i < count; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.sqrt(Math.random()) * scatterRadius;
+      const impactX = center.x + Math.cos(angle) * dist;
+      const impactY = center.y + Math.sin(angle) * dist;
+      const stagger = i * 0.045;
+      const rolled = this.rollPlayerDamage(stats, (spell.hitDamage ?? 0) + (Number(stats.magic) || 0) * (spell.magicScale ?? 0));
+      const projectile = {
+        id: createId(),
+        type: spell.id,
+        spellId: spell.id,
+        owner,
+        x: impactX - fallDirection.x * fallDistance - stagger * speed,
+        y: impactY - fallDirection.y * fallDistance,
+        vx: fallDirection.x * speed,
+        vy: fallDirection.y * speed,
+        radius: spell.radius ?? 0.16,
+        damage: rolled.damage,
+        critical: rolled.critical,
+        life: (fallDistance + stagger * speed) / speed,
+        color: spell.color,
+        texture: visuals.projectileTexture,
+        textureSize: visuals.projectileTextureSize,
+        rotateTexture: visuals.rotateProjectileTexture,
+        textureRotationOffset: visuals.projectileTextureRotationOffset,
+        areaRadius: spell.areaRadius ?? 0,
+        areaDamage: spell.areaDamage ?? 0,
+        dotDamage: spell.dotDamage ?? 0,
+        dotDuration: spell.dotDuration ?? 0,
+        slowPct: spell.slowPct ?? 0,
+        slowDuration: spell.slowDuration ?? 0,
+        hazardDuration: spell.hazardDuration ?? 0,
+        hazardTick: spell.hazardTick ?? 1,
+        explodeOnEnd: true,
+        ignoreBlocking: true,
+        noCollision: true,
+        particleVisuals: visuals,
+      };
+      this.projectiles.push(projectile);
+      if (visuals.trail?.type) {
+        this.particleEngine?.attachEmitterToProjectile(projectile.id, {
+          ...visuals.trail,
+          layer: visuals.trail.layer ?? "effects",
+          radius: visuals.trail.radius ?? 8,
+        });
+      }
     }
   },
 

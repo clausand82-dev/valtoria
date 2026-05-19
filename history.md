@@ -5,6 +5,8 @@ History over changes
 - added options to have more than one sheets on a object
 - added player occulision fade options
 - added tag and aviodtags to better use of big objects
+- shorthanded condition is implemented (makes it easy to make condition)
+- added NEW spell blizzard
 
 * V. 1.72
 * added a new particle system, visuel better and can use png's

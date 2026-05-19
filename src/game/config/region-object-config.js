@@ -214,7 +214,7 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.95 },
   },
   object_house_mainland: {
-    spawnTypes: [{ type: "building", weight: 1 }],
+    spawnTypes: [{ type: "object_house_mainland", weight: 1 }],
     // legacyWeightKey: "house", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     destructible: {
@@ -246,7 +246,17 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "mainland",
-    graphicsRef: "building_normal_sheet.png (4x4)",
+    graphics: {
+    mode: "sheet",
+    files: [
+      "object/object_house_normal_1.png",
+      "object/object_house_normal_2.png",
+      "object/object_house_normal_3.png",
+    ],
+    rows: 4,
+    cols: 4,
+    renderScale: 2,
+},
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.94 },
   },
