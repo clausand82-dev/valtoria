@@ -8,10 +8,12 @@ import { normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWate
 import {
   getRegionObjectFamily,
   // legacyRegionObjectsFromWeights,
+  normalizeObjectSpawnDamage,
   normalizeRegionObjects,
   pickObjectSpawnType,
   REGION_OBJECT_DEFS,
   resolveRegionObjectDestructibleDef,
+  resolveRegionObjectVariantCount,
 } from "./config/region-object-config.js";
 import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
 import { normalizeParticleConfigs, rollParticleConfigs } from "./config/particle-presets.js";
@@ -153,6 +155,11 @@ function pickWeightedByWeight(entries, roll = Math.random()) {
     if (cursor <= 0) return item.entry;
   }
   return weighted[weighted.length - 1]?.entry ?? entries[0];
+}
+
+function pickWeightedTileset(entries, roll = Math.random()) {
+  if (!Array.isArray(entries) || !entries.length) return null;
+  return pickWeightedByWeight(entries, roll);
 }
 
 export function getRarity(level) {
@@ -587,6 +594,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         ? normalizedTilesetArray.map((normalizedTileset) => ({
           fileName: normalizedTileset.fileName,
           sheetId: normalizedTileset.sheetId,
+          weight: normalizedTileset.weight,
           x: normalizedTileset.x,
           y: normalizedTileset.y,
           lockedVariant: normalizedTileset.lockedVariant,
@@ -629,6 +637,13 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : null,
         depthOffset: entry.depthOffset,
         scale: entry.scale ? { ...entry.scale } : null,
+        variantCount: entry.variantCount,
+        spawnDamage: entry.spawnDamage ?? null,
+        spawnTags: [...(entry.spawnTags ?? [])],
+        avoidSpawnTags: [...(entry.avoidSpawnTags ?? [])],
+        spawnAvoidRadius: entry.spawnAvoidRadius,
+        foregroundFade: entry.foregroundFade,
+        foregroundFadeAlpha: entry.foregroundFadeAlpha,
       })),
       decaySets: normalizedDecaySets.map((set) => ({
         id: set.id,
@@ -804,7 +819,7 @@ export function createChunk(cx, cy, region = null) {
       const noise = hashInt(worldX, worldY, 31);
       const regionTileset = region?.mapRegion?.tileset;
       const chosenTileset = Array.isArray(regionTileset) && regionTileset.length
-        ? regionTileset[noise % regionTileset.length]
+        ? pickWeightedTileset(regionTileset, noise / 4294967295)
         : regionTileset;
       const groundSheetId = chosenTileset?.sheetId ?? DEFAULT_GROUND_SHEET_ID;
       const lockedGroundVariant = Number.isInteger(chosenTileset?.lockedVariant)
@@ -955,6 +970,61 @@ function prefabWorldPoint(instance, item) {
   };
 }
 
+function initialObjectDamageState(def, spawnDamage, randValue = 0) {
+  const maxHp = Math.max(1, Math.floor(Number(def?.hp) || 1));
+  const stages = Math.max(1, Math.floor(Number(def?.damageStages) || 3));
+  const damagedHits = Math.min(1, stages - 1);
+  const destroyedHits = Math.max(0, stages - 1);
+  const mode = normalizeObjectSpawnDamage(spawnDamage);
+  let options = [0];
+  if (mode === "all") options = [0, damagedHits, destroyedHits];
+  else if (mode === "damaged") options = [damagedHits];
+  else if (mode === "destroyed") options = [destroyedHits];
+  else if (mode === "damaged_destroyed") options = [damagedHits, destroyedHits];
+
+  const uniqueOptions = [...new Set(options.filter((hits) => Number.isFinite(hits) && hits >= 0))];
+  const index = Math.min(uniqueOptions.length - 1, Math.floor(Math.max(0, Math.min(1, randValue)) * uniqueOptions.length));
+  const harvestHits = uniqueOptions[Math.max(0, index)] ?? 0;
+  const remainingStages = Math.max(1, stages - harvestHits);
+  const hp = Math.max(1, Math.ceil(maxHp * (remainingStages / stages)));
+  return harvestHits > 0
+    ? { maxHp, hp, harvestHits }
+    : { maxHp, hp };
+}
+
+function objectSpawnMetadataFromDef(def) {
+  return {
+    spawnTags: Array.isArray(def?.spawnTags) ? def.spawnTags.map(String).filter(Boolean) : [],
+    avoidSpawnTags: Array.isArray(def?.avoidSpawnTags) ? def.avoidSpawnTags.map(String).filter(Boolean) : [],
+    spawnAvoidRadius: Number.isFinite(Number(def?.spawnAvoidRadius)) && Number(def.spawnAvoidRadius) > 0
+      ? Number(def.spawnAvoidRadius)
+      : null,
+    foregroundFade: Boolean(def?.foregroundFade),
+    foregroundFadeAlpha: Number.isFinite(Number(def?.foregroundFadeAlpha))
+      ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
+      : undefined,
+  };
+}
+
+function objectAvoidsSpawnZone(object, producer) {
+  const avoidTags = Array.isArray(object?.avoidSpawnTags) ? object.avoidSpawnTags : [];
+  const producerTags = Array.isArray(producer?.spawnTags) ? producer.spawnTags : [];
+  const avoidRadius = Number(producer?.spawnAvoidRadius) || 0;
+  if (!avoidTags.length || !producerTags.length || avoidRadius <= 0 || object.id === producer.id) return false;
+  if (!avoidTags.some((tag) => producerTags.includes(tag))) return false;
+  return Math.hypot(object.x - producer.x, object.y - producer.y) < avoidRadius;
+}
+
+function applySpawnAvoidance(chunk) {
+  const producers = chunk.objects.filter((object) => (
+    Array.isArray(object.spawnTags)
+    && object.spawnTags.length
+    && Number(object.spawnAvoidRadius) > 0
+  ));
+  if (!producers.length) return;
+  chunk.objects = chunk.objects.filter((object) => !producers.some((producer) => objectAvoidsSpawnZone(object, producer)));
+}
+
 function addPrefabObjects(chunk, instance) {
   for (let i = 0; i < (instance.objects ?? []).length; i += 1) {
     const item = instance.objects[i];
@@ -981,6 +1051,19 @@ function addPrefabObjects(chunk, instance) {
     const effectiveDestructible = typeof item.destructible === "boolean"
       ? item.destructible
       : def.defaultDestructible !== false && Boolean(resolvedDef);
+    const damageState = effectiveDestructible
+      ? initialObjectDamageState(resolvedDef, item.spawnDamage ?? item.damageState ?? item.damageSpawn, rand01(chunk.cx, chunk.cy, 7940 + i))
+      : {};
+    const spawnMetadata = objectSpawnMetadataFromDef(def);
+    if (Array.isArray(item.spawnTags)) spawnMetadata.spawnTags = item.spawnTags.map(String).filter(Boolean);
+    if (Array.isArray(item.avoidSpawnTags)) spawnMetadata.avoidSpawnTags = item.avoidSpawnTags.map(String).filter(Boolean);
+    if (Number.isFinite(Number(item.spawnAvoidRadius)) && Number(item.spawnAvoidRadius) > 0) {
+      spawnMetadata.spawnAvoidRadius = Number(item.spawnAvoidRadius);
+    }
+    if (item.foregroundFade !== undefined) spawnMetadata.foregroundFade = Boolean(item.foregroundFade);
+    if (Number.isFinite(Number(item.foregroundFadeAlpha))) {
+      spawnMetadata.foregroundFadeAlpha = Math.min(1, Math.max(0.1, Number(item.foregroundFadeAlpha)));
+    }
     chunk.objects.push({
       id: createId(),
       type,
@@ -993,7 +1076,7 @@ function addPrefabObjects(chunk, instance) {
       flip: instance.mirrored,
       treeVariant: Number.isFinite(Number(item.variant))
         ? Math.max(0, Math.floor(Number(item.variant)))
-        : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * 16),
+        : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type)))),
       animSeed: rand01(chunk.cx, chunk.cy, 7920 + i) * Math.PI * 2,
       visualScale: Number(item.visualScale) || 1,
       blocking: item.blocking !== false,
@@ -1004,8 +1087,8 @@ function addPrefabObjects(chunk, instance) {
       depthMode: def.depthMode ?? "dynamic",
       sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
-      maxHp: effectiveDestructible ? resolvedDef?.hp : undefined,
-      hp: effectiveDestructible ? resolvedDef?.hp : undefined,
+      ...spawnMetadata,
+      ...damageState,
       prefabId: instance.id,
       prefabInstanceId: instance.instanceId,
     });
@@ -1275,6 +1358,9 @@ function addObjects(chunk, safeChunk) {
       ? selectedEntry.destructible
       : null;
     const effectiveDestructible = explicitDestructible ?? selectedEntry?.defaultDestructible ?? Boolean(resolvedDef);
+    const damageState = effectiveDestructible
+      ? initialObjectDamageState(resolvedDef, selectedEntry?.spawnDamage, rand01(chunk.cx, chunk.cy, 7950 + i))
+      : {};
     
     // Handle scale: fixed, range, or default (1.0)
     const objectScale = selectedEntry?.scale;
@@ -1297,7 +1383,7 @@ function addObjects(chunk, safeChunk) {
       rotation: rand01(chunk.cx, chunk.cy, 400 + i) * Math.PI * 2,
       colorShift: rand01(chunk.cx, chunk.cy, 500 + i),
       flip: rand01(chunk.cx, chunk.cy, 530 + i) > 0.5,
-      treeVariant: Math.floor(rand01(chunk.cx, chunk.cy, 545 + i) * 16),
+      treeVariant: Math.floor(rand01(chunk.cx, chunk.cy, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16))),
       animSeed: rand01(chunk.cx, chunk.cy, 560 + i) * Math.PI * 2,
       visualScale,
       blocking: true,
@@ -1308,12 +1394,17 @@ function addObjects(chunk, safeChunk) {
       depthMode: selectedEntry?.depthMode ?? "dynamic",
       sortAnchor: selectedEntry?.sortAnchor ? { ...selectedEntry.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(selectedEntry?.depthOffset)) ? Number(selectedEntry.depthOffset) : 0,
+      spawnTags: [...(selectedEntry?.spawnTags ?? [])],
+      avoidSpawnTags: [...(selectedEntry?.avoidSpawnTags ?? [])],
+      spawnAvoidRadius: selectedEntry?.spawnAvoidRadius ?? null,
+      foregroundFade: Boolean(selectedEntry?.foregroundFade),
+      foregroundFadeAlpha: selectedEntry?.foregroundFadeAlpha,
       // TODO: Support occluder metadata here for future pixel/shape masking.
-      maxHp: effectiveDestructible ? resolvedDef?.hp : undefined,
-      hp: effectiveDestructible ? resolvedDef?.hp : undefined,
+      ...damageState,
     });
   }
 
+  applySpawnAvoidance(chunk);
   addRegionChest(chunk);
 }
 

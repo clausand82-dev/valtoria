@@ -4,15 +4,37 @@ const EMPTY_WORLD_STATE = Object.freeze({
   values: Object.freeze({}),
 });
 
+const CONDITION_KEYS = new Set([
+  "requires",
+  "blockedBy",
+  "corruption",
+  "visited",
+  "cleared",
+  "explored",
+  "unlocked",
+  "flag",
+  "counter",
+  "quest",
+  "questActive",
+  "questCompleted",
+  "questStep",
+  "inventory",
+  "cityStat",
+  "cityStorage",
+  "cityInventory",
+  "player",
+  "playerStat",
+]);
+
 const MAP_REGION_PATCH_KEYS = {
   mobs: ["id", "type"],
   objects: ["id", "type"],
   decay: ["id"],
-  foliageSet: ["fileName"],
-  foliageSets: ["fileName"],
-  foilageSet: ["fileName"],
-  foilageSets: ["fileName"],
-  tileset: ["fileName"],
+  foliageSet: ["id", "fileName"],
+  foliageSets: ["id", "fileName"],
+  foilageSet: ["id", "fileName"],
+  foilageSets: ["id", "fileName"],
+  tileset: ["id", "fileName"],
   water: ["fileName"],
   waterSet: ["fileName"],
   waterSets: ["fileName"],
@@ -125,9 +147,14 @@ function readPath(source, path) {
   return current;
 }
 
-function compareNumber(actual, condition) {
-  const value = Number(actual) || 0;
+export function compareNumber(actual, condition) {
+  const value = Number(actual);
+  if (!Number.isFinite(value)) return false;
+  if (typeof condition === "number") return value === condition;
+  if (!condition || typeof condition !== "object" || Array.isArray(condition)) return value === Number(condition);
   if (condition.equals !== undefined && value !== Number(condition.equals)) return false;
+  if (condition.min !== undefined && value < Number(condition.min)) return false;
+  if (condition.max !== undefined && value > Number(condition.max)) return false;
   if (condition.gte !== undefined && value < Number(condition.gte)) return false;
   if (condition.gt !== undefined && value <= Number(condition.gt)) return false;
   if (condition.lte !== undefined && value > Number(condition.lte)) return false;
@@ -139,10 +166,186 @@ function compareValue(actual, condition) {
   if (condition.equals !== undefined) return actual === condition.equals;
   if (condition.notEquals !== undefined) return actual !== condition.notEquals;
   if (condition.in !== undefined) return Array.isArray(condition.in) && condition.in.includes(actual);
-  if (condition.gte !== undefined || condition.gt !== undefined || condition.lte !== undefined || condition.lt !== undefined) {
+  if (
+    condition.min !== undefined
+    || condition.max !== undefined
+    || condition.gte !== undefined
+    || condition.gt !== undefined
+    || condition.lte !== undefined
+    || condition.lt !== undefined
+  ) {
     return compareNumber(actual, condition);
   }
   return Boolean(actual);
+}
+
+function regionKey(context = {}, state) {
+  const id = context.regionId ?? context.regionConfig?.id;
+  return id ? regionWorldStateKey(id, state) : "";
+}
+
+function readWorldScalar(worldState, key) {
+  if (!key) return undefined;
+  const normalized = normalizeWorldState(worldState);
+  if (Object.prototype.hasOwnProperty.call(normalized.values, key)) return normalized.values[key];
+  if (Object.prototype.hasOwnProperty.call(normalized.counters, key)) return normalized.counters[key];
+  if (Object.prototype.hasOwnProperty.call(normalized.flags, key)) return normalized.flags[key];
+  return undefined;
+}
+
+function getRegionCorruptionLevel(worldState, context = {}) {
+  const key = regionKey(context, "corruptionLevel");
+  const worldValue = readWorldScalar(worldState, key);
+  if (worldValue !== undefined) {
+    const parsed = Number(worldValue);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  const configValue = context.regionConfig?.corruptionLevel;
+  if (configValue !== undefined) {
+    const parsed = Number(configValue);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  const corruptedKey = regionKey(context, "corrupted");
+  if (corruptedKey && Object.prototype.hasOwnProperty.call(normalizeWorldState(worldState).flags, corruptedKey)) {
+    return getWorldFlag(worldState, corruptedKey) ? 10 : 0;
+  }
+  if (typeof context.regionConfig?.corrupted === "boolean") return context.regionConfig.corrupted ? 10 : 0;
+  return undefined;
+}
+
+function compareBoolean(actual, expected) {
+  if (typeof expected !== "boolean") return false;
+  return Boolean(actual) === expected;
+}
+
+function activeQuestIds(questState = {}) {
+  return new Set((Array.isArray(questState.active) ? questState.active : []).map((quest) => String(quest?.questId ?? quest?.id ?? quest)));
+}
+
+function completedQuestIds(questState = {}) {
+  return new Set((Array.isArray(questState.completed) ? questState.completed : []).map(String));
+}
+
+function questIsActive(context, id) {
+  return activeQuestIds(context.questState).has(String(id));
+}
+
+function questIsCompleted(context, id) {
+  return completedQuestIds(context.questState).has(String(id));
+}
+
+function questStepMatches(context, requirement) {
+  if (!requirement || typeof requirement !== "object") return false;
+  const questId = String(requirement.id ?? requirement.questId ?? "").trim();
+  const step = String(requirement.step ?? requirement.progress ?? "").trim();
+  if (!questId || !step) return false;
+  const quest = (Array.isArray(context.questState?.active) ? context.questState.active : [])
+    .find((entry) => String(entry?.questId ?? entry?.id ?? "") === questId);
+  if (!quest) return false;
+  return String(quest.step ?? quest.currentStep ?? quest.progress?.step ?? quest.progress?.currentStep ?? "") === step;
+}
+
+function toInventoryList(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "object") {
+    if (Array.isArray(value.items)) return value.items;
+    return Object.values(value).flatMap((entry) => Array.isArray(entry) ? entry : [entry]);
+  }
+  return [];
+}
+
+function itemCountForRequirement(item, req) {
+  if (!item || !req || typeof req !== "object") return 0;
+  if (req.resourceId || req.resource) {
+    return item.mode === "resource" && String(item.resourceId ?? item.resource ?? "") === String(req.resourceId ?? req.resource)
+      ? Math.max(1, Math.floor(Number(item.count) || 1))
+      : 0;
+  }
+  let match = true;
+  if (req.mode) match = match && String(item.mode ?? "") === String(req.mode);
+  if (req.readableId) match = match && String(item.readableId ?? "") === String(req.readableId);
+  if (req.questItemId) match = match && String(item.questItemId ?? "") === String(req.questItemId);
+  if (req.uniqueId) match = match && String(item.uniqueId ?? "") === String(req.uniqueId);
+  if (req.namedId) match = match && String(item.namedId ?? "") === String(req.namedId);
+  if (req.id) match = match && String(item.id ?? item.itemId ?? "") === String(req.id);
+  if (req.rarity) match = match && String(item.rarity ?? "") === String(req.rarity);
+  if (req.category) match = match && String(item.category ?? item.slot ?? "") === String(req.category);
+  if (req.baseName) match = match && String(item.baseName ?? "") === String(req.baseName);
+  if (req.name) match = match && String(item.name ?? "") === String(req.name);
+  if (req.slot) match = match && String(item.slot ?? "") === String(req.slot);
+  if (!match) return 0;
+  return item.mode === "resource" || item.mode === "potion" ? Math.max(1, Math.floor(Number(item.count) || 1)) : 1;
+}
+
+function countInventoryRequirement(req, context = {}, bucket = "inventory") {
+  if (!req || typeof req !== "object") return 0;
+  const player = context.player ?? {};
+  if (req.potionType) {
+    const type = String(req.potionType);
+    const potionSource = context.potions ?? player.potions ?? {};
+    const directCount = Math.max(0, Math.floor(Number(potionSource[type]) || 0));
+    if (directCount > 0) return directCount;
+  }
+  const source = bucket === "inventory"
+    ? (context.inventory ?? player.inventory)
+    : (context[bucket] ?? context.cityStorage ?? context.cityInventory);
+  return toInventoryList(source).reduce((sum, item) => sum + itemCountForRequirement(item, req), 0);
+}
+
+function inventoryRequirementMet(req, context, bucket = "inventory") {
+  const needed = Math.max(1, Math.floor(Number(req?.min ?? req?.count ?? 1) || 1));
+  return countInventoryRequirement(req, context, bucket) >= needed;
+}
+
+function statMapMatches(stats, requirements) {
+  if (!stats || typeof stats !== "object" || !requirements || typeof requirements !== "object") return false;
+  return Object.entries(requirements).every(([key, condition]) => {
+    const actual = readPath(stats, key);
+    return compareNumber(actual, condition);
+  });
+}
+
+function shorthandConditionMet(key, expected, worldState, context) {
+  const normalized = normalizeWorldState(worldState);
+  switch (key) {
+    case "corruption":
+      return compareNumber(getRegionCorruptionLevel(normalized, context), expected);
+    case "visited": {
+      const visits = normalized.counters[regionKey(context, "visits")];
+      return typeof expected === "number" ? compareNumber(visits, { min: expected }) : compareNumber(visits, expected);
+    }
+    case "cleared":
+    case "explored":
+    case "unlocked":
+      return compareBoolean(normalized.flags[regionKey(context, key)], expected);
+    case "flag":
+      return Boolean(normalized.flags[String(expected)]);
+    case "counter": {
+      const id = typeof expected === "string" ? expected : expected?.id ?? expected?.key;
+      return Boolean(id) && compareNumber(normalized.counters[String(id)] ?? 0, typeof expected === "object" ? expected : { min: 1 });
+    }
+    case "quest":
+    case "questActive":
+      return questIsActive(context, expected);
+    case "questCompleted":
+      return questIsCompleted(context, expected);
+    case "questStep":
+      return questStepMatches(context, expected);
+    case "inventory":
+      return inventoryRequirementMet(expected, context, "inventory");
+    case "cityStorage":
+    case "cityInventory":
+      return inventoryRequirementMet(expected, context, key);
+    case "cityStat":
+      return statMapMatches(context.cityStats, expected);
+    case "player":
+      return statMapMatches(context.player, expected);
+    case "playerStat":
+      return statMapMatches(context.player?.stats, expected);
+    default:
+      return true;
+  }
 }
 
 export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, context = {}) {
@@ -157,12 +360,25 @@ export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, con
   if (Array.isArray(condition.any) && !condition.any.some((entry) => worldConditionMet(entry, normalized, context))) return false;
   if (condition.not !== undefined && worldConditionMet(condition.not, normalized, context)) return false;
 
+  for (const key of CONDITION_KEYS) {
+    if (key === "requires" || key === "blockedBy") continue;
+    if (key === "flag" || key === "counter") continue;
+    if (!Object.prototype.hasOwnProperty.call(condition, key)) continue;
+    if (!shorthandConditionMet(key, condition[key], normalized, context)) return false;
+  }
+
   if (condition.flag !== undefined) {
     const actual = Boolean(normalized.flags[String(condition.flag)]);
     return condition.equals !== undefined ? actual === Boolean(condition.equals) : actual;
   }
   if (condition.counter !== undefined) {
-    return compareNumber(normalized.counters[String(condition.counter)] ?? 0, condition);
+    const counterId = typeof condition.counter === "object"
+      ? condition.counter.id ?? condition.counter.key
+      : condition.counter;
+    const counterCondition = typeof condition.counter === "object"
+      ? { ...condition.counter, ...condition }
+      : condition;
+    return compareNumber(normalized.counters[String(counterId)] ?? 0, counterCondition);
   }
   if (condition.value !== undefined) {
     return compareValue(normalized.values[String(condition.value)], condition);
@@ -179,6 +395,11 @@ function isConditionalValue(value) {
 
 function entryAllowed(entry, worldState, context) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return true;
+  for (const key of CONDITION_KEYS) {
+    if (key === "requires" || key === "blockedBy") continue;
+    if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
+    if (!shorthandConditionMet(key, entry[key], worldState, context)) return false;
+  }
   if (entry.requires && !worldConditionMet(entry.requires, worldState, context)) return false;
   if (entry.blockedBy && worldConditionMet(entry.blockedBy, worldState, context)) return false;
   return true;
@@ -186,7 +407,10 @@ function entryAllowed(entry, worldState, context) {
 
 function stripConditionFields(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
-  const { requires, blockedBy, ...rest } = entry;
+  const rest = {};
+  for (const [key, value] of Object.entries(entry)) {
+    if (!CONDITION_KEYS.has(key)) rest[key] = value;
+  }
   return rest;
 }
 
@@ -254,6 +478,16 @@ export function filterWorldList(rawValue, worldState = EMPTY_WORLD_STATE, contex
     .map((entry) => stripConditionFields(resolveWorldValue(entry, worldState, context)));
 }
 
+function resolveNestedConditionalLists(value, worldState, context) {
+  if (Array.isArray(value)) return filterWorldList(value, worldState, context);
+  if (!value || typeof value !== "object" || isConditionalValue(value)) return resolveWorldValue(value, worldState, context);
+  const result = {};
+  for (const [key, child] of Object.entries(value)) {
+    result[key] = resolveNestedConditionalLists(child, worldState, context);
+  }
+  return result;
+}
+
 function resolveMapRegionField(key, value, worldState, context) {
   if (MAP_REGION_SKIP_KEYS.has(key)) return clone(value);
   const mergeKeys = MAP_REGION_PATCH_KEYS[key] ?? ["id", "type", "fileName"];
@@ -263,7 +497,8 @@ function resolveMapRegionField(key, value, worldState, context) {
       pool: resolveWorldValue(value.pool, worldState, context, { mergeKeys }),
     };
   }
-  return resolveWorldValue(value, worldState, context, { mergeKeys });
+  const resolved = resolveWorldValue(value, worldState, context, { mergeKeys });
+  return resolveNestedConditionalLists(resolved, worldState, context);
 }
 
 export function resolveMapRegionConfig(regionConfig, worldState = EMPTY_WORLD_STATE, context = {}) {
@@ -273,6 +508,8 @@ export function resolveMapRegionConfig(regionConfig, worldState = EMPTY_WORLD_ST
     ...context,
     areaMapId: context.areaMapId ?? regionConfig.areaMapId,
     regionId: context.regionId ?? regionConfig.id,
+    regionConfig,
+    worldState,
   };
   for (const [key, value] of Object.entries(regionConfig)) {
     resolved[key] = resolveMapRegionField(key, value, worldState, baseContext);

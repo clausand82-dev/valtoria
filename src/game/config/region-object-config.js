@@ -25,11 +25,17 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - TODO:DELETE legacyWeightKey: Only used by legacyRegionObjectsFromWeights (old biodome weight system).
 - defaultDestructible: Default destructible flag if region override is not set.
 - destructible: Inline destructible data used by runtime object damage/loot.
+- spawnDamage: Optional start damage state: "all", "damaged", "destroyed",
+  or "damaged_destroyed". Omit for current behavior: spawn undamaged.
+- spawnTags/spawnAvoidRadius: Optional spawn influence metadata, e.g. canopy zones.
+- avoidSpawnTags: Optional list of spawn influence tags this object should avoid.
+- foregroundFade: Optional render fade when this object is in front of actors/loot.
 - renderBiomeId: Optional visual biome override when rendering.
 - graphicsRef: PNG reference text. For new object_* sheet generation this should
   contain a real file name like "my_object.png".
 - graphics: Optional explicit graphics config.
   - { mode: "sheet", fileName, rows, cols, renderScale }
+  - { mode: "sheet", files: [...], rows, cols, renderScale } combines variants from multiple sheets.
   - { mode: "frames", frameFiles: [...], animated: true, ... }
 - depthMode: Render sorting layer. Use "dynamic" for tall/blocking props that
   should sort with actors, "ground" for flat decoration.
@@ -77,6 +83,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_mainland", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
       damageStages: 3,
@@ -104,6 +111,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
       damageStages: 3,
@@ -123,6 +131,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_sand", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
       damageStages: 3,
@@ -142,6 +151,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_jungle", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
       damageStages: 3,
@@ -541,6 +551,75 @@ export const REGION_OBJECT_DEFS = {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
+  object_talltree_medium: {
+    spawnTypes: [{ type: "object_talltree_medium", weight: 1 }],
+    defaultDestructible: true,
+    spawnTags: ["canopy"],
+    spawnAvoidRadius: 1.8,
+    foregroundFade: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#ffffff",
+      loot: [
+        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
+      ],  
+    },
+    graphics: {
+  mode: "sheet",
+  files: [
+      "object/trees/object_talltree_medium_1.png",
+      "object/trees/object_talltree_medium_2.png",
+      "object/trees/object_talltree_medium_3.png",
+      "object/trees/object_talltree_medium_4.png",
+      "object/trees/object_talltree_medium_5.png",
+  ],
+  
+  rows: 2,
+  cols: 2,
+  renderScale: 0.5,
+},
+    renderBiomeId: "mainland",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+  object_talltree_big: {
+    spawnTypes: [{ type: "object_talltree_big", weight: 1 }],
+    defaultDestructible: true,
+    spawnTags: ["canopy"],
+    spawnAvoidRadius: 2.4,
+    foregroundFade: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#ffffff",
+      loot: [
+        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
+      ],  
+    },
+    graphics: {
+  mode: "sheet",
+  files: [
+    "object/trees/object_talltree_big_1.png",
+    "object/trees/object_talltree_big_2.png",
+    "object/trees/object_talltree_big_3.png",
+    "object/trees/object_talltree_big_4.png",
+    "object/trees/object_talltree_big_5.png",
+  ],
+  rows: 1,
+  cols: 1,
+  renderScale: 0.25,
+},
+    renderBiomeId: "mainland",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
 };
 
 function clampNumber(value, min, max) {
@@ -594,16 +673,31 @@ function normalizeGraphicsConfig(def) {
     };
   }
 
-  const fileName = String(graphics.fileName ?? "").trim();
-  if (!/\.png$/i.test(fileName)) return null;
+  const files = (Array.isArray(graphics.files) ? graphics.files : [graphics.fileName])
+    .map((file) => String(file ?? "").trim())
+    .filter((file) => /\.png$/i.test(file));
+  const fileName = files[0] ?? "";
+  if (!fileName) return null;
+  const rows = Number.isFinite(Number(graphics.rows)) ? Math.max(1, Math.floor(Number(graphics.rows))) : 4;
+  const cols = Number.isFinite(Number(graphics.cols)) ? Math.max(1, Math.floor(Number(graphics.cols))) : 4;
+  const frameCount = Number.isFinite(Number(graphics.frameCount)) ? Math.max(1, Math.floor(Number(graphics.frameCount))) : undefined;
   return {
     fileName,
-    rows: Number.isFinite(Number(graphics.rows)) ? Math.max(1, Math.floor(Number(graphics.rows))) : 4,
-    cols: Number.isFinite(Number(graphics.cols)) ? Math.max(1, Math.floor(Number(graphics.cols))) : 4,
-    frameCount: Number.isFinite(Number(graphics.frameCount)) ? Math.max(1, Math.floor(Number(graphics.frameCount))) : undefined,
+    files: files.length > 1 ? files : undefined,
+    rows,
+    cols,
+    frameCount,
+    variantCount: files.length * (frameCount ?? rows * cols),
     animated: graphics.animated,
     renderScale: Number.isFinite(Number(graphics.renderScale)) ? Number(graphics.renderScale) : 1,
   };
+}
+
+function objectVariantCountFromDef(def) {
+  const graphics = normalizeGraphicsConfig(def);
+  if (graphics?.variantCount) return graphics.variantCount;
+  if (graphics?.frameFiles?.length) return graphics.frameFiles.length;
+  return 16;
 }
 
 function inferSheetObjectType(def) {
@@ -635,6 +729,7 @@ function buildRegionObjectSheets(definitions) {
         fileName,
         rows: 4,
         cols: 4,
+        variantCount: 16,
         renderScale: Number.isFinite(Number(def?.sheetRenderScale)) ? Number(def.sheetRenderScale) : 1,
       },
     };
@@ -671,6 +766,24 @@ function normalizeScale(scale) {
   return null;
 }
 
+function normalizeStringList(value) {
+  const list = Array.isArray(value) ? value : (value ? [value] : []);
+  return list
+    .map((entry) => String(entry ?? "").trim())
+    .filter(Boolean);
+}
+
+function normalizeOptionalRadius(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function normalizeForegroundFade(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (value && typeof value === "object") return true;
+  return Boolean(fallback);
+}
+
 function normalizeSpawnTypes(def) {
   const list = Array.isArray(def?.spawnTypes) ? def.spawnTypes : [];
   const normalized = [];
@@ -698,6 +811,11 @@ export function resolveRegionObjectDestructibleDef(type) {
   return findRegionObjectDefBySpawnType(type)?.destructible ?? null;
 }
 
+export function resolveRegionObjectVariantCount(type) {
+  const def = findRegionObjectDefBySpawnType(type);
+  return def ? objectVariantCountFromDef(def) : 16;
+}
+
 export function getRegionObjectFamily(type) {
   const def = findRegionObjectDefBySpawnType(type);
   if (!def) return type ?? null;
@@ -712,7 +830,31 @@ export function getRegionObjectFamily(type) {
   return type ?? null;
 }
 
-function buildObjectEntry(objectId, weight, destructible = null, scale = null) {
+export function normalizeObjectSpawnDamage(value) {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return null;
+  const normalized = raw.replace(/[\s-]+/g, "_");
+  if (["all", "any", "random"].includes(normalized)) return "all";
+  if (["damaged", "damage", "damaged_only", "damage_only"].includes(normalized)) return "damaged";
+  if (["destroyed", "destroy", "destoyed", "destoryed", "destroyed_only", "destroy_only", "destoyed_only", "destoryed_only"].includes(normalized)) return "destroyed";
+  if ([
+    "damaged_destroyed",
+    "damage_destroyed",
+    "damaged_and_destroyed",
+    "damage_and_destroyed",
+    "damaged_destroy",
+    "damage_destroy",
+    "damange_and_destoryed",
+    "damange_destoryed",
+    "damaged_and_destoryed",
+    "damaged_destoryed",
+    "damage_and_destoryed",
+    "damage_destoryed",
+  ].includes(normalized)) return "damaged_destroyed";
+  return null;
+}
+
+function buildObjectEntry(objectId, weight, destructible = null, scale = null, spawnDamage = null) {
   const def = REGION_OBJECT_DEFS[objectId];
   if (!def) return null;
   const resolvedWeight = parseWeight(weight);
@@ -732,6 +874,15 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null) {
     sortAnchor: normalizeSortAnchor(def.sortAnchor),
     depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
     scale: normalizeScale(scale),
+    variantCount: objectVariantCountFromDef(def),
+    spawnDamage: normalizeObjectSpawnDamage(spawnDamage),
+    spawnTags: normalizeStringList(def.spawnTags),
+    avoidSpawnTags: normalizeStringList(def.avoidSpawnTags),
+    spawnAvoidRadius: normalizeOptionalRadius(def.spawnAvoidRadius),
+    foregroundFade: normalizeForegroundFade(def.foregroundFade),
+    foregroundFadeAlpha: Number.isFinite(Number(def.foregroundFadeAlpha))
+      ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
+      : undefined,
   };
 }
 
@@ -776,7 +927,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
   const entries = [];
   for (const entry of raw) {
     if (typeof entry === "string") {
-      const normalized = buildObjectEntry(entry, 1, null, null);
+      const normalized = buildObjectEntry(entry, 1, null, null, null);
       if (normalized) entries.push(normalized);
       continue;
     }
@@ -785,7 +936,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     if (!objectId) continue;
     const destructible = typeof entry.destructible === "boolean" ? entry.destructible : null;
     const weight = parseWeight(entry.weight) || 1;
-    const normalized = buildObjectEntry(objectId, weight, destructible, entry.scale);
+    const normalized = buildObjectEntry(objectId, weight, destructible, entry.scale, entry.spawnDamage ?? entry.damageState ?? entry.damageSpawn);
     if (normalized && entry.particles) {
       normalized.particles = normalizeParticleConfigs(entry.particles);
     }
@@ -797,6 +948,21 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     }
     if (normalized && Number.isFinite(Number(entry.depthOffset))) {
       normalized.depthOffset = Number(entry.depthOffset);
+    }
+    if (normalized && (entry.spawnTags !== undefined)) {
+      normalized.spawnTags = normalizeStringList(entry.spawnTags);
+    }
+    if (normalized && (entry.avoidSpawnTags !== undefined)) {
+      normalized.avoidSpawnTags = normalizeStringList(entry.avoidSpawnTags);
+    }
+    if (normalized && entry.spawnAvoidRadius !== undefined) {
+      normalized.spawnAvoidRadius = normalizeOptionalRadius(entry.spawnAvoidRadius);
+    }
+    if (normalized && entry.foregroundFade !== undefined) {
+      normalized.foregroundFade = normalizeForegroundFade(entry.foregroundFade);
+    }
+    if (normalized && Number.isFinite(Number(entry.foregroundFadeAlpha))) {
+      normalized.foregroundFadeAlpha = Math.min(1, Math.max(0.1, Number(entry.foregroundFadeAlpha)));
     }
     if (normalized) entries.push(normalized);
   }

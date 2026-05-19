@@ -125,11 +125,13 @@ function normalizeResourceDrops(value) {
 function normalizeRegionTilesetEntry(tilesetInput) {
   const raw = toSpecObject(tilesetInput);
   if (!raw) return null;
-  const fileName = normalizeFileName(raw.fileName ?? raw.png ?? raw.src);
+  const fileName = normalizeFileName(raw.id ?? raw.fileName ?? raw.png ?? raw.src);
   if (!fileName) return null;
   const lockedVariant = resolveLockedTileVariant(raw, DEFAULT_GROUND_GRID);
+  const parsedWeight = Number(raw.weight);
   return {
     fileName,
+    weight: Number.isFinite(parsedWeight) ? Math.max(0, parsedWeight) : 1,
     sheetId: buildGroundSheetId(fileName),
     x: clampInt(raw.x, 1, DEFAULT_GROUND_GRID),
     y: clampInt(raw.y, 1, DEFAULT_GROUND_GRID),

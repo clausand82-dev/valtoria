@@ -812,6 +812,9 @@ function getObjectSheetConfigKey(config) {
   if (config.frameFiles) {
     return `frames:${config.frameFiles.join("|")}`;
   }
+  if (config.files?.length) {
+    return `${config.files.join("|")}:${config.rows}x${config.cols}:${config.frameCount ?? ""}`;
+  }
   return `${config.fileName}:${config.rows}x${config.cols}`;
 }
 
@@ -832,16 +835,69 @@ function loadObjectSheetConfig(config) {
       });
   }
 
-  return loadChromaImage(`/assets/generated/${config.fileName}`)
-    .then((canvas) => makeObjectSheet(canvas, config.rows, config.cols, {
-      animated: config.animated ?? false,
-      frameCount: config.frameCount,
-      normalizeAnimation: config.normalizeAnimation ?? true,
+  const makeSheet = (canvas) => makeObjectSheet(canvas, config.rows, config.cols, {
+    animated: config.animated ?? false,
+    frameCount: config.frameCount,
+    normalizeAnimation: config.normalizeAnimation ?? true,
+  });
+  const fileNames = objectSheetFileNames(config);
+
+  return Promise.all([
+    loadObjectSheetFiles(fileNames, makeSheet),
+    loadOptionalObjectDamageSheet(fileNames, "damaged", makeSheet),
+    loadOptionalObjectDamageSheet(fileNames, "destroyed", makeSheet),
+  ])
+    .then(([sheet, damaged, destroyed]) => ({
+      ...sheet,
+      damageVariants: {
+        ...(damaged ? { damaged } : {}),
+        ...(destroyed ? { destroyed } : {}),
+      },
     }))
     .catch((error) => {
       console.warn(`Object sheet load failed: ${config.fileName}`, error);
       return null;
     });
+}
+
+function objectSheetFileNames(config) {
+  const files = Array.isArray(config?.files) ? config.files : [config?.fileName];
+  return files
+    .map((fileName) => String(fileName ?? "").trim())
+    .filter((fileName) => /\.png$/i.test(fileName));
+}
+
+function loadObjectSheetFiles(fileNames, makeSheet) {
+  return Promise.all(fileNames.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`).then(makeSheet)))
+    .then(mergeObjectSheets);
+}
+
+function loadOptionalObjectDamageSheet(baseFileNames, suffix, makeSheet) {
+  const fileNames = baseFileNames
+    .map((fileName) => objectDamageFileName(fileName, suffix))
+    .filter(Boolean);
+  if (!fileNames.length) return Promise.resolve(null);
+  return Promise.all(fileNames.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`)
+    .then(makeSheet)
+    .catch(() => null)))
+    .then((sheets) => mergeObjectSheets(sheets.filter(Boolean)))
+    .catch(() => null);
+}
+
+function objectDamageFileName(fileName, suffix) {
+  const raw = String(fileName ?? "").trim();
+  if (!raw || !/\.png$/i.test(raw)) return null;
+  return raw.replace(/\.png$/i, `_${suffix}.png`);
+}
+
+function mergeObjectSheets(sheets) {
+  const validSheets = sheets.filter((sheet) => sheet?.cells?.length);
+  if (!validSheets.length) return null;
+  if (validSheets.length === 1) return validSheets[0];
+  return {
+    ...validSheets[0],
+    cells: validSheets.flatMap((sheet) => sheet.cells),
+  };
 }
 
 function loadGroundImage(src) {
@@ -2527,10 +2583,13 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
     : sheet.animated
       ? (object.type === "chest" ? Math.min(rawFrameIndex, cells.length - 1) : rawFrameIndex % cells.length)
     : Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length;
-  const cell = cells[frameIndex];
+  const renderSheet = objectDamageRenderSheet(sheet, object);
+  const cell = renderSheet?.cells?.[frameIndex] ?? cells[frameIndex];
   const sprite = cell?.sprite;
   if (!sprite) return false;
-  const frameOffset = sheet.frameOffsets?.[frameIndex] ?? { x: 0, y: 0 };
+  const frameOffset = renderSheet?.frameOffsets?.[frameIndex]
+    ?? sheet.frameOffsets?.[frameIndex]
+    ?? { x: 0, y: 0 };
 
   const baseScale = object.type === "building" ? 0.58
     : object.type === "ruin" ? 0.54
@@ -2557,7 +2616,7 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   }
   const drawX = -width * 0.5 + frameOffset.x * scale;
   const drawY = -height + 24 * scale + frameOffset.y * scale;
-  drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, drawX, drawY, width, height, object);
+  drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, drawX, drawY, width, height, renderSheet === sheet ? object : null);
   ctx.restore();
 
   if (object.type === "chest" && object.opening) {
@@ -2580,6 +2639,15 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   }
 
   return true;
+}
+
+function objectDamageRenderSheet(sheet, object) {
+  const variants = sheet?.damageVariants;
+  if (!variants || !object?.maxHp || object.hp >= object.maxHp) return sheet;
+  const hits = Math.max(0, Math.floor(Number(object.harvestHits) || 0));
+  if (hits >= 2) return variants.destroyed ?? sheet;
+  if (hits >= 1 && variants.damaged) return variants.damaged;
+  return sheet;
 }
 
 function drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, frameCount, time, rect) {

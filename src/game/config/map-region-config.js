@@ -167,6 +167,8 @@ region({
   objects: [                                                // Object ids come from region-object-config.js.
     { id: "object_tree_mainland", weight: 8, destructible: true }, // weight is relative spawn chance.
     { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
+    // spawnDamage supports: "all", "damaged", "destroyed", "damaged_destroyed". Omit for undamaged.
+    // spawnTags/spawnAvoidRadius mark an influence zone; avoidSpawnTags avoids matching zones; foregroundFade fades objects in front of player/mobs/loot.
   ],
 
   decay: [                                                  // Decal/decay ids come from decay-config.js.
@@ -234,6 +236,36 @@ Conditional config notes:
 - requires must pass. blockedBy must not pass.
 - Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
 - Automatic worldState currently tracks region.{id}.unlocked/explored/corrupted, region.{id}.visits, region.{id}.cleared on return, and mob.{typeName}.seen on hover/combat.
+
+Shorthand conditions:
+- List entries can add simple condition tags directly. Multiple tags on the same entry are AND.
+- Direct shorthand and requires must both pass. blockedBy always removes the entry when it matches.
+- requires is still the recommended syntax for advanced all/any/not groups, and it also understands shorthand scopes.
+- corruption reads region.{id}.corruptionLevel from worldState values/counters first, then regionConfig.corruptionLevel, then falls back to region.{id}.corrupted where true means 10 and false means 0.
+- corruption: 5 means exactly 5. corruption: { min: 5 } means 5 or higher. Numeric checks support min/max/equals/gt/gte/lt/lte.
+- visited: 1 is treated as visits >= 1. visited: { min: 1 } is preferred.
+- cityStorage and cityInventory use the same item counting shape; if the engine has not split them yet, they may be passed as aliases.
+- tileset strings are still valid. Object-form tilesets can use id (preferred) or fileName, plus weight and shorthand conditions.
+
+Recommended shorthand syntax:
+objects: [
+  { id: "object_tree", weight: 5 },
+  { id: "object_cursed_tree", weight: 2, corruption: { min: 6 } },
+  { id: "object_quest_note", weight: 1, quest: "quest_lord_kealand" },
+]
+
+weather: {
+  possible: [
+    { id: "none", weight: 50 },
+    { id: "fog", weight: 10, visited: { min: 1 } },
+    { id: "black_rain", weight: 5, corruption: { min: 7 } },
+  ],
+}
+
+tileset: [
+  "tileset/grass.png",
+  { id: "tileset/corrupt_grass.png", weight: 2, corruption: { min: 5 } },
+]
 
 Any extra fields passed to region({...}) are preserved on the region object for later use.
 */
@@ -889,9 +921,9 @@ export const MAP_REGION_SETS = {
       ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
-        { id: "object_woodboxes_ground", weight: 15, destructible: true },
+        { id: "object_woodboxes_ground", weight: 15, destructible: true, spawnDamage: "all" },
         { id: "object_bones", weight: 5, destructible: true },
-        { id: "object_barrels_ground", weight: 10, destructible: true },
+        { id: "object_barrels_ground", weight: 10, destructible: true, spawnDamage: "all" },
         //{ id: "object_shelfs", weight: 3, destructible: true },
         //{ id: "object_firebeacon_snow", weight: 1, destructible: false },
       ],
@@ -904,7 +936,7 @@ export const MAP_REGION_SETS = {
       ],
       labelX: 60,
       labelY: 31,
-      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 }, "Ghost"],
+      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 },],
       //weights: { house: 10, tree: 10, rock: 2, foilage: 9, fireplace: 1 },
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
@@ -1004,7 +1036,7 @@ export const MAP_REGION_SETS = {
       color: "#b4c46f",
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 } },
+        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
         { fileName: "foilage/foilage_foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
@@ -1072,6 +1104,13 @@ export const MAP_REGION_SETS = {
       color: "#7fb172",
       mapSize: "large",
       tileset: { fileName: "tileset/tileset_grass.png" },
+        spawnCounts: {                                            // Per chunk spawn counts.
+            objects: 100,                                            // Regular objects.
+            foliage: 50,                                            // Foliage placements.
+            decals: 24,                                             // Decay/decal placements.
+            water: 0,                                               // Lake-like water patches. 0 disables water.
+            monsters: { min: 8, max: 12 },                          // Monster count range.
+  },
       foliageSet: [
         { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2 },
@@ -1084,7 +1123,9 @@ export const MAP_REGION_SETS = {
       weights: { foilage: 10 },
       mobs: [{ type: "Wild Boar", weight: 3 }, { type: "Wolf", weight: 2 }, { type: "WolfCub", weight: 2 }, { type: "WolfFenris", weight: 2 }],
       objects: [
-        { id: "object_tree_mainland", weight: 25 },
+        { id: "object_tree_mainland", weight: 25, scale: { min: 0.9, max: 1.5 } },
+        { id: "object_talltree_medium", weight: 15, scale: { min: 2, max: 5 } },
+        { id: "object_talltree_big", weight: 12, scale: { min: 5, max: 10 } },
         { id: "object_stone_cluster", weight: 2 },
         { id: "object_house_mainland", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },

@@ -291,6 +291,13 @@ function addLegendEntry(result, entry, x, y) {
       rotation: entry.rotation,
       visualScale: entry.visualScale,
       variant: entry.variant,
+      variantCount: entry.variantCount,
+      spawnDamage: entry.spawnDamage ?? entry.damageState ?? entry.damageSpawn,
+      spawnTags: entry.spawnTags,
+      avoidSpawnTags: entry.avoidSpawnTags,
+      spawnAvoidRadius: entry.spawnAvoidRadius,
+      foregroundFade: entry.foregroundFade,
+      foregroundFadeAlpha: entry.foregroundFadeAlpha,
     });
   }
   if (entry.foliage) {

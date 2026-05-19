@@ -178,6 +178,18 @@ export const regionMethods = {
       ...resolveMapRegionConfig(regionConfig, this.worldState, {
         areaMapId,
         regionId: regionConfig.id,
+        regionConfig,
+        worldState: this.worldState,
+        questState: this.questState,
+        player: this.player,
+        inventory: this.player?.inventory,
+        potions: this.player?.potions,
+        equipment: this.player?.equipment,
+        cityStats: options.cityStats ?? this.cityStats,
+        cityInventory: options.cityInventory ?? this.cityInventory,
+        cityStorage: options.cityStorage ?? this.cityStorage ?? options.cityInventory ?? this.cityInventory,
+        activeMapRegion: this.activeMapRegion,
+        mapReturn: this.mapReturn,
         stats: {
           player: this.player,
           worldState: this.worldState,

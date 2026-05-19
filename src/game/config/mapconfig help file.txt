@@ -57,6 +57,8 @@ region({
   objects: [                                                // Object ids come from region-object-config.js.
     { id: "object_tree_mainland", weight: 8, destructible: true }, // weight is relative spawn chance.
     { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
+    // spawnDamage supports: "all", "damaged", "destroyed", "damaged_destroyed". Omit for undamaged.
+    // spawnTags/spawnAvoidRadius mark an influence zone; avoidSpawnTags avoids matching zones; foregroundFade fades objects in front of player/mobs/loot.
   ],
 
   decay: [                                                  // Decal/decay ids come from decay-config.js.
@@ -124,6 +126,36 @@ Conditional config notes:
 - requires must pass. blockedBy must not pass.
 - Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
 - Automatic worldState currently tracks region.{id}.unlocked/explored/corrupted, region.{id}.visits, region.{id}.cleared on return, and mob.{typeName}.seen on hover/combat.
+
+Shorthand conditions:
+- List entries can add simple condition tags directly. Multiple tags on the same entry are AND.
+- Direct shorthand and requires must both pass. blockedBy always removes the entry when it matches.
+- requires is still the recommended syntax for advanced all/any/not groups, and it also understands shorthand scopes.
+- corruption reads region.{id}.corruptionLevel from worldState values/counters first, then regionConfig.corruptionLevel, then falls back to region.{id}.corrupted where true means 10 and false means 0.
+- corruption: 5 means exactly 5. corruption: { min: 5 } means 5 or higher. Numeric checks support min/max/equals/gt/gte/lt/lte.
+- visited: 1 is treated as visits >= 1. visited: { min: 1 } is preferred.
+- cityStorage and cityInventory use the same item counting shape; if the engine has not split them yet, they may be passed as aliases.
+- tileset strings are still valid. Object-form tilesets can use id (preferred) or fileName, plus weight and shorthand conditions.
+
+Recommended shorthand syntax:
+objects: [
+  { id: "object_tree", weight: 5 },
+  { id: "object_cursed_tree", weight: 2, corruption: { min: 6 } },
+  { id: "object_quest_note", weight: 1, quest: "quest_lord_kealand" },
+]
+
+weather: {
+  possible: [
+    { id: "none", weight: 50 },
+    { id: "fog", weight: 10, visited: { min: 1 } },
+    { id: "black_rain", weight: 5, corruption: { min: 7 } },
+  ],
+}
+
+tileset: [
+  "tileset/grass.png",
+  { id: "tileset/corrupt_grass.png", weight: 2, corruption: { min: 5 } },
+]
 
 Any extra fields passed to region({...}) are preserved on the region object for later use.
 */

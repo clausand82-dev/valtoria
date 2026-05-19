@@ -150,6 +150,41 @@ function getTypeSortOrder(type) {
   }
 }
 
+function foregroundFadeTarget(renderable) {
+  return renderable.type === "hero"
+    || renderable.type === "monster"
+    || renderable.type === "loot"
+    || renderable.type === "questgiver";
+}
+
+function foregroundFadeAlpha(renderable, drawables) {
+  const object = renderable.object;
+  if (!object?.foregroundFade) return 1;
+  const objectDepth = Number(renderable.depth);
+  if (!Number.isFinite(objectDepth)) return 1;
+  const visualScale = Math.max(0.5, (Number(object.size) || 1) * (Number(object.visualScale) || 1));
+  const rangeX = Math.max(72, Math.min(460, 58 + visualScale * 42));
+  const rangeY = Math.max(120, Math.min(760, 96 + visualScale * 68));
+  const minAlpha = Number.isFinite(Number(object.foregroundFadeAlpha))
+    ? clamp(Number(object.foregroundFadeAlpha), 0.1, 1)
+    : 0.42;
+  let alpha = 1;
+
+  for (const target of drawables) {
+    if (!foregroundFadeTarget(target)) continue;
+    if (target.layer !== renderable.layer) continue;
+    if (!Number.isFinite(Number(target.depth)) || target.depth >= objectDepth) continue;
+    const dx = Math.abs((target.screen?.x ?? 0) - (renderable.screen?.x ?? 0));
+    const dy = Math.abs((target.screen?.y ?? 0) - (renderable.screen?.y ?? 0));
+    if (dx > rangeX || dy > rangeY) continue;
+    const edge = Math.max(dx / rangeX, dy / rangeY);
+    const targetAlpha = minAlpha + (1 - minAlpha) * clamp(edge, 0, 1);
+    alpha = Math.min(alpha, targetAlpha);
+  }
+
+  return alpha;
+}
+
 export const renderingMethods = {
   get assetsReady() {
     return this.atlas !== null && this.animationSheets !== null;
@@ -478,12 +513,15 @@ export const renderingMethods = {
         drawable.depth = getRenderableDepth(drawable, this.atlas);
       }
     }
+    for (const drawable of drawables) {
+      if (drawable.type === "object") drawable.foregroundAlpha = foregroundFadeAlpha(drawable, drawables);
+    }
     drawables.sort((a, b) => a.layer - b.layer || a.depth - b.depth || getTypeSortOrder(a.type) - getTypeSortOrder(b.type));
 
     const stats = this.calcStats();
     for (const item of drawables) {
       ctx.save();
-      ctx.globalAlpha *= item.alpha ?? 1;
+      ctx.globalAlpha *= (item.alpha ?? 1) * (item.foregroundAlpha ?? 1);
       if (item.type === "object") {
         const drawn = drawFoliageObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time)
           || drawOverlayObject(ctx, item.object, item.screen, item.biome, this.atlas, this.time);
