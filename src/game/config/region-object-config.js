@@ -264,7 +264,7 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.94 },
   },
   object_pillar_stone: {
-    spawnTypes: [{ type: "pillar", weight: 1 }],
+    spawnTypes: [{ type: "object_pillar_stone", weight: 1 }],
     // legacyWeightKey: "pillar", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     destructible: {
@@ -275,7 +275,16 @@ export const REGION_OBJECT_DEFS = {
       rareLoot: [],
     },
     renderBiomeId: "mainland",
-    graphicsRef: "atlas frame: pillar",
+    graphics: {
+      mode: "sheet",
+      files: [
+        "object/object_pillar_stone_1.png",
+        "object/object_pillar_stone_2.png",
+      ],
+      rows: 4,
+      cols: 4,
+      renderScale: 1,
+    },
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.92 },
   },
@@ -296,12 +305,12 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "mainland",
-    graphicsRef: "rock_normal_sheet.png (rock sheet)",
+    graphicsRef: "object/object_rock_normal.png (rock sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.85 },
   },
-  object_ruin_mainland: {
-    spawnTypes: [{ type: "ruin", weight: 1 }],
+  object_ruin_normal: {
+    spawnTypes: [{ type: "object_ruin_normal", weight: 1 }],
     // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     destructible: {
@@ -318,7 +327,73 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "mainland",
-    graphicsRef: "ruin_normal_sheet.png (4x4)",
+    graphicsRef: "object/object_ruin_normal.png (4x4)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_ruin_snow: {
+    spawnTypes: [{ type: "object_ruin_snow", weight: 1 }],
+    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
+    defaultDestructible: true,
+    destructible: {
+      hp: 64,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
+      rareLoot: [
+        { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+      ],
+      itemLoot: [
+        { rarity: "legendary", chance: 0.0035, tries: 120 },
+      ],
+    },
+    renderBiomeId: "snow",
+    graphicsRef: "object/object_ruin_snow.png (4x4)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+      object_ruin_sand: {
+    spawnTypes: [{ type: "object_ruin_sand", weight: 1 }],
+    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
+    defaultDestructible: true,
+    destructible: {
+      hp: 64,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
+      rareLoot: [
+        { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+      ],
+      itemLoot: [
+        { rarity: "legendary", chance: 0.0035, tries: 120 },
+      ],
+    },
+    renderBiomeId: "sand",
+    graphicsRef: "object/object_ruin_sand.png (4x4)",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+        object_ruin_jungle: {
+    spawnTypes: [{ type: "object_ruin_jungle", weight: 1 }],
+    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
+    defaultDestructible: true,
+    destructible: {
+      hp: 64,
+      damageStages: 3,
+      particleColor: "#9a9488",
+      loot: [{ resource: "rock_piece", min: 4, max: 10, chance: 1 }],
+      rareLoot: [
+        { resource: "stone_brick", min: 1, max: 2, chance: 0.26 },
+        { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
+      ],
+      itemLoot: [
+        { rarity: "legendary", chance: 0.0035, tries: 120 },
+      ],
+    },
+    renderBiomeId: "jungle",
+    graphicsRef: "object/object_ruin_jungle.png (4x4)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },

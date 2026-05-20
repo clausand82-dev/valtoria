@@ -4,11 +4,21 @@ Ting at få gjort
 - Få grafik på alle bygninger og addons, samt få bygningerne i flere variationer (hel, damage og ruin)
 - Få tilføjet flere objekter (objekter skal også have tre stadies hel, damaged, ruin)
 - begge ovenstående kodes, så findes variation ikke, så bruges normal billede bare
-- flere mobs (rats, sværm af bier, løver, puma, bjørn, isbjørn)
 - blizzard skal komme mere oppe fra, ikke fra spilleren (kun meget lidt orienteret fra spiller retning)
 - det nye class system skal bagud give point for lvl
+- critters (SE CHATGPT)
 
+- fix icebear, bear and lion animation
 
+- erstatte animeret chest med et single frame et, og så brug E ved det - så kan E blive til:
+interaction: {
+  type: "readable" | "harvest" | "unlock" | "repair" | "inspect" | "ritual" | "questStart" | "teleport" | "trap",
+  prompt: "Press E to inspect",
+  requires: {...},
+  gives: {...},
+  setsFlag: "..."
+}
+dvs multi funktionel - en parameter object skal kunne have i map-region object (default none) - måske linket til en action i anden tabel, så map-region object felt ikke behøver være så lang (object {..., actionId: "Read xxx"}) - al anden config kan være i action-config
 
 --- GENERELT---
 

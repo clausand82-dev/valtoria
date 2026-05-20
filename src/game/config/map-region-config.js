@@ -568,7 +568,7 @@ export const MAP_REGION_SETS = {
       id: "eternal-mountains",
       label: "De Evige Bjerge",
       color: "#a6a0a0",
-      mobs: ["Skeleton", "Ghost", { type: "Bjergtroll", weight: 1 }, { type: "Gigantisktroll", weight: 0.25 }],
+      mobs: ["Skeleton", "Ghost", { type: "Icebear", weight: 1.4 }, { type: "Bear", weight: 0.8 }, { type: "Bjergtroll", weight: 1 }, { type: "Gigantisktroll", weight: 0.25 }],
       unlock: { locked: true, text: "De Evige Bjerge kraever en senere historiequest." },
       labelX: 90.01,
       labelY: 64.28,
@@ -947,7 +947,7 @@ export const MAP_REGION_SETS = {
       ],
       labelX: 60,
       labelY: 31,
-      mobs: [{ type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 },],
+      mobs: [{ type: "Rat", weight: 5 }, { type: "SickRat", weight: 2 }, { type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 },],
       //weights: { house: 10, tree: 10, rock: 2, foilage: 9, fireplace: 1 },
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
@@ -979,7 +979,7 @@ export const MAP_REGION_SETS = {
       unlock: { completedQuests: ["clear_the_inn"] },
       labelX: 58,
       labelY: 59,
-      mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden", { type: "Hellhound", weight: 0.85 }],
+      mobs: [{ type: "Rat", weight: 4 }, { type: "SickRat", weight: 1.4 }, { type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden", { type: "Hellhound", weight: 0.85 }],
       antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: false },
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
@@ -1132,7 +1132,7 @@ export const MAP_REGION_SETS = {
       labelY: 16,
       // TODO:DELETE: weights: { tree: 11, rock: 2, foilage: 10, fireplace: 1 }
       weights: { foilage: 10 },
-      mobs: [{ type: "Wild Boar", weight: 3 }, { type: "Wolf", weight: 2 }, { type: "WolfCub", weight: 2 }, { type: "WolfFenris", weight: 2 }],
+      mobs: [{ type: "Wild Boar", weight: 3 }, { type: "Bear", weight: 1.1 }, { type: "Lion", weight: 0.9 }, { type: "Wolf", weight: 2 }, { type: "WolfCub", weight: 2 }, { type: "WolfFenris", weight: 2 }],
       objects: [
         { id: "object_tree_mainland", weight: 25, scale: { min: 0.9, max: 1.5 } },
         { id: "object_talltree_medium", weight: 15, scale: { min: 2, max: 5 } },
@@ -1481,7 +1481,7 @@ export const MAP_REGION_SETS = {
       color: "#7fb6d6",
       labelX: 73,
       labelY: 43,
-      mobs: ["Spider", "Snake"],
+      mobs: ["Spider", "Snake", { type: "Rat", weight: 1.5 }, { type: "SickRat", weight: 2.5 }],
       // TODO:DELETE: weights: { tree: 4, rock: 3, pillar: 1, foilage: 12 }
       weights: { foilage: 12 },
       objects: [
@@ -1537,7 +1537,7 @@ export const MAP_REGION_SETS = {
       color: "#d7a85b",
       labelX: 95,
       labelY: 42,
-      mobs: ["Skeleton", "Ghost"],
+      mobs: ["Skeleton", "Ghost", { type: "Icebear", weight: 1.1 }, { type: "Bear", weight: 0.6 }],
       // TODO:DELETE: weights: { tree: 1, rock: 10, pillar: 4, ruin: 2, foilage: 2, fireplace: 1 }
       weights: { foilage: 2 },
       objects: [

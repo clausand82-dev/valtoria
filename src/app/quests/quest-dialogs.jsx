@@ -6,6 +6,7 @@ import { QUEST_NPCS } from "../../game/config/npc-config.js";
 import { resolveQuestDefById } from "../../game/GameEngine/helpers/quests.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
+import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
 function normalizeQuestRegions(quest) {
   const target = quest?.target ?? {};
   if (quest?.type === "clear_map" && target.regionId) return [String(target.regionId)];
@@ -38,21 +39,8 @@ function getRegionLabel(regionId) {
 }
 
 function monsterSpriteSheetFromType(typeName) {
-  const type = String(typeName ?? "");
-  const id = type === "Scorpion" ? "scorpion"
-    : type === "Snake" ? "snake"
-    : type === "Spider" ? "spider"
-    : type === "MiniSpider" ? "spider"
-    : type === "MediumSpider" ? "spider"
-    : type === "LargeSpider" ? "spider"
-    : type === "Wolf" ? "wolf"
-    : type === "Skeleton" ? "skeleton"
-    : type === "Ghost" ? "ghost"
-    : type === "Demon" ? "demon"
-    : type.includes("Bone") ? "skeleton"
-    : type.includes("Warden") ? "skeleton"
-    : type.includes("Shade") ? "ghost"
-    : "demon";
+  if (MONSTER_STATS[typeName]?.spriteUrl) return MONSTER_STATS[typeName].spriteUrl;
+  const id = monsterSpriteId(typeName);
   return `/assets/generated/mobs/${id}_animated_sheet.png`;
 }
 
