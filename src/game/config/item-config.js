@@ -9,6 +9,12 @@ export const PREFIXES = {
 
 // Stats i UNIQUE_ITEMS og NAMED_ITEM_TEMPLATES:
 // Alle procent-stats skrives som decimaler: 0.05 = 5%, 0.20 = 20%.
+// slot styrer equipment-slot: "weapon", armor slots, "offhand" eller "relic".
+// offhand er ting spilleren holder/bruger i anden haand: shield, orb, tome, quiver, dagger, focus, totem.
+// relic er passivt/magisk/helligt artefakt-slot: relic, idol, charm, emblem, talisman, corrupted shard.
+// type kan bruges til subtype, fx "shield" paa offhand eller "relic" paa relic items.
+// hands paa weapons er 1 eller 2. Mangler hands, behandles weapon som 1H.
+// Two-handed weapons blokerer kun offhand, aldrig relic.
 // damageMin: minimum weapon/bonus damage.
 // damageMax: maximum weapon/bonus damage.
 // range: attack/cast range for weapons.
@@ -27,12 +33,28 @@ export const PREFIXES = {
 // critChance: chance to critically hit.
 // critDamage: extra critical multiplier added to the base 150%; 0.10 = 160%.
 // blockChance: chance to block incoming hits, reducing their damage.
+// blockAmount: flat damage reduction when a block succeeds. Hvis 0 bruges gammel 50% block-reduktion.
 // dodgeChance: chance to fully avoid incoming hits.
 // lifeSteal: heals for this part of damage dealt.
 // magicFind: increases unique/named item drop chances.
 // goldFind: increases gold drops.
 // resourceFind: increases resource drop chance and amount.
 // xpGain: increases XP gained.
+// Elemental resist er procentpoint: fireResist 25 = 25% mindre fire damage, -25 = 25% mere.
+// allResist laegges oveni elementets specifikke resist. Resist clamped i combat pipeline.
+// Resist stats: physicalResist, fireResist, iceResist, lightningResist, poisonResist,
+// arcaneResist, holyResist, shadowResist, natureResist, allResist.
+// Elemental damage bonuses er decimaler: fireDamageBonus 0.05 = 5% mere fire damage.
+// Damage bonus stats: physicalDamageBonus, fireDamageBonus, iceDamageBonus,
+// lightningDamageBonus, poisonDamageBonus, arcaneDamageBonus, holyDamageBonus,
+// shadowDamageBonus, natureDamageBonus.
+// Damage form bonuses er decimaler: spellDamageBonus, directDamageBonus,
+// areaDamageBonus, dotDamageBonus, hazardDamageBonus.
+// Duration/status bonuses er decimaler: dotDurationBonus, statusDurationBonus.
+// Requirements er optional:
+// classReq: ["warrior", "cleric"] kraever en af disse classes.
+// levelReq: 5 kraever player level 5.
+// requiresClassNode: "mage.frost_adept" kraever unlocked class node.
 // Brug maxHp/maxMana her, ikke ARMOR_BASES-felterne life/mana.
 // Hvis scaleWithLevel er true, skalerer de flade combat-tal med item level.
 // Named items skalerer de flade combat-tal med den rarity, der bliver rullet.
@@ -137,7 +159,7 @@ export const UNIQUE_ITEMS = [
     classReq: ["warrior", "cleric", "warden"],
     sources: ["chest", "boss", "monster"],
     biomes: ["snow", "mainland", "rock"],
-    iconUrl: "/assets/generated/item/item_common_relic.png",
+    iconUrl: "/assets/generated/item/item_common_shield.png",
     scaleWithLevel: true,
     stats: {
       armor: 18,

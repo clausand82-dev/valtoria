@@ -21,6 +21,8 @@ export const CLASS_DEFS = {
         id: "warrior.shield_wall",
         title: "Shield Wall",
         requires: ["warrior.base"],
+        requiresBuilding: "armory",
+        requiresAddon: "melee_training",
         bonuses: { blockChance: 0.03, blockAmount: 3, physicalResist: 5 },
       },
     },
@@ -34,6 +36,13 @@ export const CLASS_DEFS = {
         id: "ranger.base",
         title: "Ranger Training",
         bonuses: { range: 0.2, critChance: 0.02, poisonDamageBonus: 0.04 },
+      },
+      "ranger.ranged_training": {
+        id: "ranger.ranged_training",
+        title: "Ranged Training",
+        requires: ["ranger.base"],
+        requiresAddon: "ranged_training",
+        bonuses: { range: 0.15, directDamageBonus: 0.03 },
       },
     },
   },
@@ -51,7 +60,15 @@ export const CLASS_DEFS = {
         id: "mage.frost_adept",
         title: "Frost Adept",
         requires: ["mage.base"],
+        requiresBuilding: "mage_tower",
         bonuses: { iceDamageBonus: 0.06, iceResist: 8, areaDamageBonus: 0.03 },
+      },
+      "mage.arcane_study": {
+        id: "mage.arcane_study",
+        title: "Arcane Study",
+        requires: ["mage.base"],
+        requiresAddon: "arcane_archive",
+        bonuses: { arcaneDamageBonus: 0.05, spellDamageBonus: 0.02 },
       },
     },
   },
@@ -65,6 +82,13 @@ export const CLASS_DEFS = {
         title: "Cleric Training",
         bonuses: { allResist: 3, holyDamageBonus: 0.05, maxMana: 10 },
       },
+      "cleric.holy_training": {
+        id: "cleric.holy_training",
+        title: "Holy Training",
+        requires: ["cleric.base"],
+        requiresBuilding: "sanctuary",
+        bonuses: { holyDamageBonus: 0.05, allResist: 2 },
+      },
     },
   },
   rogue: {
@@ -77,6 +101,13 @@ export const CLASS_DEFS = {
         title: "Rogue Training",
         bonuses: { dodgeChance: 0.02, critDamage: 0.12, attackSpeed: 0.03 },
       },
+      "rogue.shadow_training": {
+        id: "rogue.shadow_training",
+        title: "Shadow Training",
+        requires: ["rogue.base"],
+        requiresBuilding: "library",
+        bonuses: { shadowDamageBonus: 0.05, dodgeChance: 0.01 },
+      },
     },
   },
   warden: {
@@ -88,6 +119,13 @@ export const CLASS_DEFS = {
         id: "warden.base",
         title: "Warden Training",
         bonuses: { natureDamageBonus: 0.05, poisonResist: 8, natureResist: 5, maxHp: 10 },
+      },
+      "warden.nature_training": {
+        id: "warden.nature_training",
+        title: "Nature Training",
+        requires: ["warden.base"],
+        requiresBuilding: "farm",
+        bonuses: { natureDamageBonus: 0.05, natureResist: 5 },
       },
     },
   },
@@ -126,7 +164,11 @@ export function getClassNodeBonuses(player) {
   return bonuses;
 }
 
-export function canUnlockClassNode(player, nodeId) {
+function classNodeCostsPoint(node) {
+  return node?.free !== true && !String(node?.id ?? "").endsWith(".base");
+}
+
+export function canUnlockClassNode(player, nodeId, context = {}) {
   const node = CLASS_NODE_BY_ID[String(nodeId ?? "")];
   if (!node) return { ok: false, reason: "Unknown class node" };
   const classId = normalizeClassId(player?.classId);
@@ -137,14 +179,28 @@ export function canUnlockClassNode(player, nodeId) {
   for (const req of node.requires ?? []) {
     if (!unlocked.has(req)) return { ok: false, reason: `Requires ${req}` };
   }
-  if ((Number(player?.classPoints) || 0) <= 0) return { ok: false, reason: "No class points" };
+  if (node.requiresBuilding && !context.hasBuilding?.(node.requiresBuilding)) {
+    const label = context.buildingName?.(node.requiresBuilding) ?? node.requiresBuilding;
+    return { ok: false, reason: `Requires building: ${label}` };
+  }
+  if (node.requiresAddon && !context.hasAddon?.(node.requiresAddon)) {
+    const label = context.addonName?.(node.requiresAddon) ?? node.requiresAddon;
+    return { ok: false, reason: `Requires addon: ${label}` };
+  }
+  if (node.requiresResearch && !context.hasResearch?.(node.requiresResearch)) {
+    const label = context.researchName?.(node.requiresResearch) ?? node.requiresResearch;
+    return { ok: false, reason: `Requires research: ${label}` };
+  }
+  if (classNodeCostsPoint(node) && (Number(player?.classPoints) || 0) <= 0) return { ok: false, reason: "No class points" };
   return { ok: true, reason: "" };
 }
 
-export function unlockClassNode(player, nodeId) {
-  const check = canUnlockClassNode(player, nodeId);
+export function unlockClassNode(player, nodeId, context = {}) {
+  const check = canUnlockClassNode(player, nodeId, context);
   if (!check.ok) return check;
   player.classNodes = [...getUnlockedClassNodes(player), String(nodeId)];
-  player.classPoints = Math.max(0, Math.floor(Number(player.classPoints) || 0) - 1);
+  if (classNodeCostsPoint(CLASS_NODE_BY_ID[String(nodeId)])) {
+    player.classPoints = Math.max(0, Math.floor(Number(player.classPoints) || 0) - 1);
+  }
   return { ok: true, reason: "" };
 }

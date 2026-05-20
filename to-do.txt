@@ -6,6 +6,7 @@ Ting at få gjort
 - begge ovenstående kodes, så findes variation ikke, så bruges normal billede bare
 - flere mobs (rats, sværm af bier, løver, puma, bjørn, isbjørn)
 - blizzard skal komme mere oppe fra, ikke fra spilleren (kun meget lidt orienteret fra spiller retning)
+- det nye class system skal bagud give point for lvl
 
 
 

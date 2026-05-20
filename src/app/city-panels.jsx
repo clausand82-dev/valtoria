@@ -20,6 +20,20 @@ import {
   skillTreeBranchSpentPoints,
   normalizeSkillTree,
 } from "../game/config/skill-tree-config.js";
+import {
+  CLASS_DEFS,
+  CLASS_NODE_BY_ID,
+  DEFAULT_CLASS_ID,
+  canUnlockClassNode as canUnlockClassNodeForPlayer,
+  getClassConfig,
+  normalizeClassId,
+} from "../game/config/class-config.js";
+import {
+  cityAddonName,
+  cityBuildingName,
+  cityRequirementContext,
+  hasCityBuilding,
+} from "../game/config/city-state-helpers.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
 import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
@@ -792,6 +806,125 @@ function CitySkillTreePanel({ player, onBuyRank }) {
   );
 }
 
+function formatClassBonusValue(key, value) {
+  const amount = Number(value) || 0;
+  const pct = key.endsWith("Bonus")
+    || ["critChance", "critDamage", "blockChance", "dodgeChance", "attackSpeed", "lifeSteal", "maxHpPct", "maxManaPct", "damagePct", "speedPct"].includes(key);
+  if (pct) return `${amount > 0 ? "+" : ""}${Math.round(amount * 100)}% ${key}`;
+  return `${amount > 0 ? "+" : ""}${Number.isInteger(amount) ? amount : amount.toFixed(2)} ${key}`;
+}
+
+function classNodeRequirementText(node) {
+  const entries = [];
+  for (const nodeId of node?.requires ?? []) {
+    entries.push(`Requires ${CLASS_NODE_BY_ID[nodeId]?.title ?? nodeId}`);
+  }
+  if (node?.requiresBuilding) entries.push(`Requires building: ${cityBuildingName(node.requiresBuilding)}`);
+  if (node?.requiresAddon) entries.push(`Requires addon: ${cityAddonName(node.requiresAddon)}`);
+  if (node?.requiresResearch) entries.push(`Requires research: ${node.requiresResearch}`);
+  return entries.length ? entries.join(" | ") : "No requirements";
+}
+
+function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnlockNode }) {
+  const sanctuaryBuilt = hasCityBuilding(progress, "sanctuary");
+  const classId = normalizeClassId(player?.classId);
+  const classChosen = classId !== DEFAULT_CLASS_ID;
+  const classConfig = getClassConfig(classId);
+  const classPoints = Math.max(0, Math.floor(Number(player?.classPoints) || 0));
+  const context = cityRequirementContext(progress);
+  const baseNodeId = `${classId}.base`;
+  const unlockedNodeIds = (player?.classNodes ?? []).map(String);
+  const canResetClass = classChosen && unlockedNodeIds.every((nodeId) => nodeId === baseNodeId);
+
+  if (!sanctuaryBuilt && !classChosen) {
+    return (
+      <section className="blacksmith-station class-panel" aria-label="Class training">
+        <header>
+          <h4>Class Training</h4>
+          <span>{classConfig?.name ?? "Adventurer"}</span>
+        </header>
+        <p>Build the Sanctuary to unlock class training.</p>
+      </section>
+    );
+  }
+
+  if (!classChosen) {
+    const classOptions = Object.values(CLASS_DEFS).filter((entry) => entry.id !== DEFAULT_CLASS_ID);
+    return (
+      <section className="blacksmith-station class-panel" aria-label="Choose class">
+        <header>
+          <h4>Choose Class</h4>
+          <span>Base training is unlocked for free.</span>
+        </header>
+        <div className="class-choice-grid">
+          {classOptions.map((option) => (
+            <button type="button" className="class-choice-card" key={option.id} onClick={() => onChooseClass?.(option.id)}>
+              <b>{option.name}</b>
+              <span>{option.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  const classNodes = Object.values(classConfig?.nodes ?? {});
+  const unlocked = new Set(player?.classNodes ?? []);
+  return (
+    <section className="blacksmith-station class-panel" aria-label="Class progression">
+      <header>
+        <h4>{player?.className ?? classConfig?.name ?? "Class"} Training</h4>
+        <span>{classPoints} class point{classPoints === 1 ? "" : "s"} available</span>
+      </header>
+      {canResetClass && (
+        <button
+          type="button"
+          className="class-reset-button"
+          title="Only available before unlocking class nodes beyond the free base node."
+          onClick={() => {
+            if (window.confirm("Reset class choice? You can choose another class afterwards.")) onResetClass?.();
+          }}
+        >
+          Reset class choice
+        </button>
+      )}
+      <div className="class-node-list">
+        {classNodes.length === 0 ? (
+          <span className="class-empty">No class nodes available.</span>
+        ) : classNodes.map((node) => {
+          const unlockedNode = unlocked.has(node.id);
+          const unlockCheck = canUnlockClassNodeForPlayer(player, node.id, context);
+          const bonuses = Object.entries(node.bonuses ?? {});
+          return (
+            <article className={`class-node ${unlockedNode ? "unlocked" : ""}`} key={node.id}>
+              <div>
+                <b>{node.title}</b>
+                <span>{classNodeRequirementText(node)}</span>
+              </div>
+              <div className="class-node-bonuses">
+                {bonuses.map(([key, value]) => (
+                  <em key={key}>{formatClassBonusValue(key, value)}</em>
+                ))}
+              </div>
+              <button
+                type="button"
+                disabled={unlockedNode || !unlockCheck.ok}
+                title={unlockedNode ? "Unlocked" : unlockCheck.ok ? "Unlock node" : unlockCheck.reason}
+                onClick={() => onUnlockNode?.(node.id)}
+              >
+                {unlockedNode ? "Unlocked" : "Unlock"}
+              </button>
+            </article>
+          );
+        })}
+      </div>
+      <span className="class-unlocked">
+        Unlocked: {(player?.classNodes ?? []).map((nodeId) => CLASS_NODE_BY_ID[nodeId]?.title ?? nodeId).join(", ") || "None"}
+      </span>
+    </section>
+  );
+}
+
 function CityArcaneExtractorPanel({ inventory, onExtract }) {
   const candidates = (inventory ?? []).filter(canExtractArcaneEssence);
   return (
@@ -850,6 +983,7 @@ export {
   CityResearchPanel,
   CitySocketPanel,
   CityMerchantPanel,
+  CityClassPanel,
   CitySkillTreePanel,
   CityArcaneExtractorPanel,
   CityReadableMergePanel,

@@ -35,6 +35,7 @@ import {
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
+  "maxHp", "maxMana", "range", "damageMin", "damageMax", "armor", "speed",
   "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
   "magic", "critChance", "critDamage", "blockChance", "blockAmount", "dodgeChance",
   "lifeSteal", "magicFind", "goldFind", "resourceFind", "xpGain",
@@ -67,6 +68,13 @@ function damageKindBonusKey(damageKind) {
 function damageDebugEnabled() {
   return typeof window !== "undefined" && window.VALTORIA_DEBUG_DAMAGE === true;
 }
+
+const EXPLICIT_STAT_BONUS_KEYS = [
+  "maxHp", "maxMana", "range", "damageMin", "damageMax", "armor", "speed",
+  "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
+  "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
+  "magicFind", "goldFind", "resourceFind", "xpGain",
+];
 
 function spellParticleVisuals(spell = {}) {
   const particles = spell.particles ?? {};
@@ -1221,11 +1229,7 @@ export const combatMethods = {
     stats.xpGain += n("xpGain");
     for (const key of BONUS_STAT_KEYS) {
       if (Object.prototype.hasOwnProperty.call(stats, key) || key.endsWith("Resist") || key.endsWith("DamageBonus") || key.endsWith("DurationBonus")) {
-        if (![
-          "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
-          "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
-          "magicFind", "goldFind", "resourceFind", "xpGain",
-        ].includes(key)) {
+        if (!EXPLICIT_STAT_BONUS_KEYS.includes(key)) {
           stats[key] = (stats[key] ?? 0) + (Number(bonuses[key]) || 0);
         }
       }
@@ -1325,11 +1329,7 @@ export const combatMethods = {
       stats.xpGain += s(item.xpGain);
       const genericItemBonuses = {};
       for (const key of BONUS_STAT_KEYS) {
-        if ([
-          "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
-          "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
-          "magicFind", "goldFind", "resourceFind", "xpGain",
-        ].includes(key)) continue;
+        if (EXPLICIT_STAT_BONUS_KEYS.includes(key)) continue;
         genericItemBonuses[key] = s(item[key]);
       }
       this.applyStatBonuses(stats, genericItemBonuses);

@@ -61,12 +61,18 @@ import {
   normalizeAutoLootRules,
 } from "./loot.js";
 import {
+  CLASS_DEFS,
+  DEFAULT_CLASS_ID,
   canUnlockClassNode,
   getUnlockedClassNodes,
   normalizeClassId,
   normalizeClassNodes,
   unlockClassNode,
 } from "../../config/class-config.js";
+import {
+  cityRequirementContext,
+  hasCityBuilding,
+} from "../../config/city-state-helpers.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -217,8 +223,56 @@ export const inventoryMethods = {
     return { ok: true, reason: "" };
   },
 
-  unlockClassNode(nodeId) {
-    const result = unlockClassNode(this.player, nodeId);
+  chooseClass(classId, cityProgress = null) {
+    if (!hasCityBuilding(cityProgress, "sanctuary")) {
+      this.addToast("Build the Sanctuary to unlock class training.");
+      return false;
+    }
+    const nextClassId = normalizeClassId(classId);
+    if (!CLASS_DEFS[nextClassId] || nextClassId === DEFAULT_CLASS_ID) {
+      this.addToast("Unknown class");
+      return false;
+    }
+    const currentClassId = normalizeClassId(this.player.classId);
+    if (currentClassId !== DEFAULT_CLASS_ID) {
+      this.addToast("Class already chosen");
+      return false;
+    }
+    const baseNodeId = `${nextClassId}.base`;
+    this.player.classId = nextClassId;
+    this.player.classNodes = normalizeClassNodes([...(this.player.classNodes ?? []), baseNodeId]);
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.addToast(`Class chosen: ${CLASS_DEFS[nextClassId].name}`);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  resetClassChoice() {
+    const classId = normalizeClassId(this.player.classId);
+    if (classId === DEFAULT_CLASS_ID) return false;
+    const baseNodeId = `${classId}.base`;
+    const unlockedNodes = normalizeClassNodes(this.player.classNodes);
+    const spentNodes = unlockedNodes.filter((nodeId) => nodeId !== baseNodeId);
+    if (spentNodes.length > 0) {
+      this.addToast("Class kan ikke fortrydes efter class nodes er brugt");
+      return false;
+    }
+    this.player.classId = DEFAULT_CLASS_ID;
+    this.player.classNodes = [];
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.addToast("Class choice reset");
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  unlockClassNode(nodeId, cityProgress = null) {
+    const result = unlockClassNode(this.player, nodeId, cityRequirementContext(cityProgress));
     if (!result.ok) {
       this.addToast(result.reason);
       return false;
@@ -233,8 +287,8 @@ export const inventoryMethods = {
     return true;
   },
 
-  canUnlockClassNode(nodeId) {
-    return canUnlockClassNode(this.player, nodeId);
+  canUnlockClassNode(nodeId, cityProgress = null) {
+    return canUnlockClassNode(this.player, nodeId, cityRequirementContext(cityProgress));
   },
 
   socketAddCost(item) {

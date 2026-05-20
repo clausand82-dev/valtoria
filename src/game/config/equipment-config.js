@@ -15,7 +15,7 @@ export const EQUIPMENT_SLOTS = [
   { id: "feet", label: "Feet", emptyIconKey: "common_feet" },
   { id: "weapon", label: "Weapon", emptyIconKey: "common_sword" },
   // TODO: Replace common_relic fallback with common_shield/common_offhand when that asset exists.
-  { id: "offhand", label: "Offhand", emptyIconKey: "common_relic" },
+  { id: "offhand", label: "Offhand", emptyIconKey: "common_shield" },
   { id: "relic", label: "Relic", emptyIconKey: "common_relic" },
 ];
 

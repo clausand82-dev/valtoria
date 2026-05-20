@@ -82,6 +82,7 @@ import {
   CityFarmPanel,
   CityGoldBarPanel,
   CityMerchantPanel,
+  CityClassPanel,
   CityReadableMergePanel,
   CityResearchPanel,
   CitySkillTreePanel,
@@ -2602,11 +2603,22 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               onBuy={buyMerchantItem}
             />
           )}
-          {building.id === "sanctuary" && owned && (
-            <CitySkillTreePanel
-              player={snapshot.player}
-              onBuyRank={(nodeId) => engineRef.current?.buySkillTreeRank?.(nodeId)}
-            />
+          {building.id === "sanctuary" && (
+            <>
+              <CityClassPanel
+                player={snapshot.player}
+                progress={progress}
+                onChooseClass={(classId) => engineRef.current?.chooseClass?.(classId, progress)}
+                onResetClass={() => engineRef.current?.resetClassChoice?.()}
+                onUnlockNode={(nodeId) => engineRef.current?.unlockClassNode?.(nodeId, progress)}
+              />
+              {owned && (
+                <CitySkillTreePanel
+                  player={snapshot.player}
+                  onBuyRank={(nodeId) => engineRef.current?.buySkillTreeRank?.(nodeId)}
+                />
+              )}
+            </>
           )}
           {building.id === "blacksmith" && owned && (
             <CityBlacksmithPanel

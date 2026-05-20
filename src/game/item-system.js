@@ -101,9 +101,9 @@ const COMMON_BASE_ICON_KEYS = {
   Belt: "common_belt",
   Relic: "common_relic",
   // TODO: Use common_shield/common_offhand when a dedicated offhand icon asset exists.
-  "Wooden Shield": "common_relic",
-  "Iron Shield": "common_relic",
-  "Frostguard Shield": "common_relic",
+  "Wooden Shield": "common_shield",
+  "Iron Shield": "common_shield",
+  "Frostguard Shield": "common_shield",
 };
 
 const RESOURCE_ICON_KEYS = {
