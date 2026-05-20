@@ -521,10 +521,13 @@ export const effectsMethods = {
     return false;
   },
 
-  addParticles(x, y, color, count, upward = 0.08) {
+  addParticles(x, y, color, count, upward = 0.08, options = {}) {
+    const particleCount = Math.floor(Number(count) || 0);
+    if (particleCount <= 0) return;
     this.particleEngine?.emitOneShot("hit_sparks", x, y, {
+      spellInstanceId: options.spellInstanceId ?? null,
       colors: [color],
-      oneShotCount: Math.max(1, Math.floor(Number(count) || 1)),
+      oneShotCount: particleCount,
       speed: [24, 120],
       size: [2, 5],
       lifetime: [0.25, 0.85],
@@ -569,9 +572,12 @@ export const effectsMethods = {
     });
   },
 
-  spawnGroundCloudEffect(x, y, radius, color, duration) {
-    this.particles.push({
+  spawnGroundCloudEffect(x, y, radius, color, duration, options = {}) {
+    const particle = {
       effectParticle: true,
+      id: options.id ?? createId(),
+      ownerId: options.ownerId ?? null,
+      spellInstanceId: options.spellInstanceId ?? null,
       visual: "groundCloud",
       renderLayer: "belowEntities",
       x,
@@ -582,7 +588,9 @@ export const effectsMethods = {
       age: 0,
       life: Math.max(0.2, Number(duration) || 1),
       maxLife: Math.max(0.2, Number(duration) || 1),
-    });
+    };
+    this.particles.push(particle);
+    return particle;
   },
 
   spawnGroundPulseEffect(x, y, radius, options = {}) {

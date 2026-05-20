@@ -167,9 +167,19 @@ Target shape for kill_monsters:
 Rewards:
 - rewards.xp: Flat XP.
 - rewards.gold: Flat gold.
+- rewards.lydra / rewards.netdra: Adds raw world energy points on quest turn-in.
+  Example: rewards: { xp: 100, gold: 25, lydra: 3, netdra: 0.5 }
 - rewards.resources: Resource rewards, for example [{ resource: "red_gemstone", count: 1 }].
 - rewards.randomItem: Gives a random equipment item. Current support uses { minRarity: "upgraded" } as a hint.
 - rewards.xpPerKill / rewards.goldPerKill: Used by kill quests to scale reward from target.count.
+
+World energy conditions:
+- requires / blockedBy can use worldBalanceLydra and worldBalanceNetdra as percentage checks.
+- demands can also use shorthand condition fields directly alongside old demand fields.
+  Example: demands: { completedQuests: ["clear_the_inn"], worldBalanceLydra: 30 }
+- worldBalanceLydra: 30 means at least 30% Ly'dra'thot.
+- worldBalanceNetdra: { min: 10, max: 20 } means 10-20% Net'dra'thot.
+- Use lydra/netdra for raw reward points. Use worldBalanceLydra/worldBalanceNetdra only for percentage requirements.
 
 Important behavior:
 - collect_quest_item requirements are consumed when the quest is handed in.

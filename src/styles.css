@@ -3966,6 +3966,84 @@ button {
   align-content: start;
 }
 
+.world-energy-bar {
+  width: min(var(--map-max-width, 1180px), calc(100vw - 44px));
+  margin: 0 auto;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(7, 9, 12, 0.78);
+}
+
+.world-energy-labels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.world-energy-labels span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: #f2ead7;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.world-energy-labels b {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+}
+
+.world-energy-labels img {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex: 0 0 18px;
+}
+
+.world-energy-track {
+  position: relative;
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(230, 238, 255, 0.94), rgba(244, 218, 150, 0.72) 50%, rgba(68, 44, 96, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.42);
+}
+
+.world-energy-midline {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: 50%;
+  width: 2px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.world-energy-marker {
+  position: absolute;
+  top: -4px;
+  left: var(--world-energy-marker, 100%);
+  width: 4px;
+  height: 20px;
+  border-radius: 4px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.82);
+  transform: translateX(-50%);
+}
+
+.world-energy-percent {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
 .map-frame {
   position: relative;
   width: min(var(--map-max-width), calc(100vw - 44px), calc((100vh - 170px) * var(--map-aspect-value, 1)));

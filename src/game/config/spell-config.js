@@ -1,3 +1,10 @@
+/*
+Spell world energy notes:
+- netdra / lydra on a spell are consequences when the player casts the spell, not mana costs.
+- Values are raw world energy points and can be decimals.
+- Example: netdra: 2 adds 2 Net'dra'thot every time the spell is cast.
+- Leave both fields out, or set them to 0, for spells that should not affect world energy.
+*/
 export const SPELL_DEFS = {
   ember_spark: {
     id: "ember_spark",

@@ -1,5 +1,27 @@
 import { GEMSTONE_RESOURCE_IDS } from "./resource-config.js";
 
+/*
+Monster world energy notes:
+- DEFAULT_MONSTER_WORLD_ENERGY is the global fallback for monster kill energy.
+- All defaults are 0, so existing mobs do not change balance unless you opt in.
+- A mob can override the fallback with killLydra / killNetdra on its definition.
+- killLydra / killNetdra add raw world energy points when the player kills this monster.
+- Suggested values if you want to opt in later:
+  normal mob: killNetdra: 0.05
+  elite default: eliteKillNetdra: 0.15
+  boss default: bossKillNetdra: 1
+- Minions do not apply killNetdra when they die.
+*/
+
+export const DEFAULT_MONSTER_WORLD_ENERGY = {
+  killLydra: 0,
+  killNetdra: 0.05,
+  eliteKillLydra: 0,
+  eliteKillNetdra: 0.15,
+  bossKillLydra: 0,
+  bossKillNetdra: 1,
+};
+
 const seq3x4 = [
   { name: "idle", row: 0, frames: 4 },
   { name: "walk", row: 1, frames: 4 },
@@ -715,12 +737,20 @@ export const MONSTER_DEFS = {
 };
 
 export const MONSTER_STATS = Object.fromEntries(
-  Object.entries(MONSTER_DEFS).map(([type, def]) => [
-    type,
-    {
+  Object.entries(MONSTER_DEFS).map(([type, def]) => {
+    const isBoss = Boolean(def.isBoss);
+    const killLydra = def.killLydra ?? (isBoss ? DEFAULT_MONSTER_WORLD_ENERGY.bossKillLydra : DEFAULT_MONSTER_WORLD_ENERGY.killLydra);
+    const killNetdra = def.killNetdra ?? (isBoss ? DEFAULT_MONSTER_WORLD_ENERGY.bossKillNetdra : DEFAULT_MONSTER_WORLD_ENERGY.killNetdra);
+    return [
+      type,
+      {
       ...def.stats,
+      killLydra: Math.max(0, Number(killLydra) || 0),
+      killNetdra: Math.max(0, Number(killNetdra) || 0),
+      eliteKillLydra: Math.max(0, Number(def.eliteKillLydra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillLydra) || 0),
+      eliteKillNetdra: Math.max(0, Number(def.eliteKillNetdra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillNetdra) || 0),
       allowElite: def.allowElite !== false,
-      isBoss: Boolean(def.isBoss),
+      isBoss,
       noLoot: Boolean(def.noLoot),
       despawnOnDeath: Boolean(def.despawnOnDeath),
       specialSpawn: def.specialSpawn ? { ...def.specialSpawn } : null,
@@ -733,8 +763,9 @@ export const MONSTER_STATS = Object.fromEntries(
       shadow: def.shadow ? { ...def.shadow } : def.stats?.shadow ? { ...def.stats.shadow } : null,
       sprite: def.sprite,
       spriteUrl: def.spriteUrl,
-    },
-  ])
+      },
+    ];
+  })
 );
 
 export const MONSTER_LOOT_PROFILES = Object.fromEntries(

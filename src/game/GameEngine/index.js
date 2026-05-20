@@ -12,6 +12,7 @@ import { renderingMethods } from "./methods/rendering.js";
 import { inputMethods } from "./methods/input.js";
 import { snapshotMethods } from "./methods/snapshot.js";
 import { normalizeWorldState } from "../world-state.js";
+import { normalizeWorldEnergy } from "../world-energy.js";
 import { ParticleEngine } from "../particles/ParticleEngine.js";
 
 function applyMethodGroup(prototype, methods) {
@@ -84,6 +85,7 @@ export class GameEngine {
       cityFade: [],
     };
     this.worldState = normalizeWorldState();
+    this.worldEnergy = normalizeWorldEnergy();
     if (!this.newGame) this.loadProgress();
     this.prepareRegionQuestgiver();
     this.regionStartPlayerLevel = this.player.level;

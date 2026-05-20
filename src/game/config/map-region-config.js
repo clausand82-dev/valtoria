@@ -167,6 +167,8 @@ region({
   objects: [                                                // Object ids come from region-object-config.js.
     { id: "object_tree_mainland", weight: 8, destructible: true }, // weight is relative spawn chance.
     { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
+    { id: "object_purified_totem", weight: 1, destructible: true, destroyRewards: { lydra: 1, netdra: 0.1 } }, // destroyRewards adds raw world energy points when destroyed.
+    { id: "object_bones", weight: 2, worldBalanceNetdra: { min: 10, max: 20 } }, // percentage condition: spawn only while Net'dra'thot is 10-20%.
     // spawnDamage supports: "all", "damaged", "destroyed", "damaged_destroyed". Omit for undamaged.
     // spawnTags/spawnAvoidRadius mark an influence zone; avoidSpawnTags avoids matching zones; foregroundFade fades objects in front of player/mobs/loot.
   ],
@@ -235,6 +237,10 @@ Conditional config notes:
 - variant.patch merges into the default field. Lists merge by id/type/fileName depending on field.
 - requires must pass. blockedBy must not pass.
 - Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
+- World energy balance is available as shorthand conditions anywhere this condition system is used:
+  worldBalanceLydra: 30 means Ly'dra'thot percentage >= 30.
+  worldBalanceNetdra: { min: 10, max: 20 } means Net'dra'thot percentage between 10 and 20.
+  These use percent balance, not raw points.
 - Automatic worldState currently tracks region.{id}.unlocked/explored/corrupted, region.{id}.visits, region.{id}.cleared on return, and mob.{typeName}.seen on hover/combat.
 
 Shorthand conditions:
@@ -251,6 +257,8 @@ Recommended shorthand syntax:
 objects: [
   { id: "object_tree", weight: 5 },
   { id: "object_cursed_tree", weight: 2, corruption: { min: 6 } },
+  { id: "object_woodboxes_ground", weight: 15, destructible: true, spawnDamage: "all", worldBalanceLydra: 30 },
+  { id: "object_bones", weight: 5, destructible: true, worldBalanceNetdra: { min: 10, max: 20 } },
   { id: "object_quest_note", weight: 1, quest: "quest_lord_kealand" },
 ]
 

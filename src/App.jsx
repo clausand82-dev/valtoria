@@ -782,6 +782,8 @@ export default function App() {
             <div className="comparison-list">
               {questRewardModal.rewards?.xp > 0 && <span className="diff-good">+ XP {questRewardModal.rewards.xp}</span>}
               {questRewardModal.rewards?.gold > 0 && <span className="diff-good">+ Gold {questRewardModal.rewards.gold}</span>}
+              {questRewardModal.rewards?.lydra > 0 && <span className="diff-good">+ Ly'dra'thot {questRewardModal.rewards.lydra}</span>}
+              {questRewardModal.rewards?.netdra > 0 && <span className="diff-good">+ Net'dra'thot {questRewardModal.rewards.netdra}</span>}
               {(questRewardModal.rewards?.resources ?? []).map((entry) => (
                 <span className="diff-good" key={`res-${entry.id}`}>+ {entry.count}x {entry.name}</span>
               ))}
@@ -832,6 +834,7 @@ export default function App() {
           initialMapId={regionMapInitialId}
           regionCorruption={regionCorruption}
           worldState={snapshot.worldState}
+          worldEnergy={snapshot.worldEnergy}
           completedQuests={snapshot.quests?.completed ?? []}
           army={snapshot.player?.stats?.army ?? 0}
           onPlayableRegionSelected={startPlayableMapRegion}

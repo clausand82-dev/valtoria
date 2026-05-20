@@ -1,3 +1,5 @@
+import { getWorldEnergyState } from "./world-energy.js";
+
 const EMPTY_WORLD_STATE = Object.freeze({
   flags: Object.freeze({}),
   counters: Object.freeze({}),
@@ -7,6 +9,8 @@ const EMPTY_WORLD_STATE = Object.freeze({
 const CONDITION_KEYS = new Set([
   "requires",
   "blockedBy",
+  "worldBalanceLydra",
+  "worldBalanceNetdra",
   "corruption",
   "visited",
   "cleared",
@@ -309,6 +313,14 @@ function statMapMatches(stats, requirements) {
 function shorthandConditionMet(key, expected, worldState, context) {
   const normalized = normalizeWorldState(worldState);
   switch (key) {
+    case "worldBalanceLydra": {
+      const state = getWorldEnergyState({ worldEnergy: context.worldEnergy });
+      return compareNumber(state.lydraPercent, typeof expected === "number" ? { min: expected } : expected);
+    }
+    case "worldBalanceNetdra": {
+      const state = getWorldEnergyState({ worldEnergy: context.worldEnergy });
+      return compareNumber(state.netdraPercent, typeof expected === "number" ? { min: expected } : expected);
+    }
     case "corruption":
       return compareNumber(getRegionCorruptionLevel(normalized, context), expected);
     case "visited": {

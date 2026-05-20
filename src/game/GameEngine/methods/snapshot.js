@@ -21,6 +21,7 @@ import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill
 import { getClassConfig, normalizeClassId, normalizeClassNodes } from "../../config/class-config.js";
 import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeWorldState } from "../../world-state.js";
+import { getWorldEnergyState } from "../../world-energy.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -96,6 +97,7 @@ export const snapshotMethods = {
       },
       regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
       worldState: normalizeWorldState(this.worldState),
+      worldEnergy: getWorldEnergyState(this),
       mobs: this.monsterCounterSnapshot(),
       mapReturn: this.mapReturn ? { ...this.mapReturn } : null,
       lastDeath: this.lastDeath ? { ...this.lastDeath } : null,

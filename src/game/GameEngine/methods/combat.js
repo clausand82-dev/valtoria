@@ -32,6 +32,7 @@ import {
   ITEM_DURABILITY_DEATH_THRESHOLD,
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
+import { applyWorldEnergy } from "../../world-energy.js";
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
@@ -334,6 +335,10 @@ export const combatMethods = {
       natureResist: Number(base.natureResist) || 0,
       allResist: Number(base.allResist) || 0,
       spells: [],
+      killLydra: 0,
+      killNetdra: 0,
+      eliteKillLydra: 0,
+      eliteKillNetdra: 0,
       spellCooldown: 999,
       statusEffects: [],
       allowElite: false,
@@ -381,7 +386,9 @@ export const combatMethods = {
       projectile.x += projectile.vx * dt;
       projectile.y += projectile.vy * dt;
       projectile.life -= dt;
-      this.addParticles(projectile.x, projectile.y, projectile.color, projectile.type === "burst" ? 1 : 0, 0.04);
+      this.addParticles(projectile.x, projectile.y, projectile.color, projectile.type === "burst" ? 1 : 0, 0.04, {
+        spellInstanceId: projectile.spellInstanceId,
+      });
 
       const expired = projectile.life <= 0;
       let remove = expired || (!projectile.ignoreBlocking && this.isBlocked(projectile.x, projectile.y, 0.12));
@@ -651,22 +658,48 @@ export const combatMethods = {
     const n = normalize(x - this.player.x, y - this.player.y);
     if (!n.x && !n.y) return;
     this.player.mana -= manaCost;
+    this.applySpellWorldEnergy(spell);
     this.player.stats.spellsCast += 1;
     this.player.spellCooldown = spell.cooldown;
     this.player.castAnim = 0.38;
     this.setFacing(n.x, n.y);
     const visuals = spellParticleVisuals(spell);
+    const spellInstanceId = createId();
+    this.scheduleSpellVisualCleanup(spell, spellInstanceId);
     if (visuals.cast?.type) {
       this.particleEngine?.emitOneShot(visuals.cast.type, this.player.x, this.player.y, {
         ...visuals.cast,
+        spellInstanceId,
         layer: visuals.cast.layer ?? "effects",
       });
     }
     if (spell.castMode === "skyfall") {
-      this.launchSpellSkyfall({ spell, caster: this.player, owner: "player", x, y, stats });
+      this.launchSpellSkyfall({ spell, caster: this.player, owner: "player", x, y, stats, spellInstanceId });
     } else {
-      this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats });
+      this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats, spellInstanceId });
     }
+  },
+
+  scheduleSpellVisualCleanup(spell, spellInstanceId) {
+    if (!spellInstanceId) return;
+    const travelTime = spell.castMode === "skyfall"
+      ? (Math.max(1, Number(spell.shardFallDistance) || 5) / Math.max(1, Number(spell.speed) || 10)) + 0.8
+      : (Math.max(0.1, Number(spell.range) || 1) / Math.max(0.1, Number(spell.speed) || 1)) + 0.4;
+    const hazardTime = Math.max(0, Number(spell.hazardDuration) || 0);
+    const particleTail = spell.id === "blizzard" ? 0.15 : 5;
+    this.spellVisualCleanups ??= [];
+    this.spellVisualCleanups.push({
+      spellInstanceId,
+      spellId: spell.id,
+      life: Math.max(0.5, travelTime + hazardTime + particleTail),
+    });
+  },
+
+  applySpellWorldEnergy(spell) {
+    const netdra = Number(spell?.netdra) || 0;
+    const lydra = Number(spell?.lydra) || 0;
+    if (!lydra && !netdra) return;
+    applyWorldEnergy(this, { lydra, netdra });
   },
 
   castMonsterSpell(monster, spellId) {
@@ -695,7 +728,7 @@ export const combatMethods = {
     else this.launchSpellProjectile(spellContext);
   },
 
-  launchSpellProjectile({ spell, caster, owner, x, y, stats }) {
+  launchSpellProjectile({ spell, caster, owner, x, y, stats, spellInstanceId = null }) {
     const n = normalize(x - caster.x, y - caster.y);
     const baseHitDamage = this.rollDamage(stats.damageMin, stats.damageMax) + (Number(spell.hitDamage) || 0);
     const critical = Math.random() < (Number(stats.critChance) || 0);
@@ -704,6 +737,7 @@ export const combatMethods = {
       id: createId(),
       type: spell.id,
       spellId: spell.id,
+      spellInstanceId,
       owner,
       x: caster.x + n.x * 0.5,
       y: caster.y + n.y * 0.5,
@@ -745,13 +779,14 @@ export const combatMethods = {
     if (visuals.trail?.type) {
       this.particleEngine?.attachEmitterToProjectile(projectile.id, {
         ...visuals.trail,
+        spellInstanceId,
         layer: visuals.trail.layer ?? "effects",
         radius: visuals.trail.radius ?? 8,
       });
     }
   },
 
-  launchSpellSkyfall({ spell, caster, owner, x, y, stats }) {
+  launchSpellSkyfall({ spell, caster, owner, x, y, stats, spellInstanceId = null }) {
     const center = targetPointInSpellRange(caster, x, y, spell.range);
     if (!center) return;
     const count = randomIntInRange(spell.shardCount, 5, 8);
@@ -773,6 +808,7 @@ export const combatMethods = {
         id: createId(),
         type: spell.id,
         spellId: spell.id,
+        spellInstanceId,
         owner,
         x: impactX - fallDirection.x * fallDistance - stagger * speed,
         y: impactY - fallDirection.y * fallDistance,
@@ -812,6 +848,7 @@ export const combatMethods = {
       if (visuals.trail?.type) {
         this.particleEngine?.attachEmitterToProjectile(projectile.id, {
           ...visuals.trail,
+          spellInstanceId,
           layer: visuals.trail.layer ?? "effects",
           radius: visuals.trail.radius ?? 8,
         });
@@ -866,11 +903,14 @@ export const combatMethods = {
     if (impact?.type) {
       this.particleEngine?.emitOneShot(impact.type, x, y, {
         ...impact,
+        spellInstanceId: projectile.spellInstanceId,
         layer: impact.layer ?? "effects",
         oneShotCount: impact.oneShotCount ?? (projectile.areaRadius > 0 ? 30 : 14),
       });
     } else {
-      this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08);
+      this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08, {
+        spellInstanceId: projectile.spellInstanceId,
+      });
     }
     if (projectile.hazardDuration > 0 && projectile.areaRadius > 0) {
       this.spawnGroundHazard(projectile, x, y);
@@ -883,6 +923,7 @@ export const combatMethods = {
       id: createId(),
       owner: projectile.owner,
       spellId: projectile.spellId,
+      spellInstanceId: projectile.spellInstanceId ?? null,
       x,
       y,
       radius,
@@ -899,11 +940,13 @@ export const combatMethods = {
     };
     this.groundHazards ??= [];
     this.groundHazards.push(hazard);
-    this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life);
+    const cloud = this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life, { ownerId: hazard.id, spellInstanceId: hazard.spellInstanceId });
+    hazard.groundCloudParticleId = cloud?.id ?? null;
     const area = projectile.particleVisuals?.area;
     if (area?.type) {
       hazard.particleEmitterId = this.particleEngine?.addEmitter({
         ...area,
+        spellInstanceId: hazard.spellInstanceId,
         x,
         y,
         radius: Math.max(18, radius * 42),
@@ -924,9 +967,77 @@ export const combatMethods = {
         this.applyGroundHazardTick(hazard);
       }
       if (hazard.life <= 0) {
-        if (hazard.particleEmitterId) this.particleEngine?.removeEmitter(hazard.particleEmitterId);
+        if (hazard.particleEmitterId) {
+          this.particleEngine?.removeEmitter(hazard.particleEmitterId);
+        }
         this.groundHazards.splice(i, 1);
       }
+    }
+  },
+
+  updateSpellVisualCleanups(dt) {
+    if (!Array.isArray(this.spellVisualCleanups) || this.spellVisualCleanups.length === 0) return;
+    for (let i = this.spellVisualCleanups.length - 1; i >= 0; i -= 1) {
+      const cleanup = this.spellVisualCleanups[i];
+      cleanup.life -= dt;
+      if (cleanup.life > 0) continue;
+      this.cleanupSpellVisuals(cleanup.spellInstanceId, cleanup.spellId);
+      this.spellVisualCleanups.splice(i, 1);
+    }
+  },
+
+  cleanupSpellVisuals(spellInstanceId, spellId = null) {
+    if (!spellInstanceId) return;
+    this.particleEngine?.removeEmittersByConfig("spellInstanceId", spellInstanceId);
+    this.particleEngine?.fadeParticlesByConfig?.("spellInstanceId", spellInstanceId, 0.55);
+    if (spellId === "blizzard") {
+      const frostTypes = new Set(["cast_ice", "trail_ice", "impact_ice", "frost_ground", "status_frozen", "hit_sparks"]);
+      this.particleEngine?.removeEmittersWhere?.((emitter) => {
+        const config = emitter?.config ?? {};
+        const colors = Array.isArray(config.colors) ? config.colors : [];
+        return frostTypes.has(config.type) || colors.some((color) => String(color).toLowerCase() === "#8bdfff");
+      });
+      this.particleEngine?.fadeParticlesWhere?.((particle) => String(particle.color ?? "").toLowerCase() === "#8bdfff", 0.55);
+    }
+    if (Array.isArray(this.particles)) {
+      for (const particle of this.particles) {
+        if (particle.spellInstanceId !== spellInstanceId && !(spellId === "blizzard" && String(particle.color ?? "").toLowerCase() === "#8bdfff")) continue;
+        particle.life = Math.min(Number(particle.life) || 0, 0.55);
+      }
+    }
+    if (Array.isArray(this.groundHazards)) {
+      this.groundHazards = this.groundHazards.filter((hazard) => {
+        if (hazard.spellInstanceId !== spellInstanceId) return true;
+        if (hazard.particleEmitterId) {
+          this.particleEngine?.removeEmitter(hazard.particleEmitterId);
+        }
+        return false;
+      });
+    }
+  },
+
+  removeHazardLegacyParticles(hazard) {
+    if (!hazard || !Array.isArray(this.particles)) return;
+    this.particles = this.particles.filter((particle) => (
+      particle.ownerId !== hazard.id
+      && particle.id !== hazard.groundCloudParticleId
+    ));
+  },
+
+  removeHazardAreaParticles(hazard) {
+    if (!hazard) return;
+    const cleanupRadius = Math.max(0.25, (Number(hazard.radius) || 0) + 0.9);
+    const hazardColor = String(hazard.color ?? "").toLowerCase();
+    this.particleEngine?.removeParticlesInWorldCircle(hazard.x, hazard.y, cleanupRadius, (particle) => {
+      const color = String(particle.color ?? "").toLowerCase();
+      return !hazardColor || color === hazardColor;
+    });
+    if (Array.isArray(this.particles)) {
+      this.particles = this.particles.filter((particle) => {
+        const color = String(particle.color ?? "").toLowerCase();
+        if (hazardColor && color !== hazardColor) return true;
+        return Math.hypot((Number(particle.x) || 0) - hazard.x, (Number(particle.y) || 0) - hazard.y) > cleanupRadius;
+      });
     }
   },
 
@@ -1130,9 +1241,21 @@ export const combatMethods = {
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
     this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
+    this.applyDestroyRewards(object, def);
     if (object.type === "building") {
       this.changePopularity(housePopularityDelta(this.region.index), object.x, object.y);
     }
+  },
+
+  applyDestroyRewards(object, def) {
+    const rewards = object.destroyRewards ?? def?.destroyRewards;
+    if (!rewards || typeof rewards !== "object") return;
+    const lydra = Number(rewards.lydra) || 0;
+    const netdra = Number(rewards.netdra) || 0;
+    if (!lydra && !netdra) return;
+    applyWorldEnergy(this, { lydra, netdra });
+    if (lydra) this.addFloater(object.x, object.y, `+${lydra} Ly'dra'thot`, "#eaf4ff", 0.95);
+    if (netdra) this.addFloater(object.x, object.y, `+${netdra} Net'dra'thot`, "#b8a4ff", 0.95);
   },
 
   killMonster(monster) {
@@ -1147,6 +1270,7 @@ export const combatMethods = {
     if (!monster.isMinion) this.applyQuestKill(monster);
     this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95);
     if (!monster.isMinion) this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
+    if (!monster.isMinion) this.applyMonsterKillWorldEnergy(monster);
     this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
     if (!monster.isMinion && !monster.noLoot && !monster.despawnOnDeath) this.dropLoot(monster);
     if (!monster.isMinion) this.despawnMonsterMinions(monster.id);
@@ -1155,6 +1279,19 @@ export const combatMethods = {
       this.addParticles(monster.x, monster.y, monster.color, 36, 0.18);
     }
     this.levelUpIfNeeded();
+  },
+
+  applyMonsterKillWorldEnergy(monster) {
+    const lydra = Number(monster?.killLydra) || 0;
+    const netdra = Number(monster?.killNetdra) || 0;
+    const eliteLydra = monster?.elite ? Number(monster?.eliteKillLydra) || 0 : 0;
+    const eliteNetdra = monster?.elite ? Number(monster?.eliteKillNetdra) || 0 : 0;
+    const totalLydra = lydra + eliteLydra;
+    const totalNetdra = netdra + eliteNetdra;
+    if (!totalLydra && !totalNetdra) return;
+    applyWorldEnergy(this, { lydra: totalLydra, netdra: totalNetdra });
+    if (totalLydra) this.addFloater(monster.x, monster.y, `+${totalLydra} Ly'dra'thot`, "#eaf4ff", 0.95);
+    if (totalNetdra) this.addFloater(monster.x, monster.y, `+${totalNetdra} Net'dra'thot`, "#b8a4ff", 0.95);
   },
 
   despawnMonsterMinions(ownerId) {

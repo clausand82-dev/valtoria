@@ -25,6 +25,9 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - TODO:DELETE legacyWeightKey: Only used by legacyRegionObjectsFromWeights (old biodome weight system).
 - defaultDestructible: Default destructible flag if region override is not set.
 - destructible: Inline destructible data used by runtime object damage/loot.
+- destroyRewards: Optional raw world energy rewards when this object is destroyed.
+  Example: destroyRewards: { lydra: 1, netdra: 0.1 }
+  Region overrides in map-region-config.js can also set destroyRewards per object spawn entry.
 - spawnDamage: Optional start damage state: "all", "damaged", "destroyed",
   or "damaged_destroyed". Omit for current behavior: spawn undamaged.
 - spawnTags/spawnAvoidRadius: Optional spawn influence metadata, e.g. canopy zones.
@@ -893,7 +896,16 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
     foregroundFadeAlpha: Number.isFinite(Number(def.foregroundFadeAlpha))
       ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
       : undefined,
+    destroyRewards: normalizeDestroyRewards(def.destroyRewards),
   };
+}
+
+function normalizeDestroyRewards(rewards) {
+  if (!rewards || typeof rewards !== "object" || Array.isArray(rewards)) return null;
+  const lydra = Number(rewards.lydra) || 0;
+  const netdra = Number(rewards.netdra) || 0;
+  if (!lydra && !netdra) return null;
+  return { lydra, netdra };
 }
 
 // TODO:DELETE - legacy biodome weight mapping is disabled. Regions must now use explicit objects arrays.
@@ -973,6 +985,9 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     }
     if (normalized && Number.isFinite(Number(entry.foregroundFadeAlpha))) {
       normalized.foregroundFadeAlpha = Math.min(1, Math.max(0.1, Number(entry.foregroundFadeAlpha)));
+    }
+    if (normalized && entry.destroyRewards !== undefined) {
+      normalized.destroyRewards = normalizeDestroyRewards(entry.destroyRewards);
     }
     if (normalized) entries.push(normalized);
   }

@@ -14,10 +14,6 @@ export class ParticleEmitter {
   update(dt, engine, context) {
     if (this.dead || this.config.enabled === false) return;
     this.age += dt;
-    if (this.config.duration > 0 && this.age >= this.config.duration) {
-      this.dead = true;
-      return;
-    }
     const anchor = engine.resolveEmitterAnchor(this, context);
     if (!anchor && this.config.area !== "screen" && this.config.area !== "map") {
       this.dead = true;
@@ -28,6 +24,10 @@ export class ParticleEmitter {
         engine.spawnFromEmitter(this, this.config.oneShotCount, anchor, context);
         this.burstDone = true;
       }
+      this.dead = true;
+      return;
+    }
+    if (this.config.duration > 0 && this.age >= this.config.duration) {
       this.dead = true;
       return;
     }

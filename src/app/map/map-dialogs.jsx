@@ -1,9 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CITY_BUILDINGS } from "../../game/config/city-buildings-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../../game/config/map-region-config.js";
-import { QUEST_DEFS } from "../../game/config/quest-config.js";
+import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../../game/config/quest-config.js";
+import { QUEST_NPCS } from "../../game/config/npc-config.js";
+import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
+import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
+import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { getQuestStartNpcIds } from "../../game/GameEngine/helpers.js";
 import { resolveMapRegionConfig } from "../../game/world-state.js";
+import { getWorldEnergyState } from "../../game/world-energy.js";
 import { regionStatusKey } from "../save/save-keys.js";
 const cityPrebuildCache = { layout: null };
 
@@ -153,7 +158,7 @@ function renderCityMinimap(canvas, heroPosition) {
   ctx.strokeRect(1, 1, width - 2, height - 2);
 }
 
-export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
+export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
   const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
   const [hoveredRegionId, setHoveredRegionId] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -166,9 +171,10 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
       region: resolveMapRegionConfig(rawRegion, worldState, {
         areaMapId: selectedMapId,
         regionId: rawRegion.id,
+        worldEnergy,
       }),
     }))
-  ), [selectedMapId, worldState]);
+  ), [selectedMapId, worldState, worldEnergy]);
   useEffect(() => {
     setSelectedMapId(initialMapId ?? WORLD_MAP.id);
     setHoveredRegionId(null);
@@ -192,7 +198,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
     ? regionHoverCorruptionText(selectedMapId, hoveredRegionEntry.region, regionCorruption)
     : "";
   const mapCorruptionText = isWorldMap
-    ? ""
+    ? `World average corruption: ${worldAverageCorruptionLevel(regionCorruption).toFixed(1)}/10`
     : `Average corruption: ${(areaAverageCorruptionLevel(regionCorruption, selectedMapId) ?? 0).toFixed(1)}/10`;
   const statusRegion = hoveredRegionEntry?.region ?? selectedRegion;
   const statusTitle = statusRegion?.label ?? activeMap.title;
@@ -226,6 +232,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
     if (!Number.isFinite(rawWidth) || !Number.isFinite(rawHeight) || rawHeight <= 0) return 1;
     return rawWidth / rawHeight;
   }, [activeMap?.aspect]);
+  const worldEnergyState = getWorldEnergyState({ worldEnergy });
 
   return (
     <div className="confirm-backdrop" role="presentation">
@@ -327,12 +334,11 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
               </>
             )}
           </div>
-          {!isWorldMap && (
-            <div className="map-hover-card" aria-live="polite">
-              <b>{statusTitle}</b>
-              <span>{statusCorruptionText}</span>
-            </div>
-          )}
+          <div className="map-hover-card" aria-live="polite">
+            <b>{statusTitle}</b>
+            <span>{statusCorruptionText}</span>
+          </div>
+          <WorldEnergyBalanceBar state={worldEnergyState} />
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy) && (
             <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}</p>
           )}
@@ -348,6 +354,52 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
       </section>
     </div>
   );
+}
+
+function worldAverageCorruptionLevel(regionCorruption) {
+  const areaIds = Object.keys(AREA_MAPS);
+  if (!areaIds.length) return 0;
+  const values = areaIds
+    .map((areaMapId) => areaAverageCorruptionLevel(regionCorruption, areaMapId))
+    .filter((value) => value !== null);
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function WorldEnergyBalanceBar({ state, compact = false }) {
+  const balance = Math.max(-100, Math.min(100, Number(state?.balanceValue) || 0));
+  const lydraPoints = formatWorldEnergyPoints(state?.lydra);
+  const netdraPoints = formatWorldEnergyPoints(state?.netdra);
+  const tooltip = `Ly'dra'thot: ${lydraPoints} point (${state.lydraPercent}%)\nNet'dra'thot: ${netdraPoints} point (${state.netdraPercent}%)\nBalance: ${state.balanceValue}`;
+  return (
+    <div
+      className={`world-energy-bar ${compact ? "compact" : ""}`}
+      style={{ "--world-energy-marker": `${(balance + 100) / 2}%` }}
+      title={tooltip}
+    >
+      <div className="world-energy-labels">
+        <span>
+          <img src="/assets/generated/lydra_symbol.png" alt="" aria-hidden="true" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+          Ly'dra'thot {state.lydraPercent}%
+        </span>
+        <b>0</b>
+        <span>
+          Net'dra'thot {state.netdraPercent}%
+          <img src="/assets/generated/netdra_symbol.png" alt="" aria-hidden="true" onError={(event) => { event.currentTarget.style.display = "none"; }} />
+        </span>
+      </div>
+      <div className="world-energy-track" aria-label={`Ly'dra'thot ${state.lydraPercent}% / Net'dra'thot ${state.netdraPercent}%`}>
+        <div className="world-energy-midline" />
+        <div className="world-energy-marker" />
+      </div>
+      <div className="world-energy-percent">Ly'dra'thot {state.lydraPercent}% / Net'dra'thot {state.netdraPercent}%</div>
+    </div>
+  );
+}
+
+function formatWorldEnergyPoints(value) {
+  const number = Number(value) || 0;
+  return Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function regionIsUnlocked(region, completedQuestSet, army = 0) {

@@ -302,6 +302,8 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
         <div className="comparison-list">
           {(quest.rewards?.xp ?? 0) > 0 && <span className="diff-good">+ XP {quest.rewards.xp}</span>}
           {(quest.rewards?.gold ?? 0) > 0 && <span className="diff-good">+ Gold {quest.rewards.gold}</span>}
+          {(quest.rewards?.lydra ?? 0) > 0 && <span className="diff-good">+ Ly'dra'thot {quest.rewards.lydra}</span>}
+          {(quest.rewards?.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {quest.rewards.netdra}</span>}
           {(quest.rewards?.resources ?? []).map((r) => (
             <span className="diff-good" key={`res-${r.resource}`}>+ {r.count}x {r.resource}</span>
           ))}
@@ -435,6 +437,8 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                   <div className="comparison-list">
                     {(selectedQuest.rewards?.xp ?? 0) > 0 && <span className="diff-good">+ XP {selectedQuest.rewards.xp}</span>}
                     {(selectedQuest.rewards?.gold ?? 0) > 0 && <span className="diff-good">+ Gold {selectedQuest.rewards.gold}</span>}
+                    {(selectedQuest.rewards?.lydra ?? 0) > 0 && <span className="diff-good">+ Ly'dra'thot {selectedQuest.rewards.lydra}</span>}
+                    {(selectedQuest.rewards?.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {selectedQuest.rewards.netdra}</span>}
                     {(selectedQuest.rewards?.resources ?? []).map((r) => (
                       <span className="diff-good" key={`ov-res-${selectedQuest.id}-${r.resource}`}>+ {r.count}x {r.resource}</span>
                     ))}

@@ -180,6 +180,7 @@ export const lifecycleMethods = {
       this.updateMonsters(dt, stats);
       this.updateProjectiles(dt);
       this.updateGroundHazards(dt);
+      this.updateSpellVisualCleanups?.(dt);
       this.updateLoot(dt);
     }
 

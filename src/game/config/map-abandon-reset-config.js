@@ -10,22 +10,22 @@ export const MAP_ABANDON_RESET_CONFIG = {
   player: {
     // Position and facing from before the map run. Keep this true unless you
     // explicitly want to preserve wilderness coordinates after returning to city.
-    position: true,
+    position: false,
 
     // Hero level and current XP. Set false to keep XP earned before abandoning.
-    levelAndXp: true,
+    levelAndXp: false,
 
     // Gold and popularity. Set false to keep gold/popularity changes.
-    economy: true,
+    economy: false,
 
     // HP, mana, active cooldowns, movement/attack animation state and death timer.
-    vitalsAndCooldowns: true,
+    vitalsAndCooldowns: false,
 
     // Health/mana potion counters.
-    potions: true,
+    potions: false,
 
     // Permanent readable-book stat bonuses gained during the run.
-    readableBonuses: true,
+    readableBonuses: false,
 
     // Skill tree ranks bought during the run.
     skillTree: false,
@@ -34,20 +34,33 @@ export const MAP_ABANDON_RESET_CONFIG = {
     spells: false,
 
     // Hero statistics counters such as kills, gold earned, items picked, etc.
-    stats: true,
+    stats: false,
 
     // Backpack contents. Set false to keep items/resources picked up during the run.
     inventory: false,
 
     // Equipped gear, including durability damage and gear swaps.
-    equipment: true,
+    equipment: false,
   },
 
   quests: {
     // Active quest list and quest progress, including kill/clear counters.
-    active: true,
+    active: false,
 
     // Completed quest ids.
-    completed: true,
+    completed: false,
+  },
+
+  world: {
+    // Ly'dra'thot / Net'dra'thot raw points gained or changed during the map run.
+    // true resets spell netdra, mob killNetdra/killLydra, destroyRewards lydra/netdra,
+    // and quest reward lydra/netdra if the quest completion is also rolled back.
+    // Set false to keep world-energy changes even when abandoning the map early.
+    worldEnergy: false,
+
+    // Generic world flags/counters/values changed during the map run.
+    // This covers worldState-driven systems such as region flags, mob seen flags,
+    // visit counters, conditional unlock state, and future shorthand-condition state.
+    worldState: false,
   },
 };

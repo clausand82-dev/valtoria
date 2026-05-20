@@ -43,6 +43,77 @@ export class ParticleEngine {
     this.ownerEmitters.delete(String(ownerId));
   }
 
+  removeParticlesByEmitter(emitterId) {
+    if (!emitterId) return;
+    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+      const particle = this.particles[i];
+      if (particle.emitterId !== emitterId) continue;
+      this.particles.splice(i, 1);
+      this.pool.release(particle);
+    }
+  }
+
+  removeParticlesInWorldCircle(x, y, radius, predicate = null) {
+    const centerX = Number(x);
+    const centerY = Number(y);
+    const maxRadius = Math.max(0, Number(radius) || 0);
+    if (!Number.isFinite(centerX) || !Number.isFinite(centerY) || maxRadius <= 0) return;
+    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+      const particle = this.particles[i];
+      if (particle.screenSpace) continue;
+      if (predicate && !predicate(particle)) continue;
+      if (Math.hypot((Number(particle.x) || 0) - centerX, (Number(particle.y) || 0) - centerY) > maxRadius) continue;
+      this.particles.splice(i, 1);
+      this.pool.release(particle);
+    }
+  }
+
+  removeEmittersByConfig(key, value) {
+    for (const emitter of this.emitters.values()) {
+      if (emitter.config?.[key] === value) emitter.dead = true;
+    }
+  }
+
+  removeEmittersWhere(predicate) {
+    if (typeof predicate !== "function") return;
+    for (const emitter of this.emitters.values()) {
+      if (predicate(emitter)) emitter.dead = true;
+    }
+  }
+
+  removeParticlesByConfig(key, value) {
+    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+      const particle = this.particles[i];
+      if (particle[key] !== value) continue;
+      this.particles.splice(i, 1);
+      this.pool.release(particle);
+    }
+  }
+
+  removeParticlesWhere(predicate) {
+    if (typeof predicate !== "function") return;
+    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+      const particle = this.particles[i];
+      if (!predicate(particle)) continue;
+      this.particles.splice(i, 1);
+      this.pool.release(particle);
+    }
+  }
+
+  fadeParticlesByConfig(key, value, fadeTime = 0.5) {
+    this.fadeParticlesWhere((particle) => particle[key] === value, fadeTime);
+  }
+
+  fadeParticlesWhere(predicate, fadeTime = 0.5) {
+    if (typeof predicate !== "function") return;
+    const cap = Math.max(0.05, Number(fadeTime) || 0.5);
+    for (const particle of this.particles) {
+      if (!predicate(particle)) continue;
+      const remaining = Math.max(0, (Number(particle.lifetime) || 0) - (Number(particle.age) || 0));
+      if (remaining > cap) particle.lifetime = (Number(particle.age) || 0) + cap;
+    }
+  }
+
   emitOneShot(type, x, y, options = {}) {
     return this.addEmitter({ ...options, type, x, y, oneShot: true, burst: true, duration: 0.01 }, options.owner ?? null);
   }
@@ -127,6 +198,7 @@ export class ParticleEngine {
     const lifetime = randomInRange(c.lifetime);
     return {
       emitterId: emitter.id,
+      spellInstanceId: c.spellInstanceId ?? emitter.owner?.spellInstanceId ?? null,
       layer: c.layer,
       movement: c.movement,
       visual: c.visual,

@@ -40,6 +40,7 @@ import { normalizeSockets, itemCanHaveSockets } from "../../config/socket-config
 import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 import { saveRepository } from "../../../storage/saveRepository.js";
 import { normalizeWorldState } from "../../world-state.js";
+import { normalizeWorldEnergy } from "../../world-energy.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -291,6 +292,7 @@ export const persistenceMethods = {
 
     this.questState = normalizeSavedQuestState(payload.quests);
     this.worldState = normalizeWorldState(payload.worldState);
+    this.worldEnergy = normalizeWorldEnergy(payload.worldEnergy);
 
     if (Array.isArray(savedPlayer.inventory)) {
       const normalizedInventory = savedPlayer.inventory
@@ -418,6 +420,7 @@ export const persistenceMethods = {
         completed: cfg.quests.completed ? [...this.questState.completed] : [],
       },
       ...(cfg.worldState ? { worldState: normalizeWorldState(this.worldState) } : {}),
+      ...(cfg.worldEnergy ? { worldEnergy: normalizeWorldEnergy(this.worldEnergy) } : {}),
       loots: [],
     };
 

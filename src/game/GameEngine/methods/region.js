@@ -19,6 +19,7 @@ import {
   withRegionVisitWorldState,
   regionWorldStateKey,
 } from "../../world-state.js";
+import { normalizeWorldEnergy } from "../../world-energy.js";
 
 function cloneAbandonValue(value) {
   if (value === null || value === undefined) return value;
@@ -70,12 +71,17 @@ function captureAbandonState(engine) {
       active: cloneAbandonValue(engine.questState.active),
       completed: cloneAbandonValue(engine.questState.completed),
     },
+    world: {
+      worldEnergy: normalizeWorldEnergy(engine.worldEnergy),
+      worldState: normalizeWorldState(engine.worldState),
+    },
   };
 }
 
 function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESET_CONFIG) {
   const playerCfg = config.player ?? {};
   const questCfg = config.quests ?? {};
+  const worldCfg = config.world ?? {};
   const currentPlayer = currentState.player;
   if (playerCfg.position === false) Object.assign(engine.player, currentPlayer.position);
   if (playerCfg.levelAndXp === false) Object.assign(engine.player, currentPlayer.levelAndXp);
@@ -93,6 +99,8 @@ function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESE
   if (playerCfg.equipment === false) engine.player.equipment = cloneAbandonValue(currentPlayer.equipment);
   if (questCfg.active === false) engine.questState.active = cloneAbandonValue(currentState.quests.active);
   if (questCfg.completed === false) engine.questState.completed = cloneAbandonValue(currentState.quests.completed);
+  if (worldCfg.worldEnergy === false) engine.worldEnergy = normalizeWorldEnergy(currentState.world?.worldEnergy);
+  if (worldCfg.worldState === false) engine.worldState = normalizeWorldState(currentState.world?.worldState);
 }
 
 export const regionMethods = {
@@ -180,6 +188,7 @@ export const regionMethods = {
         regionId: regionConfig.id,
         regionConfig,
         worldState: this.worldState,
+        worldEnergy: this.worldEnergy,
         questState: this.questState,
         player: this.player,
         inventory: this.player?.inventory,
@@ -307,6 +316,7 @@ export const regionMethods = {
     this.loots = [];
     this.projectiles = [];
     this.groundHazards = [];
+    this.spellVisualCleanups = [];
     this.particles = [];
     this.particleEngine?.clearMapEmitters();
     this.__ambientParticleEmitters = new Map();
@@ -453,6 +463,10 @@ export const regionMethods = {
     monster.blockChance = Number(base.blockChance) || 0;
     monster.dodgeChance = Number(base.dodgeChance) || 0;
     monster.spells = [...(base.spells ?? [])];
+    monster.killLydra = Math.max(0, Number(base.killLydra) || 0);
+    monster.killNetdra = Math.max(0, Number(base.killNetdra) || 0);
+    monster.eliteKillLydra = Math.max(0, Number(base.eliteKillLydra) || 0);
+    monster.eliteKillNetdra = Math.max(0, Number(base.eliteKillNetdra) || 0);
     monster.spellCooldown = Math.max(0, Number(monster.spellCooldown) || 0);
     monster.statusEffects = Array.isArray(monster.statusEffects) ? monster.statusEffects : [];
     monster.allowElite = base.allowElite !== false;

@@ -32,6 +32,7 @@ export const SAVE_PERSIST_CONFIG = {
     completed: true,
   },
   worldState: true,
+  worldEnergy: true,
   cityProgress: {
     areas: true,
     buildingStates: true,

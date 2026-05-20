@@ -34,6 +34,8 @@ import {
   isQuestComplete,
   resolveQuestDefById,
 } from "../helpers.js";
+import { applyWorldEnergy } from "../../world-energy.js";
+import { worldConditionMet } from "../../world-state.js";
 
 export const questsMethods = {
   updateQuestgiver() {
@@ -102,6 +104,8 @@ export const questsMethods = {
     }
 
     if (!this.questDemandsMet(def.demands)) return false;
+    if (def.requires && !worldConditionMet(def.requires, this.worldState, this.questConditionContext())) return false;
+    if (def.blockedBy && worldConditionMet(def.blockedBy, this.worldState, this.questConditionContext())) return false;
     if (scope === "city" && def?.repeatable) {
       if (this.questState.cityOfferRolls?.[def.id] !== npcId) return false;
     }
@@ -113,6 +117,29 @@ export const questsMethods = {
       ));
     }
     return true;
+  },
+
+  questConditionContext() {
+    return {
+      regionId: this.region?.mapRegion?.id,
+      regionConfig: this.region?.mapRegion,
+      worldState: this.worldState,
+      worldEnergy: this.worldEnergy,
+      questState: this.questState,
+      player: this.player,
+      inventory: this.player?.inventory,
+      potions: this.player?.potions,
+      equipment: this.player?.equipment,
+      cityStats: this.cityStats,
+      cityInventory: this.cityInventory,
+      cityStorage: this.cityStorage ?? this.cityInventory,
+      activeMapRegion: this.activeMapRegion,
+      mapReturn: this.mapReturn,
+      stats: {
+        player: this.player,
+        worldState: this.worldState,
+      },
+    };
   },
 
   monsterTypesForCurrentRegion() {
@@ -142,6 +169,7 @@ export const questsMethods = {
       const needed = Math.max(1, Math.floor(Number(req?.count) || 1));
       if (this.countDemandItems(req) < needed) return false;
     }
+    if (!worldConditionMet(demands, this.worldState, this.questConditionContext())) return false;
     return true;
   },
 
@@ -621,9 +649,18 @@ export const questsMethods = {
     const summary = {
       xp,
       gold,
+      lydra: 0,
+      netdra: 0,
       resources: [],
       items: [],
     };
+    if (rewards.lydra || rewards.netdra) {
+      applyWorldEnergy(this, { lydra: rewards.lydra, netdra: rewards.netdra });
+      summary.lydra = Number(rewards.lydra) || 0;
+      summary.netdra = Number(rewards.netdra) || 0;
+      if (summary.lydra) this.addFloater(this.player.x, this.player.y, `+${summary.lydra} Ly'dra'thot`, "#eaf4ff", 1);
+      if (summary.netdra) this.addFloater(this.player.x, this.player.y, `+${summary.netdra} Net'dra'thot`, "#b8a4ff", 1);
+    }
     if (xp) {
       this.player.xp += xp;
       this.addFloater(this.player.x, this.player.y, `+${xp} xp`, "#e0aa3f", 1);

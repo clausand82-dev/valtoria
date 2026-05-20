@@ -1,5 +1,11 @@
 History over changes
 
+*V. 1.74
+- Netdra og Lydra system tilføjet
+- fixed particle error where some blue dots remained after Blizzard was completed
+- added worldState og worldEnergy til map-abandon-reset-config
+- more old greenscreen pictures cleaned up
+
 * V 1.73
 - added options to have 1x1 or 2x2 object sheets
 - added options to have more than one sheets on a object
