@@ -115,6 +115,9 @@ export const inputMethods = {
       if (this.nearbyQuestgiver) {
         event.preventDefault();
         this.publishSnapshot();
+      } else if (this.nearbyActionTarget) {
+        event.preventDefault();
+        this.interactNearbyAction();
       } else if (this.nearbyFoliageLoot) {
         event.preventDefault();
         this.lootNearbyFoliage();

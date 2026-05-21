@@ -620,6 +620,7 @@ export const questsMethods = {
       this.questState.completed.push(quest.questId);
     }
     if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];
+    this.cleanupObsoleteCompletedQuestItems();
     this.player.stats.questsCompleted += 1;
     this.questState.cityFade.push({ npcId: String(quest.turnInNpcId ?? quest.npcId), startedAt: Date.now() });
     this.addToast(`${quest.title} indleveret`);
@@ -639,6 +640,19 @@ export const questsMethods = {
         target: { ...(quest.target ?? {}) },
       },
     };
+  },
+
+  cleanupObsoleteCompletedQuestItems() {
+    if (!Array.isArray(this.player?.inventory)) return;
+    if (!this.questState?.completed?.includes("innkeeper_ring_for_noble")) return;
+    const activeRingQuest = (this.questState.active ?? []).some((quest) => (
+      questItemTargetsForQuest(quest).some((target) => String(target.questItemId) === "ring")
+    ));
+    if (activeRingQuest) return;
+    this.player.inventory = this.player.inventory.filter((item) => !(
+      item?.mode === "quest"
+      && String(item.questItemId ?? "") === "ring"
+    ));
   },
 
   grantQuestRewards(quest) {

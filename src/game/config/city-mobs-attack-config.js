@@ -59,9 +59,9 @@ export const CITY_MOB_POOL = [
 export const CITY_MOB_LEVELS = {
   1: { mapSize: "small",  densityMultiplier: 1.0,  spreadChance: 0 },
   2: { mapSize: "small",  densityMultiplier: 1.75, spreadChance: 0 },
-  3: { mapSize: "medium", densityMultiplier: 1.0,  spreadChance: 0.25 },
-  4: { mapSize: "medium", densityMultiplier: 1.25, spreadChance: 0.45 },
-  5: { mapSize: "large",  densityMultiplier: 1.0,  spreadChance: 0.85 },
+  3: { mapSize: "medium", densityMultiplier: 1.0,  spreadChance: 0.15 },
+  4: { mapSize: "medium", densityMultiplier: 1.25, spreadChance: 0.25 },
+  5: { mapSize: "large",  densityMultiplier: 1.0,  spreadChance: 0.35 },
 };
 export const CITY_MOB_MAX_LEVEL = 5;
 

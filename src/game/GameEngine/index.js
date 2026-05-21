@@ -11,9 +11,11 @@ import { persistenceMethods } from "./methods/persistence.js";
 import { renderingMethods } from "./methods/rendering.js";
 import { inputMethods } from "./methods/input.js";
 import { snapshotMethods } from "./methods/snapshot.js";
+import { actionsMethods } from "./methods/actions.js";
 import { normalizeWorldState } from "../world-state.js";
 import { normalizeWorldEnergy } from "../world-energy.js";
 import { ParticleEngine } from "../particles/ParticleEngine.js";
+import { resolvePerformanceProfile } from "../config/performance-config.js";
 
 function applyMethodGroup(prototype, methods) {
   Object.defineProperties(prototype, Object.getOwnPropertyDescriptors(methods));
@@ -28,10 +30,18 @@ export class GameEngine {
     this.onSave = typeof options.onSave === "function" ? options.onSave : null;
     this.newGame = Boolean(options.newGame);
     this.deferAssetLoad = Boolean(options.deferAssetLoad);
+    const performanceProfile = resolvePerformanceProfile(options.performanceMode);
+    this.performanceMode = performanceProfile.id;
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
+    this.maxDpr = Math.max(1, Math.min(2, Number(options.maxDpr) || performanceProfile.maxDpr));
+    this.targetFps = Math.max(30, Math.min(60, Number(options.targetFps) || performanceProfile.targetFps));
+    this.fogRenderScale = Math.max(0.35, Math.min(1, Number(options.fogRenderScale) || performanceProfile.fogRenderScale));
     this.lastTime = performance.now();
+    this.fpsWindowTime = 0;
+    this.fpsWindowFrames = 0;
+    this.averageFps = 0;
     this.time = 0;
     this.frame = 0;
     this.raf = 0;
@@ -43,14 +53,15 @@ export class GameEngine {
     this.groundHazards = [];
     this.particles = [];
     this.particleEngine = new ParticleEngine({
-      maxParticles: options.maxParticles ?? 900,
-      quality: options.particleQuality ?? "high",
+      maxParticles: options.maxParticles ?? performanceProfile.maxParticles,
+      quality: options.particleQuality ?? performanceProfile.particleQuality,
       enabled: options.particlesEnabled !== false,
     });
     this.floaters = [];
     this.toasts = [];
     this.potionCooldown = 0;
     this.nearbyFoliageLoot = null;
+    this.nearbyActionTarget = null;
     this.fogExploredTiles = new Set();
     this.fogVisibleTiles = new Set();
     this.fogExploredPoints = [];
@@ -86,6 +97,7 @@ export class GameEngine {
     };
     this.worldState = normalizeWorldState();
     this.worldEnergy = normalizeWorldEnergy();
+    this.actionState = { completedActions: {}, objectStates: {} };
     if (!this.newGame) this.loadProgress();
     this.prepareRegionQuestgiver();
     this.regionStartPlayerLevel = this.player.level;
@@ -122,6 +134,7 @@ for (const methods of [
   persistenceMethods,
   renderingMethods,
   inputMethods,
+  actionsMethods,
   snapshotMethods,
 ]) {
   applyMethodGroup(GameEngine.prototype, methods);

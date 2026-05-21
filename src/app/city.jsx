@@ -509,15 +509,25 @@ function CityPage({
 
   const depositInventoryItemToStorage = (inventoryIndex, buildingId, sectionKey, slotIndex) => {
     const item = snapshotRef.current.inventory?.[inventoryIndex];
+    const liveItem = engineRef.current?.player?.inventory?.[inventoryIndex] ?? item;
+    if (!cityInventoryItemsSameTransferIdentity(item, liveItem)) {
+      engineRef.current?.addToast?.("Backpack ændrede sig. Prøv igen.");
+      return;
+    }
     const target = findStorageEntry(cityProgressRef.current, buildingId, sectionKey);
     if (!target || target.section.fixedDefs?.[slotIndex]) return;
-    if (slotIndex >= target.section.slots || !itemMatchesCityInventorySlot(item, target.section, slotIndex)) return;
+    if (slotIndex >= target.section.slots || !itemMatchesCityInventorySlot(liveItem, target.section, slotIndex)) return;
     const inventories = normalizeCityInventories(target.state, target.building);
-    const depositPlan = planCityInventoryDeposit(item, target.section, slotIndex, inventories[sectionKey] ?? []);
+    const depositPlan = planCityInventoryDeposit(liveItem, target.section, slotIndex, inventories[sectionKey] ?? []);
     if (!depositPlan || depositPlan.movedCount <= 0) return;
     const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, depositPlan.movedCount)
       ?? engineRef.current?.takeInventoryItem?.(inventoryIndex);
     if (!taken) return;
+    if (!cityInventoryItemsSameTransferIdentity(liveItem, taken)) {
+      engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(taken));
+      engineRef.current?.addToast?.("Storage transfer blev afbrudt.");
+      return;
+    }
     setCityProgress((current) => {
       const currentTarget = findStorageEntry(current, buildingId, sectionKey);
       if (!currentTarget) return current;
@@ -542,7 +552,7 @@ function CityPage({
     if (!source || source.section.fixedDefs?.[slotIndex]) return;
     const inventories = normalizeCityInventories(source.state, source.building);
     const item = inventories[sectionKey]?.[slotIndex];
-    if (!item || !engineRef.current?.returnInventoryItem?.(item)) return;
+    if (!item || !engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(item))) return;
     setCityProgress((current) => {
       const currentSource = findStorageEntry(current, buildingId, sectionKey);
       if (!currentSource) return current;
@@ -2015,18 +2025,28 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const depositInventoryItem = (inventoryIndex, sectionKey, slotIndex, confirmed = false) => {
     if (!owned) return;
     const item = snapshot.inventory?.[inventoryIndex];
+    const liveItem = engineRef.current?.player?.inventory?.[inventoryIndex] ?? item;
+    if (!cityInventoryItemsSameTransferIdentity(item, liveItem)) {
+      engineRef.current?.addToast?.("Backpack ændrede sig. Prøv igen.");
+      return;
+    }
     const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
-    if (!section || slotIndex >= section.slots || !itemMatchesCityInventorySlot(item, section, slotIndex)) return;
+    if (!section || slotIndex >= section.slots || !itemMatchesCityInventorySlot(liveItem, section, slotIndex)) return;
     if (section.fixedDefs?.[slotIndex] && !confirmed) {
-      setConfirmStoreItem({ inventoryIndex, sectionKey, slotIndex, itemName: item.name });
+      setConfirmStoreItem({ inventoryIndex, sectionKey, slotIndex, itemName: liveItem.name });
       return;
     }
     const inventories = normalizeCityInventories(buildingState, building);
-    const depositPlan = planCityInventoryDeposit(item, section, slotIndex, inventories[sectionKey] ?? []);
+    const depositPlan = planCityInventoryDeposit(liveItem, section, slotIndex, inventories[sectionKey] ?? []);
     if (!depositPlan || depositPlan.movedCount <= 0) return;
     const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, depositPlan.movedCount)
       ?? engineRef.current?.takeInventoryItem?.(inventoryIndex);
     if (!taken) return;
+    if (!cityInventoryItemsSameTransferIdentity(liveItem, taken)) {
+      engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(taken));
+      engineRef.current?.addToast?.("Storage transfer blev afbrudt.");
+      return;
+    }
     if (section.fixedDefs?.[slotIndex]) {
       const xp = Math.max(0, Math.floor(Number(taken.readableXp ?? READABLE_DEF_BY_ID[taken.readableId]?.xp) || 0));
       if (xp > 0) engineRef.current?.awardXp?.(xp, taken.name);
@@ -2059,7 +2079,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const inventories = normalizeCityInventories(buildingState, building);
     const item = inventories[sectionKey]?.[slotIndex];
     if (!item) return;
-    if (!engineRef.current?.returnInventoryItem?.(item)) return;
+    if (!engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(item))) return;
     onChangeProgress((current) => {
       const state = current[building.id] ?? {};
       const currentBuildingState = getCityBuildingState(current, building);
@@ -2083,27 +2103,61 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     if (!owned) return;
     const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
     if (!section || section.fixedDefs?.length) return; // Don't transfer if section has fixed slots
-    const resources = (snapshot.inventory ?? [])
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => isResourceItem(item))
-      .sort((a, b) => (a.item.resourceId ?? "").localeCompare(b.item.resourceId ?? ""));
-    let transferred = 0;
-    for (const { item, index } of resources) {
-      if (transferred >= (snapshot.inventory ?? []).length) break;
-      const remainingAttempts = 10;
-      for (let attempt = 0; attempt < remainingAttempts; attempt++) {
-        const currentItem = snapshot.inventory?.[index];
-        if (!currentItem) break;
-        const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
-        if (!section) break;
-        const inventories = normalizeCityInventories(buildingState, building);
-        const slotIndex = firstCityInventorySlotForItem(currentItem, section, inventories[sectionKey] ?? []);
-        if (slotIndex < 0) break;
-        depositInventoryItem(index, sectionKey, slotIndex, true);
-        transferred += 1;
+    const nextInventories = normalizeCityInventories(buildingState, building);
+    const items = [...(nextInventories[sectionKey] ?? [])];
+    let transferredStacks = 0;
+    let transferredCount = 0;
+    const maxMoves = Math.max(1, (engineRef.current?.player?.inventory?.length ?? snapshot.inventory?.length ?? 0) * 2);
+
+    for (let move = 0; move < maxMoves; move += 1) {
+      const liveResources = (engineRef.current?.player?.inventory ?? [])
+        .map((item, index) => ({ item, index }))
+        .filter(({ item }) => isResourceItem(item))
+        .sort((a, b) => String(a.item.resourceId ?? "").localeCompare(String(b.item.resourceId ?? "")));
+      let movedThisPass = false;
+
+      for (const { item, index } of liveResources) {
+        const slotIndex = firstCityInventorySlotForItem(item, section, items);
+        if (slotIndex < 0) continue;
+        const depositPlan = planCityInventoryDeposit(item, section, slotIndex, items);
+        if (!depositPlan || depositPlan.movedCount <= 0) continue;
+        const taken = engineRef.current?.takeInventoryItemCount?.(index, depositPlan.movedCount)
+          ?? engineRef.current?.takeInventoryItem?.(index);
+        if (!taken) continue;
+        if (!cityInventoryItemsSameTransferIdentity(item, taken)) {
+          engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(taken));
+          engineRef.current?.addToast?.("Storage transfer blev afbrudt.");
+          movedThisPass = false;
+          break;
+        }
+        applyCityInventoryDepositPlan(items, taken, depositPlan);
+        transferredStacks += 1;
+        transferredCount += depositPlan.movedCount;
+        movedThisPass = true;
+        break;
       }
+
+      if (!movedThisPass) break;
     }
-    if (transferred > 0) engineRef.current?.addToast?.(`Overførte ${transferred} resource item til ${section.label}`);
+
+    if (transferredStacks > 0) {
+      onChangeProgress((current) => {
+        const state = current[building.id] ?? {};
+        const currentBuildingState = getCityBuildingState(current, building);
+        const currentInventories = normalizeCityInventories(currentBuildingState, building);
+        return {
+          ...current,
+          [building.id]: {
+            ...state,
+            inventories: {
+              ...currentInventories,
+              [sectionKey]: items,
+            },
+          },
+        };
+      });
+      engineRef.current?.addToast?.(`Overforte ${transferredCount} resources til ${section.label}`);
+    }
   };
 
   const repairBuilding = (percent = null) => {
@@ -2751,8 +2805,17 @@ function normalizeCityInventories(state, building) {
   const next = { ...source };
   if (!next.base && Array.isArray(state?.items)) next.base = state.items;
   for (const section of cityInventorySections(building, state, true)) {
-    next[section.key] = Array.from({ length: section.slots }, (_, index) => next[section.key]?.[index] ?? null);
+    next[section.key] = Array.from({ length: section.slots }, (_, index) => normalizeCityStoredItem(next[section.key]?.[index] ?? null));
   }
+  return next;
+}
+
+function normalizeCityStoredItem(item) {
+  if (!item) return null;
+  if (isResourceItem(item) || isPotionItem(item)) return item;
+  if (item.count === undefined) return item;
+  const next = { ...item };
+  delete next.count;
   return next;
 }
 
@@ -2825,6 +2888,23 @@ function cityInventoryItemsCanStack(incoming, target) {
   return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
 }
 
+function cityInventoryItemsSameTransferIdentity(expected, actual) {
+  if (!expected || !actual) return false;
+  if (isResourceItem(expected) || isResourceItem(actual)) {
+    return isResourceItem(expected)
+      && isResourceItem(actual)
+      && String(expected.resourceId ?? "") === String(actual.resourceId ?? "");
+  }
+  const expectedId = expected.id ?? expected.itemId;
+  const actualId = actual.id ?? actual.itemId;
+  if (expectedId !== undefined || actualId !== undefined) {
+    return String(expectedId ?? "") === String(actualId ?? "");
+  }
+  return String(expected.mode ?? "") === String(actual.mode ?? "")
+    && String(expected.slot ?? "") === String(actual.slot ?? "")
+    && String(expected.name ?? "") === String(actual.name ?? "");
+}
+
 function planCityInventoryDeposit(item, section, slotIndex, storedItems = []) {
   if (!item || !section) return null;
   const target = storedItems[slotIndex] ?? null;
@@ -2882,7 +2962,13 @@ function applyCityInventoryDepositPlan(items, item, plan) {
       const current = Math.max(1, Math.floor(Number(target.count) || 1));
       items[step.slotIndex] = { ...target, count: current + moved };
     } else {
-      items[step.slotIndex] = { ...item, count: moved };
+      const placed = { ...item };
+      if (isResourceItem(placed) || isPotionItem(placed)) {
+        placed.count = moved;
+      } else {
+        delete placed.count;
+      }
+      items[step.slotIndex] = placed;
     }
     remaining -= moved;
   }

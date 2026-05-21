@@ -1311,6 +1311,8 @@ function normalizeObjectSprite(sprite) {
   canvas.height = sprite.height + padTop + padBottom;
   const ctx = canvas.getContext("2d");
   ctx.drawImage(sprite, padX, padTop);
+  if (Number.isFinite(Number(sprite.sourceCropX))) canvas.sourceCropX = Number(sprite.sourceCropX) - padX;
+  if (Number.isFinite(Number(sprite.sourceCropY))) canvas.sourceCropY = Number(sprite.sourceCropY) - padTop;
   return canvas;
 }
 

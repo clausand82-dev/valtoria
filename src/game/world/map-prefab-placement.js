@@ -298,6 +298,7 @@ function addLegendEntry(result, entry, x, y) {
       spawnAvoidRadius: entry.spawnAvoidRadius,
       foregroundFade: entry.foregroundFade,
       foregroundFadeAlpha: entry.foregroundFadeAlpha,
+      actionId: entry.actionId,
     });
   }
   if (entry.foliage) {

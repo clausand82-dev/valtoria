@@ -4,6 +4,7 @@ import {
   clamp,
   POPULARITY_CONFIG,
   QUEST_NPCS,
+  READABLE_DEF_BY_ID,
   SPELL_DEFS,
   isReadableItem,
   isResourceItem
@@ -27,6 +28,14 @@ function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
   const ids = [...Object.keys(recipe?.inputs ?? {}), recipe?.output].map(String);
   return ids.some((id) => id === "diamond" || id.includes("gemstone"));
+}
+
+function snapshotIconUrl(item) {
+  if (isReadableItem(item)) {
+    const def = READABLE_DEF_BY_ID[item.readableId];
+    if (def?.iconUrl) return def.iconUrl;
+  }
+  return item.iconUrl;
 }
 
 export const snapshotMethods = {
@@ -107,6 +116,7 @@ export const snapshotMethods = {
         label: this.nearbyFoliageLoot.label,
         resources: this.nearbyFoliageLoot.resources.map((entry) => ({ ...entry })),
       } : null,
+      nearbyActionTarget: this.nearbyActionTarget ? { ...this.nearbyActionTarget } : null,
       inventory: this.player.inventory.map((item, index) => {
         const resourceMergeRecipe = isResourceItem(item)
           ? resourceMergeRecipeFor(item, this.player.inventory)
@@ -119,6 +129,7 @@ export const snapshotMethods = {
           value: item.value ?? itemValue(item),
           iconIndex: itemIconIndex(item),
           iconSheet: itemIconSheet(item),
+          iconUrl: snapshotIconUrl(item),
           index,
           mergeCount: 0,
           canMerge: isResourceItem(item)
@@ -134,7 +145,7 @@ export const snapshotMethods = {
         const item = this.player.equipment[slot.id];
         return {
           ...slot,
-          item: item ? { ...item, summary: this.itemSummary(item), iconIndex: itemIconIndex(item), iconSheet: itemIconSheet(item) } : null,
+          item: item ? { ...item, summary: this.itemSummary(item), iconIndex: itemIconIndex(item), iconSheet: itemIconSheet(item), iconUrl: snapshotIconUrl(item) } : null,
         };
       }),
       autoLoot: normalizeAutoLootRules(this.player.autoLoot),

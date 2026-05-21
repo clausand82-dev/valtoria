@@ -9,6 +9,12 @@ Ting at få gjort
 - critters (SE CHATGPT)
 
 - fix icebear, bear and lion animation
+- fix en af village - og nogle har stadig dårlig walk cycle
+
+
+Et par eksempler på actions:
+En sten, som kan dukke op alle steder, hvor der er sten, chancen for det sker er på 10% - stenens action er at heale spiller 100%. Stenen skal have en aura lavet med partikler
+
 
 - erstatte animeret chest med et single frame et, og så brug E ved det - så kan E blive til:
 interaction: {

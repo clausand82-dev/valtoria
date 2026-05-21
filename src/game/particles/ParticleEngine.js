@@ -1,5 +1,5 @@
 import { createId } from "../world.js";
-import { clamp, screenToWorld, visibleScreenPoint, worldToScreen } from "../iso.js";
+import { clamp, screenDirectionToWorld, screenToWorld, visibleScreenPoint, worldToScreen } from "../iso.js";
 import { ParticleEmitter } from "./ParticleEmitter.js";
 import { ParticlePool } from "./ParticlePool.js";
 import { applyParticleMovement } from "./particleMovement.js";
@@ -210,8 +210,8 @@ export class ParticleEngine {
       screenY: point.screenY,
       anchorX: anchor?.x ?? point.x,
       anchorY: anchor?.y ?? point.y,
-      vx: Math.cos(angle) * speed + (c.wind || 0),
-      vy: Math.sin(angle) * speed + (c.movement === "fall" ? speed : 0),
+      vx: Math.cos(angle) * speed * c.velocityScale + (c.wind || 0),
+      vy: Math.sin(angle) * speed * c.velocityScale + (c.movement === "fall" ? speed : 0),
       vz: c.movement === "burst" || c.movement === "spark" ? Math.sin(angle) * speed * 0.8 : speed,
       speed,
       gravity: c.gravity,
@@ -258,6 +258,18 @@ export class ParticleEngine {
       return { x: world.x, y: world.y, z: config.offsetY };
     }
     const base = anchor ?? { x: Number(config.x) || 0, y: Number(config.y) || 0 };
+    const screenOffsetX = Number(config.screenOffsetX);
+    const screenOffsetY = Number(config.screenOffsetY);
+    if (Number.isFinite(screenOffsetX) || Number.isFinite(screenOffsetY)) {
+      const screenDelta = screenDirectionToWorld(Number.isFinite(screenOffsetX) ? screenOffsetX : 0, 0);
+      const angle = Math.random() * Math.PI * 2;
+      const r = config.area === "point" ? Math.random() * config.radius : Math.sqrt(Math.random()) * config.radius;
+      return {
+        x: base.x + screenDelta.x + Math.cos(angle) * r / 48,
+        y: base.y + screenDelta.y + Math.sin(angle) * r / 48,
+        z: -(Number.isFinite(screenOffsetY) ? screenOffsetY : 0) + Math.random() * 8,
+      };
+    }
     const angle = Math.random() * Math.PI * 2;
     const r = config.area === "point" ? Math.random() * config.radius : Math.sqrt(Math.random()) * config.radius;
     const x = base.x + config.offsetX / 48 + Math.cos(angle) * r / 48;
@@ -279,6 +291,7 @@ export class ParticleEngine {
     const id = config.followTarget ?? config.entityId ?? config.projectileId;
     if (!id) return null;
     if (config.attachTo === "projectile" || config.projectileId) return context.projectiles?.find((entry) => entry.id === id) ?? null;
+    if (config.attachTo === "object") return context.objectById?.get?.(id) ?? context.nearbyObjects?.().find((entry) => entry.id === id) ?? null;
     if (context.player?.id === id) return context.player;
     return context.monsters?.get?.(id) ?? context.nearbyMonsters?.().find((entry) => entry.id === id) ?? null;
   }

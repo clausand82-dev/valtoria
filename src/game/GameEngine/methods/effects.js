@@ -8,6 +8,8 @@ import {
   visibleScreenPoint,
   worldToScreen,
 } from "../dependencies.js";
+import { REGION_OBJECT_DEFS } from "../../config/region-object-config.js";
+import { resolveAttachedObjectParticleConfigs } from "../../objects/object-attached-effects.js";
 
 const CONFIG_PARTICLE_MAX = 420;
 const WEATHER_PARTICLE_MAX = 320;
@@ -16,6 +18,7 @@ const AMBIENT_PARTICLE_INTERVAL = 0.1;
 const WEATHER_PARTICLE_INTERVAL = 0.05;
 
 function particleContext(engine) {
+  const nearbyObjects = engine.nearbyChunks(2).flatMap((chunk) => chunk.objects ?? []);
   return {
     width: engine.width,
     height: engine.height,
@@ -24,6 +27,8 @@ function particleContext(engine) {
     projectiles: engine.projectiles,
     monsters: engine.monsters,
     nearbyMonsters: () => engine.nearbyMonsters(2),
+    nearbyObjects: () => nearbyObjects,
+    objectById: new Map(nearbyObjects.map((object) => [object.id, object])),
     fogPointAlpha: (point) => engine.fogPointAlpha(point),
   };
 }
@@ -60,6 +65,74 @@ function isAnchorVisible(engine, anchor, config, pad = 180) {
   if (!config.onlyWhenOnScreen) return true;
   const screen = resolveAnchorScreen(anchor, config.heightOffset, engine.camera);
   return visibleScreenPoint(screen, engine.width, engine.height, pad + config.radius);
+}
+
+function ensureRuntimeAttachedObjectEffects(object) {
+  if (object.__attachedEffectsResolved) return;
+  object.__attachedEffectsResolved = true;
+  const objectDef = REGION_OBJECT_DEFS[object.objectDefId] ?? REGION_OBJECT_DEFS[object.type];
+  if (!objectDef?.attachedEffects?.length) return;
+  const existing = object.particles ?? [];
+  const hasAttached = existing.some((particle) => particle?.attachedEffectId);
+  if (hasAttached) return;
+  const attached = resolveAttachedObjectParticleConfigs({
+    objectDef,
+    runtimeObject: object,
+    regionObjectConfig: object,
+  });
+  if (!attached.length) return;
+  object.particles = [...existing, ...attached];
+}
+
+function getSheetObjectBaseScale(type) {
+  return type === "building" ? 0.58
+    : type === "ruin" ? 0.54
+      : type === "crystal" ? 0.46
+        : type === "chest" ? 0.28
+          : type === "firebeacon" ? 0.44
+            : 0.4;
+}
+
+function objectSheetFor(engine, object) {
+  const sheetsByBiome = engine.atlas?.objectSheets?.[object.type];
+  return sheetsByBiome?.[object.renderBiomeId]
+    ?? sheetsByBiome?.default
+    ?? sheetsByBiome?.mainland
+    ?? null;
+}
+
+function refinedAttachedParticleConfig(engine, object, config) {
+  if (!config?.attachedEffectId) return config;
+  const sheet = objectSheetFor(engine, object);
+  const cells = sheet?.cells;
+  if (!cells?.length) return config;
+  const frameIndex = Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length;
+  const sprite = cells[frameIndex]?.sprite;
+  if (!sprite) return config;
+  const sourceX = Number(config.socketSourceX);
+  const sourceY = Number(config.socketSourceY);
+  const cropX = Number(sprite.sourceCropX);
+  const cropY = Number(sprite.sourceCropY);
+  if (!Number.isFinite(sourceX) || !Number.isFinite(sourceY) || !Number.isFinite(cropX) || !Number.isFinite(cropY)) return config;
+
+  const scale = getSheetObjectBaseScale(object.type)
+    * (Number(object.size) || 1)
+    * (Number(object.visualScale) || 1)
+    * (Number(sheet.renderScale) || 1);
+  const frameOffset = sheet.frameOffsets?.[frameIndex] ?? { x: 0, y: 0 };
+  const width = sprite.width * scale;
+  const height = sprite.height * scale;
+  const localX = sourceX - cropX;
+  const localY = sourceY - cropY;
+  const drawX = -width * 0.5 + (Number(frameOffset.x) || 0) * scale;
+  const drawY = -height + 24 * scale + (Number(frameOffset.y) || 0) * scale;
+  const screenOffsetX = drawX + localX * scale;
+  const screenOffsetY = 12 + drawY + localY * scale;
+  return {
+    ...config,
+    screenOffsetX: object.flip ? -screenOffsetX : screenOffsetX,
+    screenOffsetY,
+  };
 }
 
 function getParticleTarget(source, config, key) {
@@ -412,8 +485,11 @@ export const effectsMethods = {
   },
 
   spawnAttachedConfiguredParticles() {
+    const nearbyObjectIds = new Set();
     for (const chunk of this.nearbyChunks(2)) {
       for (const object of chunk.objects) {
+        nearbyObjectIds.add(object.id);
+        ensureRuntimeAttachedObjectEffects(object);
         const configs = object.particles ?? [];
         if (!configs.length || this.fogPointAlpha(object) <= 0.02) continue;
         for (let index = 0; index < configs.length; index += 1) {
@@ -421,15 +497,16 @@ export const effectsMethods = {
           if (!isAnchorVisible(this, object, config)) continue;
           const key = particleKey(object.id, index);
           object.__particleEmitterIds ??= {};
-          if (object.__particleEmitterIds[key]) continue;
+          if (object.__particleEmitterIds[key] && this.particleEngine?.emitters.has(object.__particleEmitterIds[key])) continue;
+          const emitterConfig = refinedAttachedParticleConfig(this, object, config);
           object.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
-            ...config,
+            ...emitterConfig,
             x: object.x,
             y: object.y,
             followTarget: object.id,
             attachTo: "object",
-            layer: config.layer ?? config.renderLayer ?? "aboveObjects",
-            maxParticles: config.maxParticles ?? Math.max(4, randomIntInRange(config.count) || 8),
+            layer: emitterConfig.layer ?? emitterConfig.renderLayer ?? "aboveObjects",
+            maxParticles: emitterConfig.maxParticles ?? Math.max(4, randomIntInRange(emitterConfig.count) || 8),
           }, object);
         }
       }
@@ -442,7 +519,7 @@ export const effectsMethods = {
           if (!isAnchorVisible(this, decal, config, 140)) continue;
           const key = particleKey(decal.id, index);
           decal.__particleEmitterIds ??= {};
-          if (decal.__particleEmitterIds[key]) continue;
+          if (decal.__particleEmitterIds[key] && this.particleEngine?.emitters.has(decal.__particleEmitterIds[key])) continue;
           decal.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
             ...config,
             x: decal.x,
@@ -455,6 +532,11 @@ export const effectsMethods = {
         }
       }
     }
+    this.particleEngine?.removeEmittersWhere((emitter) => (
+      emitter.config?.attachTo === "object"
+      && emitter.config?.followTarget
+      && !nearbyObjectIds.has(emitter.config.followTarget)
+    ));
   },
 
   updateAmbient(dt) {
@@ -479,11 +561,45 @@ export const effectsMethods = {
   },
 
   particleDebugStats() {
+    let nearbyHouses = 0;
+    let housesWithAttachedConfigs = 0;
+    let attachedConfigs = 0;
+    for (const chunk of this.nearbyChunks(2)) {
+      for (const object of chunk.objects ?? []) {
+        if (object.type !== "object_house_mainland") continue;
+        nearbyHouses += 1;
+        ensureRuntimeAttachedObjectEffects(object);
+        const count = (object.particles ?? []).filter((particle) => particle?.attachedEffectId).length;
+        if (count > 0) housesWithAttachedConfigs += 1;
+        attachedConfigs += count;
+      }
+    }
+    let attachedEmitters = 0;
+    for (const emitter of this.particleEngine?.emitters.values?.() ?? []) {
+      if (emitter.config?.attachedEffectId) attachedEmitters += 1;
+    }
+    let attachedParticles = 0;
+    for (const particle of this.particleEngine?.particles ?? []) {
+      const emitter = this.particleEngine?.emitters.get(particle.emitterId);
+      if (emitter?.config?.attachedEffectId) attachedParticles += 1;
+    }
     return {
       enabled: this.particleEngine?.enabled ?? false,
+      performanceMode: this.performanceMode ?? "balanced",
       quality: this.particleEngine?.quality ?? "high",
+      fps: this.lastFrameDt > 0 ? Math.round(1 / this.lastFrameDt) : 0,
+      averageFps: this.averageFps ?? 0,
+      targetFps: this.targetFps ?? 60,
+      dpr: this.dpr ?? 1,
+      fogRenderScale: this.fogRenderScale ?? 1,
+      fogExploredPoints: this.fogExploredPoints?.length ?? 0,
       emitters: this.particleEngine?.emitters.size ?? 0,
       particles: this.particleEngine?.particles.length ?? 0,
+      nearbyHouses,
+      housesWithAttachedConfigs,
+      attachedConfigs,
+      attachedEmitters,
+      attachedParticles,
     };
   },
 

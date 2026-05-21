@@ -28,6 +28,7 @@ import {
   placeRegionPrefabs,
   prefabInstancesForChunk,
 } from "./world/map-prefab-placement.js";
+import { resolveAttachedObjectParticleConfigs } from "./objects/object-attached-effects.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
@@ -699,6 +700,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         renderBiomeId: entry.renderBiomeId,
         graphicsRef: entry.graphicsRef,
         particles: entry.particles.map((particle) => ({ ...particle })),
+        effects: entry.effects ? { ...entry.effects } : null,
         depthMode: entry.depthMode,
         sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : null,
         depthOffset: entry.depthOffset,
@@ -711,6 +713,8 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         foregroundFade: entry.foregroundFade,
         foregroundFadeAlpha: entry.foregroundFadeAlpha,
         destroyRewards: entry.destroyRewards ? { ...entry.destroyRewards } : null,
+        actionId: entry.actionId ?? null,
+        defaultActionId: entry.defaultActionId ?? null,
       })),
       decaySets: normalizedDecaySets.map((set) => ({
         id: set.id,
@@ -1073,6 +1077,34 @@ function objectSpawnMetadataFromDef(def) {
   };
 }
 
+function objectGraphicsVariantInfo(def, variant) {
+  const graphics = def?.graphics ?? {};
+  const files = (Array.isArray(graphics.files) ? graphics.files : [graphics.fileName])
+    .map((file) => String(file ?? "").trim())
+    .filter(Boolean);
+  const rows = Math.max(1, Math.floor(Number(graphics.rows) || 4));
+  const cols = Math.max(1, Math.floor(Number(graphics.cols) || 4));
+  const frameCount = Math.max(1, Math.floor(Number(graphics.frameCount) || rows * cols));
+  const index = Math.max(0, Math.floor(Number(variant) || 0));
+  return {
+    graphicsFileName: files.length ? files[Math.floor(index / frameCount) % files.length] : null,
+    frameIndex: index % frameCount,
+  };
+}
+
+function runtimeObjectParticles(def, runtimeObject, regionObjectConfig, rand) {
+  const legacyParticles = rollParticleConfigs(
+    normalizeParticleConfigs(regionObjectConfig?.particles ?? def?.particles),
+    rand,
+  );
+  const attachedParticles = resolveAttachedObjectParticleConfigs({
+    objectDef: def,
+    runtimeObject,
+    regionObjectConfig,
+  });
+  return [...legacyParticles, ...attachedParticles];
+}
+
 function objectAvoidsSpawnZone(object, producer) {
   const avoidTags = Array.isArray(object?.avoidSpawnTags) ? object.avoidSpawnTags : [];
   const producerTags = Array.isArray(producer?.spawnTags) ? producer.spawnTags : [];
@@ -1131,8 +1163,14 @@ function addPrefabObjects(chunk, instance) {
     if (Number.isFinite(Number(item.foregroundFadeAlpha))) {
       spawnMetadata.foregroundFadeAlpha = Math.min(1, Math.max(0.1, Number(item.foregroundFadeAlpha)));
     }
-    chunk.objects.push({
+    const treeVariant = Number.isFinite(Number(item.variant))
+      ? Math.max(0, Math.floor(Number(item.variant)))
+      : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type))));
+    const variantInfo = objectGraphicsVariantInfo(def, treeVariant);
+    const runtimeObject = {
       id: createId(),
+      runtimeId: `${chunk.region?.id ?? "region"}:prefab:${instance.instanceId}:object:${i}:${item.id}`,
+      objectDefId: item.id,
       type,
       x,
       y,
@@ -1141,25 +1179,29 @@ function addPrefabObjects(chunk, instance) {
       rotation: (Number(item.rotation) || 0) + (instance.rotation * Math.PI) / 180,
       colorShift: rand01(chunk.cx, chunk.cy, 7900 + i),
       flip: instance.mirrored,
-      treeVariant: Number.isFinite(Number(item.variant))
-        ? Math.max(0, Math.floor(Number(item.variant)))
-        : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type)))),
+      treeVariant,
+      ...variantInfo,
       animSeed: rand01(chunk.cx, chunk.cy, 7920 + i) * Math.PI * 2,
       visualScale: Number(item.visualScale) || 1,
       blocking: item.blocking !== false,
       destructible: effectiveDestructible,
       renderBiomeId: def.renderBiomeId ?? null,
       graphicsRef: def.graphicsRef ?? null,
-      particles: rollParticleConfigs(normalizeParticleConfigs(def.particles), () => rand01(chunk.cx, chunk.cy, 7930 + i)),
+      particles: [],
+      effects: item.effects && typeof item.effects === "object" ? { ...item.effects } : null,
       depthMode: def.depthMode ?? "dynamic",
       sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
       ...spawnMetadata,
       destroyRewards: item.destroyRewards ? { ...item.destroyRewards } : def.destroyRewards ? { ...def.destroyRewards } : null,
+      actionId: item.actionId ? String(item.actionId) : null,
+      defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
       ...damageState,
       prefabId: instance.id,
       prefabInstanceId: instance.instanceId,
-    });
+    };
+    runtimeObject.particles = runtimeObjectParticles(def, runtimeObject, item, () => rand01(chunk.cx, chunk.cy, 7930 + i));
+    chunk.objects.push(runtimeObject);
   }
 }
 
@@ -1455,8 +1497,13 @@ function addObjects(chunk, safeChunk) {
       visualScale = 1; // Default: no variation, normal size
     }
     
-    chunk.objects.push({
+    const treeVariant = Math.floor(rand01(chunk.cx, chunk.cy, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16)));
+    const selectedDef = REGION_OBJECT_DEFS[selectedEntry?.id] ?? null;
+    const variantInfo = objectGraphicsVariantInfo(selectedDef, treeVariant);
+    const runtimeObject = {
       id: createId(),
+      runtimeId: `${chunk.region?.id ?? "region"}:chunk:${chunk.cx},${chunk.cy}:object:${i}:${selectedEntry?.id ?? type}:${x.toFixed(2)},${y.toFixed(2)}`,
+      objectDefId: selectedEntry?.id ?? null,
       type,
       x,
       y,
@@ -1465,14 +1512,16 @@ function addObjects(chunk, safeChunk) {
       rotation: rand01(chunk.cx, chunk.cy, 400 + i) * Math.PI * 2,
       colorShift: rand01(chunk.cx, chunk.cy, 500 + i),
       flip: rand01(chunk.cx, chunk.cy, 530 + i) > 0.5,
-      treeVariant: Math.floor(rand01(chunk.cx, chunk.cy, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16))),
+      treeVariant,
+      ...variantInfo,
       animSeed: rand01(chunk.cx, chunk.cy, 560 + i) * Math.PI * 2,
       visualScale,
       blocking: true,
       destructible: effectiveDestructible,
       renderBiomeId: selectedEntry?.renderBiomeId ?? null,
       graphicsRef: selectedEntry?.graphicsRef ?? null,
-      particles: rollParticleConfigs(selectedEntry?.particles, () => rand01(chunk.cx, chunk.cy, 7600 + i)),
+      particles: [],
+      effects: selectedEntry?.effects ? { ...selectedEntry.effects } : null,
       depthMode: selectedEntry?.depthMode ?? "dynamic",
       sortAnchor: selectedEntry?.sortAnchor ? { ...selectedEntry.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(selectedEntry?.depthOffset)) ? Number(selectedEntry.depthOffset) : 0,
@@ -1482,9 +1531,13 @@ function addObjects(chunk, safeChunk) {
       foregroundFade: Boolean(selectedEntry?.foregroundFade),
       foregroundFadeAlpha: selectedEntry?.foregroundFadeAlpha,
       destroyRewards: selectedEntry?.destroyRewards ? { ...selectedEntry.destroyRewards } : null,
+      actionId: selectedEntry?.actionId ? String(selectedEntry.actionId) : null,
+      defaultActionId: selectedEntry?.defaultActionId ? String(selectedEntry.defaultActionId) : null,
       // TODO: Support occluder metadata here for future pixel/shape masking.
       ...damageState,
-    });
+    };
+    runtimeObject.particles = runtimeObjectParticles(selectedDef, runtimeObject, selectedEntry, () => rand01(chunk.cx, chunk.cy, 7600 + i));
+    chunk.objects.push(runtimeObject);
   }
 
   applySpawnAvoidance(chunk);

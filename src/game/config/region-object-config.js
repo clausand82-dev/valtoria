@@ -1,4 +1,5 @@
 import { normalizeParticleConfigs } from "./particle-presets.js";
+import { OBJECT_SOCKET_CONFIG } from "./object-sockets-config.js";
 
 // TODO:DELETE - TREE_OBJECT_BY_BIOME is only used by legacyRegionObjectsFromWeights. All regions now use explicit objects: arrays.
 // const TREE_OBJECT_BY_BIOME = {
@@ -28,6 +29,7 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - destroyRewards: Optional raw world energy rewards when this object is destroyed.
   Example: destroyRewards: { lydra: 1, netdra: 0.1 }
   Region overrides in map-region-config.js can also set destroyRewards per object spawn entry.
+- defaultActionId: Optional fallback action id for objects spawned from this definition.
 - spawnDamage: Optional start damage state: "all", "damaged", "destroyed",
   or "damaged_destroyed". Omit for current behavior: spawn undamaged.
 - spawnTags/spawnAvoidRadius: Optional spawn influence metadata, e.g. canopy zones.
@@ -48,6 +50,13 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - particles: Optional visual-only particle effects attached to placed objects,
   for example smoke, embers, flies, spores, or magical glow. particles.type
   must match PARTICLE_PRESETS in particle-presets.js.
+- sockets: Socket definitions from object-sockets-config.js. Sheet-space x/y
+  are Photoshop coordinates on the whole sheet and are converted to frame-local
+  coordinates at runtime. Missing sockets are valid and skip effects.
+- attachedEffects: Particle or visual effects that attach to named sockets.
+  Use socket for one exact match or socketPrefix for groups like lanternA/B.
+  Region objects can override only enable/settings with effects:
+  { chimneySmoke: false, lanternGlow: true, windowGlow: { enabled: true, onlyAtNight: true } }.
 
 How to tell old vs new system here:
 - New defs-driven sheet path: spawnTypes has exactly one type starting with
@@ -250,16 +259,56 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphics: {
-    mode: "sheet",
-    files: [
-      "object/object_house_normal_1.png",
-      "object/object_house_normal_2.png",
-      "object/object_house_normal_3.png",
+      mode: "sheet",
+      files: [
+        "object/object_house_normal_1.png",
+        //"object/object_house_normal_2.png",
+        //"object/object_house_normal_3.png",
+      ],
+      rows: 4,
+      cols: 4,
+      renderScale: 2,
+    },
+    sockets: OBJECT_SOCKET_CONFIG.object_house_mainland,
+    attachedEffects: [
+      {
+        id: "chimneySmoke",
+        type: "particle",
+        preset: "chimney_smoke",
+        socket: "chimney",
+        offset: { x: 0, y: -4 },
+        enabledByDefault: true,
+      },
+      {
+        id: "lanternGlow",
+        type: "particle",
+        preset: "lantern_glow",
+        socketPrefix: "lantern",
+        enabledByDefault: true,
+      },
+      {
+        id: "windowGlow",
+        type: "particle",
+        preset: "window_glow",
+        socketPrefix: "windowGlow",
+        enabledByDefault: true,
+      },
+      {
+        id: "fireplaceGlow",
+        type: "particle",
+        preset: "fireplace_glow",
+        socket: "fireplace",
+        enabledByDefault: true,
+      },
+      {
+        id: "fireplaceSmoke",
+        type: "particle",
+        preset: "fireplace_smoke",
+        socket: "fireplace",
+        offset: { x: 0, y: -6 },
+        enabledByDefault: false,
+      },
     ],
-    rows: 4,
-    cols: 4,
-    renderScale: 2,
-},
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.94 },
   },
@@ -911,7 +960,7 @@ export function getRegionObjectFamily(type) {
   if (spawnTypes.some((entry) => String(entry?.type ?? "").startsWith("object_tree_"))) return "tree";
   if (spawnTypes.some((entry) => entry?.type === "object_stone_cluster")) return "stone";
   if (spawnTypes.some((entry) => entry?.type === "object_house_mainland")) return "building";
-  if (spawnTypes.some((entry) => entry?.type === "object_ruin_mainland")) return "ruin";
+  if (spawnTypes.some((entry) => String(entry?.type ?? "").startsWith("object_ruin_"))) return "ruin";
   if (spawnTypes.some((entry) => entry?.type === "object_pillar_stone")) return "pillar";
   if (spawnTypes.some((entry) => entry?.type === "object_fireplace_mainland")) return "fireplace";
   if (spawnTypes.some((entry) => entry?.type === "object_firebeacon_snow")) return "firebeacon";
@@ -958,6 +1007,7 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
     renderBiomeId: def.renderBiomeId ?? null,
     graphicsRef: def.graphicsRef ?? null,
     particles: normalizeParticleConfigs(def.particles),
+    effects: null,
     depthMode: normalizeDepthMode(def.depthMode, "dynamic"),
     sortAnchor: normalizeSortAnchor(def.sortAnchor),
     depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
@@ -972,7 +1022,25 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
       ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
       : undefined,
     destroyRewards: normalizeDestroyRewards(def.destroyRewards),
+    defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
+    actionId: null,
   };
+}
+
+function normalizeObjectEffects(effects) {
+  if (!effects || typeof effects !== "object" || Array.isArray(effects)) return null;
+  const normalized = {};
+  for (const [id, value] of Object.entries(effects)) {
+    if (!id) continue;
+    if (value === true || value === false) {
+      normalized[id] = value;
+      continue;
+    }
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      normalized[id] = { ...value };
+    }
+  }
+  return Object.keys(normalized).length ? normalized : null;
 }
 
 function normalizeDestroyRewards(rewards) {
@@ -1037,6 +1105,9 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     if (normalized && entry.particles) {
       normalized.particles = normalizeParticleConfigs(entry.particles);
     }
+    if (normalized && entry.effects !== undefined) {
+      normalized.effects = normalizeObjectEffects(entry.effects);
+    }
     if (normalized && entry.depthMode) {
       normalized.depthMode = normalizeDepthMode(entry.depthMode, normalized.depthMode);
     }
@@ -1063,6 +1134,9 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     }
     if (normalized && entry.destroyRewards !== undefined) {
       normalized.destroyRewards = normalizeDestroyRewards(entry.destroyRewards);
+    }
+    if (normalized && entry.actionId !== undefined) {
+      normalized.actionId = String(entry.actionId ?? "").trim() || null;
     }
     if (normalized) entries.push(normalized);
   }

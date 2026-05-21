@@ -31,7 +31,8 @@ import {
   resourceStackMax,
   normalizeResourceId,
   normalizeHeroStats,
-  normalizeSavedQuestState
+  normalizeSavedQuestState,
+  questItemTargetsForQuest
 } from "../helpers.js";
 import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
@@ -41,6 +42,7 @@ import { SAVE_PERSIST_CONFIG } from "../../config/save-persist-config.js";
 import { saveRepository } from "../../../storage/saveRepository.js";
 import { normalizeWorldState } from "../../world-state.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
+import { normalizeActionState } from "../../actions/action-runner.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -50,6 +52,22 @@ function normalizeItemEffects(effects) {
       .map((effect) => ({ ...effect }))
     : [];
   return onHit.length ? { onHit } : undefined;
+}
+
+function cleanupObsoleteQuestItems(player, questState) {
+  if (!player || !Array.isArray(player.inventory) || !questState) return;
+  const completed = new Set((Array.isArray(questState.completed) ? questState.completed : []).map(String));
+  if (!completed.has("innkeeper_ring_for_noble")) return;
+
+  const activeRingQuest = (Array.isArray(questState.active) ? questState.active : [])
+    .some((quest) => questItemTargetsForQuest(quest)
+      .some((target) => String(target.questItemId) === "ring"));
+  if (activeRingQuest) return;
+
+  player.inventory = player.inventory.filter((item) => !(
+    item?.mode === "quest"
+    && String(item.questItemId ?? "") === "ring"
+  ));
 }
 
 function savedWeaponHands(item) {
@@ -293,6 +311,7 @@ export const persistenceMethods = {
     this.questState = normalizeSavedQuestState(payload.quests);
     this.worldState = normalizeWorldState(payload.worldState);
     this.worldEnergy = normalizeWorldEnergy(payload.worldEnergy);
+    this.actionState = normalizeActionState(payload.actionState);
 
     if (Array.isArray(savedPlayer.inventory)) {
       const normalizedInventory = savedPlayer.inventory
@@ -304,6 +323,7 @@ export const persistenceMethods = {
       this.player.inventory = normalizedInventory
         .filter((item) => !isPotionItem(item))
         .slice(0, MAX_INVENTORY);
+      cleanupObsoleteQuestItems(this.player, this.questState);
     }
 
     const nextEquipment = createEquipment();
@@ -421,6 +441,7 @@ export const persistenceMethods = {
       },
       ...(cfg.worldState ? { worldState: normalizeWorldState(this.worldState) } : {}),
       ...(cfg.worldEnergy ? { worldEnergy: normalizeWorldEnergy(this.worldEnergy) } : {}),
+      ...(cfg.actionState ? { actionState: normalizeActionState(this.actionState) } : {}),
       loots: [],
     };
 

@@ -58,9 +58,16 @@ export function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }
         drawInventoryIcon(canvasRef.current, image, iconIndex, iconSheet);
       }
     }).catch(() => {
-      iconSheetPromises.get(iconFallbackSource)?.then((image) => {
+      const fallbackPromise = iconUrl && iconIndex !== undefined
+        ? iconSheetPromises.get(fallbackSource)
+        : iconSheetPromises.get(iconFallbackSource);
+      fallbackPromise?.then((image) => {
         if (cancelled || !canvasRef.current) return;
-        drawCustomInventoryIcon(canvasRef.current, image);
+        if (iconUrl && iconIndex !== undefined) {
+          drawInventoryIcon(canvasRef.current, image, iconIndex, iconSheet);
+        } else {
+          drawCustomInventoryIcon(canvasRef.current, image);
+        }
       }).catch(() => {});
     });
 

@@ -1,5 +1,14 @@
 History over changes
 
+*V. 1.75
+- added a particle system to object where pixel points can have speciel particles attatched
+- reduced DPR and set dps to lower than max before (got form 84 degress to 64)
+- blizzard ground effect added a faded/blurred border instead of harsh one
+- fixed ustabile spellbook icon use - now it don't use fallback when icon is there
+- added action system (E prompt on objects) - subregion and npc will come to
+- fixed a transfer all resourcer at bank - it would also transfer items on second try - now fixed
+- reduced GPU heat problem even more
+
 *V. 1.74
 - Netdra og Lydra system tilføjet
 - fixed particle error where some blue dots remained after Blizzard was completed

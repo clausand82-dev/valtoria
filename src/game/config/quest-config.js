@@ -399,7 +399,7 @@ export const QUEST_DEFS = {
     story: "Annelise rækker dig en forseglet note og beder dig bringe den sikkert til kroejeren.",
     acceptText: "Tag noten til Innkeeper. Han venter pa beskeden.",
     turnInText: "Godt, noten er fremme. Jeg sender noget videre til Noble.",
-    rewards: { xp: 220, gold: 40, questItems: [{ questItemId: "ring", count: 1 }] },
+    rewards: { xp: 220, gold: 40 },
   },
 
   innkeeper_ring_for_noble: {

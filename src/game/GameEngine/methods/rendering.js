@@ -185,6 +185,22 @@ function foregroundFadeAlpha(renderable, drawables) {
   return alpha;
 }
 
+function colorWithAlpha(color, alpha) {
+  const value = String(color ?? "").trim();
+  const a = clamp(Number(alpha), 0, 1);
+  const hex = value.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const n = Number.parseInt(hex[1], 16);
+    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  }
+  const rgb = value.match(/^rgba?\(([^)]+)\)$/i);
+  if (rgb) {
+    const parts = rgb[1].split(",").map((part) => Number.parseFloat(part.trim()));
+    if (parts.length >= 3 && parts.slice(0, 3).every(Number.isFinite)) return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${a})`;
+  }
+  return `rgba(135, 214, 90, ${a})`;
+}
+
 export const renderingMethods = {
   get assetsReady() {
     return this.atlas !== null && this.animationSheets !== null;
@@ -332,6 +348,7 @@ export const renderingMethods = {
     this.drawParticles(ctx, "belowUnits");
     this.drawParticles(ctx, "belowEntities");
     this.drawWorldObjects(ctx);
+    this.drawAttachedEffectDebug(ctx);
     this.drawParticles(ctx, "aboveObjects");
     this.drawParticles(ctx, "aboveUnits");
     this.drawParticles(ctx, "effects");
@@ -346,12 +363,20 @@ export const renderingMethods = {
   },
 
   drawBackdrop(ctx) {
-    const chunk = this.currentChunk();
-    const gradient = ctx.createLinearGradient(0, 0, 0, this.height);
-    gradient.addColorStop(0, "#0a0d10");
-    gradient.addColorStop(1, "#151711");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, this.width, this.height);
+    const canvas = this.backdropCanvas ??= document.createElement("canvas");
+    const width = Math.ceil(this.width);
+    const height = Math.ceil(this.height);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      const bctx = canvas.getContext("2d");
+      const gradient = bctx.createLinearGradient(0, 0, 0, height);
+      gradient.addColorStop(0, "#0a0d10");
+      gradient.addColorStop(1, "#151711");
+      bctx.fillStyle = gradient;
+      bctx.fillRect(0, 0, width, height);
+    }
+    ctx.drawImage(canvas, 0, 0);
   },
 
   drawTiles(ctx) {
@@ -576,6 +601,33 @@ export const renderingMethods = {
     ctx.restore();
   },
 
+  drawAttachedEffectDebug(ctx) {
+    if (typeof window === "undefined" || window.VALTORIA_DEBUG_ATTACHED_EFFECTS !== true) return;
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.font = "11px monospace";
+    for (const emitter of this.particleEngine?.emitters.values?.() ?? []) {
+      const config = emitter.config;
+      if (!config?.attachedEffectId || config.attachTo !== "object") continue;
+      const object = this.nearbyChunks(2)
+        .flatMap((chunk) => chunk.objects ?? [])
+        .find((entry) => entry.id === config.followTarget);
+      if (!object) continue;
+      const screen = worldToScreen(object.x, object.y, -(Number(config.screenOffsetY) || 0), this.camera);
+      screen.x += Number(config.screenOffsetX) || 0;
+      ctx.strokeStyle = config.type === "chimney_smoke" ? "#73d7ff" : config.type === "lantern_glow" ? "#ffe15a" : "#ff784a";
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.moveTo(screen.x - 7, screen.y);
+      ctx.lineTo(screen.x + 7, screen.y);
+      ctx.moveTo(screen.x, screen.y - 7);
+      ctx.lineTo(screen.x, screen.y + 7);
+      ctx.stroke();
+      ctx.fillText(`${config.type}:${config.socketName}`, screen.x + 8, screen.y - 8);
+    }
+    ctx.restore();
+  },
+
   drawParticles(ctx, layer = "aboveEntities") {
     this.particleEngine?.render(ctx, layer, {
       width: this.width,
@@ -605,13 +657,17 @@ export const renderingMethods = {
         const radiusY = Math.max(1, radiusWorld * TILE_H);
         ctx.globalAlpha = alpha;
         if (p.visual === "groundCloud") {
-          const gradient = ctx.createRadialGradient(screen.x, screen.y, 0, screen.x, screen.y, radiusX);
-          gradient.addColorStop(0, p.color ?? "#87d65a");
-          gradient.addColorStop(0.55, p.color ?? "#87d65a");
-          gradient.addColorStop(1, "rgba(255,255,255,0)");
+          const color = p.color ?? "#87d65a";
+          ctx.translate(screen.x, screen.y);
+          ctx.scale(1, radiusY / radiusX);
+          const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radiusX);
+          gradient.addColorStop(0, color);
+          gradient.addColorStop(0.35, color);
+          gradient.addColorStop(0.72, colorWithAlpha(color, 0.38));
+          gradient.addColorStop(1, colorWithAlpha(color, 0));
           ctx.fillStyle = gradient;
           ctx.beginPath();
-          ctx.ellipse(screen.x, screen.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+          ctx.arc(0, 0, radiusX, 0, Math.PI * 2);
           ctx.fill();
         } else {
           ctx.strokeStyle = p.color ?? "#d8c091";
@@ -709,6 +765,8 @@ export const renderingMethods = {
     ctx.restore();
   },
 
+  colorWithAlpha,
+
   drawWeatherEvents(ctx) {
     const flash = this.weatherFlash;
     if (!flash) return;
@@ -759,15 +817,18 @@ export const renderingMethods = {
     );
 
     const overlay = this.fogOverlayCanvas ??= document.createElement("canvas");
-    const overlayWidth = Math.ceil(this.width);
-    const overlayHeight = Math.ceil(this.height);
+    const renderScale = this.fogRenderScale ?? 0.5;
+    const overlayWidth = Math.ceil(this.width * renderScale);
+    const overlayHeight = Math.ceil(this.height * renderScale);
     if (overlay.width !== overlayWidth) overlay.width = overlayWidth;
     if (overlay.height !== overlayHeight) overlay.height = overlayHeight;
     const fogCtx = overlay.getContext("2d");
+    fogCtx.setTransform(1, 0, 0, 1, 0, 0);
     fogCtx.clearRect(0, 0, overlay.width, overlay.height);
+    fogCtx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
     fogCtx.globalCompositeOperation = "source-over";
     fogCtx.fillStyle = `rgba(0, 0, 0, ${unexploredAlpha})`;
-    fogCtx.fillRect(0, 0, overlay.width, overlay.height);
+    fogCtx.fillRect(0, 0, this.width, this.height);
     fogCtx.globalCompositeOperation = "destination-out";
     for (const point of this.fogExploredPoints ?? []) {
       const screen = worldToScreen(point.x, point.y, 0, this.camera);
@@ -777,7 +838,8 @@ export const renderingMethods = {
     }
     const heroScreen = worldToScreen(this.player.x, this.player.y, 0, this.camera);
     this.drawFogRevealGradient(fogCtx, heroScreen.x, heroScreen.y, visibleRadius, visibleCutAlpha, fogEdgeFade);
-    ctx.drawImage(overlay, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(overlay, 0, 0, this.width, this.height);
   },
 
   drawFogRevealGradient(ctx, x, y, radius, alpha, edgeFadeRadius) {
@@ -793,18 +855,27 @@ export const renderingMethods = {
   },
 
   drawVignette(ctx) {
-    const gradient = ctx.createRadialGradient(
-      this.width / 2,
-      this.height / 2,
-      Math.min(this.width, this.height) * 0.18,
-      this.width / 2,
-      this.height / 2,
-      Math.max(this.width, this.height) * 0.76,
-    );
-    gradient.addColorStop(0, "rgba(0,0,0,0)");
-    gradient.addColorStop(1, "rgba(0,0,0,0.48)");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, this.width, this.height);
+    const canvas = this.vignetteCanvas ??= document.createElement("canvas");
+    const width = Math.ceil(this.width);
+    const height = Math.ceil(this.height);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      const vctx = canvas.getContext("2d");
+      const gradient = vctx.createRadialGradient(
+        width / 2,
+        height / 2,
+        Math.min(width, height) * 0.18,
+        width / 2,
+        height / 2,
+        Math.max(width, height) * 0.76,
+      );
+      gradient.addColorStop(0, "rgba(0,0,0,0)");
+      gradient.addColorStop(1, "rgba(0,0,0,0.48)");
+      vctx.fillStyle = gradient;
+      vctx.fillRect(0, 0, width, height);
+    }
+    ctx.drawImage(canvas, 0, 0);
   },
 
   renderMinimap(canvas) {

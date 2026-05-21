@@ -76,7 +76,7 @@ export const MAP_PREFABS = {
     avoidStart: 12,
     avoidExit: 8,
     objects: [
-      { id: "object_ruin_mainland", x: 3, y: 3, blocking: true },
+      { id: "object_ruin_normal", x: 3, y: 3, blocking: true, actionId: "inspect_random_ruin" },
       { id: "object_pillar_stone", x: 2, y: 2, blocking: true },
       { id: "object_pillar_stone", x: 4, y: 2, blocking: true },
       { id: "object_stone_cluster", x: 3, y: 5, blocking: true },

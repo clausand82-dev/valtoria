@@ -325,6 +325,7 @@ export const regionMethods = {
     this.hoverMonsterId = null;
     this.nearbyQuestgiver = null;
     this.nearbyFoliageLoot = null;
+    this.nearbyActionTarget = null;
     this.fogExploredTiles = new Set();
     this.fogVisibleTiles = new Set();
     this.fogExploredPoints = [];
@@ -400,6 +401,7 @@ export const regionMethods = {
     const key = chunkKey(cx, cy);
     if (!this.chunks.has(key)) {
       const chunk = createChunk(cx, cy, this.region);
+      this.applySavedActionObjectStates?.(chunk);
       this.chunks.set(key, chunk);
       for (const monster of chunk.monsters) {
         this.scaleMonsterToHeroLevel(monster);

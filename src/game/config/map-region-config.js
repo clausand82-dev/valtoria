@@ -169,8 +169,10 @@ region({
     { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
     { id: "object_purified_totem", weight: 1, destructible: true, destroyRewards: { lydra: 1, netdra: 0.1 } }, // destroyRewards adds raw world energy points when destroyed.
     { id: "object_bones", weight: 2, worldBalanceNetdra: { min: 10, max: 20 } }, // percentage condition: spawn only while Net'dra'thot is 10-20%.
+    { id: "object_house_mainland", weight: 1, effects: { chimneySmoke: false, lanternGlow: true, windowGlow: { enabled: true, onlyAtNight: true } } }, // effects only enable/disable/settings attached socket effects; socket coordinates live in object-sockets-config.js.
     // spawnDamage supports: "all", "damaged", "destroyed", "damaged_destroyed". Omit for undamaged.
     // spawnTags/spawnAvoidRadius mark an influence zone; avoidSpawnTags avoids matching zones; foregroundFade fades objects in front of player/mobs/loot.
+    // Missing sockets skip silently. socketPrefix effects can spawn once per matching socket, for example lanternA and lanternB.
   ],
 
   decay: [                                                  // Decal/decay ids come from decay-config.js.
@@ -806,14 +808,14 @@ export const MAP_REGION_SETS = {
     region({
       id: "well",
       label: "Broenden",
+      mapSize: "small",
       color: "#7fb6d6",
       //unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
       labelX: 53,
       labelY: 52,
       layout: {
         pool: [
-          { id: "forked_path", weight: 3 },
-          { id: "linear_path", weight: 1 },
+          { id: "central_clearing", weight: 1 },
         ],
       },
       prefabRules: {
@@ -821,21 +823,21 @@ export const MAP_REGION_SETS = {
         minDistanceBetweenPrefabs: 8,
         anchors: ["clearing", "room"],
         pool: [
-          { id: "none", weight: 1, max: 1 }, // er beholdt for testing, kan fjernes senere for a sikre at det alltid spawner en prefab
+          { id: "ruined_shrine", weight: 1, max: 1 },
         ],
       },
       // TODO:DELETE: weights: { tree: 2, rock: 2, foilage: 4, water: 8, fireplace: 1 }
       weights: { foilage: 4, water: 8 },
       objects: [
         { id: "object_tree_mainland", weight: 20 },
-        { id: "object_stone_cluster", weight: 20 },
-        { id: "object_house_mainland", weight: 1 },
+        //{ id: "object_stone_cluster", weight: 20 },
+        { id: "object_house_normal_1", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
+        //{ id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 10 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
-      mobs: ["Hellhound",],
+      mobs: ["Skeleton",],
     }),
     region({
       id: "inn-of-the-good-oak",
@@ -1100,6 +1102,7 @@ export const MAP_REGION_SETS = {
       unlock: { completedQuests: ["vitlias_kings_relics"] },
       // TODO:DELETE: weights: { house: 8, tree: 3, rock: 2, foilage: 5, fireplace: 3 }
       weights: { foilage: 5 },
+      
       mobs: ["Wild Boar", "Village01", "Village02", "Village03", "Village04", "Village05", "Village06"],
       objects: [
         { id: "object_house_mainland", weight: 20 },

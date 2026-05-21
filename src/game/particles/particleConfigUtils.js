@@ -97,6 +97,7 @@ export function normalizeParticleConfig(raw) {
     offsetY: Number(merged.offsetY ?? merged.heightOffset) || 0,
     gravity: Number(merged.gravity) || 0,
     wind: Number(merged.wind) || 0,
+    velocityScale: Number.isFinite(Number(merged.velocityScale)) ? Number(merged.velocityScale) : 1,
   };
 }
 

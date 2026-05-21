@@ -25,6 +25,7 @@ import {
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { DEFAULT_CLASS_ID } from "../../config/class-config.js";
 import { createAutoLootRules } from "./loot.js";
+import { resolvePerformanceProfile } from "../../config/performance-config.js";
 
 function makeDevTestInventory() {
   if (!import.meta.env.DEV) return [];
@@ -111,6 +112,7 @@ export const lifecycleMethods = {
         })
         .catch((error) => console.error("Animation sheet load failed", error));
     }
+    this.nextFrameTime = performance.now();
     this.raf = requestAnimationFrame(this.loop);
   },
 
@@ -128,23 +130,48 @@ export const lifecycleMethods = {
   },
 
   resize() {
-    this.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    this.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, this.maxDpr ?? 1.5));
     this.width = Math.max(360, window.innerWidth);
     this.height = Math.max(360, window.innerHeight);
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.backdropCanvas = null;
+    this.vignetteCanvas = null;
+    this.fogOverlayCanvas = null;
     this.updateCamera(1);
   },
 
   loop(now) {
+    if (typeof document !== "undefined" && document.hidden) {
+      this.lastTime = now;
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
     if (this.paused) {
       this.lastTime = now;
+      this.nextFrameTime = now;
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
+    const minFrameMs = 1000 / (this.targetFps ?? 60);
+    this.nextFrameTime ??= now;
+    if (now + 0.5 < this.nextFrameTime) {
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
     const dt = Math.min(0.034, (now - this.lastTime) / 1000);
     this.lastTime = now;
+    this.nextFrameTime += minFrameMs;
+    if (now - this.nextFrameTime > minFrameMs) this.nextFrameTime = now + minFrameMs;
+    this.lastFrameDt = dt;
+    this.fpsWindowTime = (this.fpsWindowTime ?? 0) + dt;
+    this.fpsWindowFrames = (this.fpsWindowFrames ?? 0) + 1;
+    if (this.fpsWindowTime >= 0.75) {
+      this.averageFps = Math.round(this.fpsWindowFrames / this.fpsWindowTime);
+      this.fpsWindowTime = 0;
+      this.fpsWindowFrames = 0;
+    }
     this.frame += 1;
     this.update(dt);
     this.render();
@@ -154,6 +181,37 @@ export const lifecycleMethods = {
   setPaused(paused) {
     this.paused = Boolean(paused);
     if (!this.paused) this.lastTime = performance.now();
+  },
+
+  setPerformanceMode(mode) {
+    const profile = resolvePerformanceProfile(mode);
+    this.performanceMode = profile.id;
+    this.targetFps = profile.targetFps;
+    this.maxDpr = profile.maxDpr;
+    this.fogRenderScale = profile.fogRenderScale;
+    if (this.particleEngine) {
+      this.particleEngine.quality = profile.particleQuality;
+      this.particleEngine.maxParticles = profile.maxParticles;
+      while (this.particleEngine.particles.length > profile.maxParticles) {
+        const particle = this.particleEngine.particles.pop();
+        if (particle) this.particleEngine.pool.release(particle);
+      }
+    }
+    this.nextFrameTime = performance.now();
+    this.fogOverlayCanvas = null;
+    this.resize();
+    if (typeof window !== "undefined") {
+      window.localStorage?.setItem?.("valtoria.performanceMode", profile.id);
+    }
+    return {
+      mode: profile.id,
+      targetFps: this.targetFps,
+      maxDpr: this.maxDpr,
+      dpr: this.dpr,
+      fogRenderScale: this.fogRenderScale,
+      particleQuality: this.particleEngine?.quality,
+      maxParticles: this.particleEngine?.maxParticles,
+    };
   },
 
   update(dt) {
@@ -175,6 +233,7 @@ export const lifecycleMethods = {
     } else {
       this.updatePlayer(dt, stats);
       this.updateQuestgiver(dt);
+      this.updateNearbyActionTarget();
       this.updateFoliageLoot();
       this.updateChests(dt);
       this.updateMonsters(dt, stats);

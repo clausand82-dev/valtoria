@@ -232,9 +232,13 @@ export default function App() {
   useEffect(() => {
     if (!gameSession || !canvasRef.current) return undefined;
     const slot = gameSession.slot;
+    const performanceMode = typeof window !== "undefined"
+      ? window.localStorage?.getItem?.("valtoria.performanceMode") || "balanced"
+      : "balanced";
     const engine = new GameEngine(canvasRef.current, setSnapshot, {
       saveStorageKey: slot.saveKey,
       newGame: gameSession.newGame,
+      performanceMode,
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
       deferAssetLoad: true,
@@ -244,9 +248,11 @@ export default function App() {
       },
     });
     engineRef.current = engine;
+    if (typeof window !== "undefined") window.VALTORIA_ENGINE = engine;
     engine.start();
     if (gameSession.newGame) engine.saveProgress({ force: true });
     return () => {
+      if (typeof window !== "undefined" && window.VALTORIA_ENGINE === engine) delete window.VALTORIA_ENGINE;
       engine.stop();
       engineRef.current = null;
     };
@@ -716,7 +722,13 @@ export default function App() {
         </div>
       )}
 
-      {snapshot.nearbyFoliageLoot && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
+      {snapshot.nearbyActionTarget && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
+        <div className="city-interact-prompt wilderness-prompt">
+          Press <b>E</b> to {snapshot.nearbyActionTarget.label}
+        </div>
+      )}
+
+      {snapshot.nearbyFoliageLoot && !snapshot.quests?.nearbyQuestgiver && !snapshot.nearbyActionTarget && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
           Press <b>E</b> to gather {snapshot.nearbyFoliageLoot.label}
         </div>

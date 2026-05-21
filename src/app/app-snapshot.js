@@ -50,6 +50,7 @@ export const emptySnapshot = {
   mobs: { total: 0, alive: 0, killed: 0 },
   exitPrompt: false,
   nearbyFoliageLoot: null,
+  nearbyActionTarget: null,
   inventory: [],
   equipment: [],
   autoLoot: {
