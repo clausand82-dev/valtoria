@@ -1,0 +1,5 @@
+NY NPC borgmester
+Borgmester har en quest når man åbner byen første gang, hvor han også byder velkommen til en og fortælle grund historien.
+Første quest er at besøge innkeeper, som giver en quest clear_the_inn - og så er nuværende start koblet på
+
+Efter de første få non-story quest, dukker ny quest op,

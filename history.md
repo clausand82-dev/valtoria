@@ -1,5 +1,8 @@
 History over changes
 
+*V. 1.76
+- added sublevel system nu - building on top of action system form early
+
 *V. 1.75
 - added a particle system to object where pixel points can have speciel particles attatched
 - reduced DPR and set dps to lower than max before (got form 84 degress to 64)

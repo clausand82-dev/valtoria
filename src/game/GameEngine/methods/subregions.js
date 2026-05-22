@@ -1,0 +1,782 @@
+import { CHUNK_SIZE } from "../../config/game-constants-config.js";
+import { OBJECT_SPAWN_TUNING } from "../../config/spawn-config.js";
+import {
+  getRegionObjectFamily,
+  REGION_OBJECT_DEFS,
+  resolveRegionObjectVariantCount,
+} from "../../config/region-object-config.js";
+import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
+import { normalizeRegionTileset } from "../../config/region-asset-config.js";
+import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
+import { resolveMapRegionConfig } from "../../world-state.js";
+import {
+  chunkKey,
+  createId,
+  createRegion,
+  isRegionPointPlayable,
+} from "../../world.js";
+
+function clonePlain(value) {
+  if (value === null || value === undefined) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+function stringHash(value) {
+  const text = String(value ?? "");
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0);
+}
+
+function cleanInstanceId(value) {
+  return String(value ?? "unknown").replace(/[^a-zA-Z0-9:_@.,-]/g, "_");
+}
+
+function makeRootMapInstanceId(engine) {
+  const active = engine.activeMapRegion;
+  const regionId = active?.regionId ?? engine.region?.mapRegion?.id ?? engine.region?.id ?? "root";
+  return `root:${cleanInstanceId(active?.areaMapId ?? "world")}:${cleanInstanceId(regionId)}:${cleanInstanceId(engine.region?.id ?? engine.region?.seed)}`;
+}
+
+function normalizeStack(stack) {
+  return Array.isArray(stack)
+    ? stack
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => ({
+        mapInstanceId: String(entry.mapInstanceId ?? ""),
+        sourceObjectRuntimeId: entry.sourceObjectRuntimeId ? String(entry.sourceObjectRuntimeId) : null,
+        returnPlayerPosition: {
+          x: Number(entry.returnPlayerPosition?.x) || 0,
+          y: Number(entry.returnPlayerPosition?.y) || 0,
+          facingX: Number(entry.returnPlayerPosition?.facingX) || 0,
+          facingY: Number(entry.returnPlayerPosition?.facingY) || 1,
+        },
+      }))
+      .filter((entry) => entry.mapInstanceId)
+    : [];
+}
+
+function normalizeMapSnapshots(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([key, snapshot]) => key && snapshot && typeof snapshot === "object"));
+}
+
+function normalizeSubregionInstances(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([key, instance]) => key && instance && typeof instance === "object"));
+}
+
+export function normalizeCurrentExpedition(value = null) {
+  if (!value || typeof value !== "object") return null;
+  const rootMapInstanceId = value.rootMapInstanceId ? String(value.rootMapInstanceId) : null;
+  return {
+    rootRegionId: value.rootRegionId ? String(value.rootRegionId) : null,
+    rootMapId: value.rootMapId ? String(value.rootMapId) : null,
+    rootMapInstanceId,
+    currentMapInstanceId: value.currentMapInstanceId ? String(value.currentMapInstanceId) : rootMapInstanceId,
+    subregionStack: normalizeStack(value.subregionStack),
+    subregionInstances: normalizeSubregionInstances(value.subregionInstances),
+    mapSnapshots: normalizeMapSnapshots(value.mapSnapshots),
+    rootMapSnapshot: value.rootMapSnapshot && typeof value.rootMapSnapshot === "object" ? value.rootMapSnapshot : null,
+  };
+}
+
+function isSubregionMap(engine) {
+  const expedition = engine?.currentExpedition;
+  if (!expedition?.rootMapInstanceId || !expedition?.currentMapInstanceId) return false;
+  if (expedition.currentMapInstanceId === expedition.rootMapInstanceId) return false;
+  const regionId = engine?.region?.mapRegion?.id;
+  const instance = expedition.subregionInstances?.[expedition.currentMapInstanceId];
+  if (instance) return String(instance.subregionId ?? "") === String(regionId ?? "");
+  return Boolean(SUBREGION_CONFIG[regionId]);
+}
+
+function currentMapInstanceIdFor(expedition) {
+  return expedition?.currentMapInstanceId || expedition?.rootMapInstanceId || null;
+}
+
+function loadedSubregionId(engine) {
+  const regionId = engine?.region?.mapRegion?.id;
+  return SUBREGION_CONFIG[regionId] ? String(regionId) : null;
+}
+
+function loadedMapInstanceIdFor(engine, expedition) {
+  if (!expedition?.rootMapInstanceId) return null;
+  const subregionId = loadedSubregionId(engine);
+  if (!subregionId) return expedition.rootMapInstanceId;
+
+  const currentId = currentMapInstanceIdFor(expedition);
+  const currentInstance = expedition.subregionInstances?.[currentId];
+  if (String(currentInstance?.subregionId ?? "") === subregionId) return currentId;
+
+  const loadedRegionRuntimeId = engine?.region?.id ? String(engine.region.id) : null;
+  const matches = Object.entries(expedition.subregionInstances ?? {})
+    .filter(([, instance]) => String(instance?.subregionId ?? "") === subregionId)
+    .sort((a, b) => {
+      const aRegionMatch = loadedRegionRuntimeId && String(a[1]?.mapSnapshot?.regionId ?? "") === loadedRegionRuntimeId ? 1 : 0;
+      const bRegionMatch = loadedRegionRuntimeId && String(b[1]?.mapSnapshot?.regionId ?? "") === loadedRegionRuntimeId ? 1 : 0;
+      if (aRegionMatch !== bRegionMatch) return bRegionMatch - aRegionMatch;
+      return Number(b[1]?.updatedAt ?? b[1]?.createdAt ?? 0) - Number(a[1]?.updatedAt ?? a[1]?.createdAt ?? 0);
+    });
+  return matches[0]?.[0] ?? null;
+}
+
+function legacyReturnEntryFor(expedition, currentMapInstanceId) {
+  const legacyEntry = expedition?.subregionInstances?.[currentMapInstanceId]?.lastReturnEntry;
+  if (!legacyEntry?.mapInstanceId) return null;
+  return {
+    mapInstanceId: String(legacyEntry.mapInstanceId),
+    sourceObjectRuntimeId: legacyEntry.sourceObjectRuntimeId ? String(legacyEntry.sourceObjectRuntimeId) : null,
+    returnPlayerPosition: legacyEntry.returnPlayerPosition ? { ...legacyEntry.returnPlayerPosition } : null,
+  };
+}
+
+function repairLoadedSubregionMapId(engine, expedition) {
+  const subregionId = loadedSubregionId(engine);
+  if (!subregionId) return null;
+  const currentId = currentMapInstanceIdFor(expedition);
+  const repairedId = loadedMapInstanceIdFor(engine, expedition);
+  if (!repairedId) return null;
+  expedition.currentMapInstanceId = repairedId;
+  engine.currentMapInstanceId = repairedId;
+  if (repairedId !== currentId) {
+    console.warn("[subregions] Repaired currentMapInstanceId from loaded subregion map", {
+      loadedSubregionId: subregionId,
+      repairedId,
+      previousId: currentId,
+    });
+  }
+  return repairedId;
+}
+
+function transitionLabelFor(regionConfig, fallback = "Subregion") {
+  return regionConfig?.label ?? regionConfig?.id ?? fallback;
+}
+
+function serializeChunk(chunk) {
+  return {
+    key: chunk.key,
+    cx: chunk.cx,
+    cy: chunk.cy,
+    x: chunk.x,
+    y: chunk.y,
+    level: chunk.level,
+    tiles: clonePlain(chunk.tiles ?? []),
+    edgeTiles: clonePlain(chunk.edgeTiles ?? []),
+    decals: clonePlain(chunk.decals ?? []),
+    objects: clonePlain(chunk.objects ?? []),
+    monsters: clonePlain(chunk.monsters ?? []),
+  };
+}
+
+function regionTilesetSheetIds(regionConfig) {
+  const normalized = normalizeRegionTileset(regionConfig?.tileset);
+  const entries = Array.isArray(normalized) ? normalized : (normalized ? [normalized] : []);
+  return new Set(entries.map((entry) => entry.sheetId).filter(Boolean));
+}
+
+function snapshotTilesMatchConfig(snapshot) {
+  const expectedSheetIds = regionTilesetSheetIds(snapshot?.regionConfig);
+  if (!expectedSheetIds.size) return true;
+  for (const chunk of snapshot?.chunks ?? []) {
+    for (const tile of chunk.tiles ?? []) {
+      if (tile?.groundSheetId) return expectedSheetIds.has(tile.groundSheetId);
+    }
+  }
+  return false;
+}
+
+function subregionSnapshotUsable(snapshot, subregionId) {
+  if (!snapshot || typeof snapshot !== "object") return false;
+  if (String(snapshot.regionConfig?.id ?? "") !== String(subregionId ?? "")) return false;
+  if (!Array.isArray(snapshot.chunks) || !snapshot.chunks.length) return false;
+  return snapshotTilesMatchConfig(snapshot);
+}
+
+function restoreChunk(snapshot, region) {
+  return {
+    ...clonePlain(snapshot),
+    key: snapshot.key ?? chunkKey(snapshot.cx, snapshot.cy),
+    region,
+    tiles: clonePlain(snapshot.tiles ?? []),
+    edgeTiles: clonePlain(snapshot.edgeTiles ?? []),
+    decals: clonePlain(snapshot.decals ?? []),
+    objects: clonePlain(snapshot.objects ?? []),
+    monsters: clonePlain(snapshot.monsters ?? []),
+  };
+}
+
+function regionConfigForSnapshot(region) {
+  return region?.sourceRegionConfig
+    ? clonePlain(region.sourceRegionConfig)
+    : region?.mapRegion
+      ? clonePlain(region.mapRegion)
+      : null;
+}
+
+function subregionAsMapRegionConfig(config, context) {
+  return {
+    ...config,
+    label: config.label ?? config.id,
+    areaMapId: context.rootMapId ?? "subregion",
+    mapSize: config.mapSize ?? "small",
+  };
+}
+
+function firstSpawnType(objectDefId) {
+  const def = REGION_OBJECT_DEFS[objectDefId];
+  const spawnTypes = Array.isArray(def?.spawnTypes) ? def.spawnTypes : [];
+  return spawnTypes[0]?.type ?? null;
+}
+
+function makeRuntimeObject(region, entry, x, y, salt) {
+  const objectDefId = entry.id ?? entry.objectDefId;
+  const def = REGION_OBJECT_DEFS[objectDefId];
+  const type = firstSpawnType(objectDefId);
+  if (!def || !type) return null;
+  const tuning = OBJECT_SPAWN_TUNING[type]
+    ?? OBJECT_SPAWN_TUNING[getRegionObjectFamily(type)]
+    ?? OBJECT_SPAWN_TUNING.default;
+  return {
+    id: createId(),
+    runtimeId: `${region.id}:subregion-role:${entry.placementRole ?? "object"}:${salt}:${objectDefId}`,
+    objectDefId,
+    type,
+    x,
+    y,
+    radius: tuning.radius,
+    size: tuning.sizeBase,
+    rotation: 0,
+    colorShift: 0,
+    flip: false,
+    treeVariant: Math.abs(salt) % resolveRegionObjectVariantCount(type),
+    animSeed: salt,
+    visualScale: Number(entry.visualScale) || 1,
+    blocking: entry.blocking ?? !entry.actionId,
+    destructible: false,
+    renderBiomeId: def.renderBiomeId ?? null,
+    graphicsRef: def.graphicsRef ?? null,
+    particles: clonePlain(def.particles ?? []),
+    effects: def.effects ? { ...def.effects } : null,
+    depthMode: def.depthMode ?? "dynamic",
+    sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
+    depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
+    actionId: entry.actionId ?? null,
+    defaultActionId: def.defaultActionId ?? null,
+  };
+}
+
+function findValidPointNear(region, origin, minDistance = 0, maxRadius = 8) {
+  const base = origin ?? region?.start ?? { x: 2, y: 2 };
+  let best = null;
+  let bestDistance = Infinity;
+  for (let r = 0; r <= maxRadius; r += 1) {
+    for (let dx = -r; dx <= r; dx += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = Math.max(1, Math.min((region?.width ?? 4) - 2, Math.round(base.x + dx) + 0.5));
+        const y = Math.max(1, Math.min((region?.height ?? 4) - 2, Math.round(base.y + dy) + 0.5));
+        const distanceFromStart = Math.hypot(x - (region?.start?.x ?? base.x), y - (region?.start?.y ?? base.y));
+        if (distanceFromStart < minDistance) continue;
+        if (!isRegionPointPlayable(region, x, y, 0.45)) continue;
+        const distanceFromBase = Math.hypot(x - base.x, y - base.y);
+        if (distanceFromBase < bestDistance) {
+          best = { x, y };
+          bestDistance = distanceFromBase;
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return { x: region?.start?.x ?? 2, y: region?.start?.y ?? 2 };
+}
+
+function findPlayerPointNearObject(region, object) {
+  const origin = object ? { x: object.x, y: object.y } : region?.start;
+  const minObjectDistance = Math.max(0.95, Number(object?.radius) || 0);
+  for (let r = 1; r <= 6; r += 1) {
+    for (let dx = -r; dx <= r; dx += 1) {
+      for (let dy = -r; dy <= r; dy += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = Math.max(1, Math.min((region?.width ?? 4) - 2, Math.round((origin?.x ?? 2) + dx) + 0.5));
+        const y = Math.max(1, Math.min((region?.height ?? 4) - 2, Math.round((origin?.y ?? 2) + dy) + 0.5));
+        if (Math.hypot(x - (origin?.x ?? x), y - (origin?.y ?? y)) < minObjectDistance) continue;
+        if (isRegionPointPlayable(region, x, y, 0.45)) return { x, y };
+      }
+    }
+  }
+  return findValidPointNear(region, origin, 0, 6);
+}
+
+function chunkForPoint(engine, point) {
+  const cx = Math.floor(point.x / CHUNK_SIZE);
+  const cy = Math.floor(point.y / CHUNK_SIZE);
+  return engine.getChunk(cx, cy);
+}
+
+function findObjectByRuntimeId(engine, runtimeId) {
+  if (!runtimeId) return null;
+  for (const chunk of engine.chunks.values()) {
+    const found = chunk.objects?.find((object) => String(object.runtimeId ?? "") === String(runtimeId));
+    if (found) return found;
+  }
+  return null;
+}
+
+function placeNearObjectOrPosition(engine, sourceObjectRuntimeId, fallbackPosition) {
+  if (
+    fallbackPosition
+    && isRegionPointPlayable(engine.region, fallbackPosition.x, fallbackPosition.y, 0.45)
+  ) {
+    engine.player.x = fallbackPosition.x;
+    engine.player.y = fallbackPosition.y;
+    engine.player.facingX = fallbackPosition.facingX ?? engine.player.facingX;
+    engine.player.facingY = fallbackPosition.facingY ?? engine.player.facingY;
+    engine.player.target = null;
+    engine.player.attackTargetId = null;
+    engine.player.attackObjectId = null;
+    engine.pointer.worldX = fallbackPosition.x;
+    engine.pointer.worldY = fallbackPosition.y;
+    engine.updateCamera(1);
+    return;
+  }
+  const object = findObjectByRuntimeId(engine, sourceObjectRuntimeId);
+  const origin = object ? { x: object.x, y: object.y } : fallbackPosition;
+  const point = object ? findPlayerPointNearObject(engine.region, object) : findValidPointNear(engine.region, origin, 0, 5);
+  engine.player.x = point.x;
+  engine.player.y = point.y;
+  engine.player.facingX = fallbackPosition?.facingX ?? engine.player.facingX;
+  engine.player.facingY = fallbackPosition?.facingY ?? engine.player.facingY;
+  engine.player.target = null;
+  engine.player.attackTargetId = null;
+  engine.player.attackObjectId = null;
+  engine.pointer.worldX = point.x;
+  engine.pointer.worldY = point.y;
+  engine.updateCamera(1);
+}
+
+export const subregionMethods = {
+  setSubregionTransition(active, patch = {}) {
+    this.subregionTransition = active ? {
+      active: true,
+      title: patch.title ?? "Loading subregion",
+      label: patch.label ?? "Loading map",
+      detail: patch.detail ?? "",
+      percent: Math.max(0, Math.min(100, Math.floor(Number(patch.percent) || 0))),
+    } : null;
+    this.publishSnapshot?.();
+  },
+
+  refreshCurrentRegionAssets() {
+    const regionConfig = this.region?.mapRegion ?? null;
+    return Promise.all([
+      loadGeneratedAtlas(regionConfig),
+      loadAnimationSheets(regionConfig),
+    ]).then(([atlas, animationSheets]) => {
+      this.atlas = atlas;
+      this.animationSheets = animationSheets;
+      for (const chunk of this.chunks?.values?.() ?? []) {
+        chunk.terrainLayer = null;
+      }
+    });
+  },
+
+  refreshCurrentRegionAssetsLater() {
+    this.refreshCurrentRegionAssets?.().catch((error) => {
+      console.warn("[subregions] Failed to refresh subregion assets", error);
+    });
+  },
+
+  ensureCurrentExpedition() {
+    this.currentExpedition = normalizeCurrentExpedition(this.currentExpedition);
+    if (this.currentExpedition?.rootMapInstanceId) return this.currentExpedition;
+    const rootMapInstanceId = makeRootMapInstanceId(this);
+    this.currentExpedition = {
+      rootRegionId: this.activeMapRegion?.regionId ?? this.region?.mapRegion?.id ?? this.region?.id ?? null,
+      rootMapId: this.activeMapRegion?.areaMapId ?? this.region?.mapRegion?.areaMapId ?? "world",
+      rootMapInstanceId,
+      currentMapInstanceId: rootMapInstanceId,
+      subregionStack: [],
+      subregionInstances: {},
+      mapSnapshots: {},
+      rootMapSnapshot: null,
+    };
+    return this.currentExpedition;
+  },
+
+  captureCurrentMapSnapshot() {
+    return {
+      capturedAt: Date.now(),
+      regionIndex: this.regionIndex,
+      regionSeed: this.region?.seed ?? null,
+      regionId: this.region?.id ?? null,
+      regionConfig: regionConfigForSnapshot(this.region),
+      activeMapRegion: this.activeMapRegion ? { ...this.activeMapRegion } : null,
+      player: {
+        x: this.player.x,
+        y: this.player.y,
+        facingX: this.player.facingX,
+        facingY: this.player.facingY,
+      },
+      chunks: [...this.chunks.values()].map(serializeChunk),
+      loots: clonePlain(this.loots ?? []),
+    };
+  },
+
+  storeCurrentMapSnapshot(mapInstanceId = null) {
+    const expedition = this.ensureCurrentExpedition();
+    let id = mapInstanceId ?? currentMapInstanceIdFor(expedition);
+    if (!id) return null;
+    const loadedId = loadedMapInstanceIdFor(this, expedition);
+    if (loadedId && id !== loadedId) {
+      console.warn("[subregions] Redirected snapshot save to loaded map slot", {
+        requestedId: id,
+        loadedId,
+        loadedRegionId: this.region?.mapRegion?.id ?? null,
+      });
+      id = loadedId;
+      expedition.currentMapInstanceId = loadedId;
+      this.currentMapInstanceId = loadedId;
+    }
+    const snapshot = this.captureCurrentMapSnapshot();
+    expedition.mapSnapshots[id] = snapshot;
+    if (id === expedition.rootMapInstanceId) expedition.rootMapSnapshot = snapshot;
+    const instance = expedition.subregionInstances[id];
+    if (instance) {
+      instance.mapSnapshot = snapshot;
+      instance.updatedAt = Date.now();
+    }
+    return snapshot;
+  },
+
+  restoreMapSnapshot(snapshot) {
+    if (!snapshot) return false;
+    const regionConfig = snapshot.regionConfig ?? null;
+    this.regionIndex = Math.max(1, Math.floor(Number(snapshot.regionIndex) || this.regionIndex || 1));
+    this.activeMapRegion = snapshot.activeMapRegion ? { ...snapshot.activeMapRegion } : null;
+    this.region = createRegion(this.regionIndex, Math.floor(Number(snapshot.regionSeed) || Date.now()), null, regionConfig);
+    if (regionConfig) this.region.sourceRegionConfig = clonePlain(regionConfig);
+    this.resetRegionRuntime();
+    this.chunks.clear();
+    this.monsters.clear();
+    for (const chunkSnapshot of snapshot.chunks ?? []) {
+      const chunk = restoreChunk(chunkSnapshot, this.region);
+      this.chunks.set(chunk.key, chunk);
+      for (const monster of chunk.monsters ?? []) {
+        if (monster?.id) this.monsters.set(monster.id, monster);
+      }
+    }
+    this.loots = clonePlain(snapshot.loots ?? []);
+    this.exitPromptOpen = false;
+    this.exitPromptCooldown = 0;
+    this.refreshCurrentRegionAssetsLater?.();
+    return true;
+  },
+
+  resolveSubregionConfig(subregionId, source = {}) {
+    const raw = SUBREGION_CONFIG[subregionId];
+    if (!raw) return null;
+    const expedition = this.ensureCurrentExpedition();
+    const context = {
+      rootRegionId: expedition.rootRegionId,
+      rootMapId: expedition.rootMapId,
+      rootMapInstanceId: expedition.rootMapInstanceId,
+      sourceRegionId: source.sourceRegionId ?? this.region?.mapRegion?.id ?? null,
+      sourceMapId: source.sourceMapId ?? expedition.currentMapInstanceId,
+      sourceObjectId: source.sourceObjectId ?? null,
+      sourceObjectRuntimeId: source.sourceObjectRuntimeId ?? null,
+      subregionId: raw.id,
+      subregionKind: raw.kind,
+      subregionDepth: expedition.subregionStack.length + 1,
+      worldState: this.worldState,
+      worldEnergy: this.worldEnergy,
+      questState: this.questState,
+      player: this.player,
+      inventory: this.player?.inventory,
+      activeMapRegion: this.activeMapRegion,
+      stats: { player: this.player, worldState: this.worldState },
+    };
+    return {
+      ...resolveMapRegionConfig(subregionAsMapRegionConfig(raw, context), this.worldState, context),
+      __subregionRaw: raw,
+      __subregionContext: context,
+    };
+  },
+
+  subregionInstanceIdFor(action, target) {
+    const expedition = this.ensureCurrentExpedition();
+    const subregionId = action.targetSubregionId;
+    const scope = action.instanceScope ?? "sourceObject";
+    if (scope !== "sourceObject") {
+      console.warn(`[subregions] Unsupported instanceScope '${scope}', falling back to sourceObject`);
+    }
+    const sourceId = target?.runtimeId ?? target?.id ?? `${target?.objectDefId ?? "object"}@${target?.x ?? 0},${target?.y ?? 0}`;
+    return `${cleanInstanceId(expedition.rootMapInstanceId)}:${cleanInstanceId(sourceId)}:${cleanInstanceId(subregionId)}`;
+  },
+
+  placeSubregionRoleObjects(config) {
+    const roleEntries = (config.objects ?? []).filter((entry) => entry?.placementRole && entry.id);
+    roleEntries.forEach((entry, index) => {
+      const role = String(entry.placementRole);
+      const origin = role === "farFromEntry" ? this.region.end : this.region.start;
+      const minDistance = role === "farFromEntry" ? Math.max(8, Math.min(this.region.width, this.region.height) * 0.32) : 0;
+      const point = findValidPointNear(this.region, origin, minDistance, Math.max(this.region.width, this.region.height));
+      const object = makeRuntimeObject(this.region, entry, point.x, point.y, index + stringHash(`${this.region.id}:${entry.id}:${role}`));
+      if (!object) {
+        console.warn(`[subregions] Could not place role object '${entry.id}' in ${config.id}`);
+        return;
+      }
+      chunkForPoint(this, point).objects.push(object);
+    });
+  },
+
+  createSubregionInstance(instanceId, subregionConfig, action, target) {
+    const expedition = this.ensureCurrentExpedition();
+    const seed = stringHash(`${instanceId}:${subregionConfig.id}`);
+    this.regionIndex += 1;
+    const rootActiveMapRegion = this.activeMapRegion ? { ...this.activeMapRegion } : null;
+    const generatorConfig = {
+      ...subregionConfig,
+      objects: (subregionConfig.objects ?? []).filter((entry) => !entry?.placementRole),
+    };
+    this.region = createRegion(this.regionIndex, seed, null, generatorConfig);
+    this.region.sourceRegionConfig = clonePlain(generatorConfig);
+    this.activeMapRegion = rootActiveMapRegion;
+    this.resetRegionRuntime();
+    this.ensureFullRegionGenerated();
+    this.placeSubregionRoleObjects(subregionConfig);
+    const snapshot = this.captureCurrentMapSnapshot();
+    const instance = {
+      id: instanceId,
+      subregionId: subregionConfig.id,
+      kind: subregionConfig.kind ?? subregionConfig.__subregionRaw?.kind ?? "subregion",
+      sourceRegionId: subregionConfig.__subregionContext?.sourceRegionId ?? expedition.rootRegionId,
+      sourceMapId: subregionConfig.__subregionContext?.sourceMapId ?? expedition.currentMapInstanceId,
+      sourceObjectId: target?.objectDefId ?? target?.type ?? null,
+      sourceObjectRuntimeId: target?.runtimeId ?? target?.id ?? null,
+      seed,
+      persistence: action.persistence ?? subregionConfig.persistence ?? "whileRootRegionActive",
+      mapSnapshot: snapshot,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastReturnEntry: null,
+    };
+    expedition.subregionInstances[instanceId] = instance;
+    expedition.mapSnapshots[instanceId] = snapshot;
+    return instance;
+  },
+
+  placePlayerAtSubregionEntry() {
+    let entryObject = null;
+    for (const chunk of this.chunks.values()) {
+      entryObject = chunk.objects?.find((object) => object?.actionId === "exit_subregion") ?? entryObject;
+      if (entryObject) break;
+    }
+    const origin = entryObject ? { x: entryObject.x, y: entryObject.y } : this.region?.start;
+    const point = entryObject ? findPlayerPointNearObject(this.region, entryObject) : findValidPointNear(this.region, origin, 0, 5);
+    this.player.x = point.x;
+    this.player.y = point.y;
+    this.player.target = null;
+    this.player.attackTargetId = null;
+    this.player.attackObjectId = null;
+    this.pointer.worldX = point.x;
+    this.pointer.worldY = point.y;
+    this.exitPromptOpen = false;
+    this.exitPromptCooldown = 0;
+    this.updateCamera(1);
+  },
+
+  enterSubregionFromAction(action, target) {
+    const subregionId = action?.targetSubregionId;
+    if (!subregionId) {
+      console.warn("[subregions] enterSubregion missing targetSubregionId", action?.id);
+      this.addToast?.("Subregion mangler target");
+      return { ok: false, changed: false, reason: "missing_target_subregion" };
+    }
+    if (!SUBREGION_CONFIG[subregionId]) {
+      console.warn(`[subregions] Unknown subregion '${subregionId}'`);
+      this.addToast?.("Subregion mangler config");
+      return { ok: false, changed: false, reason: "unknown_subregion" };
+    }
+
+    const expedition = this.ensureCurrentExpedition();
+    const loadedId = loadedMapInstanceIdFor(this, expedition);
+    if (loadedId && loadedId !== currentMapInstanceIdFor(expedition)) {
+      expedition.currentMapInstanceId = loadedId;
+      this.currentMapInstanceId = loadedId;
+    }
+    if (!loadedSubregionId(this) && currentMapInstanceIdFor(expedition) !== expedition.rootMapInstanceId) {
+      console.warn("[subregions] Reset stale subregion map id while loaded map is root", {
+        staleId: expedition.currentMapInstanceId,
+        rootMapInstanceId: expedition.rootMapInstanceId,
+      });
+      expedition.currentMapInstanceId = expedition.rootMapInstanceId;
+      expedition.subregionStack = [];
+      this.currentMapInstanceId = expedition.rootMapInstanceId;
+    }
+    const previousMapInstanceId = currentMapInstanceIdFor(expedition);
+    const previousSnapshot = this.storeCurrentMapSnapshot(previousMapInstanceId);
+    if (previousMapInstanceId === expedition.rootMapInstanceId && previousSnapshot) {
+      expedition.rootMapSnapshot = previousSnapshot;
+    }
+    const returnPlayerPosition = {
+      x: this.player.x,
+      y: this.player.y,
+      facingX: this.player.facingX,
+      facingY: this.player.facingY,
+    };
+    const sourceObjectRuntimeId = target?.runtimeId ?? target?.id ?? null;
+    const returnEntry = { mapInstanceId: previousMapInstanceId, sourceObjectRuntimeId, returnPlayerPosition };
+    expedition.subregionStack.push(returnEntry);
+
+    const instanceId = this.subregionInstanceIdFor(action, target);
+    let instance = expedition.subregionInstances[instanceId];
+    const title = transitionLabelFor(SUBREGION_CONFIG[subregionId], "Subregion");
+    this.setSubregionTransition?.(true, {
+      title: "Loading subregion",
+      label: title,
+      detail: "Preparing nested map",
+      percent: 15,
+    });
+    expedition.currentMapInstanceId = instanceId;
+    this.currentMapInstanceId = instanceId;
+    if (instance?.mapSnapshot && subregionSnapshotUsable(instance.mapSnapshot, subregionId)) {
+      instance.sourceMapId = previousMapInstanceId;
+      instance.sourceObjectId = target?.objectDefId ?? target?.type ?? instance.sourceObjectId ?? null;
+      instance.sourceObjectRuntimeId = sourceObjectRuntimeId ?? instance.sourceObjectRuntimeId ?? null;
+      instance.lastReturnEntry = { ...returnEntry, returnPlayerPosition: { ...returnPlayerPosition } };
+      instance.updatedAt = Date.now();
+      this.restoreMapSnapshot(instance.mapSnapshot);
+      expedition.currentMapInstanceId = instanceId;
+      this.currentMapInstanceId = instanceId;
+      this.setSubregionTransition?.(true, { title: "Loading subregion", label: title, detail: "Loading saved map", percent: 60 });
+    } else {
+      if (instance?.mapSnapshot) {
+        console.warn(`[subregions] Discarding invalid subregion snapshot for ${subregionId}; regenerating instance`);
+      }
+      const config = this.resolveSubregionConfig(subregionId, {
+        sourceRegionId: this.region?.mapRegion?.id,
+        sourceMapId: previousMapInstanceId,
+        sourceObjectId: target?.objectDefId ?? target?.type,
+        sourceObjectRuntimeId,
+      });
+      if (!config) {
+        expedition.subregionStack.pop();
+        expedition.currentMapInstanceId = previousMapInstanceId;
+        this.currentMapInstanceId = previousMapInstanceId;
+        this.setSubregionTransition?.(false);
+        return { ok: false, changed: false, reason: "resolve_failed" };
+      }
+      instance = this.createSubregionInstance(instanceId, config, action, target);
+      instance.lastReturnEntry = { ...returnEntry, returnPlayerPosition: { ...returnPlayerPosition } };
+      expedition.currentMapInstanceId = instanceId;
+      this.currentMapInstanceId = instanceId;
+      this.setSubregionTransition?.(true, { title: "Loading subregion", label: title, detail: "Generating map", percent: 55 });
+    }
+
+    this.placePlayerAtSubregionEntry();
+    this.updateNearbyActionTarget?.();
+    this.refreshCurrentRegionAssets?.()
+      .then(() => {
+        this.setSubregionTransition?.(true, { title: "Loading subregion", label: title, detail: "Ready", percent: 100 });
+        globalThis.setTimeout(() => this.setSubregionTransition?.(false), 80);
+      })
+      .catch((error) => {
+        console.warn("[subregions] Failed to load subregion assets", error);
+        this.setSubregionTransition?.(false);
+      });
+    this.saveProgress?.({ force: true });
+    this.addToast?.(title);
+    return { ok: true, changed: false, subregionInstanceId: instanceId };
+  },
+
+  exitSubregionFromAction() {
+    const expedition = normalizeCurrentExpedition(this.currentExpedition);
+    this.currentExpedition = expedition;
+    if (!expedition) {
+      console.warn("[subregions] exitSubregion called without currentExpedition");
+      this.addToast?.("Ingen subregion aktiv");
+      return { ok: false, changed: false, reason: "missing_expedition" };
+    }
+    const currentMapInstanceId = repairLoadedSubregionMapId(this, expedition) ?? currentMapInstanceIdFor(expedition);
+    if (!currentMapInstanceId || currentMapInstanceId === expedition.rootMapInstanceId) {
+      console.warn("[subregions] exitSubregion called while current map is root", {
+        currentMapInstanceId,
+        rootMapInstanceId: expedition.rootMapInstanceId,
+      });
+      this.addToast?.("Du er ikke i en subregion");
+      return { ok: false, changed: false, reason: "not_in_subregion" };
+    }
+    this.storeCurrentMapSnapshot(currentMapInstanceId);
+    let entry = expedition.subregionStack.pop();
+    if (!entry) {
+      entry = legacyReturnEntryFor(expedition, currentMapInstanceId);
+      if (entry) {
+        console.warn("[subregions] Restored return point from legacy instance state; future exits should use subregionStack");
+      }
+    }
+    if (!entry) {
+      console.warn("[subregions] exitSubregion missing stack entry", {
+        currentMapInstanceId,
+        rootMapInstanceId: expedition.rootMapInstanceId,
+        subregionInstances: Object.keys(expedition.subregionInstances ?? {}),
+      });
+      this.addToast?.("Subregion stack mangler returpunkt");
+      return { ok: false, changed: false, reason: "missing_stack_entry" };
+    }
+    const previousSnapshot = expedition.mapSnapshots[entry.mapInstanceId]
+      ?? (entry.mapInstanceId === expedition.rootMapInstanceId ? expedition.rootMapSnapshot : null);
+    if (!previousSnapshot) {
+      console.warn(`[subregions] Missing return snapshot '${entry.mapInstanceId}'`, {
+        rootMapInstanceId: expedition.rootMapInstanceId,
+        currentMapInstanceId,
+        stackLength: expedition.subregionStack.length,
+        snapshotKeys: Object.keys(expedition.mapSnapshots ?? {}),
+      });
+      this.addToast?.("Kunne ikke finde kortet tilbage");
+      return { ok: false, changed: false, reason: "missing_return_snapshot" };
+    }
+    this.setSubregionTransition?.(true, {
+      title: "Loading subregion",
+      label: previousSnapshot.regionConfig?.label ?? "Previous map",
+      detail: "Returning",
+      percent: 20,
+    });
+    this.restoreMapSnapshot(previousSnapshot);
+    expedition.currentMapInstanceId = entry.mapInstanceId;
+    this.currentMapInstanceId = entry.mapInstanceId;
+    placeNearObjectOrPosition(this, entry.sourceObjectRuntimeId, entry.returnPlayerPosition);
+    this.updateNearbyActionTarget?.();
+    this.refreshCurrentRegionAssets?.()
+      .then(() => {
+        this.setSubregionTransition?.(true, {
+          title: "Loading subregion",
+          label: previousSnapshot.regionConfig?.label ?? "Previous map",
+          detail: "Ready",
+          percent: 100,
+        });
+        globalThis.setTimeout(() => this.setSubregionTransition?.(false), 80);
+      })
+      .catch((error) => {
+        console.warn("[subregions] Failed to load return map assets", error);
+        this.setSubregionTransition?.(false);
+      });
+    this.saveProgress?.({ force: true });
+    return { ok: true, changed: false };
+  },
+
+  clearSubregionExpedition(options = {}) {
+    if (!this.currentExpedition) return false;
+    this.currentExpedition = null;
+    this.currentMapInstanceId = null;
+    if (options.save) this.saveProgress?.({ force: true });
+    return true;
+  },
+
+  isInSubregion() {
+    return isSubregionMap(this);
+  },
+};

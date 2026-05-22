@@ -106,6 +106,13 @@ function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESE
 export const regionMethods = {
   updateRegionExit(dt) {
     this.exitPromptCooldown = Math.max(0, this.exitPromptCooldown - dt);
+    if (this.isInSubregion?.()) {
+      if (this.exitPromptOpen) {
+        this.exitPromptOpen = false;
+        this.publishSnapshot();
+      }
+      return;
+    }
     if (this.exitPromptOpen || this.exitPromptCooldown > 0) return;
     if (distance(this.player, this.region.end) < 0.78) {
       this.exitPromptOpen = true;
@@ -121,10 +128,15 @@ export const regionMethods = {
   },
 
   travelToNextRegion() {
+    if (this.isInSubregion?.()) {
+      this.exitSubregionFromAction?.();
+      return;
+    }
     if (this.activeMapRegion) {
       this.returnToAreaMap();
       return;
     }
+    this.clearSubregionExpedition?.();
     this.regionIndex += 1;
     this.region = createRegion(this.regionIndex);
     this.resetRegionRuntime();
@@ -138,6 +150,7 @@ export const regionMethods = {
 
   startMapRegion(areaMapId, regionConfig) {
     if (!areaMapId || !regionConfig?.id) return false;
+    this.clearSubregionExpedition?.();
     const preparedRegionConfig = regionConfig.__worldStateResolved
       ? regionConfig
       : this.prepareMapRegionConfig(areaMapId, regionConfig, { markVisit: true });
@@ -220,6 +233,7 @@ export const regionMethods = {
   returnToAreaMap() {
     const active = this.activeMapRegion;
     if (!active) return;
+    this.clearSubregionExpedition?.();
     const mobCounts = this.monsterCounterSnapshot();
     const cleared = this.allRegionMonstersCleared();
     // Mark clear_map quests complete per quest target, not by requiring all region monsters to be dead.
@@ -272,11 +286,13 @@ export const regionMethods = {
   abandonMapRegionToWorldMap() {
     const active = this.activeMapRegion;
     if (!active) return false;
+    this.clearSubregionExpedition?.();
     const mobCounts = this.monsterCounterSnapshot();
     const currentState = captureAbandonState(this);
     // Roll back to the forced save taken when the map run started.
     this.loadProgress();
     restoreKeptAbandonState(this, currentState);
+    this.clearSubregionExpedition?.();
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;

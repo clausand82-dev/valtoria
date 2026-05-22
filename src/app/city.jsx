@@ -190,10 +190,14 @@ const CITY_DAMAGE_SMOKE_TEXTURES = [
   "/assets/generated/particles/smokey_explosion.png",
 ];
 const CITY_DAMAGE_FIRE_TEXTURES = [
-  "/assets/generated/particles/flame_01.png",
-  "/assets/generated/particles/flame_02.png",
-  "/assets/generated/particles/flame_03.png",
-  "/assets/generated/particles/flame_04.png",
+  //"/assets/generated/particles/flame_01.png",
+  //"/assets/generated/particles/flame_02.png",
+  //"/assets/generated/particles/flame_03.png",
+  //"/assets/generated/particles/flame_04.png",
+  "/assets/generated/particles/flame_09.png",
+  "/assets/generated/particles/flame_10.png",
+  "/assets/generated/particles/flame_11.png",
+  "/assets/generated/particles/flame_12.png",
 ];
 
 function CityPage({

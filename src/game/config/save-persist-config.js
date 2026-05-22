@@ -34,6 +34,7 @@ export const SAVE_PERSIST_CONFIG = {
   worldState: true,
   worldEnergy: true,
   actionState: true,
+  currentExpedition: true,
   cityProgress: {
     areas: true,
     buildingStates: true,

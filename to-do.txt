@@ -12,20 +12,6 @@ Ting at få gjort
 - fix en af village - og nogle har stadig dårlig walk cycle
 
 
-Et par eksempler på actions:
-En sten, som kan dukke op alle steder, hvor der er sten, chancen for det sker er på 10% - stenens action er at heale spiller 100%. Stenen skal have en aura lavet med partikler
-
-
-- erstatte animeret chest med et single frame et, og så brug E ved det - så kan E blive til:
-interaction: {
-  type: "readable" | "harvest" | "unlock" | "repair" | "inspect" | "ritual" | "questStart" | "teleport" | "trap",
-  prompt: "Press E to inspect",
-  requires: {...},
-  gives: {...},
-  setsFlag: "..."
-}
-dvs multi funktionel - en parameter object skal kunne have i map-region object (default none) - måske linket til en action i anden tabel, så map-region object felt ikke behøver være så lang (object {..., actionId: "Read xxx"}) - al anden config kan være i action-config
-
 --- GENERELT---
 
 - befri indbyggere til ens by/lejr

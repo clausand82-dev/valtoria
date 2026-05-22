@@ -12,6 +12,7 @@ import { renderingMethods } from "./methods/rendering.js";
 import { inputMethods } from "./methods/input.js";
 import { snapshotMethods } from "./methods/snapshot.js";
 import { actionsMethods } from "./methods/actions.js";
+import { subregionMethods } from "./methods/subregions.js";
 import { normalizeWorldState } from "../world-state.js";
 import { normalizeWorldEnergy } from "../world-energy.js";
 import { ParticleEngine } from "../particles/ParticleEngine.js";
@@ -98,6 +99,8 @@ export class GameEngine {
     this.worldState = normalizeWorldState();
     this.worldEnergy = normalizeWorldEnergy();
     this.actionState = { completedActions: {}, objectStates: {} };
+    this.currentExpedition = null;
+    this.currentMapInstanceId = null;
     if (!this.newGame) this.loadProgress();
     this.prepareRegionQuestgiver();
     this.regionStartPlayerLevel = this.player.level;
@@ -135,6 +138,7 @@ for (const methods of [
   renderingMethods,
   inputMethods,
   actionsMethods,
+  subregionMethods,
   snapshotMethods,
 ]) {
   applyMethodGroup(GameEngine.prototype, methods);

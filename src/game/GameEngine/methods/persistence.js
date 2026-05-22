@@ -43,6 +43,7 @@ import { saveRepository } from "../../../storage/saveRepository.js";
 import { normalizeWorldState } from "../../world-state.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
 import { normalizeActionState } from "../../actions/action-runner.js";
+import { normalizeCurrentExpedition } from "./subregions.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -312,6 +313,16 @@ export const persistenceMethods = {
     this.worldState = normalizeWorldState(payload.worldState);
     this.worldEnergy = normalizeWorldEnergy(payload.worldEnergy);
     this.actionState = normalizeActionState(payload.actionState);
+    this.currentExpedition = normalizeCurrentExpedition(payload.currentExpedition);
+    this.currentMapInstanceId = this.currentExpedition?.currentMapInstanceId ?? null;
+    const currentMapSnapshot = this.currentExpedition?.mapSnapshots?.[this.currentMapInstanceId];
+    if (currentMapSnapshot) {
+      this.restoreMapSnapshot?.(currentMapSnapshot);
+    } else if (this.currentExpedition?.currentMapInstanceId) {
+      console.warn("[subregions] Saved current expedition had no matching map snapshot; falling back to boot region");
+      this.currentExpedition = null;
+      this.currentMapInstanceId = null;
+    }
 
     if (Array.isArray(savedPlayer.inventory)) {
       const normalizedInventory = savedPlayer.inventory
@@ -371,8 +382,11 @@ export const persistenceMethods = {
 
   saveProgress(options = {}) {
     const force = Boolean(options?.force);
-    if (this.activeMapRegion && !force) return false;
+    if (this.activeMapRegion && !force && !this.currentExpedition) return false;
     if (!SAVE_PERSIST_CONFIG.storage.playerSave) return false;
+    if (this.currentExpedition?.currentMapInstanceId) {
+      this.storeCurrentMapSnapshot?.(this.currentExpedition.currentMapInstanceId);
+    }
     const cfg = SAVE_PERSIST_CONFIG;
     const inventoryPayload = cfg.player.inventory
       ? this.player.inventory.map((item) => this.serializeItemForSave(item))
@@ -442,6 +456,7 @@ export const persistenceMethods = {
       ...(cfg.worldState ? { worldState: normalizeWorldState(this.worldState) } : {}),
       ...(cfg.worldEnergy ? { worldEnergy: normalizeWorldEnergy(this.worldEnergy) } : {}),
       ...(cfg.actionState ? { actionState: normalizeActionState(this.actionState) } : {}),
+      ...(cfg.currentExpedition ? { currentExpedition: normalizeCurrentExpedition(this.currentExpedition) } : {}),
       loots: [],
     };
 

@@ -28,6 +28,16 @@ const CONDITION_KEYS = new Set([
   "cityInventory",
   "player",
   "playerStat",
+  "rootRegionId",
+  "rootMapId",
+  "rootMapInstanceId",
+  "sourceRegionId",
+  "sourceMapId",
+  "sourceObjectId",
+  "sourceObjectRuntimeId",
+  "subregionId",
+  "subregionKind",
+  "subregionDepth",
 ]);
 
 const MAP_REGION_PATCH_KEYS = {
@@ -181,6 +191,11 @@ function compareValue(actual, condition) {
     return compareNumber(actual, condition);
   }
   return Boolean(actual);
+}
+
+function compareContextValue(actual, expected) {
+  if (expected && typeof expected === "object" && !Array.isArray(expected)) return compareValue(actual, expected);
+  return String(actual ?? "") === String(expected ?? "");
 }
 
 function regionKey(context = {}, state) {
@@ -355,6 +370,18 @@ function shorthandConditionMet(key, expected, worldState, context) {
       return statMapMatches(context.player, expected);
     case "playerStat":
       return statMapMatches(context.player?.stats, expected);
+    case "rootRegionId":
+    case "rootMapId":
+    case "rootMapInstanceId":
+    case "sourceRegionId":
+    case "sourceMapId":
+    case "sourceObjectId":
+    case "sourceObjectRuntimeId":
+    case "subregionId":
+    case "subregionKind":
+      return compareContextValue(context[key], expected);
+    case "subregionDepth":
+      return compareNumber(context.subregionDepth, expected);
     default:
       return true;
   }

@@ -883,7 +883,9 @@ export default function App() {
       )}
       </>
       )}
-      {appLoading.active && <AppLoadingScreen state={appLoading} />}
+      {(appLoading.active || snapshot.subregionTransition?.active) && (
+        <AppLoadingScreen state={appLoading.active ? appLoading : snapshot.subregionTransition} />
+      )}
     </main>
   );
 }

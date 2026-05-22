@@ -428,7 +428,7 @@ export const renderingMethods = {
       });
     }
 
-    if (chunk.region) {
+    if (chunk.region && !this.isInSubregion?.()) {
       drawRegionMarkerIfInChunk(ctx, chunk, chunk.region.start, "start", originX, originY);
       drawRegionMarkerIfInChunk(ctx, chunk, chunk.region.end, "exit", originX, originY);
     }

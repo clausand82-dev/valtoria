@@ -116,6 +116,30 @@ export const ACTION_CONFIG = {
     once: true,
   },
 
+  enter_generic_cave01: {
+    id: "enter_generic_cave01",
+    type: "enterSubregion",
+    label: "Gaa ind",
+    targetSubregionId: "cave01_lvl1",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  enter_cave01_lvl2: {
+    id: "enter_cave01_lvl2",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "cave01_lvl2",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  exit_subregion: {
+    id: "exit_subregion",
+    type: "exitSubregion",
+    label: "Gaa tilbage",
+  },
+
   summon_wolf_boss: {
     id: "summon_wolf_boss",
     type: "summon",

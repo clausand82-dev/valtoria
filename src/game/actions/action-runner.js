@@ -30,14 +30,14 @@ const IMPLEMENTED_TYPES = new Set([
   "cleanse",
   "repair",
   "offer",
+  "enterSubregion",
+  "exitSubregion",
 ]);
 
 const RESERVED_STUB_TYPES = new Set([
   "summon",
   "questStart",
   "questAdvance",
-  "enterSubregion",
-  "exitSubregion",
 ]);
 
 export function getActionConfig(actionId) {
@@ -76,6 +76,7 @@ export function actionCompletionKey({ actionId, target, sourceType = "object", c
 }
 
 function actionContext(engine, extra = {}) {
+  const expedition = engine?.currentExpedition;
   return {
     ...extra,
     engine,
@@ -90,6 +91,11 @@ function actionContext(engine, extra = {}) {
     regionId: extra.regionId ?? engine?.region?.mapRegion?.id ?? engine?.region?.id,
     regionConfig: extra.regionConfig ?? engine?.region?.mapRegion,
     activeMapRegion: extra.activeMapRegion ?? engine?.activeMapRegion,
+    rootRegionId: extra.rootRegionId ?? expedition?.rootRegionId,
+    rootMapId: extra.rootMapId ?? expedition?.rootMapId,
+    rootMapInstanceId: extra.rootMapInstanceId ?? expedition?.rootMapInstanceId,
+    sourceMapId: extra.sourceMapId ?? expedition?.currentMapInstanceId,
+    subregionDepth: extra.subregionDepth ?? expedition?.subregionStack?.length ?? 0,
   };
 }
 
@@ -305,7 +311,15 @@ function runStub(engine, action) {
   return { ok: true, changed: false, message: "not_implemented" };
 }
 
-function runImplementedHandler(engine, action) {
+function runImplementedHandler(engine, action, target = null, context = {}) {
+  if (action.type === "enterSubregion") {
+    return engine.enterSubregionFromAction?.(action, target, context)
+      ?? { ok: false, changed: false, reason: "missing_subregion_handler" };
+  }
+  if (action.type === "exitSubregion") {
+    return engine.exitSubregionFromAction?.(action, target, context)
+      ?? { ok: false, changed: false, reason: "missing_subregion_handler" };
+  }
   if (action.type === "inspect" || action.type === "read" || action.type === "activate" || action.type === "reveal") {
     showActionText(engine, action);
   }
