@@ -101,11 +101,19 @@ export const inputMethods = {
     }
     if (key === "1") {
       event.preventDefault();
-      this.usePotion("health");
+      this.activateQuickSlot("1");
     }
     if (key === "2") {
       event.preventDefault();
-      this.usePotion("mana");
+      this.activateQuickSlot("2");
+    }
+    if (key === "3") {
+      event.preventDefault();
+      this.activateQuickSlot("3");
+    }
+    if (key === "4") {
+      event.preventDefault();
+      this.activateQuickSlot("4");
     }
     if (key === "q") {
       const target = this.nearestMonster(7);
@@ -122,6 +130,10 @@ export const inputMethods = {
         event.preventDefault();
         this.lootNearbyFoliage();
       }
+    }
+    if (key === "tab" && this.nearbyActionTarget?.targetCount > 1) {
+      event.preventDefault();
+      this.cycleNearbyActionTarget(event.shiftKey ? -1 : 1);
     }
   },
 

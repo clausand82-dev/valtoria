@@ -23,7 +23,11 @@ import {
   withItemIcon,
   SAVE_VERSION,
   SAVE_STORAGE_KEY,
-  MAX_POTION_STACK
+  MAX_POTION_STACK,
+  makePotion,
+  normalizePotionId,
+  potionDefById,
+  normalizeQuickSlots
 } from "../dependencies.js";
 import {
   normalizeReadableStatus,
@@ -31,6 +35,7 @@ import {
   resourceStackMax,
   normalizeResourceId,
   normalizeHeroStats,
+  normalizeQuestBoards,
   normalizeSavedQuestState,
   questItemTargetsForQuest
 } from "../helpers.js";
@@ -182,6 +187,7 @@ export const persistenceMethods = {
         ? clamp(Number(item.durability), 0, 100)
         : undefined,
       sockets: normalizeSockets(item.sockets),
+      potionId: item.potionId ? normalizePotionId(item.potionId) : normalizePotionId(item.potionType),
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,
       resourceId: savedResourceId,
@@ -247,6 +253,19 @@ export const persistenceMethods = {
       normalized.iconUrl = def?.iconUrl ?? normalized.iconUrl;
       normalized.value = Math.max(1, Math.floor(Number(def?.value ?? normalized.value) || 1));
     }
+    if (isPotionItem(normalized)) {
+      const def = potionDefById(normalized.potionId ?? normalized.potionType);
+      if (def) {
+        normalized.potionId = def.id;
+        normalized.potionType = def.type;
+        normalized.name = def.name;
+        normalized.baseName = def.name;
+        normalized.restorePct = def.restorePct;
+        normalized.iconKey = def.iconKey;
+        normalized.iconUrl = def.iconUrl;
+        normalized.rarityColor = def.color;
+      }
+    }
     if (normalized.uniqueId) {
       const def = UNIQUE_ITEMS.find((entry) => entry.id === normalized.uniqueId);
       // Always re-derive from definition — never trust the saved iconUrl for unique items.
@@ -287,6 +306,7 @@ export const persistenceMethods = {
       health: clamp(Math.floor(Number(savedPlayer.potions?.health) || 0), 0, MAX_POTION_STACK),
       mana: clamp(Math.floor(Number(savedPlayer.potions?.mana) || 0), 0, MAX_POTION_STACK),
     };
+    this.player.quickSlots = normalizeQuickSlots(savedPlayer.quickSlots);
     this.player.readableBonuses = normalizeReadableBonuses(savedPlayer.readableBonuses);
     this.player.skillTree = normalizeSkillTree(savedPlayer.skillTree);
     this.player.classId = normalizeClassId(savedPlayer.classId ?? DEFAULT_CLASS_ID);
@@ -328,14 +348,19 @@ export const persistenceMethods = {
       const normalizedInventory = savedPlayer.inventory
         .map((item) => this.normalizeSavedItem(item))
         .filter(Boolean);
-      for (const item of normalizedInventory) {
-        if (isPotionItem(item)) this.addPotionLoot(item);
-      }
       this.player.inventory = normalizedInventory
-        .filter((item) => !isPotionItem(item))
         .slice(0, MAX_INVENTORY);
+      this.compactPotionStacks?.();
       cleanupObsoleteQuestItems(this.player, this.questState);
     }
+    for (const [legacyType, count] of Object.entries(this.player.potions ?? {})) {
+      const amount = Math.max(0, Math.floor(Number(count) || 0));
+      if (amount > 0) this.addPotionLoot(makePotion(legacyType, this.player.level));
+      const potionId = normalizePotionId(legacyType);
+      const stack = this.player.inventory.find((item) => isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === potionId);
+      if (stack) stack.count = Math.min(MAX_POTION_STACK, Math.max(Math.floor(Number(stack.count) || 1), amount));
+    }
+    this.player.potions = { health: 0, mana: 0 };
 
     const nextEquipment = createEquipment();
     const savedEquipment = savedPlayer.equipment;
@@ -419,6 +444,7 @@ export const persistenceMethods = {
           popularity: this.player.popularity,
         } : {}),
         ...(cfg.player.potions ? { potions: { ...this.player.potions } } : {}),
+        quickSlots: normalizeQuickSlots(this.player.quickSlots),
         ...(cfg.player.readableBonuses ? { readableBonuses: { ...this.player.readableBonuses } } : {}),
         ...(cfg.player.skillTree ? { skillTree: normalizeSkillTree(this.player.skillTree) } : {}),
         classId: normalizeClassId(this.player.classId),
@@ -452,6 +478,7 @@ export const persistenceMethods = {
           ? this.questState.active.map((quest) => ({ ...quest, progress: { ...(quest.progress ?? {}) } }))
           : [],
         completed: cfg.quests.completed ? [...this.questState.completed] : [],
+        questBoards: cfg.quests.questBoards ? normalizeQuestBoards(this.questState.questBoards) : {},
       },
       ...(cfg.worldState ? { worldState: normalizeWorldState(this.worldState) } : {}),
       ...(cfg.worldEnergy ? { worldEnergy: normalizeWorldEnergy(this.worldEnergy) } : {}),

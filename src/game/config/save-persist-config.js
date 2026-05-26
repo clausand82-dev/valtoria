@@ -30,6 +30,7 @@ export const SAVE_PERSIST_CONFIG = {
   quests: {
     active: true,
     completed: true,
+    questBoards: true,
   },
   worldState: true,
   worldEnergy: true,

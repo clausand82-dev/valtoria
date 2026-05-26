@@ -204,6 +204,7 @@ function slugToken(value) {
 export function deriveIconKey(itemLike = {}) {
   if (itemLike.iconKey) return slugToken(itemLike.iconKey);
   if (itemLike.mode === "potion" || itemLike.potionType) {
+    if (itemLike.iconKey) return slugToken(itemLike.iconKey);
     return itemLike.potionType === "mana" ? "potion_mana" : "potion_health";
   }
   if (itemLike.resourceId) {

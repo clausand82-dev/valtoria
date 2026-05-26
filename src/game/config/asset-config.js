@@ -99,11 +99,6 @@ export const OBJECT_SHEETS = {
     rock: { fileName: "crystal_normal_sheet.png", rows: 4, cols: 4 },
     snow: { fileName: "crystal_snow_sheet.png", rows: 4, cols: 4 },
   },
-  chest: {
-    mainland: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-    jungle: { fileName: "chest_normal_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-    snow: { fileName: "chest_snow_animated_sheet.png", rows: 2, cols: 4, frameCount: 6, animated: true },
-  },
   firebeacon: {
     // Firebeacon er pt. kun snow. Derfor ligger der kun en snow-entry her, og
     // biome-config.js sørger for at kun snow spawner "firebeacon".

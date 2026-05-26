@@ -1,20 +1,118 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   AtlasIcon,
   CityStatsTopBar,
   CitySideStats,
   ImageIcon,
-  InventoryIcon,
   ITEM_MONEY_ICON_URL,
-  QUICKBAR_ATTACK_ICON_URL,
   QUICKBAR_CITY_ICON_URL,
-  QUICKBAR_HEALTH_POTION_ICON_URL,
-  QUICKBAR_MANA_POTION_ICON_URL,
   QUICKBAR_QUEST_ICON_URL,
   QUICKBAR_WILDERNESS_ICON_URL,
   QuestObjectiveMeta,
   ResourceBar,
 } from "../index.jsx";
+
+function CooldownClock({ progress }) {
+  const pct = Math.max(0, Math.min(1, Number(progress) || 0));
+  if (pct <= 0) return null;
+  return <span className="quickslot-cooldown" style={{ "--cooldown-pct": pct }} aria-hidden="true" />;
+}
+
+function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker, onOpenPicker, onClosePicker }) {
+  const hoverTimerRef = useRef(null);
+  const closeTimerRef = useRef(null);
+  const options = slot.kind === "potion" ? (quickActions.potions ?? []) : (quickActions.spells ?? []);
+  const selected = options.find((entry) => String(entry.id) === String(slot.id)) ?? options[0] ?? null;
+  const isPotion = slot.kind === "potion";
+  const isOpen = openPicker === slotId;
+  const count = isPotion ? Math.max(0, Math.floor(Number(selected?.count) || 0)) : 0;
+  const spellCooldown = !isPotion && selected?.cooldown
+    ? Math.max(0, Number(quickActions.spellCooldown) || 0) / Math.max(0.1, Number(selected.cooldown) || 1)
+    : 0;
+  const potionCooldown = isPotion
+    ? Math.max(0, Number(quickActions.potionCooldown) || 0) / Math.max(0.1, Number(quickActions.potionCooldownMax) || 0.5)
+    : 0;
+  const disabled = cityOpen || !selected || (isPotion ? count <= 0 : false);
+  const title = selected
+    ? `${selected.name ?? selected.title}${isPotion ? ` (${count})` : selected.manaCost ? ` (${selected.manaCost} mana)` : ""}`
+    : "Empty slot";
+  const hoverMs = Math.max(0, Number(quickActions.pickerHoverMs) || 3000);
+  const closeMs = Math.max(0, Number(quickActions.pickerCloseMs) || 1800);
+
+  useEffect(() => () => {
+    window.clearTimeout(hoverTimerRef.current);
+    window.clearTimeout(closeTimerRef.current);
+  }, []);
+
+  const clearTimers = () => {
+    window.clearTimeout(hoverTimerRef.current);
+    window.clearTimeout(closeTimerRef.current);
+  };
+  const scheduleOpen = () => {
+    clearTimers();
+    hoverTimerRef.current = window.setTimeout(() => onOpenPicker(slotId), hoverMs);
+  };
+  const scheduleClose = () => {
+    window.clearTimeout(hoverTimerRef.current);
+    window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => onClosePicker(slotId), closeMs);
+  };
+  const stopQuickbarEvent = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  const renderIcon = (entry) => (
+    entry?.iconUrl
+      ? <ImageIcon src={entry.iconUrl} />
+      : <AtlasIcon frameName={entry?.frameName ?? "orb"} />
+  );
+
+  return (
+    <span
+      className={`quickslot-wrap ${isOpen ? "open" : ""}`}
+      onMouseEnter={scheduleOpen}
+      onMouseLeave={scheduleClose}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <button
+        type="button"
+        className={`quickslot ${isPotion ? "potion-slot" : "spell-slot"} ${(isPotion ? potionCooldown : spellCooldown) > 0 ? "cooling" : ""}`}
+        title={cityOpen ? "Ikke tilgaengelig i byen" : title}
+        disabled={disabled}
+        onClick={(event) => {
+          stopQuickbarEvent(event);
+          engineRef.current?.activateQuickSlot?.(slotId);
+        }}
+      >
+        {renderIcon(selected)}
+        <span className="hotkey-badge">{slotId}</span>
+        {isPotion && <b>{count}</b>}
+        <CooldownClock progress={isPotion ? potionCooldown : spellCooldown} />
+      </button>
+      {isOpen && options.length > 0 && (
+        <div className="quickslot-picker" role="menu" aria-label={`Choose slot ${slotId}`} onPointerDown={(event) => event.stopPropagation()}>
+          {options.map((option) => (
+            <button
+              type="button"
+              className={String(option.id) === String(slot.id) ? "active" : ""}
+              key={option.id}
+              title={option.name ?? option.title}
+              onClick={(event) => {
+                stopQuickbarEvent(event);
+                engineRef.current?.setQuickSlot?.(slotId, option.id);
+                onClosePicker(slotId);
+              }}
+            >
+              {renderIcon(option)}
+              {isPotion && <b>{Math.max(0, Math.floor(Number(option.count) || 0))}</b>}
+              <span className="quickslot-picker-label">{option.name ?? option.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
 
 export function GameHud({
   cityHudStats,
@@ -42,7 +140,10 @@ export function GameHud({
   trackedQuests,
   xpPct,
 }) {
+  const [openPicker, setOpenPicker] = useState(null);
   const questBadgeCount = Math.max(0, (snapshot.quests?.active ?? []).filter((quest) => quest.complete).length);
+  const handleOpenPicker = (slotId) => setOpenPicker(slotId);
+  const handleClosePicker = (slotId) => setOpenPicker((current) => (current === slotId ? null : current));
 
   return (
     <>
@@ -165,51 +266,19 @@ export function GameHud({
         </section>
       ) : (
       <section className="skillbar" aria-label="Battle quickbar">
-        <span title={cityOpen ? "Ikke tilgaengelig i byen" : undefined}>
-          <button
-            type="button"
-            className="quick-potion"
-            title="Health potion"
-            disabled={cityOpen || !snapshot.quickActions.healthPotions || snapshot.quickActions.potionCooldown > 0}
-            onClick={() => engineRef.current?.usePotion("health")}
-          >
-            <InventoryIcon iconIndex={4} iconSheet="items" iconUrl={QUICKBAR_HEALTH_POTION_ICON_URL} />
-            <span className="hotkey-badge">1</span>
-            <b>{snapshot.quickActions.healthPotions}</b>
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgaengelig i byen" : undefined}>
-          <button
-            type="button"
-            className="quick-potion"
-            title="Mana potion"
-            disabled={cityOpen || !snapshot.quickActions.manaPotions || snapshot.quickActions.potionCooldown > 0}
-            onClick={() => engineRef.current?.usePotion("mana")}
-          >
-            <InventoryIcon iconIndex={3} iconSheet="items" iconUrl={QUICKBAR_MANA_POTION_ICON_URL} />
-            <span className="hotkey-badge">2</span>
-            <b>{snapshot.quickActions.manaPotions}</b>
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgaengelig i byen" : undefined}>
-          <button type="button" className="skill active" title="Angrib" disabled={cityOpen} onClick={() => engineRef.current?.primaryAttack()}>
-            <InventoryIcon iconIndex={0} iconSheet="items" iconUrl={QUICKBAR_ATTACK_ICON_URL} />
-          </button>
-        </span>
-        <span title={cityOpen ? "Ikke tilgaengelig i byen" : undefined}>
-          <button
-            type="button"
-            className="skill"
-            title="Kast magi"
-            disabled={cityOpen}
-            onClick={() => {
-              const engine = engineRef.current;
-              if (engine) engine.castSpellAt(engine.pointer.worldX, engine.pointer.worldY);
-            }}
-          >
-            <AtlasIcon frameName="orb" />
-          </button>
-        </span>
+        {["1", "2", "3", "4"].map((slotId) => (
+          <QuickSlot
+            cityOpen={cityOpen}
+            engineRef={engineRef}
+            key={slotId}
+            onClosePicker={handleClosePicker}
+            onOpenPicker={handleOpenPicker}
+            openPicker={openPicker}
+            quickActions={snapshot.quickActions}
+            slot={snapshot.quickActions.slots?.[slotId] ?? { kind: Number(slotId) <= 2 ? "potion" : "spell", id: "" }}
+            slotId={slotId}
+          />
+        ))}
         <button type="button" className="skill" title="Rygsaek" onClick={() => setInventoryOpen((value) => !value)}>
           <ImageIcon src="/assets/generated/icon_backpack.png" />
           <span className="hotkey-badge">I</span>

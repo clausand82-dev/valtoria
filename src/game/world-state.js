@@ -444,6 +444,10 @@ function entryAllowed(entry, worldState, context) {
   return true;
 }
 
+export function worldEntryAllowed(entry, worldState = EMPTY_WORLD_STATE, context = {}) {
+  return entryAllowed(entry, normalizeWorldState(worldState), context);
+}
+
 function stripConditionFields(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
   const rest = {};

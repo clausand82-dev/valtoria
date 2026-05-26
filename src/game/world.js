@@ -2,6 +2,7 @@ import { CHUNK_SIZE, WORLD_SEED } from "./config/game-constants-config.js";
 import { ARMOR_BASES, EQUIPMENT_SLOTS, WEAPON_BASES } from "./config/equipment-config.js";
 import { NAMED_ITEM_TEMPLATES, PREFIXES, UNIQUE_ITEMS } from "./config/item-config.js";
 import { MONSTER_STATS } from "./config/monster-config.js";
+import { QUEST_NPCS } from "./config/npc-config.js";
 import { RARITIES, UNIQUE_RARITY } from "./config/rarity-config.js";
 import { OBJECT_SPAWN_TUNING, SPAWN_CONFIG } from "./config/spawn-config.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
@@ -18,6 +19,7 @@ import {
 import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
 import { normalizeParticleConfigs, rollParticleConfigs } from "./config/particle-presets.js";
 import { resolveWeatherForRegion } from "./config/weather-presets.js";
+import { potionDefById, normalizePotionId } from "./config/potion-config.js";
 import { BOSS_TINT } from "./config/monster-config.js";
 import { withItemFlags, withItemIcon } from "./item-system.js";
 import { MAX_ITEM_SOCKETS } from "./config/socket-config.js";
@@ -466,18 +468,23 @@ function rollRarityFromList(rarities, level) {
 }
 
 export function makePotion(type = Math.random() < 0.5 ? "health" : "mana", level = 1) {
-  const health = type === "health";
+  const potionId = normalizePotionId(type) || "small_health";
+  const def = potionDefById(potionId);
+  const health = def?.type === "health";
   return finalizeItem({
     id: createId(),
-    name: health ? "Health Potion" : "Mana Potion",
-    baseName: health ? "Health Potion" : "Mana Potion",
+    name: def?.name ?? (health ? "Small Health Potion" : "Mana Potion"),
+    baseName: def?.name ?? (health ? "Small Health Potion" : "Mana Potion"),
     rarity: "normal",
     rarityLabel: "Normal",
-    rarityColor: health ? "#c52c38" : "#2d8ed8",
+    rarityColor: def?.color ?? (health ? "#c52c38" : "#2d8ed8"),
     slot: "consumable",
     mode: "potion",
-    potionType: health ? "health" : "mana",
-    restorePct: 0.25,
+    potionId,
+    potionType: def?.type ?? (health ? "health" : "mana"),
+    restorePct: Number(def?.restorePct) || 0.25,
+    iconKey: def?.iconKey,
+    iconUrl: def?.iconUrl,
     level: Math.max(1, Math.floor(Number(level) || 1)),
     damageMin: 0,
     damageMax: 0,
@@ -488,7 +495,7 @@ export function makePotion(type = Math.random() < 0.5 ? "health" : "mana", level
     maxMana: 0,
     speed: 0,
     magic: 0,
-  }, { mergeable: false }, health ? "potion_health" : "potion_mana");
+  }, { mergeable: false }, def?.iconKey ?? (health ? "potion_health" : "potion_mana"));
 }
 
 const MAP_SIZE_SCALES = { small: 0.55, medium: 1.0, large: 1.5, giga: 2.2 };
@@ -879,6 +886,7 @@ export function createChunk(cx, cy, region = null) {
     decals: [],
     objects: [],
     monsters: [],
+    npcs: [],
   };
   const waterTiles = buildChunkWaterTiles(region, cx, cy);
 
@@ -933,6 +941,7 @@ function addPrefabContent(chunk) {
     addPrefabFoliage(chunk, instance);
     addPrefabDecals(chunk, instance);
     addPrefabMonsters(chunk, instance);
+    addPrefabNpcs(chunk, instance);
   }
 }
 
@@ -1195,6 +1204,7 @@ function addPrefabObjects(chunk, instance) {
       ...spawnMetadata,
       destroyRewards: item.destroyRewards ? { ...item.destroyRewards } : def.destroyRewards ? { ...def.destroyRewards } : null,
       actionId: item.actionId ? String(item.actionId) : null,
+      actions: Array.isArray(item.actions) ? item.actions.map((entry) => ({ ...entry })) : null,
       defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
       ...damageState,
       prefabId: instance.id,
@@ -1280,7 +1290,9 @@ function addPrefabChests(chunk, instance) {
     if (!isRegionPointPlayable(chunk.region, x, y, 0.42) || isWaterAt(chunk, x, y)) continue;
     chunk.objects.push({
       id: createId(),
-      type: "chest",
+      runtimeId: `${chunk.region?.id ?? "region"}:prefab:${instance.instanceId}:chest:${i}:${item.id ?? "chest"}`,
+      objectDefId: "object_chests_ground",
+      type: "object_chests_ground",
       x,
       y,
       radius: 0.42,
@@ -1295,6 +1307,7 @@ function addPrefabChests(chunk, instance) {
       depthMode: "dynamic",
       sortAnchor: { x: 0.5, y: 0.9 },
       depthOffset: 0,
+      actionId: item.actionId ? String(item.actionId) : "open_map_chest",
       prefabId: instance.id,
       prefabInstanceId: instance.instanceId,
       prefabChestId: item.id ?? "chest",
@@ -1449,6 +1462,43 @@ function addPrefabMonsters(chunk, instance) {
   }
 }
 
+function addPrefabNpcs(chunk, instance) {
+  for (let i = 0; i < (instance.npcs ?? []).length; i += 1) {
+    const item = instance.npcs[i];
+    const npcId = String(item.npcId ?? item.id ?? "").trim();
+    const def = QUEST_NPCS[npcId];
+    if (!def) {
+      console.warn(`[map-prefabs] Unknown NPC id: ${npcId || "(empty)"}`);
+      continue;
+    }
+    const { x, y } = prefabWorldPoint(instance, item);
+    if (!pointInChunk(chunk, x, y)) continue;
+    if (!isRegionPointPlayable(chunk.region, x, y, 0.35) || isWaterAt(chunk, x, y)) continue;
+    chunk.npcs.push({
+      id: createId(),
+      runtimeId: `${chunk.region?.id ?? "region"}:prefab:${instance.instanceId}:npc:${i}:${npcId}`,
+      type: "npc",
+      npcId,
+      name: def.name,
+      title: def.title,
+      imageUrl: def.imageUrl,
+      x,
+      y,
+      radius: Number(item.radius) || 0.45,
+      facing: item.facing ?? "south",
+      facingX: 0,
+      facingY: 1,
+      bob: rand01(chunk.cx, chunk.cy, 8060 + i) * Math.PI * 2,
+      actionId: item.actionId ? String(item.actionId) : null,
+      actions: Array.isArray(item.actions) ? item.actions.map((entry) => ({ ...entry })) : null,
+      defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
+      defaultActions: Array.isArray(def.defaultActions) ? def.defaultActions.map((entry) => ({ ...entry })) : null,
+      prefabId: instance.id,
+      prefabInstanceId: instance.instanceId,
+    });
+  }
+}
+
 function addObjects(chunk, safeChunk) {
   const objectPool = regionObjectPool(chunk.region);
   const objectCount = spawnCount(chunk, "objects");
@@ -1571,7 +1621,9 @@ function addRegionChest(chunk) {
 
   chunk.objects.push({
     id: createId(),
-    type: "chest",
+    runtimeId: `map-end-chest:${chunk.region?.mapRegion?.id ?? chunk.region?.id ?? "region"}`,
+    objectDefId: "object_chests_ground",
+    type: "object_chests_ground",
     x: position.x,
     y: position.y,
     radius,
@@ -1586,6 +1638,7 @@ function addRegionChest(chunk) {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
     depthOffset: 0,
+    actionId: "open_map_chest",
   });
 }
 

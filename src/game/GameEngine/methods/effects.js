@@ -665,6 +665,39 @@ export const effectsMethods = {
     });
   },
 
+  spawnHeroHealingEffect() {
+    this.particleEngine?.emitOneShot("hero_healing_beam", this.player.x, this.player.y, {
+      oneShotCount: 1,
+      layer: "belowUnits",
+      radius: 2,
+      offsetY: 0,
+      speed: [0, 0],
+      size: [28, 38],
+      endSize: [82, 112],
+      alpha: [0.26, 0.42],
+      endAlpha: [0, 0],
+      lifetime: [0.42, 0.62],
+      fadeIn: 0.18,
+      fadeOut: 0.34,
+      rotationSpeed: [-0.35, 0.35],
+      blendMode: "lighter",
+    });
+  },
+
+  spawnObjectBreakDustEffect(x, y) {
+    this.particleEngine?.emitOneShot("object_break_cold_mist", x, y, {
+      oneShotCount: 2,
+      layer: "effects",
+      radius: 18,
+      offsetY: 10,
+      speed: [1, 7],
+      alpha: [0.04, 0.1],
+      endAlpha: [0, 0],
+      blendMode: "source-over",
+      glow: false,
+    });
+  },
+
   footstepDustChance(fallback = 0.18) {
     const dustConfig = this.region?.mapRegion?.ambient?.footstepDust ?? {};
     const configured = Number(dustConfig.stepChance ?? dustConfig.chancePerStep);

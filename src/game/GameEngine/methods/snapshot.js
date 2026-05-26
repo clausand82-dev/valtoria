@@ -3,9 +3,16 @@ import {
   itemValue,
   clamp,
   POPULARITY_CONFIG,
+  QUEST_BOARD_CONFIG,
   QUEST_NPCS,
   READABLE_DEF_BY_ID,
   SPELL_DEFS,
+  POTION_IDS,
+  POTION_DEFS,
+  ACTION_BAR_CONFIG,
+  normalizeQuickSlots,
+  normalizePotionId,
+  isPotionItem,
   isReadableItem,
   isResourceItem
 } from "../dependencies.js";
@@ -43,8 +50,15 @@ export const snapshotMethods = {
     const stats = this.calcStats();
     const chunk = this.currentChunk();
     const hoverMonster = this.hoverMonsterId ? this.monsters.get(this.hoverMonsterId) : null;
-    const healthPotions = Math.max(0, Math.floor(Number(this.player.potions?.health) || 0));
-    const manaPotions = Math.max(0, Math.floor(Number(this.player.potions?.mana) || 0));
+    const potionCounts = Object.fromEntries(POTION_IDS.map((potionId) => [
+      potionId,
+      (this.player.inventory ?? []).reduce((sum, item) => (
+        isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === potionId
+          ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+          : sum
+      ), 0),
+    ]));
+    const quickSlots = normalizeQuickSlots(this.player.quickSlots);
     this.onSnapshot({
       player: {
         level: this.player.level,
@@ -166,13 +180,34 @@ export const snapshotMethods = {
         maxHp: hoverMonster.maxHp,
       } : null,
       quickActions: {
-        healthPotions,
-        manaPotions,
+        healthPotions: potionCounts.small_health ?? 0,
+        manaPotions: potionCounts.mana ?? 0,
         potionCooldown: this.potionCooldown,
+        potionCooldownMax: 0.5,
+        spellCooldown: this.player.spellCooldown,
+        slots: quickSlots,
+        pickerHoverMs: ACTION_BAR_CONFIG.pickerHoverMs,
+        pickerCloseMs: ACTION_BAR_CONFIG.pickerCloseMs,
+        potions: POTION_IDS.map((potionId) => ({
+          ...POTION_DEFS[potionId],
+          count: potionCounts[potionId] ?? 0,
+        })),
+        spells: (this.player.unlockedSpells ?? []).map((spellId) => ({
+          id: spellId,
+          title: SPELL_DEFS[spellId]?.title ?? spellId,
+          color: SPELL_DEFS[spellId]?.color,
+          cooldown: SPELL_DEFS[spellId]?.cooldown ?? 0,
+          manaCost: SPELL_DEFS[spellId]?.manaCost ?? 0,
+          frameName: SPELL_DEFS[spellId]?.hudFrame ?? "orb",
+          iconUrl: SPELL_DEFS[spellId]?.hudIconUrl ?? SPELL_DEFS[spellId]?.visuals?.projectileTexture ?? null,
+        })),
       },
       quests: {
         active: this.questState.active.map((quest) => questSnapshot(quest, this.player.inventory)),
         completed: [...this.questState.completed],
+        boards: Object.fromEntries(
+          Object.keys(QUEST_BOARD_CONFIG ?? {}).map((boardId) => [boardId, this.questBoardSnapshot?.(boardId) ?? null]),
+        ),
         cityFade: this.questState.cityFade.filter((fade) => Date.now() - fade.startedAt < 1400),
         wildernessNpc: this.questState.wildernessNpc ? {
           npcId: this.questState.wildernessNpc.npcId,

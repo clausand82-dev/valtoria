@@ -1,7 +1,16 @@
 History over changes
 
+*V. 1.77
+- changed end chest to be a object with E action and removed animated chest
+- cleaned up npc's and added more
+- changed quest to come from town hall (grind quest), inn (rumour) and npc's (story)
+- changed action bar to be more usefull (more will come)
+- fixed an erro where default box icon would show in mage tower
+
 *V. 1.76
-- added sublevel system nu - building on top of action system form early
+- added sublevel system - building on top of action system form early
+- npc can now be placed in prefabs, regions and subregions
+- added standard loot table in object drops
 
 *V. 1.75
 - added a particle system to object where pixel points can have speciel particles attatched

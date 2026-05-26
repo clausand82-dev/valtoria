@@ -8,6 +8,7 @@ import {
   clamp,
   distance,
   QUEST_CONFIG,
+  QUEST_BOARD_CONFIG,
   QUEST_DEFS,
   QUEST_NPCS,
   isPotionItem,
@@ -32,10 +33,12 @@ import {
   inventoryCanAccept,
   makeQuestInstance,
   isQuestComplete,
+  questSnapshot,
   resolveQuestDefById,
+  normalizeQuestBoards,
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
-import { worldConditionMet } from "../../world-state.js";
+import { worldEntryAllowed } from "../../world-state.js";
 
 export const questsMethods = {
   updateQuestgiver() {
@@ -77,13 +80,18 @@ export const questsMethods = {
     };
   },
 
-  questDefinitionCanOffer(def, npcId, scope = "wilderness") {
+  questDefinitionCanOffer(def, npcId, scope = "wilderness", contextOverrides = {}) {
     if (!def || !npcId) return false;
     const questSource = String(def.source ?? "npc");
+    const boardConfig = QUEST_BOARD_CONFIG?.[scope] ?? null;
     if (scope === "readable") {
-      if (questSource !== "readable") return false;
+      // A readable item explicitly names the quest it starts, so keep old readable
+      // starts working even if that quest also belongs to a board source.
+    } else if (boardConfig) {
+      if (questSource !== String(boardConfig.source ?? scope)) return false;
     } else {
       if (questSource === "readable") return false;
+      if (questSource !== "npc") return false;
       if (!canNpcStartQuest(def, npcId)) return false;
     }
     if (!def?.repeatable && this.questState.completed.includes(def.id)) return false;
@@ -95,7 +103,7 @@ export const questsMethods = {
     const currentRegionId = String(this.region?.mapRegion?.id ?? "");
     const wildernessRegionIds = regionIds.filter((id) => id !== "city");
 
-    if (scope === "city" || scope === "readable") {
+    if (scope === "city" || scope === "readable" || boardConfig) {
       if (!hasCityTag) return false;
     } else if (regionIds.length > 0) {
       if (hasCityTag && wildernessRegionIds.length === 0) return false;
@@ -103,13 +111,13 @@ export const questsMethods = {
       if (!wildernessRegionIds.includes(currentRegionId)) return false;
     }
 
-    if (!this.questDemandsMet(def.demands)) return false;
-    if (def.requires && !worldConditionMet(def.requires, this.worldState, this.questConditionContext())) return false;
-    if (def.blockedBy && worldConditionMet(def.blockedBy, this.worldState, this.questConditionContext())) return false;
+    const conditionContext = this.questConditionContext(contextOverrides);
+    if (!this.questDemandsMet(def.demands, conditionContext)) return false;
+    if (!worldEntryAllowed(def, this.worldState, conditionContext)) return false;
     if (scope === "city" && def?.repeatable) {
       if (this.questState.cityOfferRolls?.[def.id] !== npcId) return false;
     }
-    if (!this.offerPassesSpawnChance(def, npcId, scope)) return false;
+    if (!boardConfig && !this.offerPassesSpawnChance(def, npcId, scope)) return false;
 
     if (def.id === "vengeance") {
       return this.monsterTypesForCurrentRegion().some((type) => (
@@ -119,7 +127,7 @@ export const questsMethods = {
     return true;
   },
 
-  questConditionContext() {
+  questConditionContext(overrides = {}) {
     return {
       regionId: this.region?.mapRegion?.id,
       regionConfig: this.region?.mapRegion,
@@ -139,6 +147,7 @@ export const questsMethods = {
         player: this.player,
         worldState: this.worldState,
       },
+      ...overrides,
     };
   },
 
@@ -149,10 +158,11 @@ export const questsMethods = {
     return raw.map((entry) => normalizeMonsterType(entry)).filter(Boolean);
   },
 
-  questDemandsMet(demands) {
+  questDemandsMet(demands, context = this.questConditionContext()) {
     if (!demands || typeof demands !== "object") return true;
     const level = Math.max(0, Math.floor(Number(demands.level) || 0));
     if (level > 0 && this.player.level < level) return false;
+    if (demands.cityLevel !== undefined && !this.demandNumberMet(context.cityStats?.cityLevel ?? context.cityStats?.level ?? 1, demands.cityLevel)) return false;
 
     const requiredQuests = Array.isArray(demands.completedQuests)
       ? demands.completedQuests
@@ -169,7 +179,22 @@ export const questsMethods = {
       const needed = Math.max(1, Math.floor(Number(req?.count) || 1));
       if (this.countDemandItems(req) < needed) return false;
     }
-    if (!worldConditionMet(demands, this.worldState, this.questConditionContext())) return false;
+    if (!worldEntryAllowed(demands, this.worldState, context)) return false;
+    return true;
+  },
+
+  demandNumberMet(actual, condition) {
+    const value = Number(actual);
+    if (!Number.isFinite(value)) return false;
+    if (typeof condition === "number") return value >= condition;
+    if (!condition || typeof condition !== "object" || Array.isArray(condition)) return value >= Number(condition);
+    if (condition.equals !== undefined && value !== Number(condition.equals)) return false;
+    if (condition.min !== undefined && value < Number(condition.min)) return false;
+    if (condition.max !== undefined && value > Number(condition.max)) return false;
+    if (condition.gte !== undefined && value < Number(condition.gte)) return false;
+    if (condition.gt !== undefined && value <= Number(condition.gt)) return false;
+    if (condition.lte !== undefined && value > Number(condition.lte)) return false;
+    if (condition.lt !== undefined && value >= Number(condition.lt)) return false;
     return true;
   },
 
@@ -178,7 +203,13 @@ export const questsMethods = {
     if (req.resourceId || req.resource) return resourceCount(this.player.inventory, String(req.resourceId ?? req.resource));
     if (req.potionType) {
       const type = String(req.potionType);
-      return Math.max(0, Math.floor(Number(this.player.potions?.[type]) || 0));
+      const legacy = Math.max(0, Math.floor(Number(this.player.potions?.[type]) || 0));
+      const inventoryCount = (this.player.inventory ?? []).reduce((sum, item) => (
+        isPotionItem(item) && String(item.potionType ?? "") === type
+          ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+          : sum
+      ), 0);
+      return legacy + inventoryCount;
     }
 
     let total = 0;
@@ -255,13 +286,177 @@ export const questsMethods = {
     return offers;
   },
 
+  normalizeQuestBoardState() {
+    if (!this.questState.questBoards || typeof this.questState.questBoards !== "object") {
+      this.questState.questBoards = normalizeQuestBoards(this.questState.questBoards);
+    }
+    for (const boardId of Object.keys(QUEST_BOARD_CONFIG ?? {})) {
+      if (!this.questState.questBoards[boardId]) {
+        this.questState.questBoards[boardId] = { availableQuestIds: [], completedCooldowns: {} };
+      }
+      const board = this.questState.questBoards[boardId];
+      board.availableQuestIds = Array.isArray(board.availableQuestIds)
+        ? [...new Set(board.availableQuestIds.map(String).filter(Boolean))]
+        : [];
+      board.completedCooldowns = board.completedCooldowns && typeof board.completedCooldowns === "object"
+        ? board.completedCooldowns
+        : {};
+    }
+    return this.questState.questBoards;
+  },
+
+  questBoardDef(boardId) {
+    return QUEST_BOARD_CONFIG?.[boardId] ?? null;
+  },
+
+  questBoardState(boardId) {
+    const boards = this.normalizeQuestBoardState();
+    const board = boards[boardId] ?? { availableQuestIds: [], completedCooldowns: {} };
+    boards[boardId] = board;
+    return board;
+  },
+
+  questBoardNpcId(def) {
+    return getQuestTurnInNpcIds(def)[0] ?? getQuestStartNpcIds(def)[0] ?? "mayor";
+  },
+
+  questBoardCooldownRemaining(boardState, questId) {
+    return Math.max(0, Math.floor(Number(boardState?.completedCooldowns?.[questId]) || 0));
+  },
+
+  questBoardSpawnChancePasses(def) {
+    const chance = clamp(Number(def?.spawnChance ?? 1), 0, 1);
+    if (chance <= 0) return false;
+    return chance >= 1 || Math.random() <= chance;
+  },
+
+  questBoardCandidateDefs(boardId, contextOverrides = {}) {
+    const config = this.questBoardDef(boardId);
+    if (!config) return [];
+    const boardState = this.questBoardState(boardId);
+    const available = new Set((boardState.availableQuestIds ?? []).map(String));
+    return Object.values(QUEST_DEFS).filter((def) => {
+      if (!def?.id || String(def.source ?? "npc") !== String(config.source)) return false;
+      if (available.has(String(def.id))) return false;
+      if (this.questState.active.some((quest) => String(quest.questId) === String(def.id))) return false;
+      if (!def.repeatable && this.questState.completed.includes(String(def.id))) return false;
+      if (def.repeatable && this.questBoardCooldownRemaining(boardState, def.id) > 0) return false;
+      return this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides);
+    });
+  },
+
+  rollQuestBoard(boardId, contextOverrides = {}) {
+    const config = this.questBoardDef(boardId);
+    if (!config) return null;
+    const boardState = this.questBoardState(boardId);
+    const beforeIds = (boardState.availableQuestIds ?? []).map(String);
+    boardState.availableQuestIds = beforeIds.filter((questId) => {
+      const def = resolveQuestDefById(questId);
+      if (!def || String(def.source ?? "") !== String(config.source)) return false;
+      if (this.questState.active.some((quest) => String(quest.questId) === String(questId))) return false;
+      if (!def.repeatable && this.questState.completed.includes(String(questId))) return false;
+      return this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides);
+    });
+    const minAvailable = Math.max(0, Math.floor(Number(config.minAvailable) || 0));
+    const maxAvailable = Math.max(minAvailable, Math.floor(Number(config.maxAvailable) || minAvailable));
+    if (boardState.availableQuestIds.length < minAvailable) {
+      const picked = new Set(boardState.availableQuestIds.map(String));
+      while (boardState.availableQuestIds.length < maxAvailable) {
+        const candidates = this.questBoardCandidateDefs(boardId, contextOverrides)
+          .filter((def) => !picked.has(String(def.id)));
+        const rolledCandidates = candidates.filter((def) => this.questBoardSpawnChancePasses(def));
+        const next = rolledCandidates[Math.floor(Math.random() * rolledCandidates.length)];
+        if (!next) break;
+        picked.add(String(next.id));
+        boardState.availableQuestIds.push(String(next.id));
+      }
+    }
+    const afterIds = (boardState.availableQuestIds ?? []).map(String);
+    const changed = beforeIds.length !== afterIds.length || beforeIds.some((id, index) => id !== afterIds[index]);
+    if (changed) {
+      this.publishSnapshot();
+      this.saveProgress({ force: true });
+    }
+    return this.questBoardSnapshot(boardId, contextOverrides);
+  },
+
+  questBoardSnapshot(boardId, contextOverrides = {}) {
+    const config = this.questBoardDef(boardId);
+    if (!config) return null;
+    const boardState = this.questBoardState(boardId);
+    const offers = (boardState.availableQuestIds ?? [])
+      .map((questId) => resolveQuestDefById(questId))
+      .filter((def) => def && this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides))
+      .map((def) => this.buildQuestOffer(def, this.questBoardNpcId(def), {
+        source: config.source,
+        boardId,
+      }))
+      .filter(Boolean)
+      .map((quest) => questSnapshot(quest, this.player.inventory));
+    return {
+      id: boardId,
+      source: config.source,
+      title: config.title ?? boardId,
+      subtitle: config.subtitle ?? "",
+      emptyText: config.emptyText ?? "Ingen quests tilgaengelige lige nu.",
+      availableQuestIds: [...(boardState.availableQuestIds ?? [])],
+      cooldowns: { ...(boardState.completedCooldowns ?? {}) },
+      offers,
+    };
+  },
+
+  acceptBoardQuest(boardId, offer, contextOverrides = {}) {
+    const config = this.questBoardDef(boardId);
+    if (!config || !offer?.questId) return false;
+    const boardState = this.questBoardState(boardId);
+    const questId = String(offer.questId);
+    if (!(boardState.availableQuestIds ?? []).map(String).includes(questId)) {
+      this.addToast("Quest er ikke laengere paa opslagstavlen");
+      this.publishSnapshot();
+      return false;
+    }
+    const def = resolveQuestDefById(questId);
+    const npcId = offer.npcId ?? this.questBoardNpcId(def);
+    if (!def || !this.questDefinitionCanOffer(def, npcId, boardId, contextOverrides)) {
+      this.addToast("Quest er ikke laengere tilgaengelig");
+      boardState.availableQuestIds = (boardState.availableQuestIds ?? []).filter((id) => String(id) !== questId);
+      this.publishSnapshot();
+      this.saveProgress({ force: true });
+      return false;
+    }
+    const accepted = this.acceptQuestOffer({ ...offer, npcId }, boardId);
+    if (!accepted) return false;
+    boardState.availableQuestIds = (boardState.availableQuestIds ?? []).filter((id) => String(id) !== questId);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  advanceQuestBoardCooldowns(amount = 1) {
+    const delta = Math.max(1, Math.floor(Number(amount) || 1));
+    const boards = this.normalizeQuestBoardState();
+    let changed = false;
+    for (const board of Object.values(boards)) {
+      const cooldowns = board.completedCooldowns ?? {};
+      for (const [questId, value] of Object.entries(cooldowns)) {
+        const next = Math.max(0, Math.floor(Number(value) || 0) - delta);
+        if (next <= 0) delete cooldowns[questId];
+        else cooldowns[questId] = next;
+        changed = true;
+      }
+    }
+    if (changed) this.saveProgress({ force: true });
+  },
+
   cityRepeatableNpcCandidates(def) {
-    if (!def?.repeatable || String(def.source ?? "npc") === "readable") return [];
+    if (!def?.repeatable || String(def.source ?? "npc") !== "npc") return [];
     if (this.questState.active.some((quest) => quest.questId === def.id)) return [];
 
     const regionIds = Array.isArray(def.regionIds) ? def.regionIds.map(String) : ["city"];
     if (!regionIds.includes("city")) return [];
-    if (!this.questDemandsMet(def.demands)) return [];
+    const conditionContext = this.questConditionContext();
+    if (!this.questDemandsMet(def.demands, conditionContext)) return [];
+    if (!worldEntryAllowed(def, this.worldState, conditionContext)) return [];
 
     return getQuestStartNpcIds(def).filter((npcId) => Boolean(QUEST_NPCS[npcId]));
   },
@@ -620,6 +815,7 @@ export const questsMethods = {
       this.questState.completed.push(quest.questId);
     }
     if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];
+    if (quest.repeatable) this.applyQuestBoardCompletionCooldown(quest);
     this.cleanupObsoleteCompletedQuestItems();
     this.player.stats.questsCompleted += 1;
     this.questState.cityFade.push({ npcId: String(quest.turnInNpcId ?? quest.npcId), startedAt: Date.now() });
@@ -639,6 +835,20 @@ export const questsMethods = {
         regionIds: Array.isArray(quest.regionIds) ? [...quest.regionIds] : [],
         target: { ...(quest.target ?? {}) },
       },
+    };
+  },
+
+  applyQuestBoardCompletionCooldown(quest) {
+    const source = String(quest?.source ?? "");
+    const boardId = Object.keys(QUEST_BOARD_CONFIG ?? {}).find((id) => String(QUEST_BOARD_CONFIG[id]?.source ?? "") === source);
+    if (!boardId) return;
+    const def = resolveQuestDefById(quest.questId);
+    const cooldown = Math.max(0, Math.floor(Number(def?.cooldownMapRuns ?? def?.cooldownRuns ?? 0) || 0));
+    if (cooldown <= 0) return;
+    const boardState = this.questBoardState(boardId);
+    boardState.completedCooldowns = {
+      ...(boardState.completedCooldowns ?? {}),
+      [quest.questId]: cooldown,
     };
   },
 

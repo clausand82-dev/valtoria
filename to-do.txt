@@ -10,6 +10,16 @@ Ting at få gjort
 
 - fix icebear, bear and lion animation
 - fix en af village - og nogle har stadig dårlig walk cycle
+- fjern den animerede kiste og dens brug
+
+- Kan E mon bruges til at fixe nogle af husene i village map?
+
+- Måske library indeholder alle definerede mobs, men der er ikke billede eller info, får man har set dem - måske flere stages ala set 1 gang (billede) ingen stats, bekæmpet billede og stats
+prompt:
+bygningen library skal have en addons, hvor alle monster i spillet findes som bøger (brug evt book items) - hver monster indeholder billede, generel tekst og stats. Hvis en spiller har set mobs i spillet, vises billede. Hvis spilleren har kæmpet imod mobs, vises tekst og stats. Derudover bør der være statistiske informationer som antal dræbte har denne mobs (normal og elite seperat), maks lvl dræbt, steder den er set (regions) og lignende statistik - evt svagheder og fordele. Det er muligvis nødvendig at tilføje7udvide world states.
+
+
+
 
 
 --- GENERELT---

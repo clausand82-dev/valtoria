@@ -1,6 +1,7 @@
 import {
   createId,
   QUEST_CONFIG,
+  QUEST_BOARD_CONFIG,
   QUEST_DEFS,
   QUEST_ITEM_DEFS,
   QUEST_NPCS,
@@ -14,6 +15,32 @@ const QUEST_DEF_BY_ID = new Map(
     .filter((def) => def && typeof def === "object" && def.id)
     .map((def) => [String(def.id), def]),
 );
+
+function normalizeQuestBoardState(rawBoard) {
+  const raw = rawBoard && typeof rawBoard === "object" && !Array.isArray(rawBoard) ? rawBoard : {};
+  const availableQuestIds = Array.isArray(raw.availableQuestIds)
+    ? raw.availableQuestIds.map(String).filter(Boolean)
+    : [];
+  const completedCooldowns = raw.completedCooldowns && typeof raw.completedCooldowns === "object" && !Array.isArray(raw.completedCooldowns)
+    ? Object.fromEntries(
+      Object.entries(raw.completedCooldowns)
+        .map(([questId, value]) => [String(questId), Math.max(0, Math.floor(Number(value) || 0))])
+        .filter(([questId]) => Boolean(questId)),
+    )
+    : {};
+  return {
+    availableQuestIds: [...new Set(availableQuestIds)],
+    completedCooldowns,
+  };
+}
+
+export function normalizeQuestBoards(rawBoards = {}) {
+  const boards = {};
+  for (const boardId of Object.keys(QUEST_BOARD_CONFIG ?? {})) {
+    boards[boardId] = normalizeQuestBoardState(rawBoards?.[boardId]);
+  }
+  return boards;
+}
 
 export function resolveQuestDefById(questId) {
   if (!questId) return null;
@@ -203,6 +230,9 @@ export function makeQuestInstance(def, npcId, context = {}) {
       turnInNpcIds,
       title: def.titleTemplate.replace("{monster}", monster),
       repeatable: true,
+      kind: def.kind,
+      category: def.category,
+      cooldownMapRuns: def.cooldownMapRuns,
       type: def.type,
       regionIds,
       story: def.storyTemplate.replace("{npcName}", npc?.name ?? "En questgiver").replace("{monster}", monster),
@@ -225,6 +255,9 @@ export function makeQuestInstance(def, npcId, context = {}) {
     turnInNpcIds,
     title: def.title,
     repeatable: Boolean(def.repeatable),
+    kind: def.kind,
+    category: def.category,
+    cooldownMapRuns: def.cooldownMapRuns,
     type: def.type,
     regionIds,
     story: def.story,
@@ -407,6 +440,9 @@ export function normalizeSavedQuestState(saved) {
           progress: { ...(quest.progress ?? {}) },
           rewards: { ...(quest.rewards ?? {}) },
           source: String(quest.source ?? def?.source ?? "npc"),
+          kind: quest.kind ?? def?.kind,
+          category: quest.category ?? def?.category,
+          cooldownMapRuns: quest.cooldownMapRuns ?? def?.cooldownMapRuns,
           sourceLabel: quest.sourceLabel ? String(quest.sourceLabel) : undefined,
           sourceReadableId: quest.sourceReadableId ? String(quest.sourceReadableId) : undefined,
           regionIds: Array.isArray(quest.regionIds)
@@ -472,6 +508,7 @@ export function normalizeSavedQuestState(saved) {
   return {
     active: rawActive,
     completed: Array.isArray(saved?.completed) ? saved.completed.map(String) : [],
+    questBoards: normalizeQuestBoards(saved?.questBoards),
     cityOfferRolls: saved?.cityOfferRolls && typeof saved.cityOfferRolls === "object"
       ? Object.fromEntries(
         Object.entries(saved.cityOfferRolls)

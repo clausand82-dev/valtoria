@@ -1057,7 +1057,7 @@ button {
   cursor: pointer;
 }
 
-.quick-potion {
+.quickslot {
   position: relative;
   display: grid;
   place-items: center;
@@ -1069,9 +1069,10 @@ button {
     radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.1), transparent 28px),
     #171b20;
   cursor: pointer;
+  overflow: hidden;
 }
 
-.quick-potion:disabled,
+.quickslot:disabled,
 .skill:disabled {
   cursor: default;
   filter: grayscale(1);
@@ -1112,8 +1113,15 @@ button {
   pointer-events: none;
 }
 
-.quick-potion b {
+.quickslot-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.quickslot b,
+.quickslot-picker b {
   position: absolute;
+  z-index: 2;
   right: 4px;
   bottom: 3px;
   display: grid;
@@ -1124,6 +1132,90 @@ button {
   background: rgba(0, 0, 0, 0.72);
   color: #f4efe3;
   font-size: 10px;
+}
+
+.quickslot-picker {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  z-index: 42;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgba(226, 174, 79, 0.45);
+  border-radius: 6px;
+  background: rgba(14, 16, 19, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.62);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 6px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.quickslot-wrap.open .quickslot-picker {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.quickslot-picker button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  background: #20242b;
+  cursor: pointer;
+}
+
+.quickslot-picker button.active {
+  border-color: rgba(226, 174, 79, 0.86);
+  box-shadow: inset 0 0 0 1px rgba(226, 174, 79, 0.32);
+}
+
+.quickslot-picker-label {
+  position: absolute;
+  left: 50%;
+  bottom: 52px;
+  z-index: 3;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: rgba(9, 10, 12, 0.94);
+  color: #f4efe3;
+  font-size: 11px;
+  line-height: 1.1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(3px);
+  transition: opacity 0.1s ease, transform 0.1s ease;
+}
+
+.quickslot-picker button:hover .quickslot-picker-label,
+.quickslot-picker button:focus-visible .quickslot-picker-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.quickslot-picker .inventory-icon,
+.quickslot-picker .hud-image-icon {
+  width: 34px;
+  height: 34px;
+}
+
+.quickslot-cooldown {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--cooldown-pct) * 1turn), transparent 0);
+  pointer-events: none;
+}
+
+.quickslot.cooling .inventory-icon,
+.quickslot.cooling .hud-image-icon {
+  filter: brightness(0.72);
 }
 
 .hotkey-badge {
@@ -1142,7 +1234,7 @@ button {
 }
 
 .skill:hover,
-.quick-potion:not(:disabled):hover,
+.quickslot:not(:disabled):hover,
 .skill.active {
   border-color: rgba(226, 174, 79, 0.72);
 }
@@ -3723,6 +3815,7 @@ button {
 
 .city-popup-main {
   overflow: auto;
+  scrollbar-gutter: stable;
   padding: 16px 18px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }

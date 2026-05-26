@@ -86,6 +86,7 @@ function CityItemName({ item }) {
 function CityItemSlot({ item, placeholder, locked, draggable, accepted, muted, onClick, onDoubleClick, onDragStart, onDrop }) {
   const rarityClass = cityItemRarityClass(item);
   const qualityColor = cityItemQualityColor(item);
+  const itemIconUrl = (item && placeholder?.iconUrl) ? placeholder.iconUrl : (item?.iconUrl ?? null);
   return (
     <button
       type="button"
@@ -102,7 +103,7 @@ function CityItemSlot({ item, placeholder, locked, draggable, accepted, muted, o
       title={locked ? "Locked" : item?.name ?? placeholder?.title ?? "Empty"}
     >
       {locked ? <span>LOCK</span> : item ? (
-        <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
+        <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={itemIconUrl} />
       ) : placeholder ? (
         <img className="city-slot-placeholder" src={placeholder.iconUrl} alt="" draggable="false" />
       ) : null}

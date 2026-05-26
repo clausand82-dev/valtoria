@@ -1206,6 +1206,7 @@ export const combatMethods = {
     if (stats.lifeSteal > 0 && damage > 0) {
       const heal = Math.max(1, Math.floor(damage * stats.lifeSteal));
       this.player.hp = Math.min(stats.maxHp, this.player.hp + heal);
+      this.spawnHeroHealingEffect?.();
     }
     if (monster.hp <= 0) this.killMonster(monster);
   },
@@ -1238,6 +1239,7 @@ export const combatMethods = {
     incrementStatMap(this.player.stats.objectsDestroyedByType, object.type);
     this.player.attackObjectId = null;
     this.player.target = null;
+    this.spawnObjectBreakDustEffect?.(object.x, object.y);
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
     this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);

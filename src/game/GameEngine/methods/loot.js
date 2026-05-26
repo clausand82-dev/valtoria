@@ -128,9 +128,9 @@ export const lootMethods = {
           this.addToast(`+${loot.amount} guld`);
           this.loots.splice(i, 1);
         } else if (isPotionItem(loot.item)) {
-          const before = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
+          const before = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? 0;
           if (this.addPotionLoot(loot.item)) {
-            const after = Math.max(0, Math.floor(Number(this.player.potions?.[loot.item.potionType]) || 0));
+            const after = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? before + 1;
             const picked = Math.max(1, after - before);
             this.trackItemPicked(loot.item);
             this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
@@ -287,33 +287,6 @@ export const lootMethods = {
       const quest = this.questState.active.find((entry) => entry.id === loot.item.questInstanceId);
       if (quest?.type === "collect_quest_item") {
         quest.progress = { ...(quest.progress ?? {}), droppedItems: Math.max(0, Math.floor(Number(quest.progress?.droppedItems) || 0) - 1) };
-      }
-    }
-  },
-
-  updateChests(dt) {
-    const animationSeconds = 6 / 6;
-    for (const chunk of this.nearbyChunks(1)) {
-      for (let i = chunk.objects.length - 1; i >= 0; i -= 1) {
-        const object = chunk.objects[i];
-        if (object.type !== "chest") continue;
-
-        if (object.opening) {
-          object.openTime = (object.openTime ?? 0) + dt;
-          if (object.openTime >= animationSeconds) {
-            this.dropChestLoot(object);
-            this.region.chestOpened = true;
-            chunk.objects.splice(i, 1);
-          }
-          continue;
-        }
-
-        if (distance(this.player, object) <= this.player.radius + object.radius + 0.45) {
-          object.opening = true;
-          object.openTime = 0;
-          object.blocking = false;
-          this.player.target = null;
-        }
       }
     }
   },

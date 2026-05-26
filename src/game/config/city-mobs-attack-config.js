@@ -69,7 +69,7 @@ export const CITY_MOB_MAX_LEVEL = 5;
 export const CITY_MOB_LEVEL_UP_CHANCE = 0.20; // 20% chance per besøg
 
 // --- Bygningsskade: % per mob level per mob i feltet per city visit ---
-export const CITY_MOB_DAMAGE_PER_LEVEL_PCT = 5;
+export const CITY_MOB_DAMAGE_PER_LEVEL_PCT = 0.05;
 
 // --- Defence tower building-IDs (et pr. retning) ---
 // Towers ligger i "bridge" spawn-områder og beskytter dem

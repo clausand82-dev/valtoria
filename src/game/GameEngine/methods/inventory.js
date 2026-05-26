@@ -15,7 +15,11 @@ import {
   isStackableItem,
   READABLE_DEF_BY_ID,
   MAX_POTION_STACK,
-  GROUND_LOOT_DESPAWN_SECONDS
+  GROUND_LOOT_DESPAWN_SECONDS,
+  POTION_DEFS,
+  normalizePotionId,
+  potionDefById,
+  normalizeQuickSlots
 } from "../dependencies.js";
 import {
   itemsCanMerge,
@@ -374,7 +378,7 @@ export const inventoryMethods = {
     if (!item) return;
     if (isResourceItem(item)) return;
     if (isPotionItem(item)) {
-      this.usePotion(item.potionType, index);
+      this.usePotion(item.potionId ?? item.potionType, index);
       return;
     }
     let slotId = item.slot;
@@ -446,23 +450,77 @@ export const inventoryMethods = {
     return true;
   },
 
-  usePotion(type, preferredIndex = -1) {
+  normalizeQuickSlots() {
+    this.player.quickSlots = normalizeQuickSlots(this.player.quickSlots);
+    return this.player.quickSlots;
+  },
+
+  potionInventoryCount(potionId) {
+    const id = normalizePotionId(potionId);
+    if (!id) return 0;
+    return (this.player.inventory ?? []).reduce((sum, item) => (
+      isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === id
+        ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+        : sum
+    ), 0);
+  },
+
+  setQuickSlot(slotId, id) {
+    const slots = this.normalizeQuickSlots();
+    const slot = slots[String(slotId)];
+    if (!slot) return false;
+    const nextId = String(id ?? "");
+    if (slot.kind === "potion" && !POTION_DEFS[normalizePotionId(nextId)]) return false;
+    if (slot.kind === "spell" && !(this.player.unlockedSpells ?? []).includes(nextId)) return false;
+    slots[String(slotId)] = { ...slot, id: slot.kind === "potion" ? normalizePotionId(nextId) : nextId };
+    this.player.quickSlots = slots;
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
+  activateQuickSlot(slotId) {
+    const slot = this.normalizeQuickSlots()[String(slotId)];
+    if (!slot) return false;
+    if (slot.kind === "potion") return this.usePotion(slot.id);
+    if (slot.kind === "spell") {
+      const target = this.nearestMonster(7);
+      this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY, slot.id);
+      return true;
+    }
+    return false;
+  },
+
+  usePotion(potionId, preferredIndex = -1) {
     if (this.potionCooldown > 0) return;
-    const count = Math.max(0, Math.floor(Number(this.player.potions?.[type]) || 0));
-    if (count <= 0) return;
+    const id = normalizePotionId(potionId);
+    const def = potionDefById(id);
+    if (!def) return;
+    const inventory = this.player.inventory ?? [];
+    const preferred = Math.floor(Number(preferredIndex));
+    const index = Number.isInteger(preferred) && preferred >= 0
+      && isPotionItem(inventory[preferred])
+      && normalizePotionId(inventory[preferred].potionId ?? inventory[preferred].potionType) === id
+      ? preferred
+      : inventory.findIndex((item) => isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === id);
+    if (index < 0) return;
+    const item = inventory[index];
 
     const stats = this.calcStats();
-    const pct = 0.25;
-    if (type === "health") {
+    const pct = Number(item.restorePct ?? def.restorePct) || 0.25;
+    if (def.type === "health") {
       this.player.hp = clamp(this.player.hp + stats.maxHp * pct, 0, stats.maxHp);
+      this.spawnHeroHealingEffect?.();
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxHp * pct)} liv`, "#58d96d", 0.95);
     } else {
       this.player.mana = clamp(this.player.mana + stats.maxMana * pct, 0, stats.maxMana);
       this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * pct)} mana`, "#58bfff", 0.95);
     }
-    this.player.potions[type] = Math.max(0, count - 1);
-    if (type === "health") this.player.stats.healthPotionsUsed += 1;
-    if (type === "mana") this.player.stats.manaPotionsUsed += 1;
+    const count = Math.max(1, Math.floor(Number(item.count) || 1));
+    if (count > 1) item.count = count - 1;
+    else inventory.splice(index, 1);
+    if (def.type === "health") this.player.stats.healthPotionsUsed += 1;
+    if (def.type === "mana") this.player.stats.manaPotionsUsed += 1;
     this.potionCooldown = 0.5;
     this.publishSnapshot();
   },
@@ -1058,12 +1116,40 @@ export const inventoryMethods = {
   },
 
   addPotionLoot(item) {
-    const type = item?.potionType;
-    if (type !== "health" && type !== "mana") return false;
-    if (!this.player.potions) this.player.potions = { health: 0, mana: 0 };
-    const current = Math.max(0, Math.floor(Number(this.player.potions[type]) || 0));
-    if (current >= MAX_POTION_STACK) return false;
-    this.player.potions[type] = Math.min(MAX_POTION_STACK, current + Math.max(1, Math.floor(Number(item.count) || 1)));
+    const potionId = normalizePotionId(item?.potionId ?? item?.potionType);
+    const def = potionDefById(potionId);
+    if (!def) return false;
+    let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+    for (const stack of this.player.inventory) {
+      if (!isPotionItem(stack) || normalizePotionId(stack.potionId ?? stack.potionType) !== potionId) continue;
+      const current = Math.max(1, Math.floor(Number(stack.count) || 1));
+      const room = MAX_POTION_STACK - current;
+      if (room <= 0) continue;
+      const moved = Math.min(room, remaining);
+      stack.count = current + moved;
+      remaining -= moved;
+      if (remaining <= 0) return true;
+    }
+    while (remaining > 0) {
+      if (this.player.inventory.length >= MAX_INVENTORY) {
+        item.count = remaining;
+        return false;
+      }
+      const count = Math.min(MAX_POTION_STACK, remaining);
+      this.player.inventory.push({
+        ...item,
+        id: createId(),
+        name: def.name,
+        baseName: def.name,
+        potionId,
+        potionType: def.type,
+        restorePct: def.restorePct,
+        iconKey: def.iconKey,
+        iconUrl: def.iconUrl,
+        count,
+      });
+      remaining -= count;
+    }
     return true;
   },
 

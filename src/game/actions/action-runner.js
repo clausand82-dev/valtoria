@@ -20,6 +20,7 @@ import { makeQuestItem } from "../GameEngine/helpers/quests.js";
 
 const IMPLEMENTED_TYPES = new Set([
   "inspect",
+  "talk",
   "read",
   "collect",
   "harvest",
@@ -320,8 +321,12 @@ function runImplementedHandler(engine, action, target = null, context = {}) {
     return engine.exitSubregionFromAction?.(action, target, context)
       ?? { ok: false, changed: false, reason: "missing_subregion_handler" };
   }
-  if (action.type === "inspect" || action.type === "read" || action.type === "activate" || action.type === "reveal") {
+  if (action.type === "inspect" || action.type === "talk" || action.type === "read" || action.type === "activate" || action.type === "reveal") {
     showActionText(engine, action);
+  }
+  if (action.type === "open" && action.chestLoot) {
+    return engine.openActionChest?.(target, action, context)
+      ?? { ok: false, changed: false, reason: "missing_chest_handler" };
   }
   if (action.questStart) {
     console.warn("[actions] questStart field is reserved for a later quest bridge", action.id);

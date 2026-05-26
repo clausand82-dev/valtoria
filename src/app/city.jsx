@@ -30,7 +30,7 @@ import {
   normalizeSkillTree,
 } from "../game/config/skill-tree-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
-import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
+import { QUEST_BOARD_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
 import { SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
@@ -336,6 +336,19 @@ function CityPage({
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    engineRef.current.cityStats = cityStats;
+    engineRef.current.cityProgress = cityProgress;
+  }, [engineRef, cityStats, cityProgress]);
+
+  useEffect(() => {
+    if (!engineRef.current) return;
+    const context = { cityStats, cityProgress };
+    engineRef.current.rollQuestBoard?.("townHall", context);
+    engineRef.current.rollQuestBoard?.("inn", context);
+  }, [engineRef, cityStats, cityProgress]);
 
   useEffect(() => {
     const station = selectedBuildingId === "library"
@@ -836,6 +849,7 @@ function CityPage({
               progress={cityProgress}
               npcRefs={[]}
               buildingImageUrls={cityBuildingImageUrls}
+              quests={snapshot.quests}
               onOpenBuilding={openBuilding}
               onOpenNpc={openNpc}
               key={area.id}
@@ -848,6 +862,7 @@ function CityPage({
               progress={cityProgress}
               npcRefs={[]}
               buildingImageUrls={cityBuildingImageUrls}
+              quests={snapshot.quests}
               onOpenBuilding={openBuilding}
               onOpenNpc={openNpc}
             />
@@ -1308,15 +1323,16 @@ function cityEffectUnit(value) {
   return (hash >>> 0) / 4294967295;
 }
 
-function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, onOpenBuilding, onOpenNpc }) {
+function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, quests = null, onOpenBuilding, onOpenNpc }) {
   return (
     <div className="city-map-hover-icons" aria-label={`${area.title} actions`}>
       {buildingRefs.map(({ building, x, y }) => {
         const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
+        const questStatus = cityBuildingQuestStatus(building?.id, quests);
         return (
           <button
             type="button"
-            className="city-map-action-icon building"
+            className={`city-map-action-icon building ${questStatus.hasOffer ? "offer" : questStatus.hasComplete ? "complete" : questStatus.hasActive ? "active-quest" : ""}`}
             style={cityMapPositionStyle(x, y)}
             title={building.title}
             aria-label={building.title}
@@ -1330,6 +1346,11 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
               {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : cityBuildingIconText(building)}
             </span>
             <b>{building.title}</b>
+            {(questStatus.hasComplete || questStatus.hasOffer || questStatus.hasActive) && (
+              <i className="city-quest-status" aria-hidden="true">
+                {questStatus.hasOffer ? "!" : questStatus.hasComplete ? "?" : "?"}
+              </i>
+            )}
           </button>
         );
       })}
@@ -1359,6 +1380,25 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
       ))}
     </div>
   );
+}
+
+function questBoardIdForBuilding(buildingId) {
+  if (buildingId === "town_hall") return "townHall";
+  if (buildingId === "inn") return "inn";
+  return null;
+}
+
+function cityBuildingQuestStatus(buildingId, quests = null) {
+  const boardId = questBoardIdForBuilding(buildingId);
+  if (!boardId) return { hasOffer: false, hasActive: false, hasComplete: false };
+  const board = quests?.boards?.[boardId] ?? null;
+  const source = QUEST_BOARD_CONFIG[boardId]?.source ?? boardId;
+  const active = (quests?.active ?? []).filter((quest) => String(quest.source ?? "") === String(source));
+  return {
+    hasOffer: (board?.offers?.length ?? 0) > 0,
+    hasActive: active.length > 0,
+    hasComplete: active.some((quest) => quest.complete),
+  };
 }
 
 function cityBuildingMapImageUrl(buildingImageUrls, building, progress) {
@@ -1574,6 +1614,28 @@ function drawIsometricCityScene(ctx, width, height, layout, city, progress, ques
       continue;
     }
   }
+  for (const marker of getActiveCityQuestBuildings(layout, quests)) {
+    const offset = getCityQuestOffset(marker.spriteIndex);
+    drawCityQuestStatusMarker(ctx, {
+      gx: marker.gx + offset.gx,
+      gy: marker.gy + offset.gy,
+      phase: marker.phase,
+      complete: marker.hasComplete,
+      hasOffer: marker.hasOffer,
+    }, camera, city.walkClock);
+  }
+}
+
+function getActiveCityQuestBuildings(layout, quests = null) {
+  return (layout.houses ?? []).flatMap((house) => {
+    const status = cityBuildingQuestStatus(house.buildingId, quests);
+    if (!status.hasOffer && !status.hasActive && !status.hasComplete) return [];
+    return [{
+      ...house,
+      phase: house.spriteIndex * 0.37,
+      ...status,
+    }];
+  });
 }
 
 function getActiveCityQuestNpcs(layout, cityNpcStates = [], showInactive = SHOW_INACTIVE_CITY_NPCS) {
@@ -1911,6 +1973,39 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   );
 }
 
+function CityQuestBoardPanel({ board, fallbackConfig, onAcceptQuest }) {
+  const offers = board?.offers ?? [];
+  const title = board?.title ?? fallbackConfig?.title ?? "Quest Board";
+  const subtitle = board?.subtitle ?? fallbackConfig?.subtitle ?? "";
+  const emptyText = board?.emptyText ?? fallbackConfig?.emptyText ?? "Ingen quests tilgaengelige lige nu.";
+  return (
+    <section className="blacksmith-station quest-board-panel">
+      <header>
+        <h4>{title}</h4>
+        {subtitle && <span>{subtitle}</span>}
+      </header>
+      <div className="quest-list">
+        {offers.map((quest) => (
+          <article className="quest-card" key={`board-${quest.questId}`}>
+            <header>
+              <b>{quest.title}</b>
+              <span>{quest.kind ?? quest.category ?? "Quest"}</span>
+            </header>
+            <p>{quest.story}</p>
+            {quest.acceptText && <p>{quest.acceptText}</p>}
+            <QuestObjectiveMeta quest={quest} />
+            <button type="button" onClick={() => onAcceptQuest?.(quest)}>Tag quest</button>
+          </article>
+        ))}
+        {offers.length === 0 && <p>{emptyText}</p>}
+      </div>
+    </section>
+  );
+}
+
+const QUEST_BOARD_TAB_ID = "__quest_board";
+const QUEST_BOARD_ICON_URL = "/assets/generated/item/item_quest_scroll.png";
+
 function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
   const [draggedCityItem, setDraggedCityItem] = useState(null);
@@ -1918,10 +2013,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const [buildPaymentOpen, setBuildPaymentOpen] = useState(false);
   const [storedReadable, setStoredReadable] = useState(null);
   const [confirmStoreItem, setConfirmStoreItem] = useState(null);
+  const [questBoard, setQuestBoard] = useState(null);
   if (!building) return null;
 
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
+  const questBoardId = building.id === "town_hall" ? "townHall" : building.id === "inn" ? "inn" : null;
+  const activeQuestBoard = activeAddonId === QUEST_BOARD_TAB_ID;
   const prebuilt = Boolean(building.prebuilt);
   const payBuildingEntries = (entries, progressOverride = progress) => (
     payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
@@ -1951,9 +2049,46 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const purchasedAddons = new Set(buildingState.addons ?? []);
   const activeAddon = (building.addons ?? []).find((addon) => addon.id === activeAddonId && purchasedAddons.has(addon.id)) ?? null;
   const storageSections = cityInventorySections(building, buildingState, owned);
-  const activeStorageSection = activeAddon
-    ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
-    : storageSections.find((section) => section.key === "base") ?? storageSections[0] ?? null;
+  const activeStorageSection = activeQuestBoard
+    ? null
+    : activeAddon
+      ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
+      : storageSections.find((section) => section.key === "base") ?? storageSections[0] ?? null;
+
+  useEffect(() => {
+    if (!owned || !questBoardId) {
+      setQuestBoard(null);
+      return;
+    }
+    if (!activeQuestBoard) return;
+    const context = { cityStats, cityProgress: progress };
+    const board = engineRef.current?.rollQuestBoard?.(questBoardId, context)
+      ?? engineRef.current?.questBoardSnapshot?.(questBoardId, context)
+      ?? null;
+    setQuestBoard(board);
+  }, [engineRef, owned, questBoardId, activeQuestBoard, cityStats, progress]);
+
+  const refreshQuestBoard = () => {
+    if (!questBoardId) return;
+    const context = { cityStats, cityProgress: progress };
+    setQuestBoard(engineRef.current?.questBoardSnapshot?.(questBoardId, context) ?? null);
+  };
+
+  const openQuestBoardTab = () => {
+    if (!questBoardId) return;
+    const context = { cityStats, cityProgress: progress };
+    const board = engineRef.current?.rollQuestBoard?.(questBoardId, context)
+      ?? engineRef.current?.questBoardSnapshot?.(questBoardId, context)
+      ?? null;
+    setQuestBoard(board);
+    setActiveAddonId(QUEST_BOARD_TAB_ID);
+  };
+
+  const acceptBoardQuest = (quest) => {
+    if (!questBoardId) return;
+    const accepted = engineRef.current?.acceptBoardQuest?.(questBoardId, quest, { cityStats, cityProgress: progress });
+    if (accepted) refreshQuestBoard();
+  };
 
   const applyBuildResource = (resourceId, amount) => {
     if (owned) return;
@@ -2041,6 +2176,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       return;
     }
     const inventories = normalizeCityInventories(buildingState, building);
+    if (fixedSectionAlreadyHasReadable(liveItem, section, slotIndex, inventories[sectionKey] ?? [])) {
+      engineRef.current?.addToast?.("Denne spellbook er allerede afleveret i arkivet.");
+      return;
+    }
     const depositPlan = planCityInventoryDeposit(liveItem, section, slotIndex, inventories[sectionKey] ?? []);
     if (!depositPlan || depositPlan.movedCount <= 0) return;
     const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, depositPlan.movedCount)
@@ -2506,8 +2645,20 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
         <main className="city-popup-main">
           <p>{building.functionText}</p>
-          {building.addons?.length > 0 && (
+          {((owned && questBoardId) || building.addons?.length > 0) && (
             <div className="city-addon-list">
+              {owned && questBoardId && (
+                <button
+                  type="button"
+                  className={`city-addon ${activeQuestBoard ? "active" : ""}`}
+                  onClick={openQuestBoardTab}
+                  title={QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? "Quests"}
+                >
+                  <img src={QUEST_BOARD_ICON_URL} alt="" draggable="false" />
+                  <span>{questBoardId === "inn" ? "Rygter" : "Quests"}</span>
+                  <b>{QUEST_BOARD_CONFIG[questBoardId]?.title ?? "Board"}</b>
+                </button>
+              )}
               {owned && building.id === "blacksmith" && (
                 <button
                   type="button"
@@ -2532,7 +2683,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   <b>{cityInventorySlotCount(building.inventoryType)} slots</b>
                 </button>
               )}
-              {building.addons.map((addon) => {
+              {(building.addons ?? []).map((addon) => {
                 const bought = purchasedAddons.has(addon.id);
                 const prebuiltAddon = Boolean(addon.prebuilt);
                 const unlocked = cityAddonIsUnlocked(addon, snapshot);
@@ -2561,6 +2712,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 );
               })}
             </div>
+          )}
+          {owned && questBoardId && activeQuestBoard && (
+            <CityQuestBoardPanel
+              board={questBoard}
+              fallbackConfig={QUEST_BOARD_CONFIG[questBoardId]}
+              onAcceptQuest={acceptBoardQuest}
+            />
           )}
           {owned && activeStorageSection && (
             <CityStoragePanel
@@ -2809,7 +2967,27 @@ function normalizeCityInventories(state, building) {
   const next = { ...source };
   if (!next.base && Array.isArray(state?.items)) next.base = state.items;
   for (const section of cityInventorySections(building, state, true)) {
-    next[section.key] = Array.from({ length: section.slots }, (_, index) => normalizeCityStoredItem(next[section.key]?.[index] ?? null));
+    const normalized = Array.from({ length: section.slots }, (_, index) => normalizeCityStoredItem(next[section.key]?.[index] ?? null));
+    if (Array.isArray(section.fixedDefs) && section.fixedDefs.length > 0) {
+      const seenReadableIds = new Set();
+      next[section.key] = normalized.map((item, index) => {
+        if (!item) return null;
+        const fixedDef = section.fixedDefs[index];
+        if (!fixedDef || !isReadableItem(item)) return null;
+        const readableId = String(item.readableId ?? "");
+        if (readableId !== String(fixedDef.id ?? "")) return null;
+        if (seenReadableIds.has(readableId)) return null;
+        seenReadableIds.add(readableId);
+        return {
+          ...item,
+          iconUrl: fixedDef.iconUrl ?? item.iconUrl,
+          name: fixedDef.title ?? item.name,
+          baseName: fixedDef.title ?? item.baseName,
+        };
+      });
+      continue;
+    }
+    next[section.key] = normalized;
   }
   return next;
 }
@@ -2879,6 +3057,17 @@ function firstCityInventorySlotForItem(item, section, storedItems = []) {
     if (!storedItems[index] && itemMatchesCityInventorySlot(item, section, index)) return index;
   }
   return -1;
+}
+
+function fixedSectionAlreadyHasReadable(item, section, slotIndex, storedItems = []) {
+  if (!item || !section?.fixedDefs?.[slotIndex] || !isReadableItem(item)) return false;
+  const readableId = String(item.readableId ?? "");
+  if (!readableId) return false;
+  return storedItems.some((stored, index) => (
+    index !== slotIndex
+    && isReadableItem(stored)
+    && String(stored.readableId ?? "") === readableId
+  ));
 }
 
 function cityInventoryStackMax(item) {

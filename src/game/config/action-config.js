@@ -59,6 +59,14 @@ export const ACTION_CONFIG = {
     once: true,
   },
 
+  open_map_chest: {
+    id: "open_map_chest",
+    type: "open",
+    label: "Aaben kiste",
+    prompt: "open chest",
+    chestLoot: true,
+  },
+
   activate_old_rune: {
     id: "activate_old_rune",
     type: "activate",
@@ -138,6 +146,22 @@ export const ACTION_CONFIG = {
     id: "exit_subregion",
     type: "exitSubregion",
     label: "Gaa tilbage",
+  },
+
+  talk_test_wanderer: {
+    id: "talk_test_wanderer",
+    type: "talk",
+    label: "Tal",
+    text: "Den fremmede nikker og siger: 'Pas paa i moerket.'",
+    once: true,
+  },
+
+  talk_lost_miner: {
+    id: "talk_lost_miner",
+    type: "talk",
+    label: "Tal",
+    text: "Minearbejderen holder lampen taet ind til kroppen. 'Der er noget laengere inde.'",
+    once: false,
   },
 
   summon_wolf_boss: {

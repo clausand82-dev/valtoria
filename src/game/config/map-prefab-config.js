@@ -93,6 +93,9 @@ export const MAP_PREFABS = {
     monsters: [
       { type: "Ghost", x: 3, y: 1 },
     ],
+    npcs: [
+      { npcId: "wiseman", x: 1, y: 2, facing: "south", actionId: "talk_test_wanderer" },
+    ],
   },
 
   old_well_clearing: {

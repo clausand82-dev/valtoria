@@ -725,6 +725,9 @@ export default function App() {
       {snapshot.nearbyActionTarget && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
           Press <b>E</b> to {snapshot.nearbyActionTarget.label}
+          {snapshot.nearbyActionTarget.targetCount > 1 && (
+            <span> · <b>Tab</b> skift {snapshot.nearbyActionTarget.targetIndex}/{snapshot.nearbyActionTarget.targetCount}</span>
+          )}
         </div>
       )}
 

@@ -93,6 +93,7 @@ export class GameEngine {
       active: [],
       completed: [],
       cityOfferRolls: {},
+      questBoards: {},
       wildernessNpc: null,
       cityFade: [],
     };

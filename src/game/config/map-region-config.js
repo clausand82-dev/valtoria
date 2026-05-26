@@ -1,3 +1,5 @@
+import { createVillageOutskirtsMapRegions } from "./map-region/village-outskirts.js";
+
 const AREA_MAP_VIEW = {
   aspect: "1672 / 941",
   maxWidth: "1180px",
@@ -587,12 +589,13 @@ export const MAP_REGION_SETS = {
       points: "78.95,40.38 83.73,40.38 96.89,21.25 99.28,21.25 99.28,97.77 80.14,97.77 78.95,65.89 78.95,59.51 81.34,48.88 77.75,42.51",
     }),
   ],
+  ...createVillageOutskirtsMapRegions(region),
   
   // VILLAGE OUTSKIRTS AREA MAP REGIONS
   // VILLAGE OUTSKIRTS AREA MAP REGIONS
   // VILLAGE OUTSKIRTS AREA MAP REGIONS
   
-  "village-outskirts": [
+  /*"village-outskirts": [
     region({
       id: "path-to-hunter-hut",
       label: "Path to Hunter Hut",
@@ -749,7 +752,7 @@ export const MAP_REGION_SETS = {
       },
       foliageSet: [
         { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
-        { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
+        { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
@@ -837,7 +840,7 @@ export const MAP_REGION_SETS = {
         { id: "object_fireplace_mainland", weight: 10 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
-      mobs: ["Skeleton",],
+      mobs: ["Icebear",],
     }),
     region({
       id: "inn-of-the-good-oak",
@@ -1148,7 +1151,7 @@ export const MAP_REGION_SETS = {
       ],
       points: "41.87,17.00 47.85,4.25 65.79,4.25 61.00,17.00 51.44,38.26",
     }),
-  ],
+  ],*/
   elvindale: [
     region({
       id: "to-hunters-hut-and-village",

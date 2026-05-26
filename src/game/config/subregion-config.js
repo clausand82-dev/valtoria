@@ -24,6 +24,9 @@ export const SUBREGION_CONFIG = {
       { fileName: "foilage/foilage_plants_mainland.png", weight: 1, scale: 0.7 },
     ],
     mobs: ["Skeleton", "Ghost", { type: "MiniSpider", weight: 2 }],
+    npcs: [
+      { npcId: "oneleggedman", weight: 1, placementRole: "farFromEntry", actionId: "talk_lost_miner" },
+    ],
     foliage: [],
     monsters: [],
     chests: [],

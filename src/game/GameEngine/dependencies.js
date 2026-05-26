@@ -54,7 +54,9 @@ export { ELITE_VARIANTS, ELITE_NO_VARIANT_WEIGHT } from "../config/elite-config.
 export { BOSS_TINT } from "../config/monster-config.js";
 export { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../config/readable-config.js";
 export { SPELL_DEFS } from "../config/spell-config.js";
-export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../config/quest-config.js";
+export { ACTION_BAR_CONFIG, normalizeQuickSlots } from "../config/action-bar-config.js";
+export { POTION_DEFS, POTION_IDS, normalizePotionId, potionDefById } from "../config/potion-config.js";
+export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG } from "../config/quest-config.js";
 export { QUEST_NPCS } from "../config/npc-config.js";
 export { getRegionObjectFamily, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";
 export {

@@ -134,6 +134,7 @@ function getRenderableDepth(renderable, atlas) {
   if (renderable.type === "object") return getObjectDepth(renderable.object, renderable.screen, renderable.biome, atlas);
   if (renderable.type === "monster") return getActorDepth(renderable.monster, renderable.screen, "monster");
   if (renderable.type === "hero") return getActorDepth(renderable.actor, renderable.screen, "hero");
+  if (renderable.type === "npc") return getActorDepth(renderable.npc, renderable.screen, "questgiver");
   if (renderable.type === "questgiver") return getActorDepth(renderable.questgiver, renderable.screen, "questgiver");
   return renderable.screen?.y ?? 0;
 }
@@ -142,6 +143,7 @@ function getTypeSortOrder(type) {
   switch (type) {
     case "loot": return 0;
     case "object": return 1;
+    case "npc": return 2;
     case "questgiver": return 2;
     case "monster": return 3;
     case "hero": return 4;
@@ -154,6 +156,7 @@ function foregroundFadeTarget(renderable) {
   return renderable.type === "hero"
     || renderable.type === "monster"
     || renderable.type === "loot"
+    || renderable.type === "npc"
     || renderable.type === "questgiver";
 }
 
@@ -491,6 +494,17 @@ export const renderingMethods = {
       }
     }
 
+    for (const chunk of this.nearbyChunks(2)) {
+      for (const npc of chunk.npcs ?? []) {
+        const alpha = this.fogPointAlpha(npc);
+        if (alpha <= 0.02) continue;
+        const screen = worldToScreen(npc.x, npc.y, 0, this.camera);
+        if (visibleScreenPoint(screen, this.width, this.height, 170)) {
+          drawables.push({ type: "npc", npc, screen, alpha, layer: 1 });
+        }
+      }
+    }
+
     for (const loot of this.loots) {
       const alpha = this.fogPointAlpha(loot);
       if (alpha <= 0.02) continue;
@@ -555,6 +569,7 @@ export const renderingMethods = {
       }
       if (item.type === "loot") drawLoot(ctx, item.screen, item.loot, this.atlas);
       if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas, item.beamStartScreen);
+      if (item.type === "npc") drawQuestgiver(ctx, item.screen, item.npc, this.time);
       if (item.type === "questgiver") drawQuestgiver(ctx, item.screen, item.questgiver, this.time);
       if (item.type === "monster") drawMonster(ctx, item.screen, item.monster, this.atlas, this.time, this.animationSheets);
       if (item.type === "hero") {

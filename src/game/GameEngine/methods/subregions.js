@@ -5,10 +5,11 @@ import {
   REGION_OBJECT_DEFS,
   resolveRegionObjectVariantCount,
 } from "../../config/region-object-config.js";
+import { QUEST_NPCS } from "../../config/npc-config.js";
 import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
 import { normalizeRegionTileset } from "../../config/region-asset-config.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
-import { resolveMapRegionConfig } from "../../world-state.js";
+import { resolveMapRegionConfig, worldConditionMet } from "../../world-state.js";
 import {
   chunkKey,
   createId,
@@ -169,6 +170,7 @@ function serializeChunk(chunk) {
     decals: clonePlain(chunk.decals ?? []),
     objects: clonePlain(chunk.objects ?? []),
     monsters: clonePlain(chunk.monsters ?? []),
+    npcs: clonePlain(chunk.npcs ?? []),
   };
 }
 
@@ -206,6 +208,7 @@ function restoreChunk(snapshot, region) {
     decals: clonePlain(snapshot.decals ?? []),
     objects: clonePlain(snapshot.objects ?? []),
     monsters: clonePlain(snapshot.monsters ?? []),
+    npcs: clonePlain(snapshot.npcs ?? []),
   };
 }
 
@@ -265,6 +268,7 @@ function makeRuntimeObject(region, entry, x, y, salt) {
     sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
     depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
     actionId: entry.actionId ?? null,
+    actions: Array.isArray(entry.actions) ? entry.actions.map((item) => ({ ...item })) : null,
     defaultActionId: def.defaultActionId ?? null,
   };
 }
@@ -315,6 +319,35 @@ function chunkForPoint(engine, point) {
   const cx = Math.floor(point.x / CHUNK_SIZE);
   const cy = Math.floor(point.y / CHUNK_SIZE);
   return engine.getChunk(cx, cy);
+}
+
+function makeRuntimeNpc(region, entry, x, y, salt) {
+  const npcId = String(entry.npcId ?? entry.id ?? "").trim();
+  const def = QUEST_NPCS[npcId];
+  if (!def) {
+    console.warn(`[subregions] Unknown NPC id: ${npcId || "(empty)"}`);
+    return null;
+  }
+  return {
+    id: createId(),
+    runtimeId: `${region.id}:subregion-npc:${entry.placementRole ?? "fixed"}:${salt}:${npcId}`,
+    type: "npc",
+    npcId,
+    name: def.name,
+    title: def.title,
+    imageUrl: def.imageUrl,
+    x,
+    y,
+    radius: Number(entry.radius) || 0.45,
+    facing: entry.facing ?? "south",
+    facingX: 0,
+    facingY: 1,
+    bob: Math.abs(salt) % 1000,
+    actionId: entry.actionId ? String(entry.actionId) : null,
+    actions: Array.isArray(entry.actions) ? entry.actions.map((item) => ({ ...item })) : null,
+    defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
+    defaultActions: Array.isArray(def.defaultActions) ? def.defaultActions.map((item) => ({ ...item })) : null,
+  };
 }
 
 function findObjectByRuntimeId(engine, runtimeId) {
@@ -464,6 +497,7 @@ export const subregionMethods = {
     this.monsters.clear();
     for (const chunkSnapshot of snapshot.chunks ?? []) {
       const chunk = restoreChunk(chunkSnapshot, this.region);
+      if (!Array.isArray(chunk.npcs)) chunk.npcs = [];
       this.chunks.set(chunk.key, chunk);
       for (const monster of chunk.monsters ?? []) {
         if (monster?.id) this.monsters.set(monster.id, monster);
@@ -533,6 +567,30 @@ export const subregionMethods = {
     });
   },
 
+  placeSubregionNpcs(config) {
+    const context = config.__subregionContext ?? {};
+    const entries = Array.isArray(config.npcs) ? config.npcs : [];
+    entries.forEach((entry, index) => {
+      if (!entry || typeof entry !== "object") return;
+      if (entry.conditions && !worldConditionMet(entry.conditions, this.worldState, context)) return;
+      const role = entry.placementRole ? String(entry.placementRole) : null;
+      const origin = Number.isFinite(Number(entry.x)) && Number.isFinite(Number(entry.y))
+        ? { x: Number(entry.x), y: Number(entry.y) }
+        : role === "farFromEntry"
+          ? this.region.end
+          : this.region.start;
+      const minDistance = role === "farFromEntry" ? Math.max(8, Math.min(this.region.width, this.region.height) * 0.32) : 0;
+      const point = Number.isFinite(Number(entry.x)) && Number.isFinite(Number(entry.y))
+        ? findValidPointNear(this.region, origin, 0, 3)
+        : findValidPointNear(this.region, origin, minDistance, Math.max(this.region.width, this.region.height));
+      const npc = makeRuntimeNpc(this.region, entry, point.x, point.y, index + stringHash(`${this.region.id}:${entry.npcId ?? entry.id}:${role ?? "fixed"}`));
+      if (!npc) return;
+      const chunk = chunkForPoint(this, point);
+      if (!Array.isArray(chunk.npcs)) chunk.npcs = [];
+      chunk.npcs.push(npc);
+    });
+  },
+
   createSubregionInstance(instanceId, subregionConfig, action, target) {
     const expedition = this.ensureCurrentExpedition();
     const seed = stringHash(`${instanceId}:${subregionConfig.id}`);
@@ -548,6 +606,7 @@ export const subregionMethods = {
     this.resetRegionRuntime();
     this.ensureFullRegionGenerated();
     this.placeSubregionRoleObjects(subregionConfig);
+    this.placeSubregionNpcs(subregionConfig);
     const snapshot = this.captureCurrentMapSnapshot();
     const instance = {
       id: instanceId,

@@ -7,6 +7,8 @@ import {
 } from "../../config/region-object-config.js";
 import { distance } from "../../iso.js";
 import { createId } from "../../world.js";
+import { QUEST_NPCS } from "../../config/npc-config.js";
+import { worldConditionMet } from "../../world-state.js";
 import {
   actionPromptFor,
   normalizeActionState,
@@ -15,8 +17,49 @@ import {
 
 const OBJECT_ACTION_INTERACT_RANGE = 1.15;
 
-function targetActionId(target) {
-  return target?.actionId ?? target?.defaultActionId ?? null;
+function actionContextForTarget(engine, extra = {}) {
+  return {
+    region: engine.region,
+    regionId: engine.region?.mapRegion?.id ?? engine.region?.id,
+    regionConfig: engine.region?.mapRegion,
+    worldState: engine.worldState,
+    worldEnergy: engine.worldEnergy,
+    questState: engine.questState,
+    player: engine.player,
+    inventory: engine.player?.inventory,
+    activeMapRegion: engine.activeMapRegion,
+    rootRegionId: engine.currentExpedition?.rootRegionId,
+    rootMapId: engine.currentExpedition?.rootMapId,
+    rootMapInstanceId: engine.currentExpedition?.rootMapInstanceId,
+    sourceMapId: engine.currentExpedition?.currentMapInstanceId,
+    subregionDepth: engine.currentExpedition?.subregionStack?.length ?? 0,
+    ...extra,
+  };
+}
+
+function actionEntryMatches(engine, entry, target) {
+  if (!entry?.actionId) return false;
+  const conditions = entry.conditions ?? entry.requires;
+  if (!conditions) return true;
+  return worldConditionMet(conditions, engine.worldState, actionContextForTarget(engine, {
+    target,
+    npcId: target?.npcId,
+  }));
+}
+
+function firstActionFromList(engine, actions, target) {
+  if (!Array.isArray(actions)) return null;
+  const entry = actions.find((candidate) => actionEntryMatches(engine, candidate, target));
+  return entry?.actionId ? String(entry.actionId) : null;
+}
+
+function targetActionId(engine, target) {
+  if (!target) return null;
+  const npcDef = target.npcId ? QUEST_NPCS[target.npcId] : null;
+  return firstActionFromList(engine, target.actions, target)
+    ?? (target.actionId ? String(target.actionId) : null)
+    ?? firstActionFromList(engine, target.defaultActions ?? npcDef?.defaultActions, target)
+    ?? (target.defaultActionId ?? npcDef?.defaultActionId ?? null);
 }
 
 function objectStateKey(object) {
@@ -49,58 +92,130 @@ function applyReplacementShape(object, objectDefId) {
 
 export const actionsMethods = {
   updateNearbyActionTarget() {
-    const target = this.nearestActionTarget(OBJECT_ACTION_INTERACT_RANGE);
-    const actionId = targetActionId(target);
+    const candidates = this.actionTargetsInRange(OBJECT_ACTION_INTERACT_RANGE);
+    if (!candidates.length) {
+      if (!this.nearbyActionTarget) return;
+      this.nearbyActionTarget = null;
+      this.actionTargetCycleId = null;
+      this.publishSnapshot();
+      return;
+    }
+    const selectedId = this.actionTargetCycleId;
+    const target = candidates.find((entry) => entry.target.runtimeId === selectedId || entry.target.id === selectedId)?.target
+      ?? candidates[0].target;
+    this.actionTargetCycleId = target.runtimeId ?? target.id ?? null;
+    const actionId = targetActionId(this, target);
     const next = target && actionId ? {
       id: target.id,
       runtimeId: target.runtimeId ?? null,
+      sourceType: target.sourceType ?? (target.npcId ? "npc" : "object"),
       actionId,
       label: actionPromptFor(actionId) ?? "Interager",
+      targetCount: candidates.length,
+      targetIndex: Math.max(0, candidates.findIndex((entry) => entry.target === target)) + 1,
     } : null;
     if (
       (next?.id ?? null) === (this.nearbyActionTarget?.id ?? null)
       && (next?.actionId ?? null) === (this.nearbyActionTarget?.actionId ?? null)
+      && (next?.targetCount ?? 0) === (this.nearbyActionTarget?.targetCount ?? 0)
+      && (next?.targetIndex ?? 0) === (this.nearbyActionTarget?.targetIndex ?? 0)
     ) return;
     this.nearbyActionTarget = next;
     this.publishSnapshot();
   },
 
-  nearestActionTarget(maxRange = OBJECT_ACTION_INTERACT_RANGE) {
-    let best = null;
-    let bestD = maxRange;
+  actionTargetsInRange(maxRange = OBJECT_ACTION_INTERACT_RANGE) {
+    const candidates = [];
     for (const chunk of this.nearbyChunks(1)) {
       for (const object of chunk.objects) {
         if (!object || object.removed || object.actionRemoved) continue;
-        if (!targetActionId(object)) continue;
+        if (!targetActionId(this, object)) continue;
         const d = distance(this.player, object) - (Number(object.radius) || 0);
-        if (d < bestD) {
-          best = object;
-          bestD = d;
+        if (d <= maxRange) {
+          object.sourceType = "object";
+          candidates.push({ target: object, distance: d });
+        }
+      }
+      for (const npc of chunk.npcs ?? []) {
+        if (!npc || npc.removed || npc.actionRemoved) continue;
+        if (!targetActionId(this, npc)) continue;
+        const d = distance(this.player, npc) - (Number(npc.radius) || 0);
+        if (d <= maxRange) {
+          npc.sourceType = "npc";
+          candidates.push({ target: npc, distance: d });
         }
       }
     }
-    return best;
+    candidates.sort((a, b) => a.distance - b.distance || String(a.target.runtimeId ?? a.target.id).localeCompare(String(b.target.runtimeId ?? b.target.id)));
+    return candidates;
+  },
+
+  nearestActionTarget(maxRange = OBJECT_ACTION_INTERACT_RANGE) {
+    return this.actionTargetsInRange(maxRange)[0]?.target ?? null;
+  },
+
+  cycleNearbyActionTarget(direction = 1) {
+    const candidates = this.actionTargetsInRange(OBJECT_ACTION_INTERACT_RANGE);
+    if (candidates.length <= 1) return false;
+    const selectedId = this.actionTargetCycleId ?? this.nearbyActionTarget?.runtimeId ?? this.nearbyActionTarget?.id ?? null;
+    const currentIndex = Math.max(0, candidates.findIndex((entry) => (
+      entry.target.runtimeId === selectedId || entry.target.id === selectedId
+    )));
+    const nextIndex = (currentIndex + (direction >= 0 ? 1 : -1) + candidates.length) % candidates.length;
+    this.actionTargetCycleId = candidates[nextIndex].target.runtimeId ?? candidates[nextIndex].target.id ?? null;
+    this.updateNearbyActionTarget();
+    return true;
   },
 
   interactNearbyAction() {
-    const snapshotTarget = this.nearbyActionTarget?.id ? this.findObjectById(this.nearbyActionTarget.id) : null;
+    const snapshotTarget = this.nearbyActionTarget?.id
+      ? this.findActionTargetById(this.nearbyActionTarget.id, this.nearbyActionTarget.sourceType)
+      : null;
     const target = snapshotTarget ?? this.nearestActionTarget(OBJECT_ACTION_INTERACT_RANGE);
-    const actionId = targetActionId(target);
+    const actionId = targetActionId(this, target);
     if (!target || !actionId) return false;
     if (distance(this.player, target) - (Number(target.radius) || 0) > OBJECT_ACTION_INTERACT_RANGE) return false;
+    const sourceType = target.sourceType ?? (target.npcId ? "npc" : "object");
     return runAction({
       actionId,
       target,
-      sourceType: "object",
+      sourceType,
       engine: this,
       world: this.region,
       player: this.player,
-      context: {
-        region: this.region,
-        regionId: this.region?.mapRegion?.id ?? this.region?.id,
-        regionConfig: this.region?.mapRegion,
-      },
+      context: actionContextForTarget(this, { target, sourceType, npcId: target.npcId }),
     }).ok;
+  },
+
+  openActionChest(target) {
+    if (!target) return { ok: false, changed: false, reason: "missing_target" };
+    this.dropChestLoot?.(target);
+    if (this.region) this.region.chestOpened = true;
+    this.particleEngine?.removeEmittersByOwner(target.id);
+    this.removeActionTargetObject(target);
+    this.addToast?.("Kisten er aabnet");
+    return { ok: true, changed: true };
+  },
+
+  findActionTargetById(id, sourceType = null) {
+    if (!id) return null;
+    if (!sourceType || sourceType === "object") {
+      const object = this.findObjectById(id);
+      if (object) {
+        object.sourceType = "object";
+        return object;
+      }
+    }
+    if (!sourceType || sourceType === "npc") {
+      for (const chunk of this.nearbyChunks(2)) {
+        const npc = (chunk.npcs ?? []).find((entry) => entry.id === id);
+        if (npc) {
+          npc.sourceType = "npc";
+          return npc;
+        }
+      }
+    }
+    return null;
   },
 
   recordActionObjectState(object, patch) {

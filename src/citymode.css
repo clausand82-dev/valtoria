@@ -1199,19 +1199,43 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
 }
 
+.city-quest-status {
+  position: absolute;
+  right: -7px;
+  top: -11px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid rgba(40, 25, 4, 0.92);
+  border-radius: 50%;
+  background: #ffd94a;
+  color: #3a2504;
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 1000;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+}
+
 .city-map-action-icon.npc.offer,
 .city-map-action-icon.npc.complete,
-.city-map-action-icon.npc.active-quest {
+.city-map-action-icon.npc.active-quest,
+.city-map-action-icon.building.offer,
+.city-map-action-icon.building.complete,
+.city-map-action-icon.building.active-quest {
   border-color: rgba(255, 217, 74, 0.9);
   color: #ffd94a;
 }
 
-.city-map-action-icon.npc.active-quest {
+.city-map-action-icon.npc.active-quest,
+.city-map-action-icon.building.active-quest {
   border-color: rgba(172, 180, 188, 0.9);
   color: #cfd4d9;
 }
 
-.city-map-action-icon.npc.active-quest .city-npc-quest-marker {
+.city-map-action-icon.npc.active-quest .city-npc-quest-marker,
+.city-map-action-icon.building.active-quest .city-quest-status {
   border-color: rgba(14, 16, 18, 0.94);
   background: #aeb6bf;
   color: #202429;

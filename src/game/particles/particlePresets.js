@@ -56,6 +56,8 @@ export const PARTICLE_PRESETS = {
   fire_blast: texturedBurst("/assets/generated/particles/fire_blast.png", "#ff7b38", [54, 86], [0.55, 0.95], [0.22, 0.42]),
   impact_flash: texturedBurst("/assets/generated/particles/impact_flash.png", "#ffd85d", [46, 74], [0.45, 0.9], [0.14, 0.26]),
   smokey_explosion: texturedBurst("/assets/generated/particles/smokey_explosion.png", "#ff9b3d", [96, 150], [0.55, 0.95], [0.45, 0.9]),
+  hero_healing_beam: texturedBurst("/assets/generated/particles/healing_beam.png", "#8fffc0", [28, 38], [0.26, 0.42], [0.42, 0.62]),
+  object_break_cold_mist: texturedBurst("/assets/generated/particles/cold_mist.png", "#cbd8d8", [44, 72], [0.045, 0.12], [0.42, 0.85]),
   cast_fire: magic("#ff7b38", "burst", "effects", 18), cast_ice: magic("#8bdfff", "burst", "effects", 18), cast_poison: magic("#87d65a", "burst", "effects", 18), cast_shadow: magic("#6b4aa8", "burst", "effects", 18), cast_arcane: magic("#b8a4ff", "burst", "effects", 18), cast_heal: magic("#8fffc0", "burst", "effects", 18),
   trail_fire: trail("#ff7b38"), trail_ice: trail("#8bdfff"), trail_poison: trail("#87d65a"), trail_shadow: trail("#6b4aa8"), trail_arcane: trail("#b8a4ff"), trail_heal: trail("#8fffc0"),
   impact_fire: impact("#ff7b38", 30), impact_ice: impact("#8bdfff", 26), impact_poison: impact("#87d65a", 26), impact_shadow: impact("#6b4aa8", 28), impact_arcane: impact("#b8a4ff", 30), impact_heal: impact("#8fffc0", 24), hit_sparks: { ...impact("#f1d08d", 18), movement: "spark" },

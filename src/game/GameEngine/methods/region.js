@@ -272,6 +272,7 @@ export const regionMethods = {
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "cleared"), cleared);
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "corrupted"), !cleared);
+    this.advanceQuestBoardCooldowns?.(1);
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -316,6 +317,7 @@ export const regionMethods = {
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
     if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
+    this.advanceQuestBoardCooldowns?.(1);
     this.addToast(`${active.label} forladt. Progression blev nulstillet, og du er tilbage i byen.`);
     this.saveProgress({ force: true });
     this.publishSnapshot();

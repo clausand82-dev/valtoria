@@ -14,7 +14,8 @@ import {
   screenDirectionToWorld,
   worldToIso,
   AUTOSAVE_INTERVAL_SECONDS,
-  DESTRUCTIBLE_OBJECT_ATTACK_RANGE
+  DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
+  normalizeQuickSlots
 } from "../dependencies.js";
 import {
   preventDefault,
@@ -54,6 +55,7 @@ export const lifecycleMethods = {
       hp: 120,
       mana: 64,
       potions: { health: 0, mana: 0 },
+      quickSlots: normalizeQuickSlots(),
       readableBonuses: createReadableBonuses(),
       skillTree: normalizeSkillTree(),
       classId: DEFAULT_CLASS_ID,
@@ -235,7 +237,6 @@ export const lifecycleMethods = {
       this.updateQuestgiver(dt);
       this.updateNearbyActionTarget();
       this.updateFoliageLoot();
-      this.updateChests(dt);
       this.updateMonsters(dt, stats);
       this.updateProjectiles(dt);
       this.updateGroundHazards(dt);

@@ -135,6 +135,7 @@ export function normalizePrefabContent(prefab) {
     decals: [...fromLegend.decals, ...(Array.isArray(prefab?.decals) ? prefab.decals : [])],
     monsters: [...fromLegend.monsters, ...(Array.isArray(prefab?.monsters) ? prefab.monsters : [])],
     chests: [...fromLegend.chests, ...(Array.isArray(prefab?.chests) ? prefab.chests : [])],
+    npcs: [...fromLegend.npcs, ...(Array.isArray(prefab?.npcs) ? prefab.npcs : [])],
   };
 }
 
@@ -258,11 +259,12 @@ function buildPrefabInstance(prefab, x, y, rotation, mirrored, index) {
     decals: transformItems(content.decals),
     monsters: transformItems(content.monsters),
     chests: transformItems(content.chests),
+    npcs: transformItems(content.npcs),
   };
 }
 
 function prefabContentFromLegend(prefab) {
-  const result = { objects: [], foliage: [], decals: [], monsters: [], chests: [] };
+  const result = { objects: [], foliage: [], decals: [], monsters: [], chests: [], npcs: [] };
   const tiles = Array.isArray(prefab?.tiles) ? prefab.tiles : [];
   const legend = prefab?.legend && typeof prefab.legend === "object" ? prefab.legend : null;
   if (!tiles.length || !legend) return result;
@@ -299,6 +301,7 @@ function addLegendEntry(result, entry, x, y) {
       foregroundFade: entry.foregroundFade,
       foregroundFadeAlpha: entry.foregroundFadeAlpha,
       actionId: entry.actionId,
+      actions: entry.actions,
     });
   }
   if (entry.foliage) {
@@ -343,6 +346,20 @@ function addLegendEntry(result, entry, x, y) {
       ...base,
       id: entry.chest,
       blocking: entry.blocking,
+    });
+  }
+  if (entry.npc || entry.npcId) {
+    const npc = typeof (entry.npc ?? entry.npcId) === "object" && (entry.npc ?? entry.npcId) !== null
+      ? (entry.npc ?? entry.npcId)
+      : { npcId: entry.npc ?? entry.npcId };
+    result.npcs.push({
+      ...base,
+      ...npc,
+      npcId: npc.npcId ?? npc.id,
+      facing: entry.facing ?? npc.facing,
+      actionId: entry.actionId ?? npc.actionId,
+      actions: entry.actions ?? npc.actions,
+      conditions: entry.conditions ?? npc.conditions,
     });
   }
 }

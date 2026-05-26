@@ -259,7 +259,7 @@ function buildRegionAssetManifest(input) {
     .concat([...prefabFoliageSpecs.values()])
     .concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)));
 
-  const objectTypes = new Set(["chest"]);
+  const objectTypes = new Set(["object_chests_ground"]);
   for (const entry of normalizeRegionObjects(regionConfig)) {
     for (const spawnType of entry.spawnTypes ?? []) {
       const type = spawnType?.type;
@@ -2530,7 +2530,6 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
     || object.type === "building"
     || object.type === "ruin"
     || object.type === "crystal"
-    || object.type === "chest"
     || object.type === "firebeacon"
     || object.type === "fireplace") {
     return drawSheetObject(ctx, object, screen, biome, atlas, time);
@@ -2575,15 +2574,10 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const cells = sheet?.cells;
   if (!cells?.length) return false;
 
-  const animFrame = object.type === "chest" && object.opening
-    ? (object.openTime ?? 0) * 6
-    : time * 6 + (object.animSeed ?? 0);
+  const animFrame = time * 6 + (object.animSeed ?? 0);
   const rawFrameIndex = Math.floor(animFrame);
-  const frameT = animFrame - rawFrameIndex;
-  const frameIndex = object.type === "chest" && !object.opening
-    ? 0
-    : sheet.animated
-      ? (object.type === "chest" ? Math.min(rawFrameIndex, cells.length - 1) : rawFrameIndex % cells.length)
+  const frameIndex = sheet.animated
+    ? rawFrameIndex % cells.length
     : Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length;
   const renderSheet = objectDamageRenderSheet(sheet, object);
   const cell = renderSheet?.cells?.[frameIndex] ?? cells[frameIndex];
@@ -2596,7 +2590,6 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const baseScale = object.type === "building" ? 0.58
     : object.type === "ruin" ? 0.54
     : object.type === "crystal" ? 0.46
-    : object.type === "chest" ? 0.28
     : object.type === "firebeacon" ? 0.44
     : 0.4;
   const scale = baseScale * object.size * (object.visualScale ?? 1) * (sheet.renderScale ?? 1);
@@ -2605,7 +2598,7 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const bob = object.type === "crystal" ? Math.sin(time * 2.6 + object.animSeed) * 1.2 : 0;
   const glow = object.type === "crystal" ? 0.92 + Math.sin(time * 3 + object.animSeed) * 0.04 : 1;
 
-  if (object.type === "crystal" || object.type === "chest" || object.type === "firebeacon" || object.type === "fireplace") {
+  if (object.type === "crystal" || object.type === "firebeacon" || object.type === "fireplace") {
     drawShadow(ctx, screen.x, screen.y + 12, width * 0.18, Math.max(6, width * 0.055), 0.22);
   }
 
@@ -2620,15 +2613,6 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const drawY = -height + 24 * scale + frameOffset.y * scale;
   drawImageMaybeDamaged(ctx, sprite, 0, 0, sprite.width, sprite.height, drawX, drawY, width, height, renderSheet === sheet ? object : null);
   ctx.restore();
-
-  if (object.type === "chest" && object.opening) {
-    drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, cells.length, time, {
-      x: screen.x + drawX,
-      y: screen.y + 12 + bob + drawY,
-      width,
-      height,
-    });
-  }
 
   if (object.type === "crystal") {
     ctx.save();
@@ -2650,50 +2634,6 @@ function objectDamageRenderSheet(sheet, object) {
   if (hits >= 2) return variants.destroyed ?? sheet;
   if (hits >= 1 && variants.damaged) return variants.damaged;
   return sheet;
-}
-
-function drawChestVanishEffect(ctx, screen, object, frameIndex, frameT, frameCount, time, rect) {
-  if (frameCount < 2 || frameIndex < frameCount - 2) return;
-
-  const progress = Math.min(1, Math.max(0, (frameIndex - (frameCount - 2) + frameT) / 2));
-  const pulse = Math.sin(progress * Math.PI);
-  const sparkleAlpha = Math.max(0, 1 - progress) * 0.65 + pulse * 0.28;
-  const scale = object.size * (object.visualScale ?? 1);
-  const cx = rect.x + rect.width * 0.5;
-  const cy = rect.y + rect.height * 0.48;
-
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-
-  const glow = ctx.createRadialGradient(cx, cy, 4, cx, cy, 62 * scale);
-  glow.addColorStop(0, `rgba(255, 236, 144, ${0.42 * pulse})`);
-  glow.addColorStop(0.42, `rgba(255, 154, 50, ${0.18 * pulse})`);
-  glow.addColorStop(1, "rgba(255, 154, 50, 0)");
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 70 * scale, 48 * scale, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = `rgba(255, 238, 158, ${0.32 * pulse})`;
-  ctx.lineWidth = Math.max(1, 2 * scale);
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 6 * scale, 28 * scale * (1 + progress * 0.45), 9 * scale * (1 + progress * 0.3), 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.fillStyle = `rgba(255, 246, 184, ${sparkleAlpha})`;
-  for (let i = 0; i < 8; i += 1) {
-    const angle = i * 2.399 + object.animSeed;
-    const drift = progress * (18 + (i % 3) * 6);
-    const flicker = 0.72 + Math.sin(time * 9 + i * 1.7) * 0.28;
-    const x = cx + Math.cos(angle) * (16 + drift) * scale;
-    const y = cy + Math.sin(angle) * (10 + drift * 0.55) * scale - progress * 16 * scale;
-    const r = Math.max(1.2, (2.4 + (i % 2)) * flicker * scale);
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
 }
 
 function drawDamageCracks(ctx, object, x, y, width, height) {

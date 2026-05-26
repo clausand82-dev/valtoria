@@ -2,4 +2,25 @@ NY NPC borgmester
 Borgmester har en quest når man åbner byen første gang, hvor han også byder velkommen til en og fortælle grund historien.
 Første quest er at besøge innkeeper, som giver en quest clear_the_inn - og så er nuværende start koblet på
 
-Efter de første få non-story quest, dukker ny quest op,
+Efter de første få non-story quest (bill board), dukker ny quest op.
+
+--------------
+MAIN story kort fortalt.
+Spilleren er lige ankommet til village outskirt, som er den by, som spilleren styrer i city mode. Borgmesteren har en start quest til en, så man bliver fortrolig med quest systemet og kamp systemet. Overordnet set leder disse main quest en rundt i alle regionerne af village outskirt, og bygger op til man skal have åbnet passagen til elvindalen.
+
+Undervejs skal der i lore fortælles om Lord Kealand og Lady Lirians eventyr, og andre lore ting, skal også eksisterer på dette plan. F.eks. lidt omkring hvorfor Nethrendor er som han er (at han engang var en god elver og kæreste/gift med Elviria.
+
+De forskellige NPC'er skal også hinte at man forsøger at få hjælp fra den mægtige sangomspundne Lydrendor - hvad man ikke ved er at Lydrendor faktisk er Nethrendor, men kan "spiller" på begge sider af krigen (lidt ligesom palpatine/kejseren i Star Wars).
+
+Måske village outskirt main quest lidt handler om at finde ud af hvor Lydrendor kan findes; at finde clues på det.
+
+Elvindale quest skal handle om at finde Eldiria (hvilket sender en til Eldiria region) og hjælpe hende; hun skal være modvillig i at hjælpe med at finde Lydrendor (hun kender sandheden, men kan ikke få det sagt). Hun ender med at sende en til Glimmergeden (i svampemarken), som kan hjælpe en ind i Nethrendor. Dette kræver dog en tur til livstræet først. Herefter kan man komme til Nethrendor, hvor man støder på en gruppe oprører, der anføres af en mystisk mand. Den mand viser sig at være Lydrendor. Man arbejder lidt med nogle quest for at styrke gruppen og finde en vej ind i Nethrendors borg. Da det lykkedes og man angriber slottet, konfronteres man med Nethrendor, som smider en i fængsel. Lydrendor formodes at være flygtet.
+Senere lykkedes det en at flygte med hjælp fra Lydrendor. Man flygter til Den Druknede By og beslutter sig for at tage til Trolvalheden for at lede efter troldenes skat; Lydrendors forslag.
+
+På Tornvalhed leder mna efter skatten, men må konkluderer at skatten er forsvundet (vi ved fra historien om Lord Kealand at han fandt den). Man møder en sur Foldrik. Måske også en konfrontation med Elvera; denne konfrontation tager vores helt alene, imens Lydrendor bliver i lejren. Vores helt kæmper imod Elvera, der afslører at Lydrendor ikke er den han påstår han er. Dette redder Elvera fra at blive hugget ned af vores helt, som bliver meget paf. I vrede skynder han sig tilbage til lejren, men Lydrendor er forsvundet og det samme er alle ens spor om hvor Lord Kealand flyttede skatten hen!
+
+Her slutter main story og resten af områderne er til udvidelses historier.
+
+
+Retningslinjer:
+Village Outskirt er så at sige spillets opstarts område, hvor de første quest gives så historien er på plads
