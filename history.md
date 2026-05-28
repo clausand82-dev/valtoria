@@ -10,6 +10,8 @@ History over changes
 - added option to do questchains (steps system)
 - added a Bestiary system
 - added a "cheat" system and some commands to make testing easy (have a global turn on/off)
+- esc now close and open map
+- map now lands in last region opened or wolrd map
 
 *V. 1.76
 - added sublevel system - building on top of action system form early

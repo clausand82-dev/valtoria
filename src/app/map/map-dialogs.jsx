@@ -92,6 +92,15 @@ function regionHoverCorruptionText(mapId, region, regionCorruption) {
 export function MinimapDialog({ engineRef, snapshot, cityOpen, cityMinimapHero, onClose }) {
   const canvasRef = useRef(null);
   useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  useEffect(() => {
     if (!canvasRef.current) return;
     if (cityOpen) {
       renderCityMinimap(canvasRef.current, cityMinimapHero ?? undefined);
@@ -158,7 +167,7 @@ function renderCityMinimap(canvas, heroPosition) {
   ctx.strokeRect(1, 1, width - 2, height - 2);
 }
 
-export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, activeQuests = [], completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
+export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, activeQuests = [], completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation, onClose }) {
   const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
   const [hoveredRegionId, setHoveredRegionId] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -181,6 +190,15 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
     setSelectedRegion(null);
     setLockedRegion(null);
   }, [initialMapId]);
+  useEffect(() => {
+    const onKey = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   const navigateToMap = (mapId) => {
     setSelectedMapId(mapId);
     onMapNavigation?.(mapId);

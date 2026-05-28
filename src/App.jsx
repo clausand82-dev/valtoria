@@ -574,7 +574,6 @@ export default function App() {
   };
 
   const openWorldMapFromCity = () => {
-    setRegionMapInitialId(WORLD_MAP.id);
     setRegionMapOpen(true);
     setMapOpen(false);
     setInventoryOpen(false);
@@ -872,6 +871,7 @@ export default function App() {
           onPlayableRegionSelected={startPlayableMapRegion}
           onCityOpen={handleOpenCityFromMap}
           onMapNavigation={(mapId) => setRegionMapInitialId(mapId)}
+          onClose={() => setRegionMapOpen(false)}
         />
       )}
 
