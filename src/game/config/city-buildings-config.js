@@ -35,7 +35,7 @@ export const CITY_BUILDINGS = [
       {
         id: "melee_training",
         title: "Melee Training",
-        prebuilt: true,
+        prebuilt: false,
         help: "Trains sword and spear soldiers.",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
@@ -43,7 +43,7 @@ export const CITY_BUILDINGS = [
       {
         id: "ranged_training",
         title: "Ranged Training",
-        prebuilt: true,
+        prebuilt: false,
         help: "Trains archer and crossbow soldiers.",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1800 },

@@ -137,6 +137,8 @@ export const SPELL_DEFS = {
       projectileEffect: "trail_ice",
       impactEffect: "impact_ice",
       statusEffect: "status_frozen",
+      projectileTexture: "/assets/generated/particles/ice_shard.png",
+      projectileTextureSize: 48,
     },
   },
   blizzard: {
@@ -280,6 +282,8 @@ export const SPELL_DEFS = {
       impactEffect: "impact_poison",
       areaEffect: "poison_cloud_lingering",
       statusEffect: "status_poisoned",
+      projectileTexture: "/assets/generated/particles/poison_cloud.png",
+      projectileTextureSize: 48,
     },
   },
   web_slow: {

@@ -1,7 +1,7 @@
 Ting at få gjort
 
 --- IGANG ---
-Bestiary - er tilføjet, men skal bruge pænere layout
+Prøv at få gjort grass tile matchende
 
 --- GRAFISK ---
 - Få grafik på alle bygninger og addons, samt få bygningerne i flere variationer (hel, damage og ruin)
@@ -172,11 +172,283 @@ FRACTIONER - NY IDE:
 Hvis fractioner nu er de grundlæggende (som også findes på samlekort), så kan hvert map være knyttet op på hvilken fraction region styres af (kan også bruges i betingelser) - evt. rulles der efter hvert map besøg?
 
 
+PROMPT FOR Decay
+Du skal rette decay/decal-renderingen i Valtoria, så systemet understøtter både gamle top-down decay sheets og nye isometriske ground-decay sheets.
+
+Kontekst:
+- Spillet er isometrisk.
+- Nuværende decays tegnes som flade terrain decals på jorden.
+- Gamle decay sheets er top-down assets, fx blood/dust/cracks set direkte oppefra.
+- Nye decay sheets kan være isometriske ground decals, hvor selve motivet allerede er tegnet i iso-perspektiv som en flad 2:1-ish diamant/ellipse inde i en kvadratisk celle.
+- Disse to typer må IKKE behandles ens.
+
+Problem:
+- Top-down decays bør mastes/skaleres til iso-footprint, fx TILE_W x TILE_H.
+- Iso decays bør ikke mastes endnu en gang. Hvis en iso-decay celle allerede indeholder en flad iso-decal, skal hele cellen typisk tegnes i et kvadratisk renderfelt, fx TILE_W x TILE_W, så motivet inde i cellen ender omkring TILE_W x TILE_H.
+- Hvis begge typer tegnes som TILE_W x TILE_H, bliver nye iso-decays for flade/klemte.
+
+Opgave:
+1. Find decay/decal config og rendering helpers.
+   Relevante filer kan være:
+   - src/game/config/decay-config.js
+   - src/game/GameEngine/helpers/rendering.js
+   - src/game/GameEngine/methods/rendering.js
+   - evt. asset loader/assets.js hvis frame slicing er relevant.
+
+2. Udvid decay config med en eksplicit projection/sourceProjection type:
+   - "topdown" for gamle decays
+   - "iso" for nye isometriske decays
+
+   Eksempel:
+   decay_blood: {
+     id: "decay_blood",
+     fileName: "decay/decay_blood.png",
+     rows: 4,
+     cols: 4,
+     renderScale: 1,
+     projection: "topdown",
+   }
+
+   decay_dust_iso: {
+     id: "decay_dust_iso",
+     fileName: "decay/decay_dust_iso.png",
+     rows: 4,
+     cols: 4,
+     renderScale: 1,
+     projection: "iso",
+   }
+
+3. Bevar bagudkompatibilitet:
+   - Hvis projection/sourceProjection mangler, skal default være "topdown", så eksisterende decays stadig virker som før.
+   - Ingen eksisterende regioner/prefabs må crashe.
+
+4. Ret drawTerrainDecal/drawDecay helperen, så render size afhænger af projection:
+
+   For topdown:
+   - destination width = TILE_W * renderScale
+   - destination height = TILE_H * renderScale
+   - dette konverterer/masser top-down asset til iso-ground-footprint.
+
+   For iso:
+   - destination width = TILE_W * renderScale
+   - destination height = TILE_W * renderScale
+   - dette bevarer den iso-tegnede decal inde i cellen, så den ikke bliver mast dobbelt.
+
+   Brug gerne helperfunktioner, fx:
+   getTerrainDecalRenderSize({ decal, sheet, TILE_W, TILE_H })
+
+5. Tilføj også frivillige justeringsfelter i config:
+   - widthScale
+   - heightScale
+   - offsetX
+   - offsetY
+   - anchorX
+   - anchorY
+
+   Defaults:
+   - widthScale: 1
+   - heightScale: 1
+   - offsetX: 0
+   - offsetY: 0
+   - anchorX: 0.5
+   - anchorY: 0.5 eller eksisterende logik, hvis der allerede findes en standard.
+
+   Disse må ikke bryde nuværende rendering.
+
+6. Hvis decay-renderingen allerede bruger et y-offset som TILE_H * 0.52, så bevar den eksisterende visuelle placering for topdown som default.
+   For iso-decays må der gerne være samme default, men gør det muligt at justere med offsetY i config.
+
+7. Sørg for at frame slicing fortsat bruger rows/cols fra config.
+   Undgå halve pixel-problemer så godt som muligt:
+   - Brug helst præcise frame boundaries.
+   - Hvis eksisterende loader allerede håndterer dette generisk, så ændr kun hvis nødvendigt.
+   - Systemet skal fungere med både 1254x1254 gamle sheets og nye 1024x1024/2048x2048 sheets.
+
+8. Tilføj et par konkrete config-eksempler:
+   - Behold eksisterende blood/cracks/dust som projection: "topdown".
+   - Tilføj mindst én ny eksempel-entry, fx decay_dust_iso eller decay_cracks_iso, med projection: "iso", men uden at kræve at filen findes hvis asset loaderen crasher på manglende filer. Hvis manglende filer giver crash, så undlad at aktivere den nye entry eller kommentér eksempel tydeligt.
+
+9. Tilføj korte kommentarer i decay-config.js, der forklarer:
+   - topdown = source er set oppefra og bliver mast til iso footprint
+   - iso = source er allerede tegnet i iso-perspektiv og må ikke mastes igen
+
+10. Kør build/test:
+   - npm run build
+   - Ret alle fejl.
+   - Sørg for at eksisterende decays stadig vises.
+   - Sørg for at nye iso-decays kan vises korrekt, når projection: "iso" bruges.
+
+Vigtigt:
+- Lav ikke et helt nyt decay system.
+- Bevar eksisterende region/prefab usage.
+- Ingen breaking changes.
+- Fokus er kun at gøre draw/rendering klog nok til både top-down og iso-source assets.
 
 
+PROMPT FOR critters
+Du skal implementere et billigt ambient critter-system i Valtoria.
 
+Målet:
+Critters er små neutrale ambient creatures, der giver liv til maps. De må gerne genbruge eksisterende mob-grafik/animationer, f.eks. rats og spiders, men de må IKKE behandles som rigtige mobs.
 
---- IN WORK ---
+Vigtige krav:
+- Critters skal være billige i memory, CPU og GPU.
+- Genbrug eksisterende mob spritesheets/animationsdata via mobId/sourceMobId.
+- Ingen nye textures skal loades, hvis mob asset allerede findes.
+- Critters skal kunne skaleres mindre end mob-udgaven, fx scale: 0.25-0.45.
+- Critters skal ikke have combat AI, aggro, pathfinding, loot, XP, quests eller save-state.
+- Critters skal ikke kunne targetes som enemies.
+- Critters skal ikke blokere movement.
+- Critters må gerne kunne tage skade fra AoE/area damage, melee hitbox og magi, hvis config siger det.
+- Når en critter dør, skal den bare fjernes/despawne billigt. Ingen loot, ingen XP, ingen persistence.
+- Offscreen critters skal ikke renderes.
+- Offscreen critters bør enten ikke opdateres eller kun opdateres meget sjældent.
+- Der skal være maxAlive/maxPerRegion-limit, så systemet aldrig kan spamme engine/render loop.
+- Systemet skal kunne slås helt fra via en simpel performance/config-flag.
 
+Implementer som en separat runtime-type:
+type: "critter"
 
----------------------------DONE------------------------------
+Critters må gerne bruge samme render pipeline som mobs, men de skal filtreres væk fra:
+- enemy target selection
+- aggro logic
+- mob attack logic
+- mob drops
+- XP rewards
+- quest kill tracking
+- collision blocking
+- save/load persistence
+
+Tilføj config support i map-region-config.js, fx:
+
+ambientCritters: [
+  {
+    id: "ambient_rat",
+    mobId: "rat",
+    count: { min: 3, max: 8 },
+    scale: 0.35,
+    behavior: "flee",
+    fleeDistance: 120,
+    hp: 1,
+    canTakeAreaDamage: true
+  },
+  {
+    id: "ambient_spider",
+    mobId: "spider",
+    count: { min: 2, max: 5 },
+    scale: 0.3,
+    behavior: "wander",
+    hp: 1,
+    canTakeAreaDamage: true
+  }
+]
+
+Gerne også en global/default struktur, fx:
+
+ambientCritterDefaults: {
+  enabled: true,
+  maxAlivePerRegion: 20,
+  maxPerType: 10,
+  collision: false,
+  hostile: false,
+  canBeTargeted: false,
+  givesXp: false,
+  dropsLoot: false,
+  persist: false,
+  offscreenUpdate: false,
+  offscreenRender: false
+}
+
+Behaviors i første version:
+1. wander
+- Critteren går små tilfældige bevægelser.
+- Ingen pathfinding.
+- Brug simpel random direction + pause.
+- Må ikke forsøge at finde avanceret rute.
+
+2. flee
+- Hvis player er inden for fleeDistance, bevæger critteren sig væk fra player.
+- Ingen pathfinding.
+- Den må bare løbe direkte væk og evt. stoppe ved simple blocking/invalid tile.
+- Hvis den kommer langt nok væk, vender den tilbage til idle/wander.
+
+Animation:
+- Brug mobId til at finde eksisterende mob animation.
+- Brug walk/idle animation hvis de findes.
+- Brug fallback hvis animation mangler.
+- Attack animation skal ikke bruges.
+- Render med critter.scale.
+
+Damage:
+- AoE/area damage skal også kunne ramme critters, men kun hvis canTakeAreaDamage !== false.
+- Direct target spells må ikke kunne vælge critters som target.
+- Melee hitbox/area slash må gerne ramme dem, hvis det eksisterende damage-system bruger area overlap.
+- Ved hp <= 0: markér dead og fjern/despawn efter kort tid.
+- Ingen loot, ingen XP, ingen quest progress.
+
+Performance:
+- Tilføj culling før render.
+- Critters uden for camera viewport + margin må ikke renderes.
+- Hold update billig:
+  - Ingen collision-heavy pathfinding.
+  - Ingen aggro checks mod andre mobs.
+  - Ingen per-frame expensive search.
+  - Player distance check må gerne være simpel squared distance.
+- Der skal være hårdt loft på antal critters.
+- Hvis performance flag disableAmbientCritters er true, skal de slet ikke spawne.
+- Hvis lowPowerMode er true, reducer count/maxAlive eller slå dem fra.
+
+Spawning:
+- Spawn critters når region/map genereres/loaded.
+- Brug seeded/random placement på walkable tiles.
+- Respekter count min/max, men clamp efter maxAlivePerRegion og maxPerType.
+- Critters skal ikke gemmes i save.
+- Ved region reload må de gerne genereres på ny.
+- De må gerne despawne naturligt, men første version kan bare lade dem leve indtil region forlades eller de dør.
+
+Conditions:
+- Hvis det er nemt og passer med eksisterende condition resolver, så understøt både verbose conditions og shorthand conditions på critter entries.
+- Det skal virke ligesom andre map-region config entries.
+- Eksempel:
+  {
+    id: "ambient_shadow_spider",
+    mobId: "spider",
+    count: { min: 1, max: 4 },
+    scale: 0.32,
+    behavior: "wander",
+    worldBalanceNetdra: { min: 40 }
+  }
+- Hvis condition support er for stort til første patch, så lav strukturen klar, men undgå at bryde noget.
+
+Debug:
+Tilføj gerne debug counters hvis der allerede findes debug overlay:
+- crittersAlive
+- crittersRendered
+- crittersUpdated
+- crittersKilled
+- critterDrawCalls hvis draw call tracking findes
+
+Demo:
+Tilføj critters til en eller to eksisterende regioner i map-region-config.js:
+- rotter i forladte/ruin/landsby-agtige områder
+- små spiders i skov/ruin områder
+
+Eksempel:
+ambientCritters: [
+  { id: "ambient_rat", mobId: "rat", count: { min: 3, max: 8 }, scale: 0.35, behavior: "flee", fleeDistance: 120, hp: 1, canTakeAreaDamage: true },
+  { id: "ambient_spider", mobId: "spider", count: { min: 2, max: 5 }, scale: 0.3, behavior: "wander", hp: 1, canTakeAreaDamage: true }
+]
+
+Acceptance criteria:
+- npm run build skal passere.
+- Spillet må ikke crash hvis en region ikke har ambientCritters.
+- Spillet må ikke crash hvis mobId ikke findes; log en warning og skip entry.
+- Critters renderes små og neutrale.
+- Critters angriber ikke.
+- Critters kan ikke targetes som enemy.
+- Critters giver ikke XP/loot/quest progress.
+- Critters kan tage AoE/area damage og despawne.
+- Offscreen critters renderes ikke.
+- Antal critters er clamped af maxAlive/maxPerType.
+- Eksisterende mobs/combat må ikke ændre adfærd.
+

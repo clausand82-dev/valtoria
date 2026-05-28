@@ -13,13 +13,14 @@ export function getCityBuildingStateForId(progress = {}, buildingId) {
   const prebuiltAddons = (building.addons ?? [])
     .filter((addon) => addon.prebuilt)
     .map((addon) => addon.id);
-  const savedAddons = Array.isArray(saved.addons) ? saved.addons : [];
+  const purchasedAddons = Array.isArray(saved.purchasedAddons) ? saved.purchasedAddons : [];
   return {
     ...saved,
     level: building.prebuilt ? Math.max(1, saved.level ?? 0) : (saved.level ?? 0),
     paid: saved.paid ?? {},
     durability: saved.durability ?? DURABILITY_DEFAULT,
-    addons: [...new Set([...prebuiltAddons, ...savedAddons])],
+    purchasedAddons: [...new Set(purchasedAddons)],
+    addons: [...new Set([...prebuiltAddons, ...purchasedAddons])],
   };
 }
 

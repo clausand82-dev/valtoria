@@ -26,7 +26,7 @@ import {
   canNpcTurnInQuest
 } from "../helpers.js";
 import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill-tree-config.js";
-import { getClassConfig, normalizeClassId, normalizeClassNodes } from "../../config/class-config.js";
+import { classPointsAvailable, getClassConfig, normalizeClassId, normalizeClassNodes } from "../../config/class-config.js";
 import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeWorldState } from "../../world-state.js";
 import { getWorldEnergyState } from "../../world-energy.js";
@@ -87,7 +87,7 @@ export const snapshotMethods = {
         skillPoints: skillTreeAvailablePoints(this.player.level, this.player.skillTree),
         classId: normalizeClassId(this.player.classId),
         className: getClassConfig(this.player.classId)?.name ?? "Adventurer",
-        classPoints: Math.max(0, Math.floor(Number(this.player.classPoints) || 0)),
+        classPoints: classPointsAvailable(this.player),
         classNodes: normalizeClassNodes(this.player.classNodes),
         unlockedSpells: [...(this.player.unlockedSpells ?? [])],
         activeSpellId: this.player.activeSpellId ?? null,

@@ -12,6 +12,10 @@ History over changes
 - added a "cheat" system and some commands to make testing easy (have a global turn on/off)
 - esc now close and open map
 - map now lands in last region opened or wolrd map
+- change UI on building modal
+- fixed classes point error
+- fixed a bug whre prebuilt building would stay prebuilt after prebuilt sat to false
+- slowly started to convert/used 2048x2048, 1024x1024 sheets instead of 1254x1254
 
 *V. 1.76
 - added sublevel system - building on top of action system form early
@@ -34,7 +38,7 @@ History over changes
 - more old greenscreen pictures cleaned up
 - added more mobs (icebear, bear, lion, sickrat, rat) - need animation tweak
 
-* V 1.73
+* V. 1.73
 - added options to have 1x1 or 2x2 object sheets
 - added options to have more than one sheets on a object
 - added player occulision fade options

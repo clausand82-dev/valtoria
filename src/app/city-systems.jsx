@@ -548,13 +548,14 @@ function getCityBuildingState(progress, building) {
   const prebuiltAddons = (building.addons ?? [])
     .filter((addon) => addon.prebuilt)
     .map((addon) => addon.id);
-  const savedAddons = Array.isArray(saved.addons) ? saved.addons : [];
+  const purchasedAddons = Array.isArray(saved.purchasedAddons) ? saved.purchasedAddons : [];
   return {
     ...saved,
     level: building.prebuilt ? Math.max(1, saved.level ?? 0) : (saved.level ?? 0),
     paid: saved.paid ?? {},
     durability: saved.durability ?? DURABILITY_DEFAULT,
-    addons: [...new Set([...prebuiltAddons, ...savedAddons])],
+    purchasedAddons: [...new Set(purchasedAddons)],
+    addons: [...new Set([...prebuiltAddons, ...purchasedAddons])],
   };
 }
 
@@ -1696,13 +1697,19 @@ function normalizeCityStatBonuses(statBonuses = {}) {
 function normalizeCityProgress(progress = {}) {
   const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
   const reserved = new Set(["areas", "statBonuses", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const buildingIds = new Set(CITY_BUILDINGS.map((building) => building.id));
   const normalized = {
     areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
   };
   for (const [key, value] of Object.entries(raw)) {
     if (reserved.has(key)) continue;
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
-    normalized[key] = { ...value };
+    const nextValue = { ...value };
+    if (buildingIds.has(key)) {
+      delete nextValue.addons;
+      nextValue.purchasedAddons = Array.isArray(value.purchasedAddons) ? [...new Set(value.purchasedAddons)] : [];
+    }
+    normalized[key] = nextValue;
   }
   normalized.statBonuses = normalizeCityStatBonuses(raw.statBonuses);
   normalized.armoryPoints = normalizeArmoryPoints(raw.armoryPoints);

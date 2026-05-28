@@ -168,6 +168,18 @@ function classNodeCostsPoint(node) {
   return node?.free !== true && !String(node?.id ?? "").endsWith(".base");
 }
 
+export function classNodeSpentPoints(player) {
+  return getUnlockedClassNodes(player).reduce((sum, nodeId) => (
+    sum + (classNodeCostsPoint(CLASS_NODE_BY_ID[nodeId]) ? 1 : 0)
+  ), 0);
+}
+
+export function classPointsAvailable(player) {
+  const levelPoints = Math.max(0, Math.floor(Number(player?.level) || 1) - 1 - classNodeSpentPoints(player));
+  const savedPoints = Math.max(0, Math.floor(Number(player?.classPoints) || 0));
+  return Math.max(savedPoints, levelPoints);
+}
+
 export function canUnlockClassNode(player, nodeId, context = {}) {
   const node = CLASS_NODE_BY_ID[String(nodeId ?? "")];
   if (!node) return { ok: false, reason: "Unknown class node" };
@@ -191,7 +203,7 @@ export function canUnlockClassNode(player, nodeId, context = {}) {
     const label = context.researchName?.(node.requiresResearch) ?? node.requiresResearch;
     return { ok: false, reason: `Requires research: ${label}` };
   }
-  if (classNodeCostsPoint(node) && (Number(player?.classPoints) || 0) <= 0) return { ok: false, reason: "No class points" };
+  if (classNodeCostsPoint(node) && classPointsAvailable(player) <= 0) return { ok: false, reason: "No class points" };
   return { ok: true, reason: "" };
 }
 
@@ -200,7 +212,7 @@ export function unlockClassNode(player, nodeId, context = {}) {
   if (!check.ok) return check;
   player.classNodes = [...getUnlockedClassNodes(player), String(nodeId)];
   if (classNodeCostsPoint(CLASS_NODE_BY_ID[String(nodeId)])) {
-    player.classPoints = Math.max(0, Math.floor(Number(player.classPoints) || 0) - 1);
+    player.classPoints = Math.max(0, classPointsAvailable(player) - 1);
   }
   return { ok: true, reason: "" };
 }

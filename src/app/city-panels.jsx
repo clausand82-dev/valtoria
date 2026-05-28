@@ -24,6 +24,7 @@ import {
   CLASS_DEFS,
   CLASS_NODE_BY_ID,
   DEFAULT_CLASS_ID,
+  classPointsAvailable,
   canUnlockClassNode as canUnlockClassNodeForPlayer,
   getClassConfig,
   normalizeClassId,
@@ -830,7 +831,7 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
   const classId = normalizeClassId(player?.classId);
   const classChosen = classId !== DEFAULT_CLASS_ID;
   const classConfig = getClassConfig(classId);
-  const classPoints = Math.max(0, Math.floor(Number(player?.classPoints) || 0));
+  const classPoints = classPointsAvailable(player);
   const context = cityRequirementContext(progress);
   const baseNodeId = `${classId}.base`;
   const unlockedNodeIds = (player?.classNodes ?? []).map(String);

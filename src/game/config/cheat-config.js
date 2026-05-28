@@ -45,6 +45,11 @@ function commandHelp() {
     'valtoriaCheat("resetAllQuests")',
     'valtoriaCheat("clearBestiary")',
     'valtoriaCheat("clearCityMobs")',
+    'valtoriaCheat("clearCity alladdons")',
+    'valtoriaCheat("clearCity allbuildings")',
+    'valtoriaCheat("clearCity allareas")',
+    'valtoriaCheat("clearCity all")',
+    'valtoriaCheat("clearCity <buildingId|areaId|addonId>")',
     'valtoriaCheat("repairCityBuildings")',
     'valtoriaCheat("repairCityAreas")',
     'Alias: vc("help")',
@@ -278,6 +283,110 @@ function clearCityMobs(api) {
   return result(true, "City mobs cleared.", { removed });
 }
 
+function cityAddonIds() {
+  const entries = new Map();
+  for (const building of CITY_BUILDINGS) {
+    for (const addon of building.addons ?? []) {
+      if (addon?.id) entries.set(String(addon.id), { addon, building });
+    }
+  }
+  return entries;
+}
+
+function clearAddonFromProgress(progress, addonId = null) {
+  let changed = 0;
+  const wantedId = addonId ? String(addonId) : null;
+  const next = { ...progress };
+  for (const building of CITY_BUILDINGS) {
+    if (!building?.id) continue;
+    const state = next[building.id];
+    if (!state || typeof state !== "object" || Array.isArray(state)) continue;
+    const purchased = Array.isArray(state.purchasedAddons) ? state.purchasedAddons.map(String) : [];
+    const legacy = Array.isArray(state.addons) ? state.addons.map(String) : [];
+    const nextPurchased = wantedId ? purchased.filter((id) => id !== wantedId) : [];
+    const nextLegacy = wantedId ? legacy.filter((id) => id !== wantedId) : [];
+    if (nextPurchased.length !== purchased.length || nextLegacy.length !== legacy.length || (!wantedId && (purchased.length > 0 || legacy.length > 0))) {
+      changed += Math.max(1, purchased.length - nextPurchased.length + legacy.length - nextLegacy.length);
+      next[building.id] = {
+        ...state,
+        purchasedAddons: nextPurchased,
+      };
+      delete next[building.id].addons;
+    }
+  }
+  return { progress: next, changed };
+}
+
+function clearCityProgressTarget(api, rawTarget = "all") {
+  const target = String(rawTarget ?? "all").trim();
+  if (!target) return result(false, "Missing city clear target.");
+
+  const normalizedTarget = target.toLowerCase();
+  const progress = loadCityProgress(api);
+  const buildingIds = new Set(CITY_BUILDINGS.map((building) => String(building.id)));
+  const areaIds = new Set(CITY_AREAS.map((area) => String(area.id)));
+  const addonEntries = cityAddonIds();
+  let next = { ...progress };
+  const removed = { areas: 0, buildings: 0, addons: 0 };
+
+  const clearBuildings = () => {
+    for (const buildingId of buildingIds) {
+      if (Object.prototype.hasOwnProperty.call(next, buildingId)) {
+        delete next[buildingId];
+        removed.buildings += 1;
+      }
+    }
+  };
+
+  const clearAreas = () => {
+    const areas = { ...(next.areas ?? {}) };
+    for (const areaId of areaIds) {
+      if (Object.prototype.hasOwnProperty.call(areas, areaId)) {
+        delete areas[areaId];
+        removed.areas += 1;
+      }
+    }
+    next.areas = areas;
+  };
+
+  if (["alladdon", "alladdons", "addons"].includes(normalizedTarget)) {
+    const cleared = clearAddonFromProgress(next);
+    next = cleared.progress;
+    removed.addons = cleared.changed;
+  } else if (["allbuilding", "allbuildings", "buildings"].includes(normalizedTarget)) {
+    clearBuildings();
+  } else if (["allarea", "allareas", "areas", "all"].includes(normalizedTarget)) {
+    clearAreas();
+    clearBuildings();
+  } else if (buildingIds.has(target)) {
+    if (Object.prototype.hasOwnProperty.call(next, target)) {
+      delete next[target];
+      removed.buildings = 1;
+    }
+  } else if (areaIds.has(target)) {
+    const areas = { ...(next.areas ?? {}) };
+    if (Object.prototype.hasOwnProperty.call(areas, target)) {
+      delete areas[target];
+      removed.areas = 1;
+    }
+    next.areas = areas;
+  } else if (addonEntries.has(target)) {
+    const cleared = clearAddonFromProgress(next, target);
+    next = cleared.progress;
+    removed.addons = cleared.changed;
+  } else {
+    return result(false, `Unknown city clear target: ${target}`, {
+      examples: ["alladdons", "allbuildings", "allareas", "all", "barracks", "melee_training"],
+    });
+  }
+
+  commitCityProgress(api, next, `Cheat: city progress ryddet (${target})`);
+  return result(true, `City progress cleared: ${target}`, {
+    removed,
+    note: "Config prebuilt buildings/addons still apply at runtime.",
+  });
+}
+
 function repairCityBuildings(api) {
   const progress = loadCityProgress(api);
   const durability = Number(CHEAT_SETTINGS.defaultDurability) || DURABILITY_DEFAULT;
@@ -329,6 +438,7 @@ export function installValtoriaCheats(api = {}) {
     if (command === "resetallquests" || command === "questsreset" || command === "clearquests") return resetAllQuests(api);
     if (command === "clearbestiary" || command === "resetbestiary") return clearBestiary(api);
     if (command === "clearcitymobs" || command === "citymobsclear") return clearCityMobs(api);
+    if (command === "clearcity" || command === "resetcity" || command === "cityclear") return clearCityProgressTarget(api, parts[0] ?? "all");
     if (command === "repaircitybuildings" || command === "repairbuildings") return repairCityBuildings(api);
     if (command === "repaircityareas" || command === "repairareas") return repairCityAreas(api);
     return result(false, `Unknown cheat command: ${command}`, { help: commandHelp() });
