@@ -163,6 +163,52 @@ export const MAP_PREFABS = {
     ]
   },
 
+  inn_cellar_crack: {
+    id: "inn_cellar_crack",
+    label: "Inn Cellar Crack",
+    w: 5,
+    h: 5,
+    tags: ["inn", "cellar", "quest"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: false,
+    avoidStart: 7,
+    avoidExit: 7,
+    objects: [
+      {
+        id: "object_inn_cellar_crack",
+        x: 2,
+        y: 2,
+        blocking: false,
+        radius: 0.72,
+        size: 0.72,
+        actions: [
+          {
+            actionId: "inspect_inn_crack",
+            questStepActive: { questId: "check_inn_infestation", stepId: "inspect_cellar" },
+            notFlag: "inn_crack_found",
+          },
+          {
+            actionId: "enter_inn_crack_cave",
+            questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" },
+            notFlag: "inn_crack_cave_cleared",
+          },
+          {
+            actionId: "destroy_inn_crack",
+            questStepCompleted: { questId: "check_inn_infestation", stepId: "clear_crack_cave" },
+            notFlag: "inn_crack_destroyed",
+          },
+        ],
+      },
+    ],
+    decals: [
+      { decayId: "decay_cracks", x: 2, y: 2, cell: 8, size: 1.45, alpha: 0.68 },
+      { decayId: "decay_spiderweb", x: 1, y: 2, cell: 4, size: 0.95, alpha: 0.52 },
+      { decayId: "decay_spiderweb", x: 3, y: 1, cell: 6, size: 0.8, alpha: 0.48 },
+    ],
+  },
+
     labyrint: {
     id: "labyrint",
     label: "Labyrint",

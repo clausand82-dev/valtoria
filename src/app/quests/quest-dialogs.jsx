@@ -136,14 +136,38 @@ function killQuestCountLabel(quest) {
   return "?";
 }
 
+function talkQuestTargetLabel(quest) {
+  const target = quest?.target ?? {};
+  if (target.text) return String(target.text);
+  const npcIds = Array.isArray(target.targetNpcIds)
+    ? target.targetNpcIds
+    : target.targetNpcId
+      ? [target.targetNpcId]
+      : [];
+  const names = npcIds.map((npcId) => QUEST_NPCS[npcId]?.name ?? npcId).filter(Boolean);
+  return names.length ? `Tal med ${names.join(", ")}` : "Tal med den rette NPC";
+}
+
 export function QuestObjectiveMeta({ quest, compact = false }) {
   if (!quest) return null;
+  const visibleSteps = Array.isArray(quest.visibleSteps) ? quest.visibleSteps : [];
   const regions = normalizeQuestRegions(quest);
   const collectRows = quest.type === "collect_quest_item" ? collectQuestTargets(quest) : [];
   const killMonsters = quest.type === "kill_monsters" ? killQuestMonsters(quest) : [];
   const clearMapMonsters = quest.type === "clear_map" ? (quest.target?.monsters ?? []).map(String) : [];
   return (
     <div className={`quest-objective-meta ${compact ? "compact" : ""}`}>
+      {visibleSteps.length > 0 && (
+        <div className="quest-objective-row quest-objective-steps">
+          {visibleSteps.map((step) => (
+            <span className={`quest-chip quest-step-chip ${step.completed ? "complete" : step.current ? "current" : ""}`} key={step.id}>
+              <span aria-hidden="true">{step.completed ? "[x]" : step.current ? "->" : "[ ]"}</span>
+              {step.title}
+            </span>
+          ))}
+        </div>
+      )}
+
       {quest.type === "collect_quest_item" && collectRows.length > 0 && (
         <div className="quest-objective-row quest-objective-items">
           {collectRows.map((row) => (
@@ -175,6 +199,12 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
               {monster}
             </span>
           ))}
+        </div>
+      )}
+
+      {quest.type === "talk_to_npc" && (
+        <div className="quest-objective-row quest-objective-regions">
+          <span className="quest-chip region-chip">{talkQuestTargetLabel(quest)}</span>
         </div>
       )}
 
@@ -263,7 +293,7 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
   if (!quest) return null;
   const npc = QUEST_NPCS[quest.turnInNpcId ?? quest.npcId];
   const turnIn = async () => {
-    const result = engineRef.current?.completeQuest?.(quest.id, quest.turnInNpcId ?? quest.npcId);
+    const result = engineRef.current?.completeQuest?.(quest.id ?? quest.questId, quest.turnInNpcId ?? quest.npcId);
     if (result?.ok) {
       onQuestCompleted?.(result);
       onClose?.();
@@ -271,7 +301,26 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
   };
 
   return (
-    <div className="city-popup-backdrop">
+    <QuestDetailCard
+      quest={quest}
+      npc={npc}
+      onClose={onClose}
+      footer={(
+        <>
+          <button type="button" onClick={onClose}>Luk</button>
+          {cityOpen && (
+            <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
+          )}
+        </>
+      )}
+    />
+  );
+}
+
+export function QuestDetailCard({ quest, npc, onClose, footer }) {
+  if (!quest) return null;
+  return (
+    <div className="confirm-backdrop" role="presentation">
       <section className="confirm-dialog quest-offer-dialog quest-parchment-dialog quest-detail-dialog" role="dialog" aria-modal="true" aria-label={quest.title}>
         <div className="quest-offer-header">
           {npc?.imageUrl && <img src={npc.imageUrl} alt="" />}
@@ -295,12 +344,12 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
           {(quest.rewards?.resources ?? []).map((r) => (
             <span className="diff-good" key={`res-${r.resource}`}>+ {r.count}x {r.resource}</span>
           ))}
+          {(quest.rewards?.items ?? []).map((item, index) => (
+            <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
+          ))}
         </div>
         <div>
-          <button type="button" onClick={onClose}>Luk</button>
-          {cityOpen && (
-            <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
-          )}
+          {footer}
         </div>
       </section>
     </div>

@@ -70,7 +70,8 @@ import {
 } from "./hud/resource-bar.jsx";
 import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
-import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
+import { BestiaryViewer } from "./bestiary-viewer.jsx";
+import { QuestDetailCard, QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 import {
@@ -205,6 +206,7 @@ function CityPage({
   snapshot,
   setSnapshot,
   cityStorageKey = CITY_STORAGE_KEY,
+  cityProgressRefreshToken = 0,
   skipMobProgressForVisit = false,
   regionCorruption = {},
   onMobProgressSkipConsumed,
@@ -311,6 +313,10 @@ function CityPage({
     setHoveredAreaId(null);
     setClickedAreaId(null);
   }, [cityStorageKey]);
+
+  useEffect(() => {
+    setCityProgress(loadCityProgress(cityStorageKey));
+  }, [cityProgressRefreshToken, cityStorageKey]);
 
   useEffect(() => {
     setCityProgress((current) => rerollMerchantStockForCityVisit(current, snapshotRef.current.player?.level ?? 1));
@@ -716,6 +722,8 @@ function CityPage({
   };
 
   const openNpc = (npcId) => {
+    const completedTalkQuests = engineRef.current?.advanceTalkToNpcQuests?.(npcId) ?? [];
+    if (completedTalkQuests.length > 0) onQuestCompleted?.(completedTalkQuests[0]);
     setSelectedBuildingId(null);
     setSelectedQuestNpcId(npcId);
   };
@@ -1392,12 +1400,10 @@ function cityBuildingQuestStatus(buildingId, quests = null) {
   const boardId = questBoardIdForBuilding(buildingId);
   if (!boardId) return { hasOffer: false, hasActive: false, hasComplete: false };
   const board = quests?.boards?.[boardId] ?? null;
-  const source = QUEST_BOARD_CONFIG[boardId]?.source ?? boardId;
-  const active = (quests?.active ?? []).filter((quest) => String(quest.source ?? "") === String(source));
   return {
     hasOffer: (board?.offers?.length ?? 0) > 0,
-    hasActive: active.length > 0,
-    hasComplete: active.some((quest) => quest.complete),
+    hasActive: false,
+    hasComplete: false,
   };
 }
 
@@ -1911,35 +1917,71 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   const state = (npcStates ?? []).find((entry) => entry.npcId === npcId) ?? { active: [], offers: [] };
   const npcQuests = state.active ?? [];
   const npcOffers = state.offers ?? [];
+  const mayorIntroActive = npcId === "mayor" && engineRef.current?.questState?.active?.some((quest) => quest.questId === "mayor_intro_to_valtoria");
+  const mayorIntroCompleted = npcId === "mayor" && engineRef.current?.questState?.completed?.includes("mayor_intro_to_valtoria");
+  const npcDialogue = mayorIntroCompleted
+    ? npc?.dialogue?.completed
+    : mayorIntroActive
+      ? npc?.dialogue?.active
+      : "";
+  const lastPointerActionRef = useRef(0);
+  const [actionMessage, setActionMessage] = useState("");
+  const [questCompletionResult, setQuestCompletionResult] = useState(null);
   if (!npc) return null;
 
   const turnIn = (quest) => {
-    const result = engineRef.current?.completeQuest?.(quest.id, npcId);
+    const engine = engineRef.current;
+    const result = engine?.completeQuest?.(quest.id ?? quest.questId, npcId);
     if (result?.ok) {
-      onQuestCompleted?.(result);
+      setActionMessage("");
+      setQuestCompletionResult(result);
+      engine?.publishSnapshot?.();
+    } else {
+      setActionMessage("Questen kunne ikke indleveres. Tjek krav, plads i rygsaekken eller om save-state er for gammel.");
+      engine?.addToast?.("Quest kunne ikke indleveres");
+      engine?.publishSnapshot?.();
     }
   };
 
   const acceptQuest = (quest) => {
-    const accepted = engineRef.current?.acceptQuestOffer?.(quest, "city");
-    if (accepted) onClose();
+    const engine = engineRef.current;
+    const accepted = engine?.acceptQuestOffer?.({ ...quest, npcId: quest.npcId ?? npcId }, "city");
+    if (accepted) {
+      setActionMessage("");
+      engine?.publishSnapshot?.();
+      onClose?.();
+    } else {
+      setActionMessage("Questen kunne ikke tages. Tjek plads i rygsaekken eller om kravene stadig er opfyldt.");
+      engine?.addToast?.("Quest kunne ikke tages");
+      engine?.publishSnapshot?.();
+    }
+  };
+
+  const runButtonAction = (event, action, fromPointer = false) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const now = Date.now();
+    if (!fromPointer && now - lastPointerActionRef.current < 450) return;
+    if (fromPointer) lastPointerActionRef.current = now;
+    action();
   };
 
   return (
-    <div className="city-popup-backdrop">
-      <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name}>
+    <div className="city-popup-backdrop" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+      <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <header className="city-popup-header">
           <div>
             <h3>{npc.name}</h3>
             <span>{npc.title}</span>
           </div>
-          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+          <button type="button" className="city-popup-close" onPointerUp={(event) => runButtonAction(event, onClose, true)} onClick={(event) => runButtonAction(event, onClose)}>X</button>
         </header>
         <div className="quest-npc-summary">
           <img src={npc.imageUrl} alt="" />
           <p>{npc.cityHint}</p>
         </div>
         <main className="quest-list">
+          {actionMessage && <p className="quest-action-message">{actionMessage}</p>}
           {npcOffers.map((quest) => (
             <article className="quest-card" key={`offer-${quest.id}`}>
               <header>
@@ -1948,7 +1990,11 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
               </header>
               <p>{quest.story}</p>
               <QuestObjectiveMeta quest={quest} />
-              <button type="button" onClick={() => acceptQuest(quest)}>
+              <button
+                type="button"
+                onPointerUp={(event) => runButtonAction(event, () => acceptQuest(quest), true)}
+                onClick={(event) => runButtonAction(event, () => acceptQuest(quest))}
+              >
                 Tag quest
               </button>
             </article>
@@ -1961,14 +2007,38 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
               </header>
               <p>{quest.complete ? quest.turnInText : quest.story}</p>
               <QuestObjectiveMeta quest={quest} compact />
-              <button type="button" disabled={!quest.complete} onClick={() => turnIn(quest)}>
+              <button
+                type="button"
+                disabled={!quest.complete}
+                onPointerUp={(event) => runButtonAction(event, () => turnIn(quest), true)}
+                onClick={(event) => runButtonAction(event, () => turnIn(quest))}
+              >
                 Indlever quest
               </button>
             </article>
           ))}
-          {!npcOffers.length && !npcQuests.length && <p>Ingen quests tilgaengelige lige nu.</p>}
+          {!npcOffers.length && !npcQuests.length && <p>{npcDialogue || "Ingen quests tilgaengelige lige nu."}</p>}
         </main>
       </section>
+      {questCompletionResult && (
+        <QuestDetailCard
+          quest={{
+            ...(questCompletionResult.questInfo ?? {}),
+            title: questCompletionResult.questTitle ?? questCompletionResult.questInfo?.title ?? "Quest reward",
+            rewards: questCompletionResult.rewards ?? questCompletionResult.questInfo?.rewards ?? {},
+          }}
+          npc={QUEST_NPCS[questCompletionResult.questInfo?.turnInNpcId ?? questCompletionResult.questInfo?.npcId]}
+          onClose={() => setQuestCompletionResult(null)}
+          footer={(
+            <button type="button" onClick={() => {
+              setQuestCompletionResult(null);
+              onClose?.();
+            }}>
+              OK
+            </button>
+          )}
+        />
+      )}
     </div>
   );
 }
@@ -2523,7 +2593,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       if (!sold) return;
       sold = merchantCloneItem(sold);
     }
-    const gold = merchantSellPrice(sold, snapshot.player?.popularity ?? 0) * qty;
+    const gold = merchantSellPrice(sold, cityStats?.popularity ?? snapshot.player?.popularity ?? 0) * qty;
     engineRef.current?.addGold?.(gold, "Merchant");
     setMerchantState((merchant) => {
       const soldItems = [sold, ...(merchant.soldItems ?? [])].slice(0, 10);
@@ -2541,7 +2611,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const item = stock[stockIndex];
     if (!item) return;
     const qty = merchantTradeQuantity(item, quantity);
-    const price = merchantBuyPrice(item, snapshot.player?.popularity ?? 0) * qty;
+    const price = merchantBuyPrice(item, cityStats?.popularity ?? snapshot.player?.popularity ?? 0) * qty;
     if ((snapshot.player?.gold ?? 0) < price) return;
     const bought = merchantCloneItem({ ...item, count: isResourceItem(item) ? qty : item.count });
     if (!engineRef.current?.addInventoryItem?.(bought)) return;
@@ -2749,11 +2819,14 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               onMerge={(index) => engineRef.current?.mergeInventoryItem?.(index)}
             />
           )}
+          {building.id === "library" && owned && (
+            <BestiaryViewer worldState={snapshot.worldState} />
+          )}
           {building.id === "blacksmith" && owned && activeAddonId === "minting_furnace" && purchasedAddons.has("minting_furnace") && (
             <CityGoldBarPanel
               gold={snapshot.player?.gold ?? 0}
               inventory={snapshot.inventory}
-              popularity={snapshot.player?.popularity ?? 0}
+              popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
               resourceCount={buildingResourceAvailable}
               onSmelt={() => engineRef.current?.smeltGoldToBar?.(1)}
               onSmeltIron={() => onConvertResourceToResource?.("iron_piece", 3, "iron_bar", 1)}
@@ -2762,7 +2835,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           {building.id === "farm" && owned && (
             <CityFarmPanel
               inventory={snapshot.inventory}
-              popularity={snapshot.player?.popularity ?? 0}
+              popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
               resourceCount={buildingResourceAvailable}
               onProduceFoodBarrel={produceFoodBarrel}
               onProduceProvision={addFarmProvision}
@@ -2814,7 +2887,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               inventory={snapshot.inventory}
               stock={buildingState.merchant?.stock ?? []}
               gold={snapshot.player?.gold ?? 0}
-              popularity={snapshot.player?.popularity ?? 0}
+              popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
               onSell={sellMerchantItem}
               onBuy={buyMerchantItem}
             />

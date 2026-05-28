@@ -24,3 +24,42 @@ Her slutter main story og resten af områderne er til udvidelses historier.
 
 Retningslinjer:
 Village Outskirt er så at sige spillets opstarts område, hvor de første quest gives så historien er på plads
+
+
+
+
+QUESTLINE:
+
+Borgmester:
+start quest, der byder velkommen til byen og forklare lidt om situationen. Quest åbner for innkeeper, der har questen clear-the inn.
+START QUEST TILFØJET - FLOW FRA CLEAR THE INN OG NED ER IKKE FIKSET
+
+Innkeeper:
+clear-the-inn: Ryd inn for mobs (main quest) UDEN MOTHER MOBS (rotter og normale spiders)
+check-the-infestion-in-inn: Tjek kælderen for et hul (object der ligner en revne/hul - prefab eller object) - LAVE REVNE OBJECT. Når man går ind i den revne, så kommer man til en subregion, hvor masser af spiders befinder sig - ryd cave og dræb motherspider. Retuner til main region og brug ny action til at destroy revnen! KRÆVER LIDT NY KODE SE CHATGPT CHAT
+
+
+LAV EVT HEREFTER SMÅ TOWN HALL OG INN QUEST FOR AT STYRKE TILLIDEN SÅ NPC VIL GIVE QUEST (MÅSKE REPUTATION FRA BORGERE ELLER NOGET SKAL BRUGES HER - EVT DELE BYENS NPC IND I FRACTION, SÅ SOM ADELIG, FATTIGE, HANDLENDE, ELVER, DVÆRGE ELLER LIGNENDE)
+
+INDTIL FRACTION ER INDFØRT KAN DER VÆRE NOGLE SPEFICIKKE NPC QUEST (dem der er nu) - så er det bare questkrav der er styrende.
+
+Blacksmith:
+Barn låses op efter enten lost_anvil eller lost_hammer er accepteret - KAN JEG TJEKKE EFTER DET?
+lost_anvil: Efter infestion quest er lavet
+lost_hammer: også efter infestion quest er lavet
+
+NOGET QUEST ET ELLER ANDET HERIMELLEM
+
+Annelise:
+Efter lost_anvil og lost_hammer er løst, stoler Annelise mere på en, og har quest - MÅSKE FØRST EFTER MARKEN ER ÅBNET OP, SÅ DER ER FLERE DROP STEDER
+find_annelises_redroses: 
+
+
+SIDE QUESTS:
+
+Inn:
+find-the-mug: tilgængelig samtidig som clear-the-inn (side quest)
+find-the-beer: tilgængelig samtidig som clear-the-inn (side quest)
+
+
+

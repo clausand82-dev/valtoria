@@ -6,7 +6,7 @@ export {
   WORLD_SEED,
 } from "../config/game-constants-config.js";
 export { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "../config/monster-config.js";
-export { EQUIPMENT_SLOTS } from "../config/equipment-config.js";
+export { ARMOR_BASES, EQUIPMENT_SLOTS, WEAPON_BASES } from "../config/equipment-config.js";
 export { NAMED_ITEM_TEMPLATES, PREFIXES, UNIQUE_ITEMS } from "../config/item-config.js";
 export { RARITIES } from "../config/rarity-config.js";
 export { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../assets-ground.js";
@@ -27,6 +27,7 @@ export {
   isRegionPointPlayable,
   itemValue,
   makeItem,
+  makeNamedItem,
   makePotion,
   makeUniqueItem,
   rollNamedItem,
@@ -56,7 +57,7 @@ export { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../config/readable-confi
 export { SPELL_DEFS } from "../config/spell-config.js";
 export { ACTION_BAR_CONFIG, normalizeQuickSlots } from "../config/action-bar-config.js";
 export { POTION_DEFS, POTION_IDS, normalizePotionId, potionDefById } from "../config/potion-config.js";
-export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG } from "../config/quest-config.js";
+export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG, QUEST_GLOBAL_RULES } from "../config/quest-config.js";
 export { QUEST_NPCS } from "../config/npc-config.js";
 export { getRegionObjectFamily, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";
 export {

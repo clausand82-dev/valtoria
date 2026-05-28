@@ -13,7 +13,6 @@ import {
 } from "../dependencies.js";
 import {
   monsterPopularityDelta,
-  housePopularityDelta,
   normalizeReadableBonuses,
   incrementStatMap,
   isDestructibleObject,
@@ -33,6 +32,7 @@ import {
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
 import { applyWorldEnergy } from "../../world-energy.js";
+import { recordMonsterFought, recordMonsterKilled } from "../../world-state.js";
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
@@ -127,6 +127,9 @@ export const combatMethods = {
     this.processStatusEffects(this.player, dt, true);
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      if (!monster.bestiarySeenRecorded && this.isPointVisible(monster)) {
+        monster.bestiarySeenRecorded = this.recordBestiarySeen?.(monster) || true;
+      }
       this.processStatusEffects(monster, dt, false);
       this.scaleMonsterToHeroLevel(monster);
       monster.attackCooldown = Math.max(0, monster.attackCooldown - dt);
@@ -204,6 +207,7 @@ export const combatMethods = {
 
   applyMonsterMeleeHit(monster, critical = false) {
     const amount = critical ? monster.damage * (Number(monster.critDamage) || 1.5) : monster.damage;
+    this.recordBestiaryFought?.(monster);
     this.damagePlayer(amount, monster, critical);
     this.applyMonsterOnHitStatus(monster, this.player);
     this.applyMonsterMeleeAreaDamage(monster);
@@ -246,6 +250,7 @@ export const combatMethods = {
     if (effect.visibleOnly && !this.isPointVisible(this.player)) return;
     if (Math.hypot(this.player.x - monster.x, this.player.y - monster.y) > radius + this.player.radius) return;
     const damage = Math.max(1, Math.floor(monster.damage * (Number(effect.damageMult) || 0.5)));
+    this.recordBestiaryFought?.(monster);
     this.damagePlayer(damage, { typeName: `${monster.typeName} shockwave` }, false);
     this.spawnGroundPulseEffect(monster.x, monster.y, radius, {
       color: effect.color ?? "#d8c091",
@@ -739,6 +744,7 @@ export const combatMethods = {
       spellId: spell.id,
       spellInstanceId,
       owner,
+      casterTypeName: caster.typeName ?? null,
       x: caster.x + n.x * 0.5,
       y: caster.y + n.y * 0.5,
       beamStartX: caster.x + n.x * 0.18,
@@ -810,6 +816,7 @@ export const combatMethods = {
         spellId: spell.id,
         spellInstanceId,
         owner,
+        casterTypeName: caster.typeName ?? null,
         x: impactX - fallDirection.x * fallDistance - stagger * speed,
         y: impactY - fallDirection.y * fallDistance,
         vx: fallDirection.x * speed,
@@ -895,8 +902,12 @@ export const combatMethods = {
           magicScale: projectile.areaMagicScale ?? 0,
           source: { type: "spell", id: projectile.spellId ?? "spell" },
         }).damage;
-      if (target === this.player) this.damagePlayer(damage, { typeName: projectile.spellId }, projectile.critical && direct);
-      else this.damageMonster(target, damage, "magic", projectile.critical && direct);
+      if (target === this.player) {
+        if (projectile.casterTypeName) this.recordBestiaryFought?.({ typeName: projectile.casterTypeName });
+        this.damagePlayer(damage, { typeName: projectile.casterTypeName ?? projectile.spellId }, projectile.critical && direct);
+      } else {
+        this.damageMonster(target, damage, "magic", projectile.critical && direct);
+      }
       this.applyProjectileStatus(target, projectile);
     }
     const impact = projectile.particleVisuals?.impact;
@@ -1199,6 +1210,7 @@ export const combatMethods = {
     if (damageDebugEnabled()) console.debug("[Valtoria Damage Block]", { target: monster?.typeName, blocked: block.blocked, blockAmount: block.blockAmount, damageBeforeBlock: amount, damageAfterBlock: block.damage, finalDamage: damage });
     const beforeHp = Math.max(0, Math.floor(Number(monster.hp) || 0));
     monster.hp = Math.max(0, monster.hp - damage);
+    if (damage > 0) this.recordBestiaryFought?.(monster);
     this.player.stats.damageDealt += Math.min(beforeHp, damage);
     monster.hurt = 0.18;
     this.addFloater(monster.x, monster.y, block.blocked ? `Block -${damage}` : critical ? `CRIT -${damage}` : `-${damage}`, critical ? "#ffdf5f" : sourceType === "magic" ? "#9de9ff" : "#f1d08d");
@@ -1219,9 +1231,19 @@ export const combatMethods = {
       object.hp = def.hp;
     }
     const stages = Math.max(1, Math.floor(Number(def.damageStages) || 3));
-    object.harvestHits = Math.min(stages, Math.floor(Number(object.harvestHits) || 0) + 1);
+    const previousHits = Math.max(0, Math.min(stages, Math.floor(Number(object.harvestHits) || 0)));
+    object.harvestHits = Math.min(stages, previousHits + 1);
     const remainingStages = Math.max(0, stages - object.harvestHits);
     object.hp = Math.max(0, Math.ceil(object.maxHp * (remainingStages / stages)));
+    const popularityDeltaTotal = Number(object.popularityDelta ?? def?.popularityDelta);
+    if (Number.isFinite(popularityDeltaTotal) && popularityDeltaTotal !== 0) {
+      // Apply popularity changes progressively while damaging an object so impact is visible before full destruction.
+      const appliedBefore = Number.isFinite(Number(object.popularityDeltaApplied)) ? Number(object.popularityDeltaApplied) : 0;
+      const appliedAfter = (object.harvestHits / stages) * popularityDeltaTotal;
+      const stepDelta = appliedAfter - appliedBefore;
+      if (Math.abs(stepDelta) > 0.0001) this.changePopularity(stepDelta, object.x, object.y);
+      object.popularityDeltaApplied = appliedAfter;
+    }
     object.hurt = 0.18;
     this.addFloater(object.x, object.y, `-${object.harvestHits}/${stages}`, "#f1d08d", 0.72);
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 8, 0.08);
@@ -1244,8 +1266,12 @@ export const combatMethods = {
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
     this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
     this.applyDestroyRewards(object, def);
-    if (object.type === "building") {
-      this.changePopularity(housePopularityDelta(this.region.index), object.x, object.y);
+    const popularityDelta = Number(object.popularityDelta ?? def?.popularityDelta);
+    if (Number.isFinite(popularityDelta) && popularityDelta !== 0) {
+      // If object was destroyed by any non-standard path, apply any remaining delta not already applied during damage ticks.
+      const applied = Number.isFinite(Number(object.popularityDeltaApplied)) ? Number(object.popularityDeltaApplied) : 0;
+      const remainingDelta = popularityDelta - applied;
+      if (Math.abs(remainingDelta) > 0.0001) this.changePopularity(remainingDelta, object.x, object.y);
     }
   },
 
@@ -1263,6 +1289,7 @@ export const combatMethods = {
   killMonster(monster) {
     if (monster.dead) return;
     monster.dead = true;
+    this.recordBestiaryKilled?.(monster);
     this.recordMonsterKill(monster);
     if (monster.elite) {
       // Elite killed — game UI already shows effects, no debug toast needed
@@ -1270,6 +1297,7 @@ export const combatMethods = {
     const xp = this.modifiedXp?.(monster.xp) ?? monster.xp;
     this.player.xp += xp;
     if (!monster.isMinion) this.applyQuestKill(monster);
+    if (!monster.isMinion) this.applyCurrentSubregionClear?.();
     this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95);
     if (!monster.isMinion) this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
     if (!monster.isMinion) this.applyMonsterKillWorldEnergy(monster);
@@ -1313,6 +1341,27 @@ export const combatMethods = {
       normal: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.normal) || 0)) + (bucket === "normal" ? 1 : 0),
       elite: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.elite) || 0)) + (bucket === "elite" ? 1 : 0),
     };
+  },
+
+  bestiaryContext() {
+    return {
+      regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId,
+      activeMapRegion: this.activeMapRegion,
+    };
+  },
+
+  recordBestiaryFought(monster) {
+    if (!monster?.typeName || monster.isMinion) return false;
+    const result = recordMonsterFought(this.worldState, monster, this.bestiaryContext());
+    this.worldState = result.worldState;
+    return result.changed;
+  },
+
+  recordBestiaryKilled(monster) {
+    if (!monster?.typeName || monster.isMinion) return false;
+    const result = recordMonsterKilled(this.worldState, monster, this.bestiaryContext());
+    this.worldState = result.worldState;
+    return result.changed;
   },
 
   changePopularity(amount, x = this.player.x, y = this.player.y) {

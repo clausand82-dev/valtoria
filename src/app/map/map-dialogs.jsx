@@ -7,7 +7,7 @@ import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { getQuestStartNpcIds } from "../../game/GameEngine/helpers.js";
-import { resolveMapRegionConfig } from "../../game/world-state.js";
+import { resolveMapRegionConfig, worldEntryAllowed } from "../../game/world-state.js";
 import { getWorldEnergyState } from "../../game/world-energy.js";
 import { regionStatusKey } from "../save/save-keys.js";
 const cityPrebuildCache = { layout: null };
@@ -158,7 +158,7 @@ function renderCityMinimap(canvas, heroPosition) {
   ctx.strokeRect(1, 1, width - 2, height - 2);
 }
 
-export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
+export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, activeQuests = [], completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation }) {
   const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
   const [hoveredRegionId, setHoveredRegionId] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
@@ -206,7 +206,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
   const activateRegion = (regionEntry) => {
     const region = regionEntry?.region ?? regionEntry;
     const rawRegion = regionEntry?.rawRegion ?? region;
-    if (!regionIsUnlocked(region, completedQuestSet, currentArmy)) {
+    if (!regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests)) {
       setSelectedRegion(region);
       setLockedRegion(region);
       return;
@@ -271,7 +271,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                   {activeRegions.map((entry) => (
                     (() => {
                       const region = entry.region;
-                      const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
+                      const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests);
                       const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                       const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
                       return (
@@ -298,7 +298,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                 </svg>
                 {activeRegions.map((entry) => {
                   const region = entry.region;
-                  const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy);
+                  const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests);
                   const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                   const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
                   return (
@@ -339,7 +339,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
             <span>{statusCorruptionText}</span>
           </div>
           <WorldEnergyBalanceBar state={worldEnergyState} />
-          {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy) && (
+          {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests) && (
             <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}</p>
           )}
         </div>
@@ -402,7 +402,7 @@ function formatWorldEnergyPoints(value) {
   return Number.isInteger(number) ? String(number) : number.toFixed(2).replace(/\.?0+$/, "");
 }
 
-function regionIsUnlocked(region, completedQuestSet, army = 0) {
+function regionIsUnlocked(region, completedQuestSet, army = 0, worldState = null, activeQuests = []) {
   if (region?.unlock?.locked) return false;
   const requiredArmy = Math.max(0, Math.floor(Number(region?.unlock?.army ?? region?.unlock?.requiredArmy) || 0));
   if (army < requiredArmy) return false;
@@ -413,7 +413,10 @@ function regionIsUnlocked(region, completedQuestSet, army = 0) {
     return completedQuestSet.has(raw) || completedQuestSet.has(swapped);
   };
   const requiredQuests = region?.unlock?.completedQuests ?? [];
-  return requiredQuests.every((questId) => hasQuestCompletion(questId));
+  if (!requiredQuests.every((questId) => hasQuestCompletion(questId))) return false;
+  const context = { regionId: region?.id, regionConfig: region, questState: { completed: [...completedQuestSet], active: activeQuests }, worldState };
+  if (region?.unlock && !worldEntryAllowed(region.unlock, worldState, context)) return false;
+  return worldEntryAllowed(region, worldState, context);
 }
 
 function regionUnlockText(region, completedQuestSet, army = 0) {

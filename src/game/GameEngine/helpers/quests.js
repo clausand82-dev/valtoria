@@ -89,6 +89,21 @@ export function getQuestTurnInNpcIds(quest) {
   return legacy;
 }
 
+export function questHasSteps(quest) {
+  return Array.isArray(quest?.steps) && quest.steps.length > 0;
+}
+
+// Step quests expose only the active step through the legacy quest fields.
+export function currentQuestStep(quest) {
+  if (!questHasSteps(quest)) return null;
+  const currentId = String(quest.progress?.currentStepId ?? quest.currentStepId ?? "");
+  return quest.steps.find((step) => String(step?.id ?? "") === currentId) ?? quest.steps[0] ?? null;
+}
+
+function stepOrQuest(quest) {
+  return currentQuestStep(quest) ?? quest;
+}
+
 export function canNpcStartQuest(quest, npcId) {
   if (!quest || !npcId) return false;
   const source = String(quest.source ?? "npc");
@@ -98,7 +113,7 @@ export function canNpcStartQuest(quest, npcId) {
 
 export function canNpcTurnInQuest(quest, npcId) {
   if (!quest || !npcId) return false;
-  return getQuestTurnInNpcIds(quest).includes(String(npcId));
+  return getQuestTurnInNpcIds(stepOrQuest(quest)).includes(String(npcId));
 }
 
 export function normalizeMonsterType(entry) {
@@ -142,7 +157,8 @@ export function makeQuestItem(questItemId, questInstanceId) {
 }
 
 export function questItemTargetsForQuest(quest) {
-  const defTarget = resolveQuestDefById(quest?.questId)?.target ?? {};
+  const activeStep = currentQuestStep(quest);
+  const defTarget = activeStep ? {} : resolveQuestDefById(quest?.questId)?.target ?? {};
   const target = quest?.target ?? {};
   const targets = [];
   const questItems = Array.isArray(defTarget.questItems)
@@ -199,13 +215,21 @@ export function questConsumesQuestItem(quest, item) {
 }
 
 export function makeQuestInstance(def, npcId, context = {}) {
-  const startNpcIds = getQuestStartNpcIds(def);
-  const turnInNpcIds = getQuestTurnInNpcIds(def);
+  const steps = Array.isArray(def.steps) ? def.steps.map((step) => ({ ...step })) : undefined;
+  const firstStep = steps?.[0] ?? null;
+  const firstStepId = firstStep?.id ? String(firstStep.id) : "";
+  const activeDef = firstStep ?? def;
+  const startNpcIds = getQuestStartNpcIds(activeDef).length ? getQuestStartNpcIds(activeDef) : getQuestStartNpcIds(def);
+  const turnInNpcIds = getQuestTurnInNpcIds(activeDef).length ? getQuestTurnInNpcIds(activeDef) : getQuestTurnInNpcIds(def);
   const startNpcId = String(context.startNpcId ?? npcId ?? startNpcIds[0] ?? turnInNpcIds[0] ?? "");
   const turnInNpcId = String(context.turnInNpcId ?? turnInNpcIds[0] ?? startNpcId);
   const npc = QUEST_NPCS[startNpcId];
   const uid = createId();
-  const regionIds = Array.isArray(def?.regionIds) ? def.regionIds.map(String) : ["city"];
+  const regionIds = Array.isArray(activeDef?.regionIds)
+    ? activeDef.regionIds.map(String)
+    : Array.isArray(def?.regionIds)
+      ? def.regionIds.map(String)
+      : ["city"];
   const source = context.source ? String(context.source) : String(def.source ?? "npc");
   const sourceLabel = context.sourceLabel
     ? String(context.sourceLabel)
@@ -258,24 +282,58 @@ export function makeQuestInstance(def, npcId, context = {}) {
     kind: def.kind,
     category: def.category,
     cooldownMapRuns: def.cooldownMapRuns,
-    type: def.type,
+    type: activeDef.type ?? def.type,
     regionIds,
-    story: def.story,
-    acceptText: def.acceptText,
-    turnInText: def.turnInText,
-    target: { ...def.target },
-    progress: def.type === "collect_quest_item" ? { items: 0 } : def.type === "clear_map" ? { kills: 0, total: null, cleared: false } : {},
-    rewards: { ...def.rewards },
+    story: activeDef.story ?? def.story,
+    acceptText: activeDef.acceptText ?? def.acceptText,
+    turnInText: activeDef.turnInText ?? def.turnInText,
+    target: { ...(activeDef.target ?? def.target) },
+      progress: steps?.length > 0
+      ? {
+        currentStepId: firstStepId,
+        completedStepIds: [],
+        revealedStepIds: [firstStepId].filter(Boolean),
+        stepProgress: firstStepId ? { [firstStepId]: {} } : {},
+      }
+      : def.type === "collect_quest_item"
+        ? { items: 0 }
+        : def.type === "clear_map"
+          ? { kills: 0, total: null, cleared: false }
+          : def.type === "talk_to_npc"
+            ? { talked: false }
+            : {},
+    steps,
+    completeWhen: def.completeWhen ? { ...def.completeWhen } : undefined,
+    autoComplete: Boolean(def.autoComplete),
+    rewards: { ...(activeDef.rewards ?? def.rewards) },
     ...sourceFields,
   };
 }
 
 export function isQuestComplete(quest, inventory = []) {
+  if (Array.isArray(quest.steps) && quest.steps.length > 0) {
+    if (quest.progress?.complete === true) return true;
+    const step = currentQuestStep(quest);
+    if (!step) return false;
+    const currentStepId = String(step.id ?? "");
+    if ((quest.progress?.completedStepIds ?? []).map(String).includes(currentStepId)) return true;
+    const stepQuest = {
+      ...quest,
+      steps: undefined,
+      type: step.type ?? quest.type,
+      target: { ...(step.target ?? quest.target ?? {}) },
+      progress: quest.progress?.stepProgress?.[currentStepId] ?? quest.progress ?? {},
+    };
+    return isQuestComplete(stepQuest, inventory);
+  }
   if (quest.type === "clear_map") {
     return quest.progress?.cleared === true;
   }
   if (quest.type === "kill_monsters") {
     return Math.max(0, Math.floor(Number(quest.progress?.kills) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));
+  }
+  if (quest.type === "talk_to_npc") {
+    return quest.progress?.talked === true;
   }
   if (quest.type === "collect_quest_item") {
     let hasAnyRequirement = false;
@@ -331,8 +389,9 @@ export function isQuestComplete(quest, inventory = []) {
 
 export function questSnapshot(quest, inventory = []) {
   if (!quest) return null;
-  const startNpcId = String(quest.startNpcId ?? quest.npcId ?? "");
-  const turnInNpcId = String(quest.turnInNpcId ?? getQuestTurnInNpcIds(quest)[0] ?? startNpcId);
+  const step = currentQuestStep(quest);
+  const startNpcId = String(quest.startNpcId ?? step?.startNpcIds?.[0] ?? quest.npcId ?? "");
+  const turnInNpcId = String(quest.turnInNpcId ?? getQuestTurnInNpcIds(step ?? quest)[0] ?? startNpcId);
   const startNpc = QUEST_NPCS[startNpcId];
   const turnInNpc = QUEST_NPCS[turnInNpcId];
   // prefer provided inventory, otherwise fallback to cached inventory on quest
@@ -356,10 +415,42 @@ export function questSnapshot(quest, inventory = []) {
     sourceReadableId: quest.sourceReadableId,
     complete,
     progressText: questProgressText(quest, inv),
+    visibleSteps: visibleQuestSteps(quest),
+    currentStepId: quest.progress?.currentStepId ?? null,
+    currentStepTitle: step?.title ?? null,
   };
 }
 
+export function visibleQuestSteps(quest) {
+  if (!Array.isArray(quest?.steps) || quest.steps.length <= 0) return [];
+  const completed = new Set((quest.progress?.completedStepIds ?? []).map(String));
+  const revealed = new Set((quest.progress?.revealedStepIds ?? []).map(String));
+  return quest.steps
+    .filter((step) => completed.has(String(step.id)) || revealed.has(String(step.id)))
+    .map((step) => ({
+      id: String(step.id),
+      title: step.title ?? step.id,
+      completed: completed.has(String(step.id)),
+      current: String(quest.progress?.currentStepId ?? "") === String(step.id),
+    }));
+}
+
 export function questProgressText(quest, inventory = []) {
+  if (Array.isArray(quest.steps) && quest.steps.length > 0) {
+    const current = visibleQuestSteps(quest).find((step) => !step.completed);
+    const step = currentQuestStep(quest);
+    if (current && step) {
+      const detail = questProgressText({
+        ...quest,
+        steps: undefined,
+        type: step.type ?? quest.type,
+        target: { ...(step.target ?? quest.target ?? {}) },
+        progress: quest.progress?.stepProgress?.[String(step.id ?? "")] ?? quest.progress ?? {},
+      }, inventory);
+      return detail ? `${current.title}: ${detail}` : current.title;
+    }
+    return quest.progress?.complete ? "Klar" : "";
+  }
   if (quest.type === "clear_map") {
     if (quest.progress?.cleared) return "Ryddet – klar til indlevering";
     const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
@@ -368,6 +459,16 @@ export function questProgressText(quest, inventory = []) {
   }
   if (quest.type === "kill_monsters") {
     return `${Math.max(0, Math.floor(Number(quest.progress?.kills) || 0))} / ${Math.max(1, Math.floor(Number(quest.target?.count) || 1))} ${quest.target?.monster ?? "kills"}`;
+  }
+  if (quest.type === "talk_to_npc") {
+    if (quest.progress?.talked) return "Klar";
+    const targetNpcIds = Array.isArray(quest.target?.targetNpcIds)
+      ? quest.target.targetNpcIds
+      : quest.target?.targetNpcId
+        ? [quest.target.targetNpcId]
+        : [];
+    const names = targetNpcIds.map((npcId) => QUEST_NPCS[npcId]?.name ?? npcId).join(", ");
+    return quest.target?.text ?? (names ? `Tal med ${names}` : "Tal med den rette NPC");
   }
   if (quest.type === "collect_quest_item") {
     // legacy quest item progress
@@ -439,6 +540,13 @@ export function normalizeSavedQuestState(saved) {
           target: { ...(quest.target ?? {}) },
           progress: { ...(quest.progress ?? {}) },
           rewards: { ...(quest.rewards ?? {}) },
+          steps: Array.isArray(quest.steps)
+            ? quest.steps.map((step) => ({ ...step }))
+            : Array.isArray(def?.steps)
+              ? def.steps.map((step) => ({ ...step }))
+              : undefined,
+          completeWhen: quest.completeWhen ?? def?.completeWhen,
+          autoComplete: Boolean(quest.autoComplete ?? def?.autoComplete),
           source: String(quest.source ?? def?.source ?? "npc"),
           kind: quest.kind ?? def?.kind,
           category: quest.category ?? def?.category,
@@ -456,6 +564,45 @@ export function normalizeSavedQuestState(saved) {
         base.title = String(quest.title ?? quest.questId);
         base.story = String(quest.story ?? "");
         base.acceptText = String(quest.acceptText ?? "");
+
+        if (Array.isArray(base.steps) && base.steps.length > 0) {
+          const completed = Array.isArray(base.progress.completedStepIds) ? base.progress.completedStepIds.map(String) : [];
+          const revealed = Array.isArray(base.progress.revealedStepIds) ? base.progress.revealedStepIds.map(String) : [];
+          let currentStepId = String(base.progress.currentStepId ?? base.currentStepId ?? "");
+          if (!revealed.length) {
+            const first = base.steps.find((step) => step?.revealed) ?? base.steps[0];
+            if (first?.id) revealed.push(String(first.id));
+          }
+          if (!currentStepId) {
+            currentStepId = base.steps.find((step) => !completed.includes(String(step?.id ?? "")))?.id
+              ?? base.steps[base.steps.length - 1]?.id
+              ?? "";
+          }
+          const activeStep = base.steps.find((step) => String(step?.id ?? "") === String(currentStepId)) ?? base.steps[0];
+          const activeStartNpcIds = getQuestStartNpcIds(activeStep).length ? getQuestStartNpcIds(activeStep) : defStartNpcIds;
+          const activeTurnInNpcIds = getQuestTurnInNpcIds(activeStep).length ? getQuestTurnInNpcIds(activeStep) : defTurnInNpcIds;
+          base.startNpcIds = activeStartNpcIds;
+          base.turnInNpcIds = activeTurnInNpcIds;
+          base.startNpcId = activeStartNpcIds[0] ?? base.startNpcId;
+          base.npcId = base.startNpcId;
+          base.turnInNpcId = activeTurnInNpcIds[0] ?? base.turnInNpcId;
+          base.type = String(activeStep?.type ?? base.type ?? "");
+          base.regionIds = Array.isArray(activeStep?.regionIds) ? activeStep.regionIds.map(String) : base.regionIds;
+          base.story = String(activeStep?.story ?? base.story ?? "");
+          base.acceptText = String(activeStep?.acceptText ?? base.acceptText ?? "");
+          base.turnInText = String(activeStep?.turnInText ?? base.turnInText ?? "");
+          base.target = { ...(activeStep?.target ?? base.target ?? {}) };
+          base.rewards = { ...(activeStep?.rewards ?? base.rewards ?? {}) };
+          base.progress = {
+            ...base.progress,
+            currentStepId: String(currentStepId),
+            completedStepIds: [...new Set(completed)],
+            revealedStepIds: [...new Set(revealed)],
+            stepProgress: base.progress.stepProgress && typeof base.progress.stepProgress === "object"
+              ? { ...base.progress.stepProgress }
+              : {},
+          };
+        }
 
         // Backfill missing collect_quest_item target fields from QUEST_DEFS.
         // This keeps old saves compatible when new constraints (for example

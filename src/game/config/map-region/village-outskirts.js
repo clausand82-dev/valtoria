@@ -97,9 +97,12 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "river-creek", label: "Elvbaekken", color: "#7fb6d6",
-      unlock: { completedQuests: ["innkeeper_ring_for_noble"], text: "Kraever, at Noble har aabnet Elvbaekken." },
+      unlock: {
+        questStepCompleted: { questId: "annelise_document_chain", stepId: "ring_for_noble" },
+        text: "Kraever, at Noble har aabnet Elvbaekken.",
+      },
       labelX: 49, labelY: 79,
-      mapSize: "medium",
+      mapSize: "small",
       cityStats: {
         population: 10,
         water: 20,
@@ -173,6 +176,25 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_fireplace_mainland", weight: 1 },
       ],
       mobs: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }, { type: "WolfFenris", weight: 1 }, { type: "Spawn of Hydre", weight: 0.35 }],
+      rareMobs: [
+        {
+          id: "rare_document_wolf",
+          type: "Demon",
+          chance: 1.04,
+          maxPerRegion: 1,
+          levelOffset: 10,
+          displayName: "Den Sporsoegende Ulv",
+          loot: {
+            mode: "add",
+            resources: [
+              { resource: "bonedust", min: 1, max: 1, chance: 1, questItem: true },
+            ],
+            items: [
+              { itemId: "iron_sword", chance: 0.08 },
+            ],
+          },
+        },
+      ],
       points: "66.99,87.14 35.89,85.02 35.89,68.01 56.22,74.39",
     }),
     region({
@@ -280,10 +302,11 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       },
       prefabRules: {
-      maxTotal: 2,
+      maxTotal: 3,
       minDistanceBetweenPrefabs: 8,
       anchors: ["clearing", "room"],
       pool: [
+        { id: "inn_cellar_crack", weight: 10, max: 1, questCompleted: "clear_the_inn", notFlag: "inn_crack_destroyed" },
         { id: "spider_nest", weight: 4, max: 2 },
       ],
     },

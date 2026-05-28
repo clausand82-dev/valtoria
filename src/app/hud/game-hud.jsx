@@ -128,6 +128,7 @@ export function GameHud({
   openWorldMapFromCity,
   player,
   popularityPct,
+  popularityValue,
   setConfirmMapAbandonOpen,
   setCitySettingsOpen,
   setCityStorageOpen,
@@ -154,7 +155,7 @@ export function GameHud({
               <CitySideStats
                 gold={player.gold}
                 threatLevel={cityThreatLevel}
-                popularity={derivedCityStats.popularity}
+                popularity={popularityValue}
                 events={derivedCityStats.events}
               />
             </div>
@@ -169,7 +170,7 @@ export function GameHud({
               <ResourceBar type="health" value={hpPct} label={`HP ${player.hp} / ${player.maxHp}`} />
               <ResourceBar type="mana" value={manaPct} label={`MANA ${player.mana} / ${player.maxMana}`} />
               <ResourceBar type="xp" value={xpPct} label={`XP ${player.xp} / ${player.nextXp}`} />
-              <ResourceBar type="popularity" value={popularityPct} label={`POPULARITY ${Math.round(player.popularity ?? 0)}%`} />
+              <ResourceBar type="popularity" value={popularityPct} label={`POPULARITY ${Math.round(Number(popularityValue) || 0)}%`} />
             </div>
           </>
         )}

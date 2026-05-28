@@ -14,6 +14,7 @@ import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.
 import {
   mobWorldStateKey,
   normalizeWorldState,
+  recordMonsterSeen,
   resolveMapRegionConfig,
   setWorldFlag,
   withRegionVisitWorldState,
@@ -225,9 +226,29 @@ export const regionMethods = {
     const id = String(typeName ?? "").trim();
     if (!id) return false;
     const key = mobWorldStateKey(id, "seen");
-    if (this.worldState?.flags?.[key]) return false;
-    this.worldState = setWorldFlag(this.worldState, key, true);
-    return true;
+    let changed = false;
+    if (!this.worldState?.flags?.[key]) {
+      this.worldState = setWorldFlag(this.worldState, key, true);
+      changed = true;
+    }
+    const result = recordMonsterSeen(this.worldState, id, {
+      regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId,
+      activeMapRegion: this.activeMapRegion,
+      incrementSeenCount: false,
+    });
+    this.worldState = result.worldState;
+    return changed || result.changed;
+  },
+
+  recordBestiarySeen(monster) {
+    if (!monster?.typeName || monster.isMinion) return false;
+    const result = recordMonsterSeen(this.worldState, monster, {
+      regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId,
+      activeMapRegion: this.activeMapRegion,
+      incrementSeenCount: true,
+    });
+    this.worldState = result.worldState;
+    return result.changed;
   },
 
   returnToAreaMap() {

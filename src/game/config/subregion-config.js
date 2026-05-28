@@ -73,4 +73,65 @@ export const SUBREGION_CONFIG = {
       monsters: { min: 1, max: 2 },
     },
   },
+
+  inn_crack_cave: {
+    id: "inn_crack_cave",
+    label: "Hulen under kroen",
+    kind: "cave",
+    generator: "mapRegion",
+    mapSize: "small",
+    width: 48,
+    height: 48,
+    persistence: "whileRootRegionActive",
+    tileset: [
+      { fileName: "tileset/tileset_rock.png", weight: 1, lockedVariant: 2 },
+      { fileName: "tileset/tileset_debriswithblood.png", weight: 1, lockedVariant: 1 },
+    ],
+    objects: [
+      { id: "object_ruin_normal", weight: 1, actionId: "exit_subregion", placementRole: "entryArea", blocking: false },
+      { id: "object_stone_cluster", weight: 8 },
+      { id: "object_bones", weight: 5, scale: 0.7 },
+      { id: "object_pillar_stone", weight: 2 },
+    ],
+    foliageSets: [
+      { fileName: "foilage/foilage_boneparts.png", weight: 4, scale: 0.85 },
+      { fileName: "foilage/foilage_deadanimal_small.png", weight: 2, scale: 0.45 },
+      { fileName: "foilage/foilage_deadanimal_verysmall.png", weight: 3, scale: 0.3 },
+    ],
+    decay: [
+      { id: "decay_spiderweb", weight: 18 },
+      { id: "decay_cracks", weight: 10 },
+      { id: "decay_blood", weight: 5 },
+      { id: "decay_dust", weight: 8 },
+    ],
+    mobs: [
+      { type: "MiniSpider", weight: 3 },
+      { type: "Spider", weight: 3 },
+      { type: "MediumSpider", weight: 2 },
+      { type: "LargeSpider", weight: 1 },
+      { type: "MotherSpider", weight: 0.65 },
+    ],
+    foliage: [],
+    monsters: [],
+    chests: [],
+    prefabRules: {},
+    spawnCounts: {
+      objects: 7,
+      foliage: 8,
+      decals: 12,
+      monsters: { min: 6, max: 9 },
+    },
+    onClear: {
+      once: true,
+      setFlags: ["inn_crack_cave_cleared"],
+      addCounters: {
+        subregionsCleared: 1,
+      },
+      message: "Hulen er ryddet. Revnen kan nu oedelaegges.",
+      questStepComplete: {
+        questId: "check_inn_infestation",
+        stepId: "clear_crack_cave",
+      },
+    },
+  },
 };

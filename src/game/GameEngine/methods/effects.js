@@ -327,6 +327,12 @@ function updateConfiguredParticle(particle, dt) {
 }
 
 export const effectsMethods = {
+  clearToastTimer(toastId) {
+    const timerId = this.toastTimers?.get(toastId);
+    if (timerId) clearTimeout(timerId);
+    this.toastTimers?.delete(toastId);
+  },
+
   updateEffects(dt) {
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
@@ -360,8 +366,12 @@ export const effectsMethods = {
     }
 
     for (let i = this.toasts.length - 1; i >= 0; i -= 1) {
-      this.toasts[i].life -= dt;
-      if (this.toasts[i].life <= 0) this.toasts.splice(i, 1);
+      const toast = this.toasts[i];
+      toast.life -= dt;
+      if (toast.life <= 0) {
+        this.clearToastTimer(toast.id);
+        this.toasts.splice(i, 1);
+      }
     }
     this.particleEngine?.update(dt, particleContext(this));
   },
@@ -764,8 +774,19 @@ export const effectsMethods = {
   },
 
   addToast(text) {
-    this.toasts.push({ id: createId(), text, life: 2.25 });
-    if (this.toasts.length > 4) this.toasts.shift();
+    const id = createId();
+    const life = 2.25;
+    const toast = { id, text, life, expiresAt: Date.now() + (life * 1000) };
+    this.toasts.push(toast);
+    if (this.toasts.length > 4) {
+      const removedToast = this.toasts.shift();
+      if (removedToast) this.clearToastTimer(removedToast.id);
+    }
+    this.toastTimers?.set(id, setTimeout(() => {
+      this.clearToastTimer(id);
+      this.toasts = this.toasts.filter((entry) => entry.id !== id);
+      this.publishSnapshot();
+    }, life * 1000));
     this.publishSnapshot();
   }
 };

@@ -35,6 +35,7 @@ export {
   ResourceBar,
 } from "./hud/resource-bar.jsx";
 export {
+  QuestDetailCard,
   QuestDetailDialog,
   QuestObjectiveMeta,
   QuestOfferDialog,

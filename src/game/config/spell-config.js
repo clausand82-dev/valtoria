@@ -192,7 +192,7 @@ export const SPELL_DEFS = {
     title: "Fire Rain",
     castMode: "skyfall",
     manaCost: 36,
-    cooldown: 4.6,
+    cooldown: 0.6, //standard er 4.6 - 0.6 er blot test kørsel
     range: 6.8,
     speed: 12.2,
     element: "fire",

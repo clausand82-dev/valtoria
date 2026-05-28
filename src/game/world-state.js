@@ -8,6 +8,7 @@ const EMPTY_WORLD_STATE = Object.freeze({
 
 const CONDITION_KEYS = new Set([
   "requires",
+  "conditions",
   "blockedBy",
   "worldBalanceLydra",
   "worldBalanceNetdra",
@@ -17,11 +18,17 @@ const CONDITION_KEYS = new Set([
   "explored",
   "unlocked",
   "flag",
+  "notFlag",
   "counter",
   "quest",
   "questActive",
   "questCompleted",
   "questStep",
+  "stepCompleted",
+  "questStepActive",
+  "questStepCompleted",
+  "questStepRevealed",
+  "questCurrentStep",
   "inventory",
   "cityStat",
   "cityStorage",
@@ -42,6 +49,7 @@ const CONDITION_KEYS = new Set([
 
 const MAP_REGION_PATCH_KEYS = {
   mobs: ["id", "type"],
+  rareMobs: ["id", "type"],
   objects: ["id", "type"],
   decay: ["id"],
   foliageSet: ["id", "fileName"],
@@ -115,6 +123,131 @@ export function regionWorldStateKey(regionId, state) {
 
 export function mobWorldStateKey(mobId, state) {
   return `mob.${String(mobId ?? "").trim()}.${String(state ?? "").trim()}`;
+}
+
+export function getMonsterDiscovery(worldState) {
+  const value = normalizeWorldState(worldState).values.monsterDiscovery;
+  return value && typeof value === "object" && !Array.isArray(value) ? clone(value) : {};
+}
+
+function emptyMonsterDiscoveryEntry() {
+  return {
+    seen: false,
+    fought: false,
+    killed: false,
+    killedNormal: 0,
+    killedElite: 0,
+    killedBoss: 0,
+    maxLevelKilled: 0,
+    seenRegions: {},
+    lastSeenRegionId: null,
+  };
+}
+
+function normalizeMonsterDiscoveryEntry(entry) {
+  const source = entry && typeof entry === "object" && !Array.isArray(entry) ? entry : {};
+  const seenRegions = source.seenRegions && typeof source.seenRegions === "object" && !Array.isArray(source.seenRegions)
+    ? Object.fromEntries(Object.entries(source.seenRegions)
+      .map(([regionId, count]) => [String(regionId), Math.max(0, Math.floor(Number(count) || 0))])
+      .filter(([regionId]) => regionId))
+    : {};
+  return {
+    seen: Boolean(source.seen),
+    fought: Boolean(source.fought),
+    killed: Boolean(source.killed),
+    killedNormal: Math.max(0, Math.floor(Number(source.killedNormal) || 0)),
+    killedElite: Math.max(0, Math.floor(Number(source.killedElite) || 0)),
+    killedBoss: Math.max(0, Math.floor(Number(source.killedBoss) || 0)),
+    maxLevelKilled: Math.max(0, Math.floor(Number(source.maxLevelKilled) || 0)),
+    seenRegions,
+    lastSeenRegionId: source.lastSeenRegionId ? String(source.lastSeenRegionId) : null,
+    lastSeenAt: source.lastSeenAt ?? undefined,
+  };
+}
+
+function monsterDiscoveryId(monsterOrId) {
+  if (!monsterOrId) return "";
+  if (typeof monsterOrId === "string") return monsterOrId.trim();
+  return String(monsterOrId.typeName ?? monsterOrId.monsterId ?? monsterOrId.id ?? "").trim();
+}
+
+function monsterDiscoveryRegionId(context = {}, monster = null) {
+  return String(
+    context.regionId
+    ?? context.regionConfig?.id
+    ?? context.activeMapRegion?.regionId
+    ?? monster?.regionId
+    ?? "",
+  ).trim();
+}
+
+function updateMonsterDiscovery(worldState, monsterOrId, context, updater) {
+  const monsterId = monsterDiscoveryId(monsterOrId);
+  if (!monsterId) return normalizeWorldState(worldState);
+  const next = normalizeWorldState(worldState);
+  const discovery = getMonsterDiscovery(next);
+  const entry = normalizeMonsterDiscoveryEntry(discovery[monsterId] ?? emptyMonsterDiscoveryEntry());
+  const updated = updater(entry, monsterId);
+  discovery[monsterId] = normalizeMonsterDiscoveryEntry(updated);
+  next.values.monsterDiscovery = discovery;
+  return next;
+}
+
+export function recordMonsterSeen(worldState, monsterOrId, context = {}) {
+  const monster = monsterOrId && typeof monsterOrId === "object" ? monsterOrId : null;
+  const regionId = monsterDiscoveryRegionId(context, monster);
+  const timestamp = context.lastSeenAt ?? context.now ?? Date.now?.();
+  let changed = false;
+  const next = updateMonsterDiscovery(worldState, monsterOrId, context, (entry) => {
+    if (!entry.seen) changed = true;
+    entry.seen = true;
+    if (regionId) {
+      const before = Math.max(0, Math.floor(Number(entry.seenRegions[regionId]) || 0));
+      const shouldIncrementRegion = context.incrementSeenCount === true || before <= 0;
+      entry.seenRegions[regionId] = shouldIncrementRegion ? before + 1 : before;
+      entry.lastSeenRegionId = regionId;
+      changed = changed || shouldIncrementRegion;
+    }
+    if (timestamp !== undefined) entry.lastSeenAt = timestamp;
+    return entry;
+  });
+  return { worldState: next, changed };
+}
+
+export function recordMonsterFought(worldState, monsterOrId, context = {}) {
+  const seenResult = recordMonsterSeen(worldState, monsterOrId, context);
+  let changed = seenResult.changed;
+  const next = updateMonsterDiscovery(seenResult.worldState, monsterOrId, context, (entry) => {
+    if (!entry.fought) changed = true;
+    entry.seen = true;
+    entry.fought = true;
+    return entry;
+  });
+  return { worldState: next, changed };
+}
+
+export function recordMonsterKilled(worldState, monsterOrId, context = {}) {
+  const monster = monsterOrId && typeof monsterOrId === "object" ? monsterOrId : {};
+  const foughtResult = recordMonsterFought(worldState, monsterOrId, context);
+  let changed = true;
+  const next = updateMonsterDiscovery(foughtResult.worldState, monsterOrId, context, (entry) => {
+    entry.seen = true;
+    entry.fought = true;
+    entry.killed = true;
+    if (monster?.boss || monster?.isBoss || context.boss) {
+      entry.killedBoss += 1;
+    } else if (monster?.elite || context.elite) {
+      entry.killedElite += 1;
+    } else {
+      entry.killedNormal += 1;
+    }
+    entry.maxLevelKilled = Math.max(
+      entry.maxLevelKilled,
+      Math.floor(Number(context.level ?? monster?.lootLevel ?? monster?.level) || 0),
+    );
+    return entry;
+  });
+  return { worldState: next, changed };
 }
 
 export function questWorldStateKey(questId, state) {
@@ -264,6 +397,71 @@ function questStepMatches(context, requirement) {
   return String(quest.step ?? quest.currentStep ?? quest.progress?.step ?? quest.progress?.currentStep ?? "") === step;
 }
 
+function questStepCompleted(context, requirement) {
+  const active = Array.isArray(context.questState?.active) ? context.questState.active : [];
+  const questId = typeof requirement === "object" && requirement
+    ? String(requirement.id ?? requirement.questId ?? context.questId ?? "").trim()
+    : String(context.questId ?? "").trim();
+  const stepId = typeof requirement === "object" && requirement
+    ? String(requirement.stepId ?? requirement.step ?? requirement.id ?? "").trim()
+    : String(requirement ?? "").trim();
+  if (!stepId) return false;
+  const quest = active.find((entry) => (
+    questId
+      ? String(entry?.questId ?? entry?.id ?? "") === questId
+      : String(entry?.id ?? "") === String(context.questInstanceId ?? "")
+  )) ?? context.quest;
+  const completed = quest?.progress?.completedStepIds;
+  return Array.isArray(completed) && completed.map(String).includes(stepId);
+}
+
+function questStepRequirement(context, requirement) {
+  const questId = typeof requirement === "object" && requirement
+    ? String(requirement.questId ?? requirement.id ?? context.questId ?? "").trim()
+    : String(context.questId ?? "").trim();
+  const stepId = typeof requirement === "object" && requirement
+    ? String(requirement.stepId ?? requirement.step ?? "").trim()
+    : String(requirement ?? "").trim();
+  if (!stepId) return { quest: null, stepId: "" };
+  const active = Array.isArray(context.questState?.active) ? context.questState.active : [];
+  const quest = active.find((entry) => (
+    questId
+      ? String(entry?.questId ?? entry?.id ?? "") === questId
+      : String(entry?.id ?? "") === String(context.questInstanceId ?? "")
+  )) ?? context.quest ?? null;
+  return { quest, stepId };
+}
+
+function questStepSetHas(quest, key, stepId) {
+  const list = quest?.progress?.[key];
+  return Array.isArray(list) && list.map(String).includes(String(stepId));
+}
+
+function questStepIsActive(context, requirement) {
+  const { quest, stepId } = questStepRequirement(context, requirement);
+  return Boolean(quest) && String(quest.progress?.currentStepId ?? quest.currentStepId ?? "") === String(stepId);
+}
+
+function questStepIsCompleted(context, requirement) {
+  const { quest, stepId } = questStepRequirement(context, requirement);
+  return Boolean(quest) && questStepSetHas(quest, "completedStepIds", stepId);
+}
+
+function questStepCompletedFlagKey(context, requirement) {
+  const questId = typeof requirement === "object" && requirement
+    ? String(requirement.questId ?? requirement.id ?? context.questId ?? "").trim()
+    : String(context.questId ?? "").trim();
+  const stepId = typeof requirement === "object" && requirement
+    ? String(requirement.stepId ?? requirement.step ?? "").trim()
+    : String(requirement ?? "").trim();
+  return questId && stepId ? `quest.${questId}.step.${stepId}.completed` : "";
+}
+
+function questStepIsRevealed(context, requirement) {
+  const { quest, stepId } = questStepRequirement(context, requirement);
+  return Boolean(quest) && questStepSetHas(quest, "revealedStepIds", stepId);
+}
+
 function toInventoryList(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value;
@@ -348,6 +546,8 @@ function shorthandConditionMet(key, expected, worldState, context) {
       return compareBoolean(normalized.flags[regionKey(context, key)], expected);
     case "flag":
       return Boolean(normalized.flags[String(expected)]);
+    case "notFlag":
+      return !Boolean(normalized.flags[String(expected)]);
     case "counter": {
       const id = typeof expected === "string" ? expected : expected?.id ?? expected?.key;
       return Boolean(id) && compareNumber(normalized.counters[String(id)] ?? 0, typeof expected === "object" ? expected : { min: 1 });
@@ -359,6 +559,15 @@ function shorthandConditionMet(key, expected, worldState, context) {
       return questIsCompleted(context, expected);
     case "questStep":
       return questStepMatches(context, expected);
+    case "stepCompleted":
+      return questStepCompleted(context, expected);
+    case "questStepActive":
+    case "questCurrentStep":
+      return questStepIsActive(context, expected);
+    case "questStepCompleted":
+      return questStepIsCompleted(context, expected) || Boolean(normalized.flags[questStepCompletedFlagKey(context, expected)]);
+    case "questStepRevealed":
+      return questStepIsRevealed(context, expected);
     case "inventory":
       return inventoryRequirementMet(expected, context, "inventory");
     case "cityStorage":
@@ -400,15 +609,18 @@ export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, con
   if (condition.not !== undefined && worldConditionMet(condition.not, normalized, context)) return false;
 
   for (const key of CONDITION_KEYS) {
-    if (key === "requires" || key === "blockedBy") continue;
-    if (key === "flag" || key === "counter") continue;
+    if (key === "requires" || key === "conditions" || key === "blockedBy") continue;
+    if (key === "flag" || key === "notFlag" || key === "counter") continue;
     if (!Object.prototype.hasOwnProperty.call(condition, key)) continue;
     if (!shorthandConditionMet(key, condition[key], normalized, context)) return false;
   }
 
   if (condition.flag !== undefined) {
     const actual = Boolean(normalized.flags[String(condition.flag)]);
-    return condition.equals !== undefined ? actual === Boolean(condition.equals) : actual;
+    if (condition.equals !== undefined ? actual !== Boolean(condition.equals) : !actual) return false;
+  }
+  if (condition.notFlag !== undefined) {
+    if (Boolean(normalized.flags[String(condition.notFlag)])) return false;
   }
   if (condition.counter !== undefined) {
     const counterId = typeof condition.counter === "object"
@@ -417,13 +629,13 @@ export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, con
     const counterCondition = typeof condition.counter === "object"
       ? { ...condition.counter, ...condition }
       : condition;
-    return compareNumber(normalized.counters[String(counterId)] ?? 0, counterCondition);
+    if (!compareNumber(normalized.counters[String(counterId)] ?? 0, counterCondition)) return false;
   }
   if (condition.value !== undefined) {
-    return compareValue(normalized.values[String(condition.value)], condition);
+    if (!compareValue(normalized.values[String(condition.value)], condition)) return false;
   }
   if (condition.stat !== undefined) {
-    return compareValue(readPath(context.stats ?? context, condition.stat), condition);
+    if (!compareValue(readPath(context.stats ?? context, condition.stat), condition)) return false;
   }
   return true;
 }
@@ -435,10 +647,11 @@ function isConditionalValue(value) {
 function entryAllowed(entry, worldState, context) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return true;
   for (const key of CONDITION_KEYS) {
-    if (key === "requires" || key === "blockedBy") continue;
+    if (key === "requires" || key === "conditions" || key === "blockedBy") continue;
     if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
     if (!shorthandConditionMet(key, entry[key], worldState, context)) return false;
   }
+  if (entry.conditions && !worldConditionMet(entry.conditions, worldState, context)) return false;
   if (entry.requires && !worldConditionMet(entry.requires, worldState, context)) return false;
   if (entry.blockedBy && worldConditionMet(entry.blockedBy, worldState, context)) return false;
   return true;

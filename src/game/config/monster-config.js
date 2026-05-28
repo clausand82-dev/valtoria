@@ -564,6 +564,13 @@ export const MONSTER_DEFS = {
     lootProfile: ratLoot,
     resources: { loot: [{ resource: "meat", min: 1, max: 1, chance: 0.05 }, { resource: "junk", min: 1, max: 1, chance: 0.12 }] },
     popularity: { change: 0.08 },
+    library: {
+      title: "Skovrotte",
+      text: "En aggressiv lille skabning, der ofte angriber fra krat, kaeldre og forladte bygninger.",
+      strengths: ["Hurtig", "Angriber ofte i flok"],
+      weaknesses: ["Lavt liv", "Saarbar mod ild"],
+      habitatText: "Ses ofte i fugtige skove, kaeldre og ruiner.",
+    },
   },
   SickRat: {
     sprite: "sickrat",
@@ -772,6 +779,13 @@ export const MONSTER_DEFS = {
     stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22, spells: ["web_slow"] },
     lootProfile: spiderLoot,
     popularity: { change: 0.85 },
+    library: {
+      title: "Edderkop",
+      text: "En taetbygget kryber, der bruger net og trange passager til at saenke sit bytte.",
+      strengths: ["Kan saenke fjender", "Farlig i grupper"],
+      weaknesses: ["Begraenset raekkevidde", "Saarbar naar den holdes i bevaegelse"],
+      habitatText: "Traeffes i grotter, lader, ruiner og fugtige underjordiske steder.",
+    },
   },
   MiniSpider: {
     sprite: "minispider",
@@ -815,6 +829,13 @@ export const MONSTER_DEFS = {
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
     popularity: { change: -0.35 },
+    library: {
+      title: "Ulv",
+      text: "En aarvaagen jaeger, der presser byttedyr med hurtige udfald og vedholdende forfoelgelse.",
+      strengths: ["Hurtig", "God til at lukke afstand"],
+      weaknesses: ["Middel modstandskraft", "Let at holde paa afstand med kontrol"],
+      habitatText: "Findes i skovkanter, bakker og urolige landsbyomraader.",
+    },
   },
   Wolf: {
     sprite: "wolf",

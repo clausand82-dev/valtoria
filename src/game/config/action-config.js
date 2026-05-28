@@ -148,6 +148,53 @@ export const ACTION_CONFIG = {
     label: "Gaa tilbage",
   },
 
+  inspect_inn_crack: {
+    id: "inspect_inn_crack",
+    type: "inspect",
+    label: "Undersoeg revnen",
+    text: "Revnen er frisk, og spind traekker ned i moerket under kroen.",
+    requires: {
+      questStepActive: { questId: "check_inn_infestation", stepId: "inspect_cellar" },
+      notFlag: "inn_crack_found",
+    },
+    blockedBy: {
+      flag: "inn_crack_destroyed",
+    },
+    setFlags: ["inn_crack_found"],
+  },
+
+  enter_inn_crack_cave: {
+    id: "enter_inn_crack_cave",
+    type: "enterSubregion",
+    label: "Gaa ned gennem revnen",
+    targetSubregionId: "inn_crack_cave",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: {
+      questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" },
+      notFlag: "inn_crack_cave_cleared",
+    },
+    setFlags: ["inn_crack_entered"],
+  },
+
+  destroy_inn_crack: {
+    id: "destroy_inn_crack",
+    type: "destroy",
+    label: "Oedelaeg revnen",
+    prompt: "Oedelaeg revnen",
+    requires: {
+      questStepCompleted: { questId: "check_inn_infestation", stepId: "clear_crack_cave" },
+      notFlag: "inn_crack_destroyed",
+    },
+    setFlags: ["inn_crack_destroyed"],
+    removeTarget: true,
+    questAdvance: {
+      questId: "check_inn_infestation",
+      stepId: "seal_crack",
+    },
+    once: true,
+  },
+
   talk_test_wanderer: {
     id: "talk_test_wanderer",
     type: "talk",

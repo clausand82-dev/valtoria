@@ -174,7 +174,9 @@ export const snapshotMethods = {
       autoLoot: normalizeAutoLootRules(this.player.autoLoot),
       hoverMonster: hoverMonster && !hoverMonster.dead ? {
         id: hoverMonster.id,
-        name: hoverMonster.elite ? `${hoverMonster.elite.label} ${hoverMonster.typeName}` : hoverMonster.typeName,
+        name: hoverMonster.elite
+          ? `${hoverMonster.elite.label} ${hoverMonster.displayName ?? hoverMonster.typeName}`
+          : (hoverMonster.displayName ?? hoverMonster.typeName),
         level: hoverMonster.level,
         hp: Math.max(0, Math.ceil(hoverMonster.hp)),
         maxHp: hoverMonster.maxHp,
@@ -203,7 +205,9 @@ export const snapshotMethods = {
         })),
       },
       quests: {
-        active: this.questState.active.map((quest) => questSnapshot(quest, this.player.inventory)),
+        active: this.questState.active
+          .filter((quest) => this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true)
+          .map((quest) => questSnapshot(quest, this.player.inventory)),
         completed: [...this.questState.completed],
         boards: Object.fromEntries(
           Object.keys(QUEST_BOARD_CONFIG ?? {}).map((boardId) => [boardId, this.questBoardSnapshot?.(boardId) ?? null]),
@@ -213,7 +217,7 @@ export const snapshotMethods = {
           npcId: this.questState.wildernessNpc.npcId,
           offers: this.collectQuestOffers(this.questState.wildernessNpc.npcId, "wilderness").map((quest) => questSnapshot(quest, this.player.inventory)),
           active: this.questState.active
-            .filter((quest) => canNpcTurnInQuest(quest, this.questState.wildernessNpc.npcId))
+            .filter((quest) => (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true) && canNpcTurnInQuest(quest, this.questState.wildernessNpc.npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory)),
         } : null,
         nearbyQuestgiver: this.nearbyQuestgiver ? {
@@ -221,15 +225,20 @@ export const snapshotMethods = {
           npcId: this.nearbyQuestgiver.npcId,
           offers: this.collectQuestOffers(this.nearbyQuestgiver.npcId, "wilderness").map((quest) => questSnapshot(quest, this.player.inventory)),
           active: this.questState.active
-            .filter((quest) => canNpcTurnInQuest(quest, this.nearbyQuestgiver.npcId))
+            .filter((quest) => (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true) && canNpcTurnInQuest(quest, this.nearbyQuestgiver.npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory)),
         } : null,
         cityNpcStates: Object.keys(QUEST_NPCS).map((npcId) => {
           const activeQuests = this.questState.active
-            .filter((quest) => canNpcTurnInQuest(quest, npcId))
+            .filter((quest) => (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true) && canNpcTurnInQuest(quest, npcId))
             .map((quest) => questSnapshot(quest, this.player.inventory));
           const offers = this.collectQuestOffers(npcId, "city").map((quest) => questSnapshot(quest, this.player.inventory));
-          const hasComplete = activeQuests.some((quest) => quest.complete);
+          const hasComplete = activeQuests.some((quest) => quest.complete)
+            || this.questState.active.some((quest) => (
+              (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true)
+              && canNpcTurnInQuest(quest, npcId)
+              && this.questCompletesByTalkingToNpc?.(quest, npcId)
+            ));
           return {
             npcId,
             active: activeQuests,

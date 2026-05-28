@@ -96,6 +96,8 @@ function actionContext(engine, extra = {}) {
     rootMapId: extra.rootMapId ?? expedition?.rootMapId,
     rootMapInstanceId: extra.rootMapInstanceId ?? expedition?.rootMapInstanceId,
     sourceMapId: extra.sourceMapId ?? expedition?.currentMapInstanceId,
+    sourceObjectId: extra.sourceObjectId ?? extra.target?.objectDefId ?? extra.target?.type,
+    sourceObjectRuntimeId: extra.sourceObjectRuntimeId ?? extra.target?.runtimeId ?? extra.target?.id,
     subregionDepth: extra.subregionDepth ?? expedition?.subregionStack?.length ?? 0,
   };
 }
@@ -276,6 +278,18 @@ function applyWorldEnergyIfAvailable(engine, worldEnergy) {
   return true;
 }
 
+function applyQuestAdvance(engine, action) {
+  let changed = false;
+  if (action.questStepComplete) {
+    changed = Boolean(engine.advanceQuestProgress?.(action.questStepComplete)) || changed;
+  }
+  if (action.questAdvance) {
+    changed = Boolean(engine.advanceQuestProgress?.(action.questAdvance)) || changed;
+  }
+  changed = Boolean(engine.refreshQuestStepProgress?.()) || changed;
+  return changed;
+}
+
 function removeOrReplaceTarget(engine, action, target, sourceType) {
   let changed = false;
   if (sourceType !== "object") return changed;
@@ -330,9 +344,6 @@ function runImplementedHandler(engine, action, target = null, context = {}) {
   }
   if (action.questStart) {
     console.warn("[actions] questStart field is reserved for a later quest bridge", action.id);
-  }
-  if (action.questAdvance) {
-    console.warn("[actions] questAdvance field is reserved for a later quest bridge", action.id);
   }
   return { ok: true, changed: false };
 }
@@ -396,6 +407,7 @@ export function runAction({
   changed = applyRewards(engine, action.rewards) || changed;
   changed = applyFlags(engine, action) || changed;
   changed = applyCounters(engine, action) || changed;
+  changed = applyQuestAdvance(engine, action) || changed;
   changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;
 

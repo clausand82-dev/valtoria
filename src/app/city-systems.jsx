@@ -3,6 +3,7 @@ import { MAX_INVENTORY, RARITIES, TILE_H, TILE_W } from "../game/data.js";
 import { drawGroundTile, drawShadow } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue } from "../game/world.js";
+import { worldEntryAllowed } from "../game/world-state.js";
 import { makeResourceItem } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
@@ -1005,6 +1006,14 @@ function cityAreaItemRequirementLabel(req) {
 }
 
 function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
+  const applyNonPopularityEffects = (target, effects) => {
+    const filtered = {};
+    for (const [rawId, rawAmount] of Object.entries(effects ?? {})) {
+      if (normalizeCityStatId(rawId) === "popularity") continue;
+      filtered[rawId] = rawAmount;
+    }
+    applyCityStatEffects(target, filtered);
+  };
   const stats = {
     ...CITY_STATS_RULES.baseStats,
     gold: Math.max(0, Math.floor(Number(snapshot?.player?.gold) || 0)),
@@ -1013,20 +1022,20 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   };
   const armyPower = armyTotalPower(progress?.armyUnits);
   stats.defense = Math.max(0, Math.floor(Number(stats.defense) || 0)) + armyPower;
-  applyCityStatEffects(stats, normalizeCityStatBonuses(progress?.statBonuses));
+  applyNonPopularityEffects(stats, normalizeCityStatBonuses(progress?.statBonuses));
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
-    applyCityStatEffects(stats, cityAreaActiveStatEffects(area, state.level));
+    applyNonPopularityEffects(stats, cityAreaActiveStatEffects(area, state.level));
   }
   for (const building of CITY_BUILDINGS) {
     const state = getCityBuildingState(progress, building);
     if ((state.level ?? 0) <= 0) continue;
-    applyCityStatEffects(stats, cityBuildingActiveStatEffects(building, state.level));
+    applyNonPopularityEffects(stats, cityBuildingActiveStatEffects(building, state.level));
     const purchasedAddons = new Set(state.addons ?? []);
     for (const addon of building.addons ?? []) {
       if (!purchasedAddons.has(addon.id)) continue;
-      applyCityStatEffects(stats, addon.statEffects ?? addon.effects?.cityStats);
+      applyNonPopularityEffects(stats, addon.statEffects ?? addon.effects?.cityStats);
     }
   }
   applyRegionCityStats(stats, regionCorruption, snapshot);
@@ -1054,12 +1063,14 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   addEntry("popularity", "Hero popularity", Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0)));
   addEntry("defense", "Army units", armyTotalPower(progress?.armyUnits));
   for (const [statId, amount] of Object.entries(normalizeCityStatBonuses(progress?.statBonuses))) {
+    if (normalizeCityStatId(statId) === "popularity") continue;
     addEntry(statId, "City progress", amount);
   }
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
     for (const [statId, amount] of Object.entries(cityAreaActiveStatEffects(area, state.level))) {
+      if (normalizeCityStatId(statId) === "popularity") continue;
       addEntry(statId, area.title ?? area.id, amount, `Area level ${state.level}`);
     }
   }
@@ -1067,6 +1078,7 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
     const state = getCityBuildingState(progress, building);
     if ((state.level ?? 0) <= 0) continue;
     for (const [statId, amount] of Object.entries(cityBuildingActiveStatEffects(building, state.level))) {
+      if (normalizeCityStatId(statId) === "popularity") continue;
       addEntry(statId, building.title ?? building.id, amount, `Building level ${state.level}`);
     }
     const purchasedAddons = new Set(state.addons ?? []);
@@ -1074,6 +1086,7 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
       if (!purchasedAddons.has(addon.id)) continue;
       const effects = mergeCityStatEffects([addon.statEffects ?? addon.effects?.cityStats]);
       for (const [statId, amount] of Object.entries(effects)) {
+        if (normalizeCityStatId(statId) === "popularity") continue;
         addEntry(statId, addon.title ?? addon.id, amount, `${building.title ?? building.id} addon`);
       }
     }
@@ -1090,6 +1103,7 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
       if (multiplier <= 0) continue;
       for (const [rawId, rawAmount] of Object.entries(regionStats)) {
         const statId = rawId === "populationGain" ? "population" : rawId;
+        if (normalizeCityStatId(statId) === "popularity") continue;
         const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
         addEntry(statId, region.label ?? region.id, amount, `Corruption ${level}/10`);
       }
@@ -1103,7 +1117,10 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   if (Math.max(0, Math.floor(Number(finalStats.provision) || 0)) < population) addEntry("health", "Low provision", -15);
   if (Math.max(0, Math.floor(Number(finalStats.water) || 0)) < population) addEntry("health", "Low water", -15);
   if (population > 0 && Math.max(0, Math.floor(Number(finalStats.knowledge) || 0)) >= population) addEntry("defense", "Knowledge threshold", 0, "+5% defense");
-  if (population > 0 && Math.max(0, Math.floor(Number(finalStats.culture) || 0)) >= population) addEntry("popularity", "Culture threshold", 0, "+10% popularity");
+  if (population > 0 && Math.max(0, Math.floor(Number(finalStats.culture) || 0)) >= population) addEntry("popularity", "Culture threshold", 0, "+10% toward cap");
+  const basePopularity = Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0));
+  const cityPopularityModifier = Math.floor(Number(finalStats.popularity) || 0) - basePopularity;
+  if (cityPopularityModifier !== 0) addEntry("popularity", "City modifier", cityPopularityModifier, "Effective = base + city modifier");
   addEntry("maintenance", "Average durability", finalStats.maintenance, "Unlocked city areas and buildings");
   return breakdown;
 }
@@ -1209,7 +1226,15 @@ function cityStatsRegionIsUnlocked(region, snapshot = emptySnapshot, army = 0) {
   if (army < requiredArmy) return false;
   const completedQuestSet = new Set((snapshot?.quests?.completed ?? []).map(String));
   const requiredQuests = region?.unlock?.completedQuests ?? [];
-  return requiredQuests.every((questId) => regionQuestCompleted(completedQuestSet, questId));
+  if (!requiredQuests.every((questId) => regionQuestCompleted(completedQuestSet, questId))) return false;
+  const context = {
+    regionId: region?.id,
+    regionConfig: region,
+    questState: snapshot?.quests ?? {},
+    worldState: snapshot?.worldState,
+  };
+  return worldEntryAllowed(region?.unlock ?? {}, snapshot?.worldState, context)
+    && worldEntryAllowed(region ?? {}, snapshot?.worldState, context);
 }
 
 function applyRegionCityStats(stats, regionCorruption = {}, snapshot = emptySnapshot) {
@@ -1226,6 +1251,7 @@ function applyRegionCityStats(stats, regionCorruption = {}, snapshot = emptySnap
       for (const [rawId, rawAmount] of Object.entries(regionStats)) {
         const statId = normalizeCityStatId(rawId === "populationGain" ? "population" : rawId);
         if (!statId) continue;
+        if (statId === "popularity") continue;
         const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
         if (amount === 0) continue;
         stats[statId] = Math.max(0, Math.floor(Number(stats[statId]) || 0) + amount);
@@ -1359,10 +1385,12 @@ function applyCurrentCityStatEffects(stats, progress = {}) {
   if (Math.max(0, Math.floor(Number(stats.knowledge) || 0)) >= population && population > 0) {
     stats.defense = Math.floor((Number(stats.defense) || 0) * 1.05);
   }
+  const basePopularity = clampPct(stats.popularity);
   if (Math.max(0, Math.floor(Number(stats.culture) || 0)) >= population && population > 0) {
-    stats.popularity = clampPct((Number(stats.popularity) || 0) * 1.1);
+    // Keep culture influence without creating a hidden >100 buffer that masks popularity drops.
+    stats.popularity = clampPct(basePopularity + (100 - basePopularity) * 0.1);
   } else {
-    stats.popularity = clampPct(stats.popularity);
+    stats.popularity = basePopularity;
   }
   stats.nonUniqueDropRateBonus = Math.max(0, Math.floor(Number(stats.faith) || 0)) >= population && population > 0 ? 0.05 : 0;
   stats.maintenance = calculateCityMaintenance(progress, stats.maintenance);

@@ -218,6 +218,38 @@ region({
     ],
   },
 
+  rareMobs: [                                               // Rare instance layer checked before specialSpawn and weighted mobs.
+    {
+      id: "rare_cursed_wolf",                             // Stable encounter id used for per-region spawn limits.
+      type: "Wolf",                                       // Monster type from monster-config.js. Use a dedicated type there for combat-stat changes.
+      chance: 0.04,                                        // Per monster-slot spawn attempt chance. Defaults to 0 when omitted.
+      maxPerRegion: 1,                                     // Numeric max for this rare mob in the region.
+      displayName: "Den Forbandede Ulv",                  // Optional runtime name override for UI/snapshot text.
+      namePrefix: "Den",                                  // Optional prefix/suffix around displayName (or base monster name).
+      nameSuffix: "af Elvindale",
+      levelOffset: 2,                                       // Optional level offset for this rare instance.
+      scale: 1.15,                                          // Optional visual scale multiplier for this rare instance.
+      tint: "#7cc8ff",                                    // Optional color tint override for this rare instance.
+      quest: "find_cursed_fang",                          // Shorthand conditions work directly on the rare mob entry.
+      corruption: { min: 5 },
+      loot: {
+        mode: "add",                                      // add = normal monster loot plus rare loot. override = rare loot only.
+        resources: [
+          { resource: "bonedust", min: 1, max: 1, chance: 1, questItem: true, quest: "find_cursed_fang" },
+        ],
+        items: [
+          { itemId: "iron_sword", chance: 0.1 },          // Common gear can target generated item names/base names.
+        ],
+        named: [
+          { itemId: "nethrendor_soldier_sword", chance: 0.25 },
+        ],
+        uniques: [
+          { itemId: "blade_of_the_pulse", chance: 0.02 },
+        ],
+      },
+    },
+  ],
+
   spawnCounts: {                                            // Per chunk spawn counts.
     objects: 15,                                            // Regular objects.
     foliage: 28,                                            // Foliage placements.
@@ -239,6 +271,7 @@ Conditional config notes:
 - variants are checked in order; the first matching variant wins.
 - variant.value replaces the whole field.
 - variant.patch merges into the default field. Lists merge by id/type/fileName depending on field.
+- variant.patch merges into the default field. Lists merge by id/type/fileName depending on field, including rareMobs by id/type.
 - requires must pass. blockedBy must not pass.
 - Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
 - World energy balance is available as shorthand conditions anywhere this condition system is used:
@@ -256,6 +289,12 @@ Shorthand conditions:
 - visited: 1 is treated as visits >= 1. visited: { min: 1 } is preferred.
 - cityStorage and cityInventory use the same item counting shape; if the engine has not split them yet, they may be passed as aliases.
 - tileset strings are still valid. Object-form tilesets can use id (preferred) or fileName, plus weight and shorthand conditions.
+- rareMobs supports the same value/variants pattern as mobs when you need region-wide conditional rare encounter lists.
+- rareMobs entries and rare loot lines both support shorthand conditions plus requires/blockedBy.
+- rareMobs is a lightweight instance layer, not a full monster definition. Allowed instance overrides include displayName, namePrefix, nameSuffix, levelOffset, scale, and tint.
+- combat-stat changes should be made in monster-config.js by creating a dedicated monster type and referencing it via rareMobs.type.
+- rare loot mode "add" keeps normal monster loot and appends rare loot. "override" skips normal monster loot entirely.
+- rare loot uniques are unique-rarity drops, not one-per-save collectibles.
 
 Recommended shorthand syntax:
 objects: [
@@ -290,6 +329,87 @@ function normalizeMobs(mobs) {
   );
 }
 
+function normalizeRareMobLootLines(entries) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
+    .map((entry) => ({ ...entry }));
+}
+
+function normalizeRareMobLoot(loot) {
+  if (!loot || typeof loot !== "object" || Array.isArray(loot)) return null;
+  return {
+    ...loot,
+    mode: loot.mode === "override" ? "override" : "add",
+    resources: normalizeRareMobLootLines(loot.resources),
+    items: normalizeRareMobLootLines(loot.items),
+    named: normalizeRareMobLootLines(loot.named),
+    uniques: normalizeRareMobLootLines(loot.uniques),
+  };
+}
+
+function normalizeRareMobEntry(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) return null;
+  const normalizedType = String(entry.type ?? entry.typeName ?? "").trim();
+  if (!normalizedType) return null;
+  const normalized = {
+    ...entry,
+    type: normalizedType,
+    chance: Math.max(0, Number(entry.chance) || 0),
+    loot: normalizeRareMobLoot(entry.loot),
+  };
+  // rareMobs is an instance layer only. Combat/stat changes should be made on a dedicated monster type.
+  const blockedMonsterDefinitionFields = [
+    "hp", "maxHp", "maxMana", "damage", "damageMin", "damageMax", "armor", "speed", "range",
+    "magic", "critChance", "critDamage", "blockChance", "dodgeChance", "allResist",
+    "physicalResist", "fireResist", "iceResist", "lightningResist", "poisonResist",
+    "arcaneResist", "holyResist", "shadowResist", "natureResist",
+    "spells", "onHitStatus", "leapAttack", "attackCooldown", "attackCooldownConfig", "meleeAreaDamage",
+    "aggro", "xp", "killLydra", "killNetdra", "eliteKillLydra", "eliteKillNetdra", "allowElite", "isBoss",
+    "boss", "noLoot", "despawnOnDeath", "haveMinion", "minions", "minionCooldown", "isMinion", "minionOwnerId",
+  ];
+  for (const key of blockedMonsterDefinitionFields) delete normalized[key];
+  if (entry.maxPerRegion !== undefined) {
+    const maxPerRegion = Math.max(0, Math.round(Number(entry.maxPerRegion) || 0));
+    normalized.maxPerRegion = maxPerRegion;
+  }
+  if (entry.uniquePerRegion !== undefined) normalized.uniquePerRegion = Boolean(entry.uniquePerRegion);
+  if (entry.displayName !== undefined) normalized.displayName = String(entry.displayName);
+  if (entry.namePrefix !== undefined) normalized.namePrefix = String(entry.namePrefix);
+  if (entry.nameSuffix !== undefined) normalized.nameSuffix = String(entry.nameSuffix);
+  if (entry.levelOffset !== undefined) {
+    const levelOffset = Number(entry.levelOffset);
+    if (Number.isFinite(levelOffset)) normalized.levelOffset = Math.round(levelOffset);
+  }
+  if (entry.scale !== undefined) {
+    const scale = Number(entry.scale);
+    if (Number.isFinite(scale) && scale > 0) normalized.scale = scale;
+  }
+  if (entry.tint !== undefined) normalized.tint = String(entry.tint);
+  if (entry.id !== undefined) normalized.id = String(entry.id);
+  return normalized;
+}
+
+function normalizeConditionalRareMobs(value) {
+  if (!isConditionalConfig(value)) return normalizeRareMobs(value);
+  return {
+    ...value,
+    value: normalizeRareMobs(value.value),
+    variants: value.variants.map((variant) => {
+      if (!variant || typeof variant !== "object" || Array.isArray(variant)) return variant;
+      const normalized = { ...variant };
+      if (Object.prototype.hasOwnProperty.call(variant, "value")) normalized.value = normalizeRareMobs(variant.value);
+      if (Object.prototype.hasOwnProperty.call(variant, "patch")) normalized.patch = normalizeRareMobs(variant.patch);
+      return normalized;
+    }),
+  };
+}
+
+function normalizeRareMobs(rareMobs) {
+  if (!Array.isArray(rareMobs)) return rareMobs;
+  return rareMobs.map((entry) => normalizeRareMobEntry(entry)).filter(Boolean);
+}
+
 function normalizeCount(value, fallback) {
   const parsed = Math.round(Number(value));
   if (!Number.isFinite(parsed)) return fallback;
@@ -317,7 +437,7 @@ function isConditionalConfig(value) {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray(value.variants) && Object.prototype.hasOwnProperty.call(value, "value"));
 }
 
-function region({ mobs = ["Wolf", "Spider"], mapSize = "medium", weights = {}, spawnCounts = {}, water, antiDrops = {}, corrupted = true, ...regionConfig }) {
+function region({ mobs = ["Wolf", "Spider"], rareMobs = [], mapSize = "medium", weights = {}, spawnCounts = {}, water, antiDrops = {}, corrupted = true, ...regionConfig }) {
   const normalizedSpawnCounts = normalizeSpawnCounts(spawnCounts, weights);
   const conditionalSpawnCounts = isConditionalConfig(spawnCounts);
   return {
@@ -327,6 +447,7 @@ function region({ mobs = ["Wolf", "Spider"], mapSize = "medium", weights = {}, s
     water: water ?? (conditionalSpawnCounts || normalizedSpawnCounts.water > 0 ? DEFAULT_WATER : undefined),
     spawnCounts: conditionalSpawnCounts ? spawnCounts : normalizedSpawnCounts,
     mobs: normalizeMobs(mobs),
+    rareMobs: normalizeConditionalRareMobs(rareMobs),
     antiDrops: {
       items: [],
       resources: [],
@@ -692,7 +813,10 @@ export const MAP_REGION_SETS = {
     }),
     region({
       id: "river-creek", label: "Elvbaekken", color: "#7fb6d6",
-      unlock: { completedQuests: ["innkeeper_ring_for_noble"], text: "Kraever, at Noble har aabnet Elvbaekken." },
+      unlock: {
+        questStepCompleted: { questId: "annelise_document_chain", stepId: "ring_for_noble" },
+        text: "Kraever, at Noble har aabnet Elvbaekken.",
+      },
       labelX: 49, labelY: 79,
       mapSize: "medium",
       cityStats: {

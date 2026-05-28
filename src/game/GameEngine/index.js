@@ -60,6 +60,7 @@ export class GameEngine {
     });
     this.floaters = [];
     this.toasts = [];
+    this.toastTimers = new Map();
     this.potionCooldown = 0;
     this.nearbyFoliageLoot = null;
     this.nearbyActionTarget = null;

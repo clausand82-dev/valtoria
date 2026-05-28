@@ -120,6 +120,10 @@ export const lifecycleMethods = {
 
   stop() {
     this.saveProgress();
+    for (const timerId of this.toastTimers.values()) {
+      clearTimeout(timerId);
+    }
+    this.toastTimers.clear();
     cancelAnimationFrame(this.raf);
     window.removeEventListener("resize", this.resize);
     window.removeEventListener("keydown", this.handleKeyDown);

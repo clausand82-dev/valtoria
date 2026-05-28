@@ -36,11 +36,221 @@ import {
   questSnapshot,
   resolveQuestDefById,
   normalizeQuestBoards,
+  currentQuestStep,
+  questHasSteps,
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
-import { worldEntryAllowed } from "../../world-state.js";
+import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
+
+function questStepCompletedFlag(questId, stepId) {
+  return `quest.${String(questId ?? "").trim()}.step.${String(stepId ?? "").trim()}.completed`;
+}
+
+function talkTargetNpcIds(target = {}) {
+  if (Array.isArray(target.targetNpcIds)) return target.targetNpcIds.map(String).filter(Boolean);
+  if (target.targetNpcId) return [String(target.targetNpcId)];
+  if (Array.isArray(target.npcIds)) return target.npcIds.map(String).filter(Boolean);
+  if (target.npcId) return [String(target.npcId)];
+  return [];
+}
+
+// Keep the quest instance shaped like a normal quest while the current step changes.
+function copyStepRuntimeFields(quest, step, def = null) {
+  if (!quest || !step) return quest;
+  const fallbackStart = getQuestStartNpcIds(def ?? quest);
+  const fallbackTurnIn = getQuestTurnInNpcIds(def ?? quest);
+  const startNpcIds = getQuestStartNpcIds(step).length ? getQuestStartNpcIds(step) : fallbackStart;
+  const turnInNpcIds = getQuestTurnInNpcIds(step).length ? getQuestTurnInNpcIds(step) : fallbackTurnIn;
+  quest.startNpcIds = startNpcIds;
+  quest.turnInNpcIds = turnInNpcIds;
+  quest.startNpcId = startNpcIds[0] ?? quest.startNpcId ?? quest.npcId;
+  quest.npcId = quest.startNpcId;
+  quest.turnInNpcId = turnInNpcIds[0] ?? quest.turnInNpcId ?? quest.startNpcId;
+  quest.type = step.type ?? quest.type;
+  quest.regionIds = Array.isArray(step.regionIds) ? step.regionIds.map(String) : quest.regionIds;
+  quest.story = step.story ?? quest.story;
+  quest.acceptText = step.acceptText ?? quest.acceptText;
+  quest.turnInText = step.turnInText ?? quest.turnInText;
+  quest.target = { ...(step.target ?? {}) };
+  quest.rewards = { ...(step.rewards ?? {}) };
+  return quest;
+}
 
 export const questsMethods = {
+  advanceQuestProgress(advance = {}) {
+    const questId = String(advance.questId ?? advance.id ?? "").trim();
+    const stepId = String(advance.stepId ?? advance.step ?? "").trim();
+    if (!questId || !stepId) return false;
+    return Boolean(this.completeQuestStepById?.(questId, stepId, { grantRewards: false, consumeItems: false }));
+  },
+
+  applyQuestStepEffects(effects = {}) {
+    if (!effects || typeof effects !== "object") return false;
+    let changed = false;
+    let next = this.worldState;
+    for (const flag of effects.setFlags ?? []) {
+      next = setWorldFlag(next, flag, true);
+      changed = true;
+    }
+    for (const flag of effects.clearFlags ?? []) {
+      next = setWorldFlag(next, flag, false);
+      changed = true;
+    }
+    for (const [counter, amount] of Object.entries(effects.addCounters ?? {})) {
+      next = incrementWorldCounter(next, counter, amount);
+      changed = true;
+    }
+    this.worldState = next;
+    if (effects.message) this.addToast?.(String(effects.message));
+    if (effects.worldEnergy) {
+      applyWorldEnergy(this, effects.worldEnergy);
+      changed = true;
+    }
+    return changed;
+  },
+
+  startQuestCurrentStep(quest) {
+    if (!questHasSteps(quest)) return false;
+    const def = resolveQuestDefById(quest.questId);
+    const step = currentQuestStep(quest);
+    if (!step?.id) return false;
+    copyStepRuntimeFields(quest, step, def);
+    quest.progress = {
+      ...(quest.progress ?? {}),
+      currentStepId: String(step.id),
+      stepProgress: {
+        ...(quest.progress?.stepProgress ?? {}),
+        [String(step.id)]: quest.progress?.stepProgress?.[String(step.id)] ?? {},
+      },
+    };
+    this.applyQuestStepEffects(step.onStart);
+    return this.grantQuestStartItems(quest);
+  },
+
+  completeQuestStepById(questId, stepId, options = {}) {
+    const quest = this.questState.active.find((entry) => String(entry.questId) === String(questId));
+    if (!questHasSteps(quest)) return false;
+    const index = quest.steps.findIndex((step) => String(step?.id ?? "") === String(stepId));
+    if (index < 0) return false;
+    const step = quest.steps[index];
+    const completed = new Set((quest.progress?.completedStepIds ?? []).map(String));
+    if (completed.has(String(stepId))) return false;
+
+    if (options.grantRewards !== false) this.grantQuestRewards({ ...quest, rewards: step.rewards ?? {} });
+    if (options.consumeItems !== false && quest.type === "collect_quest_item") this.consumeQuestItems(quest);
+    this.applyQuestStepEffects(step.onComplete);
+    this.worldState = setWorldFlag(this.worldState, questStepCompletedFlag(quest.questId, stepId), true);
+    completed.add(String(stepId));
+    const revealed = new Set((quest.progress?.revealedStepIds ?? []).map(String));
+    revealed.add(String(stepId));
+    const nextStep = quest.steps[index + 1] ?? null;
+    if (nextStep?.id) revealed.add(String(nextStep.id));
+
+    quest.progress = {
+      ...(quest.progress ?? {}),
+      completedStepIds: [...completed],
+      revealedStepIds: [...revealed],
+      stepProgress: { ...(quest.progress?.stepProgress ?? {}) },
+      currentStepId: nextStep?.id ? String(nextStep.id) : String(stepId),
+      complete: !nextStep,
+    };
+
+    if (nextStep) {
+      copyStepRuntimeFields(quest, nextStep, resolveQuestDefById(quest.questId));
+      this.startQuestCurrentStep(quest);
+      this.addToast?.(`${quest.title}: ${nextStep.acceptText ?? nextStep.title ?? "naeste trin"}`);
+      return true;
+    }
+
+    const activeIndex = this.questState.active.findIndex((entry) => entry.id === quest.id);
+    if (activeIndex >= 0) this.questState.active.splice(activeIndex, 1);
+    if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
+      this.questState.completed.push(quest.questId);
+    }
+    if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];
+    if (quest.repeatable) this.applyQuestBoardCompletionCooldown(quest);
+    this.cleanupObsoleteCompletedQuestItems();
+    this.player.stats.questsCompleted += 1;
+    this.questState.cityFade.push({ npcId: String(quest.turnInNpcId ?? quest.npcId), startedAt: Date.now() });
+    this.addToast?.(`${quest.title} fuldfoert`);
+    this.levelUpIfNeeded();
+    return true;
+  },
+
+  refreshQuestStepProgress() {
+    let changed = false;
+    const completedQuestIds = [];
+    for (const quest of this.questState.active) {
+      if (!Array.isArray(quest.steps) || quest.steps.length <= 0) continue;
+      const completed = new Set((quest.progress?.completedStepIds ?? []).map(String));
+      const revealed = new Set((quest.progress?.revealedStepIds ?? []).map(String));
+      if (!revealed.size) {
+        const first = quest.steps.find((step) => step?.revealed) ?? quest.steps[0];
+        if (first?.id) {
+          revealed.add(String(first.id));
+          quest.progress = { ...(quest.progress ?? {}), currentStepId: String(first.id) };
+          changed = true;
+        }
+      }
+      const context = this.questConditionContext({ quest, questId: quest.questId, questInstanceId: quest.id });
+      for (let index = 0; index < quest.steps.length; index += 1) {
+        const step = quest.steps[index];
+        const stepId = String(step?.id ?? "");
+        if (!stepId) continue;
+        if (step.revealWhen && worldConditionMet(step.revealWhen, this.worldState, context)) revealed.add(stepId);
+        if (index > 0 && completed.has(String(quest.steps[index - 1]?.id ?? ""))) revealed.add(stepId);
+        if (completed.has(stepId)) continue;
+        if (step.completeWhen && worldConditionMet(step.completeWhen, this.worldState, context)) {
+          changed = Boolean(this.completeQuestStepById?.(quest.questId, stepId, { grantRewards: false, consumeItems: false })) || changed;
+          break;
+        }
+      }
+      const completeBySteps = quest.steps.every((step) => completed.has(String(step?.id ?? "")));
+      const completeByCondition = quest.completeWhen
+        ? worldConditionMet(quest.completeWhen, this.worldState, context)
+        : false;
+      const complete = completeBySteps || completeByCondition;
+      const nextProgress = {
+        ...(quest.progress ?? {}),
+        completedStepIds: [...completed],
+        revealedStepIds: [...revealed],
+        complete,
+      };
+      if (
+        complete !== quest.progress?.complete
+        || nextProgress.completedStepIds.join("|") !== (quest.progress?.completedStepIds ?? []).map(String).join("|")
+        || nextProgress.revealedStepIds.join("|") !== (quest.progress?.revealedStepIds ?? []).map(String).join("|")
+      ) {
+        quest.progress = nextProgress;
+        changed = true;
+      }
+      if (complete && quest.autoComplete) completedQuestIds.push(quest.id);
+    }
+    for (const instanceId of completedQuestIds) {
+      changed = this.completeQuestDirect(instanceId) || changed;
+    }
+    return changed;
+  },
+
+  completeQuestDirect(instanceId) {
+    const index = this.questState.active.findIndex((quest) => quest.id === instanceId);
+    if (index < 0) return false;
+    const quest = this.questState.active[index];
+    if (!isQuestComplete(quest, this.player.inventory)) return false;
+    const turnInQuestInfo = questSnapshot(quest, this.player.inventory);
+    const rewardSummary = this.grantQuestRewards(quest);
+    this.questState.active.splice(index, 1);
+    if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
+      this.questState.completed.push(quest.questId);
+    }
+    this.player.stats.questsCompleted += 1;
+    this.addToast(`${quest.title} fuldfoert`);
+    this.levelUpIfNeeded();
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return { ok: true, questTitle: quest.title, rewards: rewardSummary, questInfo: turnInQuestInfo };
+  },
+
   updateQuestgiver() {
     const questgiver = this.questState.wildernessNpc;
     if (questgiver) {
@@ -82,6 +292,8 @@ export const questsMethods = {
 
   questDefinitionCanOffer(def, npcId, scope = "wilderness", contextOverrides = {}) {
     if (!def || !npcId) return false;
+    if (def.enabled === false || def.legacy === true) return false;
+    if (!this.questGlobalGateAllows(def)) return false;
     const questSource = String(def.source ?? "npc");
     const boardConfig = QUEST_BOARD_CONFIG?.[scope] ?? null;
     if (scope === "readable") {
@@ -125,6 +337,37 @@ export const questsMethods = {
       ));
     }
     return true;
+  },
+
+  questGlobalGateAllows(def) {
+    const rules = QUEST_CONFIG.globalRules ?? {};
+    const gateQuestId = String(rules.hideAllUntilCompleted ?? "").trim();
+    if (!gateQuestId) return true;
+    if (this.questState.completed.includes(gateQuestId)) return true;
+    const exceptions = new Set((rules.exceptions ?? []).map(String));
+    exceptions.add(gateQuestId);
+    return exceptions.has(String(def?.id ?? ""));
+  },
+
+  questRuntimeVisibleUnderGlobalGate(quest) {
+    const rules = QUEST_CONFIG.globalRules ?? {};
+    const gateQuestId = String(rules.hideAllUntilCompleted ?? "").trim();
+    if (!gateQuestId) return true;
+    if (this.questState.completed.includes(gateQuestId)) return true;
+    const exceptions = new Set((rules.exceptions ?? []).map(String));
+    exceptions.add(gateQuestId);
+    return exceptions.has(String(quest?.questId ?? quest?.id ?? ""));
+  },
+
+  questCompletesByTalkingToNpc(quest, npcId) {
+    const targetNpcId = String(npcId ?? "").trim();
+    if (!quest || !targetNpcId) return false;
+    const step = currentQuestStep(quest);
+    const activeType = step?.type ?? quest.type;
+    if (activeType !== "talk_to_npc") return false;
+    if (isQuestComplete(quest, this.player.inventory)) return false;
+    const target = step?.target ?? quest.target ?? {};
+    return talkTargetNpcIds(target).includes(targetNpcId);
   },
 
   questConditionContext(overrides = {}) {
@@ -450,6 +693,7 @@ export const questsMethods = {
 
   cityRepeatableNpcCandidates(def) {
     if (!def?.repeatable || String(def.source ?? "npc") !== "npc") return [];
+    if (!this.questGlobalGateAllows(def)) return [];
     if (this.questState.active.some((quest) => quest.questId === def.id)) return [];
 
     const regionIds = Array.isArray(def.regionIds) ? def.regionIds.map(String) : ["city"];
@@ -478,9 +722,62 @@ export const questsMethods = {
   getNpcQuestInteractions(npcId, scope = "wilderness") {
     return {
       npcId,
-      active: this.questState.active.filter((quest) => canNpcTurnInQuest(quest, npcId)),
+      active: this.questState.active.filter((quest) => this.questRuntimeVisibleUnderGlobalGate(quest) && canNpcTurnInQuest(quest, npcId)),
       offers: this.collectQuestOffers(npcId, scope),
     };
+  },
+
+  advanceTalkToNpcQuests(npcId) {
+    const targetNpcId = String(npcId ?? "").trim();
+    if (!targetNpcId) return [];
+    const completedResults = [];
+    let changed = false;
+
+    for (const quest of [...this.questState.active]) {
+      const step = currentQuestStep(quest);
+      const activeType = step?.type ?? quest.type;
+      if (activeType !== "talk_to_npc") continue;
+      const target = step?.target ?? quest.target ?? {};
+      const matches = talkTargetNpcIds(target).includes(targetNpcId);
+      if (!matches) continue;
+
+      if (questHasSteps(quest) && step?.id) {
+        const stepId = String(step.id);
+        const progressSource = quest.progress?.stepProgress?.[stepId] ?? {};
+        quest.progress = {
+          ...(quest.progress ?? {}),
+          stepProgress: {
+            ...(quest.progress?.stepProgress ?? {}),
+            [stepId]: { ...progressSource, talked: true },
+          },
+        };
+        const rewardSummary = this.grantQuestRewards({ ...quest, rewards: step.rewards ?? {} });
+        const completed = this.completeQuestStepById(quest.questId, stepId, { grantRewards: false, consumeItems: false });
+        if (completed) {
+          completedResults.push({
+            ok: true,
+            questTitle: step.title ?? quest.title,
+            rewards: rewardSummary,
+            questInfo: questSnapshot(quest, this.player.inventory),
+          });
+          changed = true;
+        }
+        continue;
+      }
+
+      quest.progress = { ...(quest.progress ?? {}), talked: true };
+      const result = this.completeQuestDirect(quest.id);
+      if (result?.ok) {
+        completedResults.push(result);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.publishSnapshot();
+      this.saveProgress({ force: true });
+    }
+    return completedResults;
   },
 
   wildernessNpcCandidates() {
@@ -530,11 +827,17 @@ export const questsMethods = {
       target: { ...(offer.target ?? {}) },
       rewards: { ...(offer.rewards ?? {}) },
     };
-    if (!this.grantQuestStartItems(quest)) {
+    if (!questHasSteps(quest) && !this.grantQuestStartItems(quest)) {
       this.publishSnapshot();
       return false;
     }
     this.questState.active.push(quest);
+    if (questHasSteps(quest) && !this.startQuestCurrentStep(quest)) {
+      this.questState.active = this.questState.active.filter((entry) => entry.id !== quest.id);
+      this.publishSnapshot();
+      return false;
+    }
+    this.refreshQuestStepProgress();
     if (source === "wilderness" && this.questState.wildernessNpc?.npcId === offer.npcId) {
       const interactions = this.getNpcQuestInteractions(offer.npcId, "wilderness");
       if (interactions.offers.length <= 0) {
@@ -641,7 +944,9 @@ export const questsMethods = {
         const objectives = killObjectiveTargets(quest);
         if (objectives.length > 0) {
           let objectiveChanged = false;
-          const nextKills = { ...(quest.progress?.killObjectives ?? {}) };
+          const stepId = questHasSteps(quest) ? String(quest.progress?.currentStepId ?? "") : "";
+          const progressSource = stepId ? (quest.progress?.stepProgress?.[stepId] ?? {}) : (quest.progress ?? {});
+          const nextKills = { ...(progressSource.killObjectives ?? {}) };
           for (const objective of objectives) {
             const objectiveTypes = Array.isArray(objective?.monsterTypes)
               ? objective.monsterTypes.map((type) => norm(type)).filter(Boolean)
@@ -662,7 +967,17 @@ export const questsMethods = {
             objectiveChanged = true;
           }
           if (objectiveChanged) {
-            quest.progress = { ...(quest.progress ?? {}), killObjectives: nextKills };
+            if (stepId) {
+              quest.progress = {
+                ...(quest.progress ?? {}),
+                stepProgress: {
+                  ...(quest.progress?.stepProgress ?? {}),
+                  [stepId]: { ...progressSource, killObjectives: nextKills },
+                },
+              };
+            } else {
+              quest.progress = { ...(quest.progress ?? {}), killObjectives: nextKills };
+            }
             changed = true;
             if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
           }
@@ -789,13 +1104,44 @@ export const questsMethods = {
   },
 
   completeQuest(instanceId, npcId = null) {
-    const index = this.questState.active.findIndex((quest) => quest.id === instanceId);
-    if (index < 0) return false;
+    let index = this.questState.active.findIndex((quest) => quest.id === instanceId);
+    if (index < 0) {
+      index = this.questState.active.findIndex((quest) => String(quest.questId) === String(instanceId));
+    }
+    if (index < 0) {
+      this.addToast("Quest kunne ikke findes i save-state");
+      this.publishSnapshot();
+      return false;
+    }
     const quest = this.questState.active[index];
     if (npcId && !canNpcTurnInQuest(quest, npcId)) {
       this.addToast("Denne NPC kan ikke modtage questen");
       this.publishSnapshot();
       return false;
+    }
+    if (questHasSteps(quest)) {
+      if (!isQuestComplete(quest, this.player.inventory)) {
+        this.addToast(`${currentQuestStep(quest)?.title ?? quest.title} er ikke faerdig endnu`);
+        this.publishSnapshot();
+        return false;
+      }
+      if (!this.questRewardsCanFit(quest)) {
+        this.addToast("Rygsaekken er fuld. Lav plads foer questen indleveres");
+        this.publishSnapshot();
+        return false;
+      }
+      const step = currentQuestStep(quest);
+      const rewardSummary = this.grantQuestRewards(quest);
+      if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
+      const completed = this.completeQuestStepById(quest.questId, step?.id, { grantRewards: false, consumeItems: false });
+      this.publishSnapshot();
+      this.saveProgress();
+      return completed ? {
+        ok: true,
+        questTitle: step?.title ?? quest.title,
+        rewards: rewardSummary,
+        questInfo: questSnapshot(quest, this.player.inventory),
+      } : false;
     }
     if (!isQuestComplete(quest, this.player.inventory)) {
       this.addToast(`${quest.title} er ikke faerdig endnu`);
@@ -827,14 +1173,7 @@ export const questsMethods = {
       ok: true,
       questTitle: quest.title,
       rewards: rewardSummary,
-      questInfo: {
-        id: quest.id,
-        questId: quest.questId,
-        title: quest.title,
-        type: quest.type,
-        regionIds: Array.isArray(quest.regionIds) ? [...quest.regionIds] : [],
-        target: { ...(quest.target ?? {}) },
-      },
+      questInfo: questSnapshot(quest, this.player.inventory),
     };
   },
 
@@ -854,14 +1193,16 @@ export const questsMethods = {
 
   cleanupObsoleteCompletedQuestItems() {
     if (!Array.isArray(this.player?.inventory)) return;
-    if (!this.questState?.completed?.includes("innkeeper_ring_for_noble")) return;
-    const activeRingQuest = (this.questState.active ?? []).some((quest) => (
-      questItemTargetsForQuest(quest).some((target) => String(target.questItemId) === "ring")
-    ));
-    if (activeRingQuest) return;
-    this.player.inventory = this.player.inventory.filter((item) => !(
-      item?.mode === "quest"
-      && String(item.questItemId ?? "") === "ring"
+    const neededQuestItems = new Set();
+    for (const quest of this.questState.active ?? []) {
+      for (const target of questItemTargetsForQuest(quest)) {
+        if (target?.questItemId) neededQuestItems.add(String(target.questItemId));
+      }
+    }
+    this.player.inventory = this.player.inventory.filter((item) => (
+      item?.mode !== "quest"
+      || !item.questItemId
+      || neededQuestItems.has(String(item.questItemId))
     ));
   },
 

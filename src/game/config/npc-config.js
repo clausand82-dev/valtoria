@@ -1,4 +1,16 @@
 export const QUEST_NPCS = {
+  mayor: {
+    name: "Mayor",
+    title: "Mayor",
+    imageUrl: "/assets/generated/npc/npc_mayor.png",
+    cityLocation: "town_center",
+    cityHint: "Ved byens midte",
+    wildernessText: "Byens borgmester holder sig normalt ved byens midte, hvor han tager imod nye ankomne.",
+    dialogue: {
+      active: "Tal med innkeeper. Byen har brug for at se, at du vil hjaelpe.",
+      completed: "Godt. Hjaelp byens folk, saa vender haabet langsomt tilbage.",
+    },
+  },
   blacksmith: {
     name: "Traver",
     title: "Blacksmith",

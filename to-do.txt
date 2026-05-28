@@ -1,5 +1,8 @@
 Ting at få gjort
 
+--- IGANG ---
+Bestiary - er tilføjet, men skal bruge pænere layout
+
 --- GRAFISK ---
 - Få grafik på alle bygninger og addons, samt få bygningerne i flere variationer (hel, damage og ruin)
 - Få tilføjet flere objekter (objekter skal også have tre stadies hel, damaged, ruin)
@@ -17,10 +20,11 @@ Ting at få gjort
 - Måske library indeholder alle definerede mobs, men der er ikke billede eller info, får man har set dem - måske flere stages ala set 1 gang (billede) ingen stats, bekæmpet billede og stats
 prompt:
 bygningen library skal have en addons, hvor alle monster i spillet findes som bøger (brug evt book items) - hver monster indeholder billede, generel tekst og stats. Hvis en spiller har set mobs i spillet, vises billede. Hvis spilleren har kæmpet imod mobs, vises tekst og stats. Derudover bør der være statistiske informationer som antal dræbte har denne mobs (normal og elite seperat), maks lvl dræbt, steder den er set (regions) og lignende statistik - evt svagheder og fordele. Det er muligvis nødvendig at tilføje7udvide world states.
+Vieweren til at vise monsters må gerne benytte lore book vieweren, men med understøttelse af billede. Forestiller mig følgende view:
+Titel - dvs mobs navn (svarer til lore books titel), billede af monster (første animation frame fra sheet), basic info om monster (burde komme fra monster defs, men findes vist ikke endnu - så skal nok tilføjes til hvert enkelt mobs - denne info fortæller i plain tekst lidt om monster svagheder og styrker), på side 2 skal der stå stå stats på mobs og hvis der er plads statistik. Fylder det mere end hvad der kan være på side 1 og 2, skal der tilføjes paganation.
 
-
-
-
+- test popularity noget mere
+- teste om population matcher
 
 --- GENERELT---
 
@@ -55,7 +59,7 @@ En ekstra ting jeg lagde mærke til: almindelig visit-degradation for areas ser 
 
 - overveje om progress skal "slettes" ved early battle map leave eller om det skal moderares lidt
 
-
+- regions modsatte af antidrop, så en liste der gør at alt kan droppe dette med X chance, måske både med hårde chance tal, men måske eller bare multiplier - f.eks. meat: 0.15 betyder at der ligges 15% droprate til ALT meat drop imens man er i den region (og evt condition er opfyldt)
 
 --- QUESTTYPE ---
 Runesten som skal aktiveres rundt omkring - måske gemstone skal bruges til aktiveringen.
@@ -65,23 +69,7 @@ Skal kunne huske om runestenen er aktiveres eller ej (localstorage)
 Skal det være meget nemt at bruge i nuværende så kan hver sten være sin egen quest
 aktivering af runesten kan koste x antal gemstone i bestemte farver
 
---- STORY OBJECT ---
-Behandles som et object, men kan aktiveres på maps, hvor det er på med E 
-E udløser en modal med tekst på - denne tekst kan være historie eller hjælpe hint 
-Story object kan også være et para i region som peger på et object det altid spawner på det givne map 
-Hvis story para fylder for meget, laver vi story config fil 
-måske bare object skal kunne få en para (objectType: normal (default), quest (kun hvis relaterede quest er tilgængelig), story (e prompt))
-normal = default som det er nu
-quest = kan spawne 1 entry, hvis relaterede quest betingelse er opfyldt (bruger også questens spawnrate)
-story = kan spawne 1 entry på map
 
-Måske det er region der skal have mulighed for at gøre object til quest objekt eller story object i stedet for selve object listen. Ved quest eller story, er det en random af de mulige 16 objects der bruges, medmindre x og y er sat. - hvor skal story stå? Måske story skal være config fil for sig selv, som så kan kaldes med variable/id - til alt, der bruger story. MÅSKE PREFAB SYSTEM KAN BRUGES HER!
-
-
--- REGION OBJECT para tilføjelse --
-Måske skal et object udover object reference og x og y og weight, også have mulighed for count 
-(count bestemmer konkret antal på det map, og overrules weight hvis angivet)
-count skal kunne være en af de random 16 eller specifik x og y
 
 -- BYGNING FUNKTIONER --
 farm

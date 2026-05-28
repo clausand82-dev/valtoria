@@ -3094,7 +3094,7 @@ button {
 
 .toast-stack {
   position: fixed;
-  z-index: 9;
+  z-index: 95;
   left: 50%;
   bottom: 94px;
   display: grid;
@@ -3465,13 +3465,20 @@ button {
 .confirm-dialog .quest-overview-list {
   display: grid;
   gap: 8px;
-  max-height: auto;
-  height: auto;
+  min-height: 0;
+  height: 100%;
   width: 100%;
   overflow: auto;
+  scrollbar-width: none;
+  scrollbar-gutter: stable;
   padding: 10px;
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   align-items: start;
+}
+
+.confirm-dialog .quest-overview-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .quest-overview-row {
@@ -3824,6 +3831,17 @@ button {
   width: min(540px, calc(100vw - 32px));
 }
 
+.quest-popup .quest-list {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.quest-popup .quest-list::-webkit-scrollbar {
+  display: none;
+}
+
 .quest-npc-summary {
   display: grid;
   grid-template-columns: 74px 1fr;
@@ -3842,6 +3860,16 @@ button {
   display: grid;
   gap: 10px;
   padding: 0 18px 18px;
+}
+
+.quest-action-message {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 110, 95, 0.45);
+  border-radius: 6px;
+  background: rgba(120, 20, 14, 0.22);
+  color: #ffd6cf;
+  font-size: 13px;
 }
 
 .quest-card {
@@ -3926,6 +3954,20 @@ button {
   border-radius: 4px;
   object-fit: cover;
   image-rendering: pixelated;
+}
+
+.quest-step-chip.complete {
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+
+.quest-objective-steps {
+  display: grid;
+  gap: 5px;
+}
+
+.quest-objective-steps .quest-step-chip {
+  width: fit-content;
 }
 
 .quest-monster-mini {
@@ -5582,5 +5624,171 @@ button {
   .inventory-detail-empty-icon {
     width: 54px;
     height: 54px;
+  }
+}
+.bestiary-panel {
+  margin-top: 8px;
+}
+
+.bestiary-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 250px) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 320px;
+}
+
+.bestiary-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  max-height: 430px;
+  overflow: auto;
+}
+
+.bestiary-entry {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 7px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 7px;
+  color: #f5f3ea;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: left;
+}
+
+.bestiary-entry:hover,
+.bestiary-entry.active {
+  border-color: rgba(244, 218, 150, 0.42);
+  background: rgba(244, 218, 150, 0.1);
+}
+
+.bestiary-entry.unknown {
+  color: rgba(245, 243, 234, 0.62);
+}
+
+.bestiary-entry span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.bestiary-entry b {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bestiary-sprite,
+.bestiary-sprite-placeholder {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.bestiary-sprite-placeholder {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(245, 243, 234, 0.38);
+  font-weight: 800;
+}
+
+.bestiary-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bestiary-book-page {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 300px;
+  max-height: 430px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.bestiary-detail-header {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.bestiary-detail-header .bestiary-sprite,
+.bestiary-detail-header .bestiary-sprite-placeholder {
+  width: 72px;
+  height: 72px;
+}
+
+.bestiary-book-page h4,
+.bestiary-book-page h5 {
+  margin: 0;
+  color: #f4da96;
+}
+
+.bestiary-book-page h5 {
+  font-size: 13px;
+}
+
+.bestiary-book-page p,
+.bestiary-detail-header span,
+.bestiary-detail-header small,
+.bestiary-region-list span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bestiary-chip-group,
+.bestiary-stat-grid,
+.bestiary-region-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bestiary-chip-group b {
+  width: 100%;
+  color: #f5f3ea;
+  font-size: 12px;
+}
+
+.bestiary-chip-group span,
+.bestiary-stat-grid span {
+  display: inline-grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f3ea;
+  font-size: 12px;
+}
+
+.bestiary-chip-group.weak span {
+  border-color: rgba(255, 114, 114, 0.22);
+}
+
+.bestiary-stat-grid span b {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 820px) {
+  .bestiary-layout,
+  .bestiary-detail {
+    grid-template-columns: 1fr;
   }
 }

@@ -774,6 +774,12 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         allItems: regionConfig.antiDrops?.allItems ?? false,
       },
       mobs: [...(regionConfig.mobs ?? [])],
+      rareMobs: Array.isArray(regionConfig.rareMobs)
+        ? regionConfig.rareMobs.map((entry) => ({
+          ...entry,
+          loot: cloneRareMobLoot(entry.loot),
+        }))
+        : [],
       mapSize: regionConfig.mapSize ?? "medium",
     } : null,
     width: regionW,
@@ -1773,6 +1779,98 @@ function pickWeightedMob(entries, roll) {
   return typeof last === "string" ? last : last.type;
 }
 
+function cloneRareMobLoot(loot) {
+  if (!loot || typeof loot !== "object" || Array.isArray(loot)) return null;
+  return {
+    ...loot,
+    resources: Array.isArray(loot.resources) ? loot.resources.map((entry) => ({ ...entry })) : [],
+    items: Array.isArray(loot.items) ? loot.items.map((entry) => ({ ...entry })) : [],
+    named: Array.isArray(loot.named) ? loot.named.map((entry) => ({ ...entry })) : [],
+    uniques: Array.isArray(loot.uniques) ? loot.uniques.map((entry) => ({ ...entry })) : [],
+  };
+}
+
+function clampRareMobScale(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 1;
+  return Math.max(0.25, Math.min(4, parsed));
+}
+
+function normalizeRareMobLevelOffset(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.round(parsed);
+}
+
+function composeRareMobDisplayName(monsterType, rareMob) {
+  const hasNameOverride = (
+    rareMob?.displayName !== undefined
+    || rareMob?.namePrefix !== undefined
+    || rareMob?.nameSuffix !== undefined
+  );
+  if (!hasNameOverride) return undefined;
+  const baseName = String(rareMob?.displayName ?? monsterType ?? "").trim();
+  const prefix = String(rareMob?.namePrefix ?? "").trim();
+  const suffix = String(rareMob?.nameSuffix ?? "").trim();
+  return `${prefix ? `${prefix} ` : ""}${baseName}${suffix ? ` ${suffix}` : ""}`.trim();
+}
+
+function rareMobKey(entry) {
+  return String(entry?.id ?? entry?.type ?? entry?.typeName ?? "").trim();
+}
+
+function rareMobSpawnLimit(entry) {
+  if (entry?.uniquePerRegion) return 1;
+  if (entry?.maxPerRegion === undefined) return Infinity;
+  return Math.max(0, Math.round(Number(entry.maxPerRegion) || 0));
+}
+
+function rareMobCountsStore(owner) {
+  return owner ? (owner.__spawnedRareMobCounts ??= new Map()) : new Map();
+}
+
+function pickRegionRareMob(chunk, slotIndex) {
+  const rareMobs = chunk.region?.mapRegion?.rareMobs ?? [];
+  if (!rareMobs.length) return null;
+
+  const spawnedRareMobCounts = rareMobCountsStore(chunk.region ?? chunk);
+  const spawnedBossTypes = chunk.region
+    ? (chunk.region.__spawnedBossTypes ??= new Set())
+    : (chunk.__spawnedBossTypes ??= new Set());
+
+  let selected = null;
+  let selectedRoll = Infinity;
+
+  for (let rareIndex = 0; rareIndex < rareMobs.length; rareIndex += 1) {
+    const entry = rareMobs[rareIndex];
+    const monsterType = String(entry?.type ?? entry?.typeName ?? "").trim();
+    if (!monsterType) continue;
+    const base = MONSTER_STATS[monsterType];
+    if (!base) continue;
+    if (base.isBoss && spawnedBossTypes.has(monsterType)) continue;
+
+    const spawnLimit = rareMobSpawnLimit(entry);
+    if (spawnLimit <= 0) continue;
+
+    const id = rareMobKey(entry);
+    const alreadySpawned = id ? (spawnedRareMobCounts.get(id) ?? 0) : 0;
+    if (alreadySpawned >= spawnLimit) continue;
+
+    const chance = Math.max(0, Math.min(1, Number(entry?.chance) || 0));
+    if (chance <= 0) continue;
+
+    const roll = rand01(chunk.cx + rareIndex * 37, chunk.cy + slotIndex * 53, 1110 + rareIndex * 97 + slotIndex * 131);
+    if (roll >= chance) continue;
+
+    if (roll < selectedRoll) {
+      selected = entry;
+      selectedRoll = roll;
+    }
+  }
+
+  return selected;
+}
+
 function listValueMatches(value, list) {
   if (!Array.isArray(list) || !list.length) return false;
   return list.map(String).includes(String(value ?? ""));
@@ -1806,6 +1904,82 @@ function pickSpecialSpawnMonster(chunk) {
     if (rand01(chunk.cx, chunk.cy, salt) < chance) return monsterType;
   }
   return null;
+}
+
+function createChunkMonster(chunk, slotIndex, monsterType, x, y, level, extra = {}) {
+  const base = MONSTER_STATS[monsterType];
+  if (!base) return null;
+  const hp = Math.floor(base.hp * (1 + level * 0.18));
+  return {
+    id: createId(),
+    typeName: monsterType,
+    x,
+    y,
+    vx: 0,
+    vy: 0,
+    radius: base.radius,
+    baseLevel: level,
+    level,
+    maxHp: hp,
+    hp,
+    damage: Math.floor(base.damage * (1 + level * 0.16)),
+    speed: base.speed * (1 + Math.min(0.32, level * 0.025)),
+    baseSpeed: base.speed * (1 + Math.min(0.32, level * 0.025)),
+    range: base.range,
+    magic: Math.floor(Number(base.magic) || 0),
+    critChance: Number(base.critChance) || 0,
+    critDamage: Number(base.critDamage) || 1.5,
+    blockChance: Number(base.blockChance) || 0,
+    dodgeChance: Number(base.dodgeChance) || 0,
+    physicalResist: Number(base.physicalResist) || 0,
+    fireResist: Number(base.fireResist) || 0,
+    iceResist: Number(base.iceResist) || 0,
+    lightningResist: Number(base.lightningResist) || 0,
+    poisonResist: Number(base.poisonResist) || 0,
+    arcaneResist: Number(base.arcaneResist) || 0,
+    holyResist: Number(base.holyResist) || 0,
+    shadowResist: Number(base.shadowResist) || 0,
+    natureResist: Number(base.natureResist) || 0,
+    allResist: Number(base.allResist) || 0,
+    spells: [...(base.spells ?? [])],
+    killLydra: Math.max(0, Number(base.killLydra) || 0),
+    killNetdra: Math.max(0, Number(base.killNetdra) || 0),
+    eliteKillLydra: Math.max(0, Number(base.eliteKillLydra) || 0),
+    eliteKillNetdra: Math.max(0, Number(base.eliteKillNetdra) || 0),
+    spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + slotIndex) * 1.5,
+    statusEffects: [],
+    allowElite: base.allowElite !== false,
+    isBoss: Boolean(base.isBoss),
+    boss: base.isBoss ? { ...BOSS_TINT } : null,
+    noLoot: Boolean(base.noLoot),
+    despawnOnDeath: Boolean(base.despawnOnDeath),
+    onHitStatus: base.onHitStatus ? { ...base.onHitStatus } : null,
+    leapAttack: base.leapAttack ? { ...base.leapAttack } : null,
+    attackCooldownConfig: base.attackCooldown ? { ...base.attackCooldown } : null,
+    meleeAreaDamage: base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null,
+    shadow: base.shadow ? { ...base.shadow } : null,
+    haveMinion: Boolean(base.haveMinion),
+    minions: base.minions ?? false,
+    minionCooldown: Number(base.minions?.cooldown) || 0,
+    isMinion: false,
+    minionOwnerId: null,
+    aggro: base.range > 1 ? 8.2 : 6.7,
+    attackCooldown: 0.3 + rand01(chunk.cx, chunk.cy, 980 + slotIndex),
+    color: base.color,
+    xp: Math.floor(base.xp * (1 + level * 0.15)),
+    animSeed: rand01(chunk.cx, chunk.cy, 1010 + slotIndex) * Math.PI * 2,
+    breathSpeed: 1.6 + rand01(chunk.cx, chunk.cy, 1020 + slotIndex) * 1.4,
+    visualScale: 0.9 + rand01(chunk.cx, chunk.cy, 1030 + slotIndex) * 0.22,
+    facingX: 1,
+    facingY: 0,
+    moving: false,
+    gait: rand01(chunk.cx, chunk.cy, 1040 + slotIndex) * Math.PI * 2,
+    moveSpeed: 0,
+    attackAnim: 0,
+    dead: false,
+    hurt: 0,
+    ...extra,
+  };
 }
 
 function addMonsters(chunk, safeChunk) {
@@ -1842,7 +2016,8 @@ function addMonsters(chunk, safeChunk) {
     if (chunk.region && isReservedTile(chunk.region, x, y)) continue;
     if (chunk.region && !isRegionPointPlayable(chunk.region, x, y, 0.5)) continue;
 
-    const monsterType = pickSpecialSpawnMonster(chunk) ?? pickWeightedMob(monsterTypes, rand01(chunk.cx, chunk.cy, 900 + i));
+    const rareMob = pickRegionRareMob(chunk, i);
+    const monsterType = rareMob?.type ?? pickSpecialSpawnMonster(chunk) ?? pickWeightedMob(monsterTypes, rand01(chunk.cx, chunk.cy, 900 + i));
     const base = MONSTER_STATS[monsterType];
     if (!base) continue;
     if (base.isBoss) {
@@ -1852,77 +2027,29 @@ function addMonsters(chunk, safeChunk) {
       if (spawnedBossTypes.has(monsterType)) continue;
       spawnedBossTypes.add(monsterType);
     }
-    const level = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 930 + i) * 2);
-    const hp = Math.floor(base.hp * (1 + level * 0.18));
-    chunk.monsters.push({
-      id: createId(),
-      typeName: monsterType,
-      x,
-      y,
-      vx: 0,
-      vy: 0,
-      radius: base.radius,
-      baseLevel: level,
-      level,
-      maxHp: hp,
-      hp,
-      damage: Math.floor(base.damage * (1 + level * 0.16)),
-      speed: base.speed * (1 + Math.min(0.32, level * 0.025)),
-      baseSpeed: base.speed * (1 + Math.min(0.32, level * 0.025)),
-      range: base.range,
-      magic: Math.floor(Number(base.magic) || 0),
-      critChance: Number(base.critChance) || 0,
-      critDamage: Number(base.critDamage) || 1.5,
-      blockChance: Number(base.blockChance) || 0,
-      dodgeChance: Number(base.dodgeChance) || 0,
-      physicalResist: Number(base.physicalResist) || 0,
-      fireResist: Number(base.fireResist) || 0,
-      iceResist: Number(base.iceResist) || 0,
-      lightningResist: Number(base.lightningResist) || 0,
-      poisonResist: Number(base.poisonResist) || 0,
-      arcaneResist: Number(base.arcaneResist) || 0,
-      holyResist: Number(base.holyResist) || 0,
-      shadowResist: Number(base.shadowResist) || 0,
-      natureResist: Number(base.natureResist) || 0,
-      allResist: Number(base.allResist) || 0,
-      spells: [...(base.spells ?? [])],
-      killLydra: Math.max(0, Number(base.killLydra) || 0),
-      killNetdra: Math.max(0, Number(base.killNetdra) || 0),
-      eliteKillLydra: Math.max(0, Number(base.eliteKillLydra) || 0),
-      eliteKillNetdra: Math.max(0, Number(base.eliteKillNetdra) || 0),
-      spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + i) * 1.5,
-      statusEffects: [],
-      allowElite: base.allowElite !== false,
-      isBoss: Boolean(base.isBoss),
-      boss: base.isBoss ? { ...BOSS_TINT } : null,
-      noLoot: Boolean(base.noLoot),
-      despawnOnDeath: Boolean(base.despawnOnDeath),
-      onHitStatus: base.onHitStatus ? { ...base.onHitStatus } : null,
-      leapAttack: base.leapAttack ? { ...base.leapAttack } : null,
-      attackCooldownConfig: base.attackCooldown ? { ...base.attackCooldown } : null,
-      meleeAreaDamage: base.meleeAreaDamage ? { ...base.meleeAreaDamage } : null,
-      shadow: base.shadow ? { ...base.shadow } : null,
-      haveMinion: Boolean(base.haveMinion),
-      minions: base.minions ?? false,
-      minionCooldown: Number(base.minions?.cooldown) || 0,
-      isMinion: false,
-      minionOwnerId: null,
-      aggro: base.range > 1 ? 8.2 : 6.7,
-      attackCooldown: 0.3 + rand01(chunk.cx, chunk.cy, 980 + i),
-      color: base.color,
-      xp: Math.floor(base.xp * (1 + level * 0.15)),
-      animSeed: rand01(chunk.cx, chunk.cy, 1010 + i) * Math.PI * 2,
-      breathSpeed: 1.6 + rand01(chunk.cx, chunk.cy, 1020 + i) * 1.4,
-      visualScale: 0.9 + rand01(chunk.cx, chunk.cy, 1030 + i) * 0.22,
-      facingX: 1,
-      facingY: 0,
-      moving: false,
-      gait: rand01(chunk.cx, chunk.cy, 1040 + i) * Math.PI * 2,
-      moveSpeed: 0,
-      attackAnim: 0,
-      dead: false,
-      hurt: 0,
-    });
+    const baseLevel = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 930 + i) * 2);
+    const levelOffset = rareMob ? normalizeRareMobLevelOffset(rareMob.levelOffset) : 0;
+    const level = Math.max(1, baseLevel + levelOffset);
+    const baseVisualScale = 0.9 + rand01(chunk.cx, chunk.cy, 1030 + i) * 0.22;
+    const scaleMultiplier = rareMob ? clampRareMobScale(rareMob.scale) : 1;
+    const rareDisplayName = rareMob ? composeRareMobDisplayName(monsterType, rareMob) : undefined;
+    const rareTint = rareMob?.tint !== undefined ? String(rareMob.tint).trim() : "";
+    if (rareMob) {
+      const spawnedRareMobCounts = rareMobCountsStore(chunk.region ?? chunk);
+      const rareId = rareMobKey(rareMob);
+      if (rareId) spawnedRareMobCounts.set(rareId, (spawnedRareMobCounts.get(rareId) ?? 0) + 1);
+    }
+    chunk.monsters.push(createChunkMonster(chunk, i, monsterType, x, y, level, rareMob ? {
+      spawnSource: "rareMobs",
+      rareMobId: rareMobKey(rareMob),
+      rareLoot: cloneRareMobLoot(rareMob.loot),
+      displayName: rareDisplayName,
+      visualScale: Number((baseVisualScale * scaleMultiplier).toFixed(3)),
+      color: rareTint || undefined,
+      rareLevelOffset: levelOffset,
+      rareScaleMultiplier: scaleMultiplier,
+      rareTint: rareTint || undefined,
+    } : {}));
   }
 }
 

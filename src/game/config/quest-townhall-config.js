@@ -10,7 +10,7 @@ vengeance: {
     titleTemplate: "Haevn over {monster}",
     repeatable: true,
     cooldownMapRuns: 1,
-    npcIds: Object.keys(QUEST_NPCS),
+    npcIds: ["mage"],
     spawnChance: 0.40,
     type: "kill_monsters",
     target: { countMin: 5, countMax: 20, monster: "random", allowElite: true },

@@ -248,6 +248,7 @@ export const REGION_OBJECT_DEFS = {
       hp: 70,
       damageStages: 3,
       particleColor: "#c99b5d",
+      popularityDelta: -3,
       loot: REGION_OBJECT_LOOT_TABLES.HOUSE,
       rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
     },
@@ -641,7 +642,7 @@ export const REGION_OBJECT_DEFS = {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
-    object_bones: {
+  object_bones: {
     spawnTypes: [{ type: "object_bones", weight: 1 }],
     defaultDestructible: true,
     destructible: {
@@ -659,6 +660,15 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "foilage/foilage_bones.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
+  },
+  object_inn_cellar_crack: {
+    spawnTypes: [{ type: "object_inn_cellar_crack", weight: 1 }],
+    defaultDestructible: false,
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_cracks02.png",
+    depthMode: "ground",
+    sortAnchor: { x: 0.5, y: 0.7 },
+    sheetRenderScale: 1.75,
   },
     object_treestumps: {
     spawnTypes: [{ type: "object_treestumps", weight: 1 }],

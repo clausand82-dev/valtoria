@@ -9,7 +9,12 @@ import { QUEST_NPCS } from "../../config/npc-config.js";
 import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
 import { normalizeRegionTileset } from "../../config/region-asset-config.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
-import { resolveMapRegionConfig, worldConditionMet } from "../../world-state.js";
+import {
+  incrementWorldCounter,
+  resolveMapRegionConfig,
+  setWorldFlag,
+  worldConditionMet,
+} from "../../world-state.js";
 import {
   chunkKey,
   createId,
@@ -391,7 +396,65 @@ function placeNearObjectOrPosition(engine, sourceObjectRuntimeId, fallbackPositi
   engine.updateCamera(1);
 }
 
+function subregionClearKey(instanceId, subregionId, onClear = {}) {
+  const explicit = String(onClear.key ?? onClear.id ?? "").trim();
+  return explicit || `subregion:${cleanInstanceId(instanceId)}:${cleanInstanceId(subregionId)}:cleared`;
+}
+
+function applySubregionOnClear(engine, instanceId) {
+  const expedition = engine.currentExpedition;
+  const instance = expedition?.subregionInstances?.[instanceId];
+  const subregionId = instance?.subregionId ?? loadedSubregionId(engine);
+  const raw = SUBREGION_CONFIG[subregionId];
+  const onClear = raw?.onClear;
+  if (!instance || !raw || !onClear || typeof onClear !== "object") return false;
+  if (!engine.allRegionMonstersCleared?.()) return false;
+  const key = subregionClearKey(instanceId, subregionId, onClear);
+  if (onClear.once !== false && engine.worldState?.flags?.[key]) return false;
+
+  let changed = false;
+  let next = engine.worldState;
+  if (onClear.once !== false) {
+    next = setWorldFlag(next, key, true);
+    changed = true;
+  }
+  for (const flag of onClear.setFlags ?? []) {
+    next = setWorldFlag(next, flag, true);
+    changed = true;
+  }
+  for (const flag of onClear.clearFlags ?? []) {
+    next = setWorldFlag(next, flag, false);
+    changed = true;
+  }
+  for (const [counter, amount] of Object.entries(onClear.addCounters ?? {})) {
+    next = incrementWorldCounter(next, counter, amount);
+    changed = true;
+  }
+  engine.worldState = next;
+  if (onClear.questStepComplete) changed = Boolean(engine.advanceQuestProgress?.(onClear.questStepComplete)) || changed;
+  if (onClear.questAdvance) changed = Boolean(engine.advanceQuestProgress?.(onClear.questAdvance)) || changed;
+  changed = Boolean(engine.refreshQuestStepProgress?.()) || changed;
+  if (onClear.message) engine.addToast?.(String(onClear.message));
+  return changed;
+}
+
 export const subregionMethods = {
+  applyCurrentSubregionClear() {
+    if (!isSubregionMap(this)) return false;
+    const expedition = normalizeCurrentExpedition(this.currentExpedition);
+    this.currentExpedition = expedition;
+    if (!expedition) return false;
+    const currentMapInstanceId = repairLoadedSubregionMapId(this, expedition) ?? currentMapInstanceIdFor(expedition);
+    if (!currentMapInstanceId || currentMapInstanceId === expedition?.rootMapInstanceId) return false;
+    const changed = applySubregionOnClear(this, currentMapInstanceId);
+    if (changed) {
+      this.updateNearbyActionTarget?.();
+      this.publishSnapshot?.();
+      this.saveProgress?.({ force: true });
+    }
+    return changed;
+  },
+
   setSubregionTransition(active, patch = {}) {
     this.subregionTransition = active ? {
       active: true,
@@ -770,6 +833,7 @@ export const subregionMethods = {
       return { ok: false, changed: false, reason: "not_in_subregion" };
     }
     this.storeCurrentMapSnapshot(currentMapInstanceId);
+    const clearChanged = applySubregionOnClear(this, currentMapInstanceId);
     let entry = expedition.subregionStack.pop();
     if (!entry) {
       entry = legacyReturnEntryFor(expedition, currentMapInstanceId);
@@ -824,7 +888,7 @@ export const subregionMethods = {
         this.setSubregionTransition?.(false);
       });
     this.saveProgress?.({ force: true });
-    return { ok: true, changed: false };
+    return { ok: true, changed: clearChanged };
   },
 
   clearSubregionExpedition(options = {}) {

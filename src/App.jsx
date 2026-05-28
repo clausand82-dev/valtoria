@@ -4,6 +4,7 @@ import { GameEngine } from "./game/GameEngine.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { WORLD_MAP } from "./game/config/map-region-config.js";
+import { installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import {
@@ -21,6 +22,7 @@ import {
   InventoryPanel,
   MergeChoiceDialog,
   MinimapDialog,
+  QuestDetailCard,
   QuestDetailDialog,
   QuestObjectiveMeta,
   QuestOfferDialog,
@@ -86,6 +88,7 @@ export default function App() {
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
   const [cityMinimapHero, setCityMinimapHero] = useState(null);
   const [cityProgressHud, setCityProgressHud] = useState(() => loadCityProgress());
+  const [cityProgressRefreshToken, setCityProgressRefreshToken] = useState(0);
   const [skipCityMobProgressReturnId, setSkipCityMobProgressReturnId] = useState(null);
   const snapshotRef = useRef(emptySnapshot);
   const gameSessionRef = useRef(null);
@@ -263,6 +266,18 @@ export default function App() {
   }, [snapshot]);
 
   useEffect(() => {
+    installValtoriaCheats({
+      getEngine: () => engineRef.current,
+      getCityStorageKey: () => gameSessionRef.current?.slot?.cityStorageKey ?? CITY_STORAGE_KEY,
+      getCityProgress: () => cityProgressHud,
+      setCityProgress: setCityProgressHud,
+      loadCityProgress,
+      saveCityProgress,
+      refreshCity: () => setCityProgressRefreshToken((value) => value + 1),
+    });
+  }, [cityProgressHud]);
+
+  useEffect(() => {
     const enteredCity = cityOpen && !lastCityOpenRef.current;
     lastCityOpenRef.current = cityOpen;
     if (!cityOpen || !gameSession?.sessionId || !engineRef.current) return;
@@ -394,6 +409,12 @@ export default function App() {
       if (key === "c") setHeroOpen((value) => !value);
       if (key === "e" && snapshotRef.current.quests?.nearbyQuestgiver) {
         event.preventDefault();
+        const completedTalkQuests = engineRef.current?.advanceTalkToNpcQuests?.(snapshotRef.current.quests.nearbyQuestgiver.npcId) ?? [];
+        if (completedTalkQuests.length > 0) {
+          setQuestRewardModal(completedTalkQuests[0]);
+          setQuestOffer(null);
+          return;
+        }
         setQuestOffer(snapshotRef.current.quests.nearbyQuestgiver);
       }
     };
@@ -440,11 +461,12 @@ export default function App() {
   const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
   const manaPct = Math.max(0, Math.min(100, (player.mana / player.maxMana) * 100));
   const xpPct = Math.max(0, Math.min(100, (player.xp / player.nextXp) * 100));
-  const popularityPct = Math.max(0, Math.min(100, player.popularity ?? 0));
   const derivedCityStats = useMemo(
     () => calculateCityStats(cityProgressHud, snapshot, regionCorruption),
     [cityProgressHud, snapshot, regionCorruption],
   );
+  const effectivePopularity = Math.max(0, Math.min(100, Number(derivedCityStats.popularity) || 0));
+  const popularityPct = effectivePopularity;
   const cityThreatLevel = Math.max(0, Math.min(100, Number(cityProgressHud?.threatLevel) || 0));
   const cityStatBreakdown = useMemo(
     () => calculateCityStatBreakdown(cityProgressHud, snapshot, regionCorruption),
@@ -600,6 +622,7 @@ export default function App() {
         openWorldMapFromCity={openWorldMapFromCity}
         player={player}
         popularityPct={popularityPct}
+        popularityValue={effectivePopularity}
         setConfirmMapAbandonOpen={setConfirmMapAbandonOpen}
         setCitySettingsOpen={setCitySettingsOpen}
         setCityStorageOpen={setCityStorageOpen}
@@ -747,16 +770,21 @@ export default function App() {
           onAcceptQuest={(quest) => {
             const accepted = engineRef.current?.acceptWildernessQuest?.({
               npcId: questOffer.npcId,
-              quest,
+              quest: { ...quest, npcId: quest.npcId ?? questOffer.npcId },
             });
             if (accepted) setAcceptedQuestNotice({ npcId: questOffer.npcId, quest });
+            else engineRef.current?.addToast?.("Quest kunne ikke tages");
+            engineRef.current?.publishSnapshot?.();
             setQuestOffer(null);
           }}
           onTurnInQuest={(quest) => {
-            const result = engineRef.current?.completeQuest?.(quest.id, questOffer.npcId);
+            const result = engineRef.current?.completeQuest?.(quest.id ?? quest.questId, questOffer.npcId);
             if (result?.ok) {
               setQuestRewardModal(result);
               setQuestOffer(null);
+            } else {
+              engineRef.current?.addToast?.("Quest kunne ikke indleveres");
+              engineRef.current?.publishSnapshot?.();
             }
           }}
         />
@@ -789,28 +817,16 @@ export default function App() {
       )}
 
       {questRewardModal && (
-        <div className="confirm-backdrop" role="presentation">
-          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-reward-title">
-            <h2 id="quest-reward-title">Quest reward</h2>
-            <p>{questRewardModal.questTitle}</p>
-            {questRewardModal.questInfo && <QuestObjectiveMeta quest={questRewardModal.questInfo} compact />}
-            <div className="comparison-list">
-              {questRewardModal.rewards?.xp > 0 && <span className="diff-good">+ XP {questRewardModal.rewards.xp}</span>}
-              {questRewardModal.rewards?.gold > 0 && <span className="diff-good">+ Gold {questRewardModal.rewards.gold}</span>}
-              {questRewardModal.rewards?.lydra > 0 && <span className="diff-good">+ Ly'dra'thot {questRewardModal.rewards.lydra}</span>}
-              {questRewardModal.rewards?.netdra > 0 && <span className="diff-good">+ Net'dra'thot {questRewardModal.rewards.netdra}</span>}
-              {(questRewardModal.rewards?.resources ?? []).map((entry) => (
-                <span className="diff-good" key={`res-${entry.id}`}>+ {entry.count}x {entry.name}</span>
-              ))}
-              {(questRewardModal.rewards?.items ?? []).map((entry, index) => (
-                <span className="diff-good" key={`item-${entry.id ?? index}`}>+ {entry.name}</span>
-              ))}
-            </div>
-            <div>
-              <button type="button" onClick={() => setQuestRewardModal(null)}>OK</button>
-            </div>
-          </section>
-        </div>
+        <QuestDetailCard
+          quest={{
+            ...(questRewardModal.questInfo ?? {}),
+            title: questRewardModal.questTitle ?? questRewardModal.questInfo?.title ?? "Quest reward",
+            rewards: questRewardModal.rewards ?? questRewardModal.questInfo?.rewards ?? {},
+          }}
+          npc={QUEST_NPCS[questRewardModal.questInfo?.turnInNpcId ?? questRewardModal.questInfo?.npcId]}
+          onClose={() => setQuestRewardModal(null)}
+          footer={<button type="button" onClick={() => setQuestRewardModal(null)}>OK</button>}
+        />
       )}
 
       {snapshot.exitPrompt && !cityOpen && (
@@ -850,6 +866,7 @@ export default function App() {
           regionCorruption={regionCorruption}
           worldState={snapshot.worldState}
           worldEnergy={snapshot.worldEnergy}
+          activeQuests={snapshot.quests?.active ?? []}
           completedQuests={snapshot.quests?.completed ?? []}
           army={snapshot.player?.stats?.army ?? 0}
           onPlayableRegionSelected={startPlayableMapRegion}
@@ -874,6 +891,7 @@ export default function App() {
           setSnapshot={setSnapshot}
           onQuestCompleted={(result) => setQuestRewardModal(result)}
           cityStorageKey={gameSession.slot.cityStorageKey}
+          cityProgressRefreshToken={cityProgressRefreshToken}
           regionCorruption={regionCorruption}
           onProgressChange={setCityProgressHud}
           onStartCityMobBattle={startCityMobBattle}

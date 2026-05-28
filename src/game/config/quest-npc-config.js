@@ -2,6 +2,26 @@ import { QUEST_NPCS } from "./npc-config.js";
 
 // Quest definitions are split by source. Keep objects in the existing quest shape.
 export const NPC_QUESTS = {
+mayor_intro_to_valtoria: {
+    id: "mayor_intro_to_valtoria",
+    source: "npc",
+    kind: "main",
+    title: "A Land in Shadow",
+    repeatable: false,
+    startNpcIds: ["mayor"],
+    turnInNpcIds: ["innkeeper"],
+    regionIds: ["city"],
+    spawnChance: 1,
+    type: "talk_to_npc",
+    target: {
+      targetNpcId: "innkeeper",
+      text: "Talk to the innkeeper.",
+    },
+    story: "Valtoria er haardt ramt af Nethrendors moerke indflydelse, og mange borgere har mistet haabet. Der gaar rygter om en gammel elverkonge, Lydrendor, som maaske kan redde landet, men ingen ved hvor han befinder sig. Hvis byen skal finde modet igen, maa du foerst vinde borgernes tillid ved at hjaelpe dem.",
+    acceptText: "Begynd ved kroen. Tal med Oliver, innkeeper. Kroen har brug for hjaelp, og han ved mere om byens problemer.",
+    turnInText: "Oliver nikker alvorligt. Borgmesteren sendte dig altsaa. Godt. Saa lad os begynde med kroens kaelder.",
+    rewards: { xp: 40, lydra: 1 },
+  },
 clear_the_inn: {
     id: "clear_the_inn",
     source: "npc",
@@ -10,6 +30,7 @@ clear_the_inn: {
     repeatable: false,
     npcIds: ["innkeeper"],
     regionIds: ["city"],
+    demands: { completedQuests: ["mayor_intro_to_valtoria"] },
     spawnChance: 1,
     type: "clear_map",
     target: {
@@ -19,9 +40,9 @@ clear_the_inn: {
     story: "Oliver tørrer af bordet og sukker tungt. 'Kroen er fuld af edderkopper – i kælderen, bag skabene, i loftet. Gæsterne tør ikke sove, og jeg kan ikke drive forretning sådan her. Ryd dem ud, alle sammen.'",
     acceptText: "Dræb alle edderkopper i kroen og kom tilbage, når det er gjort.",
     turnInText: "Endelig. Jeg har allerede sat øllet frem. Tak, eventyrer.",
-    rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }] },
+    rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }], lydra:2 },
   },
-kill_mother_spider: {
+/*kill_mother_spider: {
     id: "kill_mother_spider",
     source: "npc",
     kind: "main",
@@ -40,7 +61,7 @@ kill_mother_spider: {
     acceptText: "Dræb Moder edderkoppen i kælderen og kom tilbage, når det er gjort.",
     turnInText: "Endelig. Nu tør jeg bruge min kælder igen. Tak, eventyrer.",
     rewards: { xp: 320, gold: 150, resources: [{ resource: "green_gemstone", count: 1 }] },
-  },
+  },*/
 lost_anvil: {
     id: "lost_anvil",
     source: "npc",
@@ -56,7 +77,7 @@ lost_anvil: {
     story: "Traver havde gemt sin gamle anvil i et rejsebur, mens han undersoegte en malmsti. Baesterne rev vognen op og sloebte metallet vaek som et blankt trofae. Find den, foer smedjen mister sit bedste arbejde.",
     acceptText: "Find min gamle anvil. Jeg kan ikke smede ordentligt uden den.",
     turnInText: "Der er ridser i kanten, men det er min. Smedjen kan arbejde igen.",
-    rewards: { xp: 180, gold: 90, resources: [{ resource: "orange_gemstone", count: 1 }] },
+    rewards: { xp: 180, gold: 90, resources: [{ resource: "orange_gemstone", count: 1 }], lydra: 1 },
   },
 lost_hammer: {
     id: "lost_hammer",
@@ -73,7 +94,7 @@ lost_hammer: {
     story: "Traver mistede sin runemarkerede hammer, da en flok monstre overfaldt hans forsyningskurv. Hammeren kan stadig kalde varme frem i metallet, og den maa ikke ende hos de forkerte.",
     acceptText: "Min hammer er borte. Finder du den, betaler jeg dig med mere end tak.",
     turnInText: "Haandtaget kender stadig min haand. Godt arbejde.",
-    rewards: { xp: 190, gold: 95, resources: [{ resource: "purple_gemstone", count: 1 }] },
+    rewards: { xp: 190, gold: 95, resources: [{ resource: "purple_gemstone", count: 1 }], lydra: 1 },
   },
 find_annelises_redroses: {
     id: "find_annelises_redroses",
@@ -90,10 +111,105 @@ find_annelises_redroses: {
     story: "Annelise har brug for dine tjenester. Hendes forlovede gav hende 12 røde roser, men de er forsvundet under en tur uden for byen. Kan du finde dem tilbage?",
     acceptText: "Find 12 røde roser og bring dem tilbage til Annelise.",
     turnInText: "Oh, mine roser! Tak, du har gjort mig en stor tjeneste. Tag dette som tak.",
-    rewards: { xp: 520, gold: 120 },
+    rewards: { xp: 520, gold: 120, lydra: 3 },
   },
-annelise_note_for_innkeeper: {
+
+annelise_document_chain: {
+    id: "annelise_document_chain",
+    source: "npc",
+    kind: "main",
+    title: "Annelises Aerinde",
+    repeatable: false,
+    startNpcIds: ["lady"],
+    regionIds: ["city"],
+    spawnChance: 1,
+    steps: [
+      {
+        id: "note_for_innkeeper",
+        title: "Bring Annelises note til kroejeren",
+        startNpcIds: ["lady"],
+        turnInNpcIds: ["innkeeper"],
+        regionIds: ["city"],
+        type: "collect_quest_item",
+        target: { questItems: [{ questItemId: "note", count: 1, source: "giver" }] },
+        story: "Annelise raekker dig en forseglet note og beder dig bringe den sikkert til kroejeren.",
+        acceptText: "Tag noten til Innkeeper. Han venter paa beskeden.",
+        turnInText: "Godt, noten er fremme. Jeg sender noget videre til Noble.",
+        rewards: { xp: 220, gold: 40, lydra: 2 },
+      },
+      {
+        id: "ring_for_noble",
+        title: "Bring signetringen til Noble",
+        startNpcIds: ["innkeeper"],
+        turnInNpcIds: ["noble"],
+        regionIds: ["city"],
+        type: "collect_quest_item",
+        target: { questItems: [{ questItemId: "ring", count: 1, source: "giver" }] },
+        story: "Innkeeper giver dig en signetring, som kun Noble maa modtage personligt.",
+        acceptText: "Aflever ringen til Noble i byen.",
+        turnInText: "Perfekt. Nu kan jeg aabne vejen til Elvbaekken.",
+        rewards: { xp: 320, gold: 90, lydra: 2 },
+        onComplete: { setFlags: ["region.river-creek.unlocked"] },
+      },
+      {
+        id: "wolf_document_hunt",
+        title: "Dokumentet i Elvbaekken",
+        startNpcIds: ["noble"],
+        turnInNpcIds: ["noble"],
+        regionIds: ["city", "river-creek"],
+        type: "collect_quest_item",
+        target: {
+          questItems: [
+            {
+              questItemId: "unsigned_document",
+              count: 1,
+              source: "monster",
+              dropChance: 1,
+              monsterTypes: ["WolfFenris"],
+              regionIds: ["river-creek"],
+            },
+          ],
+          killObjectives: [
+            {
+              id: "river_creek_wolves",
+              label: "Almindelige ulve",
+              count: 10,
+              monsterTypes: ["Wolf", "WolfCub"],
+              regionIds: ["river-creek"],
+            },
+            {
+              id: "river_creek_wolf_boss",
+              label: "Ulveboss",
+              count: 1,
+              monsterTypes: ["WolfFenris"],
+              regionIds: ["river-creek"],
+            },
+          ],
+        },
+        story: "Noble har aabnet Elvbaekken. En ulv har slugt et vigtigt ikke-underskrevet dokument, og flokken skal samtidig holdes nede.",
+        acceptText: "Hent dokumentet fra ulvebossen i Elvbaekken, og ryd ulveflokken.",
+        turnInText: "Dokumentet er i sikkerhed. Jeg underskriver det nu.",
+        rewards: { xp: 900, gold: 260, questItems: [{ questItemId: "signed_document", count: 1 }], lydra: 2 },
+      },
+      {
+        id: "signed_document_delivery",
+        title: "Aflever det underskrevne dokument",
+        startNpcIds: ["noble"],
+        turnInNpcIds: ["lady", "merchant"],
+        regionIds: ["city"],
+        type: "collect_quest_item",
+        target: { questItems: [{ questItemId: "signed_document", count: 1, source: "reward" }] },
+        story: "Noble overdrager det underskrevne dokument til dig. Bring det tilbage til Annelise eller Elis.",
+        acceptText: "Rejs tilbage til Annelise eller Elis med dokumentet.",
+        turnInText: "Dokumentet er modtaget. Questlinjen er fuldfoert.",
+        rewards: { xp: 720, gold: 320, resources: [{ resource: "yellow_gemstone", count: 1 }], lydra: 2 },
+      },
+    ],
+  },
+/*annelise_note_for_innkeeper: {
     id: "annelise_note_for_innkeeper",
+    enabled: false,
+    legacy: true,
     source: "npc",
     kind: "main",
     title: "Annelises Note",
@@ -115,6 +231,8 @@ annelise_note_for_innkeeper: {
   },
 innkeeper_ring_for_noble: {
     id: "innkeeper_ring_for_noble",
+    enabled: false,
+    legacy: true,
     source: "npc",
     kind: "main",
     title: "Ring Til Noble",
@@ -137,6 +255,8 @@ innkeeper_ring_for_noble: {
   },
 noble_wolf_document_hunt: {
     id: "noble_wolf_document_hunt",
+    enabled: false,
+    legacy: true,
     source: "npc",
     kind: "main",
     title: "Dokumentet I Elvbaekken",
@@ -182,6 +302,8 @@ noble_wolf_document_hunt: {
   },
 noble_signed_document_delivery: {
     id: "noble_signed_document_delivery",
+    enabled: false,
+    legacy: true,
     source: "npc",
     kind: "main",
     title: "Det Underskrevne Dokument",
@@ -201,7 +323,7 @@ noble_signed_document_delivery: {
     acceptText: "Rejs tilbage til Annelise eller Elis med dokumentet.",
     turnInText: "Dokumentet er modtaget. Questlinjen er fuldfoert.",
     rewards: { xp: 720, gold: 320, resources: [{ resource: "yellow_gemstone", count: 1 }] },
-  },
+  },*/
 find_annelises_rarepinkflowers: {
     id: "find_annelises_rarepinkflowers",
     source: "npc",

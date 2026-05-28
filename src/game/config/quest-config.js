@@ -102,7 +102,7 @@ Top-level quest fields:
   - region ids without "city": quest can only be offered in those wilderness regions.
   - Omit to default to "city".
 - spawnChance: For repeatable city quests, chance that the quest appears in town. For wilderness quests, chance when rolling a wilderness quest. 1 means guaranteed if valid.
-- type: Supported values are "collect_quest_item" and "kill_monsters".
+- type: Supported values are "collect_quest_item", "kill_monsters", "clear_map", and "talk_to_npc".
 - demands: Optional gate requirements before quest can be offered.
   Supported fields:
   - level: Minimum player level.
@@ -164,6 +164,10 @@ Target shape for kill_monsters:
 - target.monster: "random" lets the engine pick from current region mobs.
 - target.allowElite: true means elite variants count too.
 
+Target shape for talk_to_npc:
+- target.targetNpcId or target.targetNpcIds: NPC id(s) that complete the objective when spoken to.
+- target.text: Optional objective text shown in quest UI.
+
 Rewards:
 - rewards.xp: Flat XP.
 - rewards.gold: Flat gold.
@@ -198,6 +202,11 @@ export const QUEST_DEFS = {
   ...INN_QUESTS,
 };
 
+export const QUEST_GLOBAL_RULES = {
+  hideAllUntilCompleted: "mayor_intro_to_valtoria",
+  exceptions: ["mayor_intro_to_valtoria"],
+};
+
 export const QUEST_BOARD_CONFIG = {
   townHall: {
     id: "townHall",
@@ -221,6 +230,7 @@ export const QUEST_BOARD_CONFIG = {
 
 export const QUEST_CONFIG = {
   boards: QUEST_BOARD_CONFIG,
+  globalRules: QUEST_GLOBAL_RULES,
   wildernessNpcSpawnChance: 0.42,
   questItemIconPlaceholder: "/assets/generated/item/item_lost_anvil.png",
 };

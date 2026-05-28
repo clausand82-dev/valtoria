@@ -8,9 +8,10 @@ import {
 import { distance } from "../../iso.js";
 import { createId } from "../../world.js";
 import { QUEST_NPCS } from "../../config/npc-config.js";
-import { worldConditionMet } from "../../world-state.js";
+import { worldEntryAllowed } from "../../world-state.js";
 import {
   actionPromptFor,
+  getActionConfig,
   normalizeActionState,
   runAction,
 } from "../../actions/action-runner.js";
@@ -32,6 +33,8 @@ function actionContextForTarget(engine, extra = {}) {
     rootMapId: engine.currentExpedition?.rootMapId,
     rootMapInstanceId: engine.currentExpedition?.rootMapInstanceId,
     sourceMapId: engine.currentExpedition?.currentMapInstanceId,
+    sourceObjectId: extra.target?.objectDefId ?? extra.target?.type,
+    sourceObjectRuntimeId: extra.target?.runtimeId ?? extra.target?.id,
     subregionDepth: engine.currentExpedition?.subregionStack?.length ?? 0,
     ...extra,
   };
@@ -39,12 +42,13 @@ function actionContextForTarget(engine, extra = {}) {
 
 function actionEntryMatches(engine, entry, target) {
   if (!entry?.actionId) return false;
-  const conditions = entry.conditions ?? entry.requires;
-  if (!conditions) return true;
-  return worldConditionMet(conditions, engine.worldState, actionContextForTarget(engine, {
+  const context = actionContextForTarget(engine, {
     target,
     npcId: target?.npcId,
-  }));
+  });
+  if (!worldEntryAllowed(entry, engine.worldState, context)) return false;
+  const action = getActionConfig(entry.actionId);
+  return !action || worldEntryAllowed(action, engine.worldState, context);
 }
 
 function firstActionFromList(engine, actions, target) {
