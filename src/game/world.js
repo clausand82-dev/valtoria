@@ -16,7 +16,12 @@ import {
   resolveRegionObjectDestructibleDef,
   resolveRegionObjectVariantCount,
 } from "./config/region-object-config.js";
-import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
+import {
+  buildDecaySheetId,
+  DECAY_SET_DEFS,
+  normalizeDecayRenderConfig,
+  normalizeRegionDecaySets,
+} from "./config/decay-config.js";
 import { normalizeParticleConfigs, rollParticleConfigs } from "./config/particle-presets.js";
 import { resolveWeatherForRegion } from "./config/weather-presets.js";
 import { potionDefById, normalizePotionId } from "./config/potion-config.js";
@@ -774,6 +779,12 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         allItems: regionConfig.antiDrops?.allItems ?? false,
       },
       mobs: [...(regionConfig.mobs ?? [])],
+      ambientCritterDefaults: regionConfig.ambientCritterDefaults
+        ? { ...regionConfig.ambientCritterDefaults }
+        : null,
+      ambientCritters: Array.isArray(regionConfig.ambientCritters)
+        ? regionConfig.ambientCritters.map((entry) => ({ ...entry, count: entry?.count ? { ...entry.count } : entry?.count }))
+        : [],
       rareMobs: Array.isArray(regionConfig.rareMobs)
         ? regionConfig.rareMobs.map((entry) => ({
           ...entry,
@@ -1338,14 +1349,28 @@ function resolvePrefabDecay(item, chunk, index) {
   const variant = explicitVariant === null
     ? hashInt(chunk.cx, chunk.cy, 7975 + index) % variantCount
     : Math.max(0, Math.floor(explicitVariant)) % variantCount;
+  const renderConfig = normalizeDecayRenderConfig({
+    ...def,
+    ...item,
+    renderScale: item.renderScale ?? item.decayRenderScale ?? def.renderScale,
+    projection: item.projection ?? item.sourceProjection ?? def.projection ?? def.sourceProjection,
+  });
   return {
     decaySheetId: buildDecaySheetId(decayId),
     decayVariant: variant,
-    decayRenderScale: Number.isFinite(Number(item.renderScale))
-      ? Number(item.renderScale)
-      : Number.isFinite(Number(def.renderScale))
-        ? Number(def.renderScale)
-        : 1,
+    decayRenderScale: renderConfig.renderScale,
+    decayProjection: renderConfig.projection,
+    decayBlendMode: renderConfig.blendMode,
+    decayRotation: renderConfig.rotation,
+    decayRandomRotation: renderConfig.randomRotation,
+    decayWidthScale: renderConfig.widthScale,
+    decayHeightScale: renderConfig.heightScale,
+    decayOffsetX: renderConfig.offsetX,
+    decayOffsetY: renderConfig.offsetY,
+    decayAnchorX: renderConfig.anchorX,
+    decayAnchorY: renderConfig.anchorY,
+    decayAlpha: renderConfig.alpha,
+    decayAlphaExplicit: renderConfig.alpha !== null || Number.isFinite(Number(item.alpha)),
     particles: rollParticleConfigs(
       normalizeParticleConfigs(item.particles ?? def.particles),
       () => rand01(chunk.cx, chunk.cy, 7985 + index),
@@ -1366,13 +1391,28 @@ function addPrefabDecals(chunk, instance) {
       x,
       y,
       size: Number(item.size) || 0.9,
-      rotation: (Number(item.rotation) || 0) + (instance.rotation * Math.PI) / 180,
+      rotation: decay?.decayProjection === "iso" && decay?.decayRotation === null && decay?.decayRandomRotation !== true
+        ? 0
+        : (Number.isFinite(Number(item.rotation)) ? Number(item.rotation) : decay?.decayRotation ?? 0)
+          + (decay?.decayProjection === "iso" ? 0 : (instance.rotation * Math.PI) / 180),
       color: rand01(chunk.cx, chunk.cy, 7970 + i),
-      alpha: Number(item.alpha) || 0.42,
+      alpha: Number.isFinite(Number(item.alpha))
+        ? Number(item.alpha)
+        : decay?.decayAlpha ?? (decay?.decayProjection === "iso" ? 1 : 0.42),
       animSeed: rand01(chunk.cx, chunk.cy, 7980 + i) * Math.PI * 2,
       decaySheetId: decay?.decaySheetId,
       decayVariant: decay?.decayVariant,
       decayRenderScale: decay?.decayRenderScale,
+      decayProjection: decay?.decayProjection,
+      decayBlendMode: decay?.decayBlendMode,
+      decayRandomRotation: decay?.decayRandomRotation,
+      decayWidthScale: decay?.decayWidthScale,
+      decayHeightScale: decay?.decayHeightScale,
+      decayOffsetX: decay?.decayOffsetX,
+      decayOffsetY: decay?.decayOffsetY,
+      decayAnchorX: decay?.decayAnchorX,
+      decayAnchorY: decay?.decayAnchorY,
+      decayAlphaExplicit: decay?.decayAlphaExplicit,
       particles: decay?.particles ?? [],
       prefabId: instance.id,
       prefabInstanceId: instance.instanceId,
@@ -1756,12 +1796,27 @@ function addDecals(chunk, safeChunk) {
       x: chunk.x + localX,
       y: chunk.y + localY,
       size,
-      rotation: rand01(chunk.cx, chunk.cy, 1600 + i) * Math.PI * 2,
+      rotation: selectedDecaySet.randomRotation
+        ? rand01(chunk.cx, chunk.cy, 1600 + i) * Math.PI * 2
+        : selectedDecaySet.rotation ?? 0,
       color: rand01(chunk.cx, chunk.cy, 1700 + i),
-      alpha: 0.2 + rand01(chunk.cx, chunk.cy, 1750 + i) * 0.32,
+      alpha: selectedDecaySet.alpha ?? (
+        selectedDecaySet.projection === "iso"
+          ? 1
+          : 0.2 + rand01(chunk.cx, chunk.cy, 1750 + i) * 0.32
+      ),
       decaySheetId: selectedDecaySet.sheetId,
       decayVariant: pickDecayVariant(selectedDecaySet, 1450 + i),
       decayRenderScale: decayScale,
+      decayProjection: selectedDecaySet.projection,
+      decayBlendMode: selectedDecaySet.blendMode,
+      decayWidthScale: selectedDecaySet.widthScale,
+      decayHeightScale: selectedDecaySet.heightScale,
+      decayOffsetX: selectedDecaySet.offsetX,
+      decayOffsetY: selectedDecaySet.offsetY,
+      decayAnchorX: selectedDecaySet.anchorX,
+      decayAnchorY: selectedDecaySet.anchorY,
+      decayAlphaExplicit: selectedDecaySet.alpha !== null,
       animSeed: rand01(chunk.cx, chunk.cy, 1800 + i) * Math.PI * 2,
       particles: rollParticleConfigs(selectedDecaySet.particles, () => rand01(chunk.cx, chunk.cy, 1810 + i)),
     });

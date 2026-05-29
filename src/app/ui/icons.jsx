@@ -12,6 +12,7 @@ export const ITEM_STANDARD_ICON_URL = "/assets/generated/item/item_standard.png"
 export const ITEM_GOLD_ICON_URL = "/assets/generated/item/item_gold.png";
 export const ITEM_MONEY_ICON_URL = "/assets/generated/item/item_gold.png";
 
+const ENABLE_RUNTIME_CHROMA_KEY = false;
 const iconSheetPromises = new Map();
 
 export function InventoryIcon({ iconIndex, iconSheet = "items", iconUrl = null }) {
@@ -100,15 +101,17 @@ export function AtlasIcon({ frameName }) {
       temp.height = frame.h;
       const tctx = temp.getContext("2d", { willReadFrequently: true });
       tctx.drawImage(image, frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h);
-      const imageData = tctx.getImageData(0, 0, temp.width, temp.height);
-      const { data } = imageData;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        if (g > 135 && g > r * 1.45 && g > b * 1.35) data[i + 3] = 0;
+      if (ENABLE_RUNTIME_CHROMA_KEY) {
+        const imageData = tctx.getImageData(0, 0, temp.width, temp.height);
+        const { data } = imageData;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          if (g > 135 && g > r * 1.45 && g > b * 1.35) data[i + 3] = 0;
+        }
+        tctx.putImageData(imageData, 0, 0);
       }
-      tctx.putImageData(imageData, 0, 0);
       const bounds = expandBounds(alphaBoundsFromCanvas(temp), temp.width, temp.height, frameName === "orb" ? 18 : 3);
       const scale = Math.min((canvas.width - 6) / bounds.w, (canvas.height - 6) / bounds.h, frameName === "orb" ? 0.34 : Infinity);
       const width = bounds.w * scale;
@@ -190,7 +193,7 @@ function drawInventoryIcon(canvas, image, iconIndex, iconSheet = "items") {
     const r = data[i];
     const g = data[i + 1];
     const b = data[i + 2];
-    if (g > 145 && g > r * 1.55 && g > b * 1.55) data[i + 3] = 0;
+    if (ENABLE_RUNTIME_CHROMA_KEY && g > 145 && g > r * 1.55 && g > b * 1.55) data[i + 3] = 0;
     if (data[i + 3] > 45) {
       const p = i / 4;
       const x = p % cellW;

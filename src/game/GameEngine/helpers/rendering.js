@@ -109,6 +109,50 @@ export function getNpcImage(url) {
   return null;
 }
 
+function finiteNumber(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function decayProjection(decal, sheet) {
+  const raw = String(
+    decal.decayProjection
+      ?? decal.projection
+      ?? decal.sourceProjection
+      ?? sheet?.projection
+      ?? sheet?.sourceProjection
+      ?? "topdown",
+  ).trim().toLowerCase();
+  return raw === "iso" ? "iso" : "topdown";
+}
+
+function decalBlendMode(decal, sheet) {
+  return String(
+    decal.decayBlendMode
+      ?? decal.blendMode
+      ?? decal.compositeOperation
+      ?? sheet?.blendMode
+      ?? sheet?.compositeOperation
+      ?? "source-over",
+  ).trim() || "source-over";
+}
+
+export function getTerrainDecalRenderSize({ decal, sheet, TILE_W: tileW = TILE_W, TILE_H: tileH = TILE_H }) {
+  const baseSize = finiteNumber(decal.size, 1);
+  const renderScale = finiteNumber(decal.decayRenderScale, finiteNumber(sheet?.renderScale, 1));
+  const scale = baseSize * renderScale;
+  const projection = decayProjection(decal, sheet);
+  const widthScale = finiteNumber(decal.decayWidthScale ?? decal.widthScale, finiteNumber(sheet?.widthScale, 1));
+  const heightScale = finiteNumber(decal.decayHeightScale ?? decal.heightScale, finiteNumber(sheet?.heightScale, 1));
+
+  return {
+    projection,
+    width: Math.max(8, tileW * scale * widthScale),
+    height: Math.max(4, (projection === "iso" ? tileW : tileH) * scale * heightScale),
+  };
+}
+
 export function drawTerrainDecal(ctx, decal, x, y, atlas) {
   const s = decal.size;
 
@@ -121,22 +165,31 @@ export function drawTerrainDecal(ctx, decal, x, y, atlas) {
     const cell = cells[(Math.abs(variant) % Math.max(1, cells.length))] ?? cells[0];
     if (cell) {
       const source = sheet.canvas;
-      const scale = s * (Number(decal.decayRenderScale) || Number(sheet.renderScale) || 1);
-      const width = Math.max(8, TILE_W * scale);
-      const height = Math.max(4, TILE_H * scale);
-      const alpha = Math.max(0.08, Math.min(0.85, Number(decal.alpha) || 0.34));
+      const { width, height } = getTerrainDecalRenderSize({ decal, sheet, TILE_W, TILE_H });
+      const offsetX = finiteNumber(decal.decayOffsetX ?? decal.offsetX, finiteNumber(sheet.offsetX, 0));
+      const offsetY = finiteNumber(decal.decayOffsetY ?? decal.offsetY, finiteNumber(sheet.offsetY, 0));
+      const anchorX = finiteNumber(decal.decayAnchorX ?? decal.anchorX, finiteNumber(sheet.anchorX, 0.5));
+      const anchorY = finiteNumber(decal.decayAnchorY ?? decal.anchorY, finiteNumber(sheet.anchorY, 0.5));
+      const projection = decayProjection(decal, sheet);
+      const maxAlpha = projection === "iso" ? 1 : 0.85;
+      const configuredIsoAlpha = finiteNumber(sheet.alpha, 1);
+      const rawAlpha = projection === "iso" && decal.decayAlphaExplicit !== true
+        ? configuredIsoAlpha
+        : finiteNumber(decal.alpha, 0.34);
+      const alpha = Math.max(0.08, Math.min(maxAlpha, rawAlpha));
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(decal.rotation || 0);
       ctx.globalAlpha *= alpha;
+      ctx.globalCompositeOperation = decalBlendMode(decal, sheet);
       ctx.drawImage(
         source,
         cell.x,
         cell.y,
         cell.w,
         cell.h,
-        -width * 0.5,
-        -height * 0.5,
+        offsetX - width * anchorX,
+        offsetY - height * anchorY,
         width,
         height,
       );

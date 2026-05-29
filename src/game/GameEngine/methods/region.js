@@ -143,6 +143,7 @@ export const regionMethods = {
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureWorldAroundPlayer();
+    this.spawnAmbientCritters?.();
     this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
     this.addToast(`Rejst til ${this.region.mapRegion?.label ?? "regionen"}`);
@@ -174,6 +175,7 @@ export const regionMethods = {
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();
     this.ensureWorldAroundPlayer();
+    this.spawnAmbientCritters?.();
     this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
     // Set total spawned count for active clear_map quests targeting this region
@@ -348,6 +350,7 @@ export const regionMethods = {
   resetRegionRuntime() {
     this.chunks.clear();
     this.monsters.clear();
+    this.resetCritterRuntime?.();
     // Before clearing loots, run despawn handling so quest drop counts are adjusted
     for (const loot of this.loots) {
       try { this.handleLootDespawn(loot); } catch (e) { /* best-effort */ }

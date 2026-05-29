@@ -15,6 +15,20 @@ const DEFAULT_SPAWN_COUNTS = {
   water: 0,
 };
 
+export const ambientCritterDefaults = {
+  enabled: true,
+  maxAlivePerRegion: 20,
+  maxPerType: 10,
+  collision: false,
+  hostile: false,
+  canBeTargeted: false,
+  givesXp: false,
+  dropsLoot: false,
+  persist: false,
+  offscreenUpdate: false,
+  offscreenRender: false,
+};
+
 export const WORLD_MAP = {
   id: "world",
   title: "World map",
@@ -456,6 +470,7 @@ function region({ mobs = ["Wolf", "Spider"], rareMobs = [], mapSize = "medium", 
       categories: [],
       ...antiDrops,
     },
+    ambientCritterDefaults,
     ...regionConfig,
   };
 }
@@ -1178,7 +1193,7 @@ export const MAP_REGION_SETS = {
       foliageSet: [
         { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
-        { fileName: "foilage/foilage_foilage_barnitems.png", weight: 2, scale: 0.5},
+        { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
       decay: [
         { id: "decay_field", weight: 20 },

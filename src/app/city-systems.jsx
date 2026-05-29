@@ -90,6 +90,7 @@ import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 import { saveRepository } from "../storage/saveRepository.js";
 
+const ENABLE_RUNTIME_CHROMA_KEY = false;
 
 const cityAssetCache = {
   promise: null,
@@ -1768,6 +1769,7 @@ function removeGreenScreen(image) {
   canvas.height = image.naturalHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(image, 0, 0);
+  if (!ENABLE_RUNTIME_CHROMA_KEY) return canvas;
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const { data } = imageData;
   for (let i = 0; i < data.length; i += 4) {

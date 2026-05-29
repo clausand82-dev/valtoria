@@ -133,6 +133,7 @@ function getActorDepth(actor, screen, kind) {
 function getRenderableDepth(renderable, atlas) {
   if (renderable.type === "object") return getObjectDepth(renderable.object, renderable.screen, renderable.biome, atlas);
   if (renderable.type === "monster") return getActorDepth(renderable.monster, renderable.screen, "monster");
+  if (renderable.type === "critter") return getActorDepth(renderable.critter, renderable.screen, "monster");
   if (renderable.type === "hero") return getActorDepth(renderable.actor, renderable.screen, "hero");
   if (renderable.type === "npc") return getActorDepth(renderable.npc, renderable.screen, "questgiver");
   if (renderable.type === "questgiver") return getActorDepth(renderable.questgiver, renderable.screen, "questgiver");
@@ -145,6 +146,7 @@ function getTypeSortOrder(type) {
     case "object": return 1;
     case "npc": return 2;
     case "questgiver": return 2;
+    case "critter": return 3;
     case "monster": return 3;
     case "hero": return 4;
     case "projectile": return 5;
@@ -155,6 +157,7 @@ function getTypeSortOrder(type) {
 function foregroundFadeTarget(renderable) {
   return renderable.type === "hero"
     || renderable.type === "monster"
+    || renderable.type === "critter"
     || renderable.type === "loot"
     || renderable.type === "npc"
     || renderable.type === "questgiver";
@@ -536,6 +539,22 @@ export const renderingMethods = {
       }
     }
 
+    if (this.critterStats) {
+      this.critterStats.rendered = 0;
+      this.critterStats.drawCalls = 0;
+    }
+    const critterDefaults = this.region?.mapRegion?.ambientCritterDefaults ?? {};
+    for (const critter of this.nearbyCritters?.() ?? []) {
+      if (critter.dead) continue;
+      const alpha = this.fogPointAlpha(critter);
+      if (alpha <= 0.02) continue;
+      const screen = worldToScreen(critter.x, critter.y, 0, this.camera);
+      if (critterDefaults.offscreenRender === true || visibleScreenPoint(screen, this.width, this.height, 150)) {
+        drawables.push({ type: "critter", critter, screen, alpha, layer: 1 });
+        if (this.critterStats) this.critterStats.rendered += 1;
+      }
+    }
+
     const questgiver = this.questState.wildernessNpc;
     const questgiverAlpha = this.fogPointAlpha(questgiver);
     if (questgiver && questgiverAlpha > 0.02) {
@@ -571,6 +590,10 @@ export const renderingMethods = {
       if (item.type === "projectile") drawProjectile(ctx, item.screen, item.projectile, this.atlas, item.beamStartScreen);
       if (item.type === "npc") drawQuestgiver(ctx, item.screen, item.npc, this.time);
       if (item.type === "questgiver") drawQuestgiver(ctx, item.screen, item.questgiver, this.time);
+      if (item.type === "critter") {
+        drawMonster(ctx, item.screen, item.critter, this.atlas, this.time, this.animationSheets);
+        if (this.critterStats) this.critterStats.drawCalls += 1;
+      }
       if (item.type === "monster") drawMonster(ctx, item.screen, item.monster, this.atlas, this.time, this.animationSheets);
       if (item.type === "hero") {
         drawHero(ctx, item.screen, {

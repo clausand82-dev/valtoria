@@ -242,6 +242,7 @@ export const lifecycleMethods = {
       this.updateNearbyActionTarget();
       this.updateFoliageLoot();
       this.updateMonsters(dt, stats);
+      this.updateCritters?.(dt);
       this.updateProjectiles(dt);
       this.updateGroundHazards(dt);
       this.updateSpellVisualCleanups?.(dt);

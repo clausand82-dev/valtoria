@@ -1,6 +1,20 @@
 import { normalizeParticleConfigs } from "./particle-presets.js";
 
 const DEFAULT_DECAY_GRID = 4;
+const DEFAULT_DECAY_PROJECTION = "topdown";
+const DECAY_PROJECTIONS = new Set(["topdown", "iso"]);
+const DECAY_BLEND_MODES = new Set([
+  "source-over",
+  "multiply",
+  "overlay",
+  "soft-light",
+  "darken",
+  "screen",
+  "lighter",
+]);
+
+// topdown = source is painted from above and is squeezed into the iso ground footprint.
+// iso = source is already painted in iso perspective and must not be squeezed again.
 
 export const DECAY_SET_DEFS = {
   decay_spiderweb: {
@@ -8,38 +22,61 @@ export const DECAY_SET_DEFS = {
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
   },
   decay_cracks: {
     fileName: "decay/decay_cracks.png",
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
   },
   decay_dust: {
     fileName: "decay/decay_dust.png",
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
   },
   decay_blood: {
     fileName: "decay/decay_blood.png",
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
   },
-    decay_field: {
+  decay_field: {
     fileName: "decay/decay_field.png",
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
   },
-    decay_basement: {
+  decay_basement: {
     fileName: "decay/decay_basement.png",
     rows: 4,
     cols: 4,
     renderScale: 1,
+    projection: "topdown",
+  },
+    decay_food: {
+    fileName: "decay/decay_food.png",
+    rows: 4,
+    cols: 4,
+    renderScale: 1,
+    projection: "iso",
+    blendMode: "multiply",
   },
 };
+
+// Example for a future iso-painted sheet. Keep inactive until the asset exists:
+// decay_dust_iso: {
+//   fileName: "decay/decay_dust_iso.png",
+//   rows: 4,
+//   cols: 4,
+//   renderScale: 1,
+//   projection: "iso",
+// },
 
 export function buildDecaySheetId(decayId) {
   return `decay:${String(decayId ?? "").trim().toLowerCase()}`;
@@ -55,6 +92,46 @@ function parseWeight(value) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return 0;
   return Math.max(0, parsed);
+}
+
+export function normalizeDecayProjection(value) {
+  const normalized = String(value ?? DEFAULT_DECAY_PROJECTION).trim().toLowerCase();
+  return DECAY_PROJECTIONS.has(normalized) ? normalized : DEFAULT_DECAY_PROJECTION;
+}
+
+function parseFiniteNumber(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseOptionalFiniteNumber(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDecayBlendMode(value) {
+  const normalized = String(value ?? "source-over").trim().toLowerCase();
+  return DECAY_BLEND_MODES.has(normalized) ? normalized : "source-over";
+}
+
+export function normalizeDecayRenderConfig(def = {}) {
+  const projection = normalizeDecayProjection(def.projection ?? def.sourceProjection);
+  return {
+    renderScale: parseFiniteNumber(def.renderScale, 1),
+    projection,
+    blendMode: normalizeDecayBlendMode(def.blendMode ?? def.compositeOperation),
+    rotation: parseOptionalFiniteNumber(def.rotation),
+    randomRotation: def.randomRotation ?? projection === "topdown",
+    widthScale: parseFiniteNumber(def.widthScale, 1),
+    heightScale: parseFiniteNumber(def.heightScale, 1),
+    offsetX: parseFiniteNumber(def.offsetX, 0),
+    offsetY: parseFiniteNumber(def.offsetY, 0),
+    anchorX: parseFiniteNumber(def.anchorX, 0.5),
+    anchorY: parseFiniteNumber(def.anchorY, 0.5),
+    alpha: parseOptionalFiniteNumber(def.alpha),
+  };
 }
 
 function toArray(value) {
@@ -110,7 +187,7 @@ function normalizeDecayEntry(entry) {
     fileName: def.fileName,
     rows,
     cols,
-    renderScale: Number.isFinite(Number(def.renderScale)) ? Number(def.renderScale) : 1,
+    ...normalizeDecayRenderConfig(def),
     sheetId: buildDecaySheetId(id),
     variants,
     particles: normalizeParticleConfigs(typeof entry === "object" ? entry.particles : def.particles),

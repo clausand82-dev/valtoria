@@ -6,7 +6,12 @@ import {
   OBJECT_SHEETS,
   TREE_SHEETS,
 } from "./config/asset-config.js";
-import { buildDecaySheetId, DECAY_SET_DEFS, normalizeRegionDecaySets } from "./config/decay-config.js";
+import {
+  buildDecaySheetId,
+  DECAY_SET_DEFS,
+  normalizeDecayRenderConfig,
+  normalizeRegionDecaySets,
+} from "./config/decay-config.js";
 import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_DEFS, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
 import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
@@ -51,6 +56,7 @@ let generatedAtlasCache = null;
 let animationSheetsPromise = null;
 let animationSheetsCache = null;
 const chromaImageCache = new Map();
+const ENABLE_RUNTIME_CHROMA_KEY = false;
 
 const atlasPartCache = {
   canvas: null,
@@ -416,8 +422,18 @@ function customGroundSpec(biomeId, fileName) {
 }
 
 function loadChromaImage(src, options = {}) {
-  const cacheKey = `${src}|${options.keyEdgeBlack ? 1 : 0}|${options.keyEdgeHalo ? 1 : 0}|${options.blackThreshold ?? ""}`;
+  const cacheKey = ENABLE_RUNTIME_CHROMA_KEY
+    ? `${src}|${options.keyEdgeBlack ? 1 : 0}|${options.keyEdgeHalo ? 1 : 0}|${options.blackThreshold ?? ""}`
+    : `${src}|raw`;
   if (chromaImageCache.has(cacheKey)) return chromaImageCache.get(cacheKey);
+  if (!ENABLE_RUNTIME_CHROMA_KEY) {
+    const rawPromise = loadRawImage(src).catch((error) => {
+      chromaImageCache.delete(cacheKey);
+      throw error;
+    });
+    chromaImageCache.set(cacheKey, rawPromise);
+    return rawPromise;
+  }
   const promise = new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
@@ -556,7 +572,7 @@ function loadRawImage(src) {
       const canvas = document.createElement("canvas");
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
       ctx.drawImage(image, 0, 0);
       resolve(canvas);
     };
@@ -749,10 +765,11 @@ function loadDecaySheets(manifest = buildFullRegionAssetManifest()) {
     if (atlasPartCache.decayPromises.has(sheetId)) return atlasPartCache.decayPromises.get(sheetId);
     const rows = Math.max(1, Math.floor(Number(def?.rows) || 4));
     const cols = Math.max(1, Math.floor(Number(def?.cols) || 4));
+    const renderConfig = normalizeDecayRenderConfig(def);
     const promise = loadChromaImage(`/assets/generated/${def.fileName}`)
       .then((canvas) => [sheetId, {
         ...makeTileSheet(canvas, rows, cols),
-        renderScale: Number.isFinite(Number(def?.renderScale)) ? Number(def.renderScale) : 1,
+        ...renderConfig,
       }])
       .catch((error) => {
         console.warn(`Decay sheet load failed: ${id} (${def.fileName})`, error);
@@ -901,6 +918,7 @@ function mergeObjectSheets(sheets) {
 }
 
 function loadGroundImage(src) {
+  if (!ENABLE_RUNTIME_CHROMA_KEY) return loadRawImage(src);
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => {

@@ -1,5 +1,11 @@
 History over changes
 
+*V. 1.78
+- deactivated greenscreen and greenspill processing as all sheets now have alpha
+- added a decay iso para (not using it for now)
+- added a critter system
+
+
 *V. 1.77
 - changed end chest to be a object with E action and removed animated chest
 - cleaned up npc's and added more

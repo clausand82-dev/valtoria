@@ -13,6 +13,7 @@ import { inputMethods } from "./methods/input.js";
 import { snapshotMethods } from "./methods/snapshot.js";
 import { actionsMethods } from "./methods/actions.js";
 import { subregionMethods } from "./methods/subregions.js";
+import { critterMethods } from "./methods/critters.js";
 import { normalizeWorldState } from "../world-state.js";
 import { normalizeWorldEnergy } from "../world-energy.js";
 import { ParticleEngine } from "../particles/ParticleEngine.js";
@@ -33,6 +34,8 @@ export class GameEngine {
     this.deferAssetLoad = Boolean(options.deferAssetLoad);
     const performanceProfile = resolvePerformanceProfile(options.performanceMode);
     this.performanceMode = performanceProfile.id;
+    this.lowPowerMode = Boolean(options.lowPowerMode);
+    this.disableAmbientCritters = Boolean(options.disableAmbientCritters || performanceProfile.disableAmbientCritters);
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
@@ -49,6 +52,8 @@ export class GameEngine {
     this.keys = new Set();
     this.chunks = new Map();
     this.monsters = new Map();
+    this.critters = new Map();
+    this.critterStats = { alive: 0, rendered: 0, updated: 0, killed: 0, drawCalls: 0 };
     this.loots = [];
     this.projectiles = [];
     this.groundHazards = [];
@@ -141,6 +146,7 @@ for (const methods of [
   inputMethods,
   actionsMethods,
   subregionMethods,
+  critterMethods,
   snapshotMethods,
 ]) {
   applyMethodGroup(GameEngine.prototype, methods);

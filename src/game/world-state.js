@@ -50,6 +50,7 @@ const CONDITION_KEYS = new Set([
 const MAP_REGION_PATCH_KEYS = {
   mobs: ["id", "type"],
   rareMobs: ["id", "type"],
+  ambientCritters: ["id", "mobId", "sourceMobId"],
   objects: ["id", "type"],
   decay: ["id"],
   foliageSet: ["id", "fileName"],

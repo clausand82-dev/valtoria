@@ -544,6 +544,23 @@ export const combatMethods = {
       this.damageMonster(monster, damage, damageType, false);
     }
 
+    for (const critter of this.nearbyCritters?.() ?? []) {
+      if (critter.dead || critter.canTakeAreaDamage === false || damaged.has(critter.id)) continue;
+      if (Math.hypot(critter.x - center.x, critter.y - center.y) > radius + critter.radius) continue;
+      damaged.add(critter.id);
+      const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
+      const damage = this.calculateDamage({
+        caster: context.player ?? this.player,
+        casterStats: stats,
+        target: critter,
+        baseDamage: (Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0),
+        element: effect.element ?? "arcane",
+        damageKind: "area",
+        source: effect.id ?? "weapon_effect",
+      }).damage;
+      this.damageCritter?.(critter, damage, damageType, false);
+    }
+
     if (effect.visual === "expandingEnergyRing") {
       this.spawnExpandingEnergyRingEffect(center.x, center.y, radius, {
         color: effect.color,
@@ -872,6 +889,11 @@ export const combatMethods = {
         const inArea = projectile.areaRadius > 0 && Math.hypot(monster.x - x, monster.y - y) <= projectile.areaRadius + monster.radius;
         if (direct || inArea) targets.push(monster);
       }
+      for (const critter of this.nearbyCritters?.() ?? []) {
+        if (critter.dead || critter.canTakeAreaDamage === false) continue;
+        const inArea = projectile.areaRadius > 0 && Math.hypot(critter.x - x, critter.y - y) <= projectile.areaRadius + critter.radius;
+        if (inArea) targets.push(critter);
+      }
     } else {
       const direct = directTarget === this.player;
       const inArea = projectile.areaRadius > 0 && Math.hypot(this.player.x - x, this.player.y - y) <= projectile.areaRadius + this.player.radius;
@@ -905,10 +927,12 @@ export const combatMethods = {
       if (target === this.player) {
         if (projectile.casterTypeName) this.recordBestiaryFought?.({ typeName: projectile.casterTypeName });
         this.damagePlayer(damage, { typeName: projectile.casterTypeName ?? projectile.spellId }, projectile.critical && direct);
+      } else if (target.runtimeType === "critter" || target.type === "critter") {
+        this.damageCritter?.(target, damage, "magic", false);
       } else {
         this.damageMonster(target, damage, "magic", projectile.critical && direct);
       }
-      this.applyProjectileStatus(target, projectile);
+      if (!(target.runtimeType === "critter" || target.type === "critter")) this.applyProjectileStatus(target, projectile);
     }
     const impact = projectile.particleVisuals?.impact;
     if (impact?.type) {
@@ -1069,6 +1093,21 @@ export const combatMethods = {
         }).damage;
         this.damageMonster(monster, damage, "magic", false);
       }
+      for (const critter of this.nearbyCritters?.() ?? []) {
+        if (critter.dead || critter.canTakeAreaDamage === false) continue;
+        if (Math.hypot(critter.x - hazard.x, critter.y - hazard.y) > hazard.radius + critter.radius) continue;
+        const damage = this.calculateDamage({
+          caster: { level: hazard.casterLevel },
+          casterStats: hazard.casterStats,
+          target: critter,
+          baseDamage: hazard.baseDamage,
+          element: hazard.element,
+          damageKind: "hazard",
+          magicScale: hazard.magicScale,
+          source: { type: "spell", id: hazard.spellId ?? "hazard" },
+        }).damage;
+        this.damageCritter?.(critter, damage, "magic", false);
+      }
       return;
     }
     if (Math.hypot(this.player.x - hazard.x, this.player.y - hazard.y) <= hazard.radius + this.player.radius) {
@@ -1200,6 +1239,10 @@ export const combatMethods = {
   },
 
   damageMonster(monster, amount, sourceType, critical = false) {
+    if (monster?.runtimeType === "critter" || monster?.type === "critter") {
+      this.damageCritter?.(monster, amount, sourceType, critical);
+      return;
+    }
     this.markMobSeen?.(monster?.typeName);
     if (Math.random() < (Number(monster.dodgeChance) || 0)) {
       this.addFloater(monster.x, monster.y, "Dodge", "#9ee8a4");

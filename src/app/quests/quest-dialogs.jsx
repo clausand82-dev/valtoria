@@ -7,6 +7,9 @@ import { resolveQuestDefById } from "../../game/GameEngine/helpers/quests.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
+
+const ENABLE_RUNTIME_CHROMA_KEY = false;
+
 function normalizeQuestRegions(quest) {
   const target = quest?.target ?? {};
   if (quest?.type === "clear_map" && target.regionId) return [String(target.regionId)];
@@ -51,7 +54,7 @@ function QuestMonsterSprite({ monsterType }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     const image = new Image();
     image.onload = () => {
       // Extract frame 0 from 4-col x 3-row sheet
@@ -61,18 +64,19 @@ function QuestMonsterSprite({ monsterType }) {
       // Draw frame 0 to canvas
       ctx.drawImage(image, 0, 0, cellW, cellH, 0, 0, canvas.width, canvas.height);
       
-      // Remove green screen like loadChromaImage does
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        if (g > 145 && g > r * 1.55 && g > b * 1.55) {
-          data[i + 3] = 0;
+      if (ENABLE_RUNTIME_CHROMA_KEY) {
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          if (g > 145 && g > r * 1.55 && g > b * 1.55) {
+            data[i + 3] = 0;
+          }
         }
+        ctx.putImageData(imageData, 0, 0);
       }
-      ctx.putImageData(imageData, 0, 0);
     };
     image.src = monsterSpriteSheetFromType(monsterType);
   }, [monsterType]);

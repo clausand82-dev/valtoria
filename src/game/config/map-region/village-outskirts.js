@@ -55,6 +55,9 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_house_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      ambientCritters: [
+        { id: "ambient_spider", mobId: "spider", count: { min: 2, max: 5 }, scale: 0.3, behavior: "wander", hp: 1, canTakeAreaDamage: true },
+      ],
       points: "78.95,4.25 65.79,4.25 61.00,17.00 72.97,27.63 83.73,17.00",
     }),
     region({
@@ -361,7 +364,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
         { fileName: "foilage/foilage_boneparts.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
         { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
-        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true }, corruption: { min: 5 } },
+        { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true }, corruption: { min: 5 } },        
       ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
@@ -377,10 +380,15 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "decay_dust", weight: 10 },
         { id: "decay_basement", weight: 20 },
         { id: "decay_blood", weight: 20, corruption: { min: 5 } },
+        { id: "decay_food", weight: 5, corruption: { min: 5 } },
       ],
       labelX: 60,
       labelY: 31,
       mobs: [{ type: "Rat", weight: 5 }, { type: "SickRat", weight: 2 }, { type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 },],
+      ambientCritters: [
+        { id: "ambient_rat", mobId: "rat", count: { min: 7, max: 14 }, scale: 0.25, behavior: "flee", fleeDistance: 120, hp: 1, canTakeAreaDamage: true },
+        { id: "ambient_spider", mobId: "spider", count: { min: 5, max: 8 }, scale: 0.1, behavior: "wander", hp: 1, canTakeAreaDamage: true },
+      ],
       //weights: { house: 10, tree: 10, rock: 2, foilage: 9, fireplace: 1 },
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
@@ -482,7 +490,7 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: [
         { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
-        { fileName: "foilage/foilage_foilage_barnitems.png", weight: 2, scale: 0.5},
+        { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
       decay: [
         { id: "decay_field", weight: 20 },

@@ -6,7 +6,9 @@ const tintCache = new WeakMap();
 
 export function drawMonster(ctx, screen, monster, atlas, time = 0, sheets) {
 	if (drawAnimatedMonsterSheet(ctx, screen, monster, time, sheets?.monsters)) {
-		drawMonsterHealth(ctx, screen, monster, monster.elite || monster.boss ? 58 : 52);
+		if (!monster.noHealthBar && monster.runtimeType !== "critter" && monster.type !== "critter") {
+			drawMonsterHealth(ctx, screen, monster, monster.elite || monster.boss ? 58 : 52);
+		}
 	}
 }
 
@@ -24,7 +26,7 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 
 	const attackProgress = monster.attackAnim > 0 ? 1 - monster.attackAnim / 0.24 : 0;
 	let seq = cfg.sequences.find((s) => s.name === "idle");
-	if (monster.attackAnim > 0) {
+	if (monster.runtimeType !== "critter" && monster.type !== "critter" && monster.attackAnim > 0) {
 		seq = cfg.sequences.find((s) => s.name === "attack") ?? seq;
 	} else if (monster.moving) {
 		seq = cfg.sequences.find((s) => s.name === "walk") ?? seq;
@@ -39,7 +41,7 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 		col = colStart + (Math.floor(time * 3.8 + monster.animSeed) % seq.frames);
 	}
 
-	const attack = monster.attackAnim > 0 ? Math.sin((monster.attackAnim / 0.24) * Math.PI) : 0;
+	const attack = monster.runtimeType !== "critter" && monster.type !== "critter" && monster.attackAnim > 0 ? Math.sin((monster.attackAnim / 0.24) * Math.PI) : 0;
 	const hurt = monster.hurt > 0 ? Math.sin((monster.hurt / 0.18) * Math.PI) : 0;
 	const bob = ghost ? Math.sin(time * 2.4 + monster.animSeed) * 7
 		: monster.moving ? -Math.abs(Math.sin(monster.gait)) * 3

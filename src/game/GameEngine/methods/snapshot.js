@@ -131,6 +131,7 @@ export const snapshotMethods = {
       worldState: normalizeWorldState(this.worldState),
       worldEnergy: getWorldEnergyState(this),
       mobs: this.monsterCounterSnapshot(),
+      critters: this.critterCounterSnapshot?.() ?? { total: 0, alive: 0, rendered: 0, updated: 0, killed: 0, drawCalls: 0 },
       mapReturn: this.mapReturn ? { ...this.mapReturn } : null,
       lastDeath: this.lastDeath ? { ...this.lastDeath } : null,
       exitPrompt: this.exitPromptOpen,
