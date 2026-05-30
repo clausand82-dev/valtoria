@@ -80,9 +80,12 @@ import {
 import {
   CityArcaneExtractorPanel,
   CityBlacksmithPanel,
+  CityFarmAlePanel,
   CityFarmPanel,
   CityGoldBarPanel,
+  CityInnAlePanel,
   CityMerchantPanel,
+  CitySanctuaryDonationPanel,
   CityClassPanel,
   CityReadableMergePanel,
   CityResearchPanel,
@@ -2078,6 +2081,9 @@ const QUEST_BOARD_ICON_URL = "/assets/generated/item/item_quest_scroll.png";
 const BUILDING_BASE_TAB_ID = "__base";
 const BUILDING_STORAGE_FUNCTION_ID = "__storage";
 const BLACKSMITH_BASE_FUNCTION_ID = "__blacksmith_base";
+const SANCTUARY_DONATION_TAB_ID = "__sanctuary_donations";
+const FARM_ALE_TAB_ID = "__farm_ale";
+const INN_ALE_TAB_ID = "__inn_ale";
 const CITY_BUILDING_BASE_FUNCTIONS = {
   town_hall: { label: "Civic", detail: "Settlement overview", title: "Town Hall" },
   armory: { label: "Armory", detail: "Donate gear", title: "Armory" },
@@ -2103,6 +2109,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const owned = buildingState.level > 0;
   const questBoardId = building.id === "town_hall" ? "townHall" : building.id === "inn" ? "inn" : null;
   const activeQuestBoard = activeAddonId === QUEST_BOARD_TAB_ID;
+  const activeSanctuaryDonationTab = functionModalId === SANCTUARY_DONATION_TAB_ID;
+  const activeFarmAleTab = functionModalId === FARM_ALE_TAB_ID;
+  const activeInnAleTab = functionModalId === INN_ALE_TAB_ID;
   const prebuilt = Boolean(building.prebuilt);
   const payBuildingEntries = (entries, progressOverride = progress) => (
     payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
@@ -2143,6 +2152,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     ? QUEST_BOARD_CONFIG[questBoardId]?.title ?? "Quests"
     : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
       ? "Repair"
+      : functionModalId === SANCTUARY_DONATION_TAB_ID
+        ? "Donation Trail"
+      : functionModalId === FARM_ALE_TAB_ID
+        ? "Ale Brewing"
+      : functionModalId === INN_ALE_TAB_ID
+        ? "Ale Sales"
       : functionModalId === BUILDING_STORAGE_FUNCTION_ID
         ? baseFunction?.title ?? `${building.title} Storage`
         : activeAddon?.title ?? "Building function";
@@ -2152,6 +2167,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       ? QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? "Available local quests and rumors."
       : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
         ? "Repair equipped and carried gear with available resources."
+        : functionModalId === SANCTUARY_DONATION_TAB_ID
+          ? "Donate gold bars or food barrels for one chosen city benefit."
+        : functionModalId === FARM_ALE_TAB_ID
+          ? "Brew ale from wheat, planks, and city water."
+        : functionModalId === INN_ALE_TAB_ID
+          ? "Serve ale to gain popularity and water service."
         : functionModalId === BUILDING_STORAGE_FUNCTION_ID
           ? baseFunction?.detail ?? building.functionText ?? ""
           : activeAddon?.help ?? "";
@@ -2159,7 +2180,11 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     ? `${activeAddon.prebuilt ? "Prebuilt addon" : savedPurchasedAddons.has(activeAddon.id) ? "Built addon" : "Available addon"} | ${building.title}`
     : functionModalId === QUEST_BOARD_TAB_ID
       ? `Function | ${building.title}`
-      : functionModalId === BLACKSMITH_BASE_FUNCTION_ID || functionModalId === BUILDING_STORAGE_FUNCTION_ID
+      : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
+        || functionModalId === SANCTUARY_DONATION_TAB_ID
+        || functionModalId === FARM_ALE_TAB_ID
+        || functionModalId === INN_ALE_TAB_ID
+        || functionModalId === BUILDING_STORAGE_FUNCTION_ID
         ? `Function | ${building.title}`
         : owned
           ? `${prebuilt ? "Prebuilt | " : ""}Lvl ${buildingState.level}`
@@ -2520,6 +2545,61 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     onChangeProgress((current) => addCityPermanentStatBonus(current, "provision", provision));
   };
 
+  const applyConfiguredCityEffects = (effects = {}) => {
+    const cityEntries = Object.entries(effects ?? {}).filter(([statId]) => String(statId) !== "popularity");
+    const popularity = Math.floor(Number(effects.popularity) || 0);
+    if (cityEntries.length > 0) {
+      onChangeProgress((current) => cityEntries.reduce(
+        (next, [statId, amount]) => addCityPermanentStatBonus(next, statId, amount),
+        current,
+      ));
+    }
+    if (popularity !== 0) {
+      engineRef.current?.changePopularity?.(popularity);
+      engineRef.current?.publishSnapshot?.();
+      engineRef.current?.saveProgress?.({ force: true });
+    }
+  };
+
+  const applySanctuaryDonation = (trade) => {
+    const resourceId = String(trade?.resourceId ?? "");
+    const cost = Math.max(1, Math.floor(Number(trade?.cost) || 1));
+    if (!resourceId || !payBuildingEntries([[resourceId, cost]])) return;
+    applyConfiguredCityEffects(trade.effects ?? {});
+  };
+
+  const brewFarmAle = (recipe) => {
+    const inputs = Object.entries(recipe?.inputs ?? {})
+      .map(([resourceId, amount]) => [resourceId, Math.max(1, Math.floor(Number(amount) || 1))]);
+    const statCosts = Object.entries(recipe?.statCosts ?? {})
+      .map(([statId, amount]) => [statId, Math.max(1, Math.floor(Number(amount) || 1))]);
+    if (!statCosts.every(([statId, amount]) => Math.max(0, Math.floor(Number(cityStats?.[statId]) || 0)) >= amount)) return;
+    const outputResourceId = String(recipe?.outputResourceId ?? "ale");
+    const outputCount = Math.max(1, Math.floor(Number(recipe?.outputCount) || 1));
+    const output = makeResourceItem(outputResourceId, outputCount);
+    if (!output) return;
+    if (!payBuildingEntries(inputs)) return;
+    if (statCosts.length > 0) {
+      onChangeProgress((current) => statCosts.reduce(
+        (next, [statId, amount]) => addCityPermanentStatBonus(next, statId, -amount),
+        current,
+      ));
+    }
+    if (!engineRef.current?.addInventoryItem?.(output)) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+    engineRef.current?.addToast?.(`Created ${outputCount}x ${output.name}`);
+    engineRef.current?.saveProgress?.({ force: true });
+  };
+
+  const serveInnAle = (trade) => {
+    const resourceId = String(trade?.resourceId ?? "ale");
+    const cost = Math.max(1, Math.floor(Number(trade?.cost) || 1));
+    if (!payBuildingEntries([[resourceId, cost]])) return;
+    applyConfiguredCityEffects(trade.effects ?? {});
+  };
+
   const repairEquippedItem = (slotId, cost = {}) => {
     const entries = [
       ["gold", Math.max(0, Math.floor(Number(cost.gold) || 0))],
@@ -2722,6 +2802,48 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               <span>Repair</span>
             </button>
           )}
+          {owned && building.id === "sanctuary" && (
+            <button
+              type="button"
+              className={`city-building-rail-tab ${activeSanctuaryDonationTab ? "active" : ""}`}
+              onClick={() => {
+                setActiveAddonId(null);
+                setFunctionModalId(SANCTUARY_DONATION_TAB_ID);
+              }}
+              title="Donation Trail"
+            >
+              <img src="/assets/generated/item/item_res_goldbar.png" alt="" draggable="false" />
+              <span>Donations</span>
+            </button>
+          )}
+          {owned && building.id === "farm" && (
+            <button
+              type="button"
+              className={`city-building-rail-tab ${activeFarmAleTab ? "active" : ""}`}
+              onClick={() => {
+                setActiveAddonId(null);
+                setFunctionModalId(FARM_ALE_TAB_ID);
+              }}
+              title="Ale Brewing"
+            >
+              <img src="/assets/generated/item/item_quest_barrel.png" alt="" draggable="false" />
+              <span>Ale</span>
+            </button>
+          )}
+          {owned && building.id === "inn" && (
+            <button
+              type="button"
+              className={`city-building-rail-tab ${activeInnAleTab ? "active" : ""}`}
+              onClick={() => {
+                setActiveAddonId(null);
+                setFunctionModalId(INN_ALE_TAB_ID);
+              }}
+              title="Ale Sales"
+            >
+              <img src="/assets/generated/item/item_quest_barrel.png" alt="" draggable="false" />
+              <span>Ale</span>
+            </button>
+          )}
           {(building.addons ?? []).map((addon) => {
             const bought = purchasedAddons.has(addon.id);
             const unlocked = cityAddonIsUnlocked(addon, snapshot);
@@ -2830,7 +2952,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           </div>
         </div>}
 
-        <main className="city-popup-main">
+        <main className={`city-popup-main ${activeStorageSection && (functionModalId === BUILDING_STORAGE_FUNCTION_ID || functionModalId === activeAddon?.id) ? "storage-tab" : ""}`}>
           {activeBaseTab && (
             <section className="city-building-base-note">
               <h4>{building.title}</h4>
@@ -2929,6 +3051,21 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       onProduceProvision={addFarmProvision}
                     />
                   )}
+                  {building.id === "farm" && owned && activeFarmAleTab && (
+                    <CityFarmAlePanel
+                      inventory={snapshot.inventory}
+                      cityStats={cityStats}
+                      resourceCount={buildingResourceAvailable}
+                      onBrewAle={brewFarmAle}
+                    />
+                  )}
+                  {building.id === "inn" && owned && activeInnAleTab && (
+                    <CityInnAlePanel
+                      inventory={snapshot.inventory}
+                      resourceCount={buildingResourceAvailable}
+                      onServeAle={serveInnAle}
+                    />
+                  )}
                   {building.id === "town_hall" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
                     <section className="blacksmith-station">
                       <header>
@@ -2996,6 +3133,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                         />
                       )}
                     </>
+                  )}
+                  {building.id === "sanctuary" && owned && activeSanctuaryDonationTab && (
+                    <CitySanctuaryDonationPanel
+                      inventory={snapshot.inventory}
+                      resourceCount={buildingResourceAvailable}
+                      onDonate={applySanctuaryDonation}
+                    />
                   )}
                   {building.id === "blacksmith" && owned && (
                     functionModalId === BLACKSMITH_BASE_FUNCTION_ID

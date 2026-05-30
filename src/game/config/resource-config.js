@@ -37,12 +37,15 @@ export const RESOURCE_DEFS = {
   gold_bar: { name: "Gold Bar", stackMax: 100, value: 1000, sheet: "resources", iconIndex: 5, color: "#f1c657", iconUrl: "/assets/generated/item/item_res_goldbar.png" },
   magic_essence: { name: "Magic Essence", stackMax: 1000, value: 45, sheet: "resources", iconIndex: 6, color: "#9f7dff", iconUrl: "/assets/generated/item/item_res_magicessens.png" },
   food: { name: "Food Barrel", stackMax: 1000, value: 120, sheet: "resources", iconIndex: 8, color: "#d49a58", iconUrl: "/assets/generated/item/item_res_food.png" },
+  ale: { name: "Ale", stackMax: 1000, value: 150, sheet: "resources", iconIndex: 8, color: "#dca64f", iconUrl: "/assets/generated/item/item_quest_barrel.png" },
   hide: { name: "Skind", stackMax: 100, value: 4, sheet: "resources", iconIndex: 8, color: "#a87a50", iconUrl: "/assets/generated/item/item_res_hide.png" },
   bonedust: { name: "Bone Dust", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_res_bonedust.png" },
   
   // Plants / forageables
   red_rose: { name: "Rød rose", stackMax: 100, value: 1, sheet: "resources", iconIndex: 12, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },
   rare_pink_flower: { name: "Sjælden lilla blomst", stackMax: 100, value: 2, sheet: "resources", iconIndex: 13, color: "#c27bd9", iconUrl: "/assets/generated/item/item_plant_rarepinkflower.png" },
+  fruit_orange: { name: "Orange", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_orange.png" },
+  fruit_banana: { name: "Banana", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_banana.png" },
 
   // res_sheet_002 gemstones
   red_gemstone: { name: "Red Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 0, color: "#ff6b5f" },

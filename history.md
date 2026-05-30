@@ -4,6 +4,10 @@ History over changes
 - deactivated greenscreen and greenspill processing as all sheets now have alpha
 - added a decay iso para (not using it for now)
 - added a critter system
+- changed area/building durability loos chance from 40% to 10%
+- added individuel baseCost and minCost to foodbarrel convertion
+- added res orange and banana (for quest and food barrel)
+- added ale and use for goldignot, foodbarrel and ale to game
 
 
 *V. 1.77

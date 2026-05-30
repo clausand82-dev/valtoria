@@ -17,6 +17,7 @@ Prøv at få gjort grass tile matchende
 - fjern den animerede kiste og dens brug
 
 - Kan E mon bruges til at fixe nogle af husene i village map?
+f.eks. 1 run, hvor man skal klare corrupted/sure villageer - derefter et 2. run, hvor bygninger skal reperares med E. Derefter kan man i tredje run samle et eller andet, der kun er tilgængelig i 3 run???
 
 
 - test popularity noget mere
@@ -68,28 +69,20 @@ aktivering af runesten kan koste x antal gemstone i bestemte farver
 
 
 -- BYGNING FUNKTIONER --
-farm
-Sales addon: her kan kød, frugt og evt senere korn og andet mad sælges (lidt bedre pris end købmand)
-Kitchen addon: her kan resources mad og øl produceres, som bruges i town hall eller inn
 
 town hall
 et eller andet med flygtninge fra området (jo flere corrupted zoner, jo flere flygtninge) - hvis man så donerer mad, så falder flygtninge presset - hvad har flygtninge presset af betydning? Måske maden skal laves via farm?
 
-sancturary
-donation af penge for at øge popularity? nuværende popularity stats skal ændres meget - måske i form af guldbare, der skal laves ved blacksmith
 
-inn
-købe sig til popularity ved at donerer mad, øl (mad og øl laves ved farm)
 
 -- START QUEST --
-Starte med en quest eller få start quest i city - alle regioner låst indtil den start quest er løst (snak med innkeeper, besøge inn).
 
 Udfylde main quest for lidt flere regioner og så have en masse fyld quest også.
 
 QUEST TO ADD:
 Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
 
-Frugterne kan kun findes
+Frugterne kan kun findes i marketplace ved corruption der maks må være 1. FGrugterne er orange og banana, som allerede er defineret og gjort klar.
 
 
 -- MAGI --

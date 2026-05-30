@@ -167,10 +167,10 @@ function popularityBonusStep(popularity) {
   return Math.max(0, Math.floor((Math.max(0, Number(popularity) || 0) - 50) / 10));
 }
 
-function foodBarrelCost(popularity) {
+function foodBarrelCost(popularity, option = {}) {
   const recipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
-  const baseCost = Math.max(1, Math.floor(Number(recipe.baseCost) || 100));
-  const minCost = Math.max(1, Math.floor(Number(recipe.minCost) || 50));
+  const baseCost = Math.max(1, Math.floor(Number(option?.baseCost ?? recipe.baseCost) || 100));
+  const minCost = Math.max(1, Math.floor(Number(option?.minCost ?? recipe.minCost) || 50));
   const popularityStart = Math.max(0, Math.floor(Number(recipe.popularityStart) || 50));
   const popularityStep = Math.max(1, Math.floor(Number(recipe.popularityStep) || 10));
   const discountPerStep = Math.max(0, Math.floor(Number(recipe.discountPerStep) || 5));

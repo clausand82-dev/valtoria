@@ -223,7 +223,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "market-square",
       label: "Markedstorv",
       color: "#f0d58a",
-      unlock: { locked: true, text: "Markedstorv kraever en senere historiequest." },
+      //unlock: { locked: true, text: "Markedstorv kraever en senere historiequest." },
       labelX: 50,
       labelY: 45,
       // TODO:DELETE: weights: { house: 3, tree: 2, rock: 1, foilage: 4, fireplace: 2 }
@@ -234,7 +234,8 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_fireplace_mainland", weight: 2 },
         { id: "object_stone_cluster", weight: 1 },
         { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
+        { id: "object_ruin_mainland", weight: 1, corruption: { min: 5 } },
+        { id: "object_fruitbaskets", weight: 5, /*corruption: { max: 1 }*/ },
       ],
       points: "47.85,40.38 44.26,46.76 46.65,51.01 50.24,48.88 55.02,48.88 56.22,42.51 51.44,38.26",
     }),

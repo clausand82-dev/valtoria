@@ -200,7 +200,8 @@ button {
 
 .start-menu-actions button,
 .load-menu-head button,
-.save-slot-row {
+.save-slot-load,
+.save-slot-delete {
   min-height: 46px;
   border: 1px solid rgba(244, 218, 150, 0.28);
   border-radius: 6px;
@@ -213,7 +214,8 @@ button {
 
 .start-menu-actions button:hover,
 .load-menu-head button:hover,
-.save-slot-row:hover {
+.save-slot-load:hover,
+.save-slot-delete:hover {
   border-color: rgba(244, 218, 150, 0.68);
   background: rgba(38, 31, 20, 0.92);
 }
@@ -254,22 +256,35 @@ button {
 
 .save-slot-row {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.save-slot-load {
+  display: grid;
   align-content: center;
   gap: 4px;
   padding: 10px 12px;
   text-align: left;
 }
 
-.save-slot-row b {
+.save-slot-load b {
   color: #f4da96;
   font-size: 14px;
 }
 
-.save-slot-row span,
+.save-slot-load span,
 .save-slot-list p {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+
+.save-slot-delete {
+  min-height: 0;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .game-canvas {
@@ -3045,6 +3060,107 @@ button {
   color: #ff7777;
 }
 
+.city-settings-dialog {
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(86vh, 780px);
+  overflow: auto;
+  gap: 14px;
+  padding: 18px;
+  border-color: rgba(244, 218, 150, 0.34);
+}
+
+.city-settings-dialog h3 {
+  margin: 0;
+  color: #f4da96;
+  font-size: 14px;
+}
+
+.city-settings-note {
+  color: var(--muted) !important;
+  font-size: 12px !important;
+}
+
+.city-settings-dialog > .city-settings-section {
+  display: grid;
+  justify-content: initial;
+  gap: 12px;
+}
+
+.city-settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgba(244, 218, 150, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.city-settings-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.city-settings-grid h3 {
+  grid-column: 1 / -1;
+}
+
+.city-settings-section label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.city-settings-section input,
+.city-settings-section select {
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  padding: 0 10px;
+}
+
+.city-settings-check {
+  display: flex !important;
+  align-items: center;
+  gap: 10px !important;
+  min-height: 34px;
+}
+
+.city-settings-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #c99543;
+}
+
+.city-settings-cheat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.city-settings-cheat-inline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  gap: 8px;
+  align-items: end;
+}
+
+.city-settings-cheat-inline button,
+.city-settings-cheat-grid button {
+  height: 34px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.city-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .merge-choice-dialog {
   width: min(460px, calc(100vw - 28px));
   border-color: rgba(244, 218, 150, 0.36);
@@ -4229,6 +4345,12 @@ button {
   min-height: 0;
   overflow: auto;
   scrollbar-gutter: stable;
+}
+
+.city-building-modal .city-popup-main.storage-tab {
+  grid-template-rows: minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
 }
 
 .city-building-modal .class-panel {
@@ -5798,6 +5920,12 @@ button {
   grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);
   gap: 16px;
   margin-top: 18px;
+  min-height: 0;
+}
+
+.city-popup-main.storage-tab .city-bank-panel {
+  height: 100%;
+  margin-top: 0;
 }
 
 .city-storage-overview-backdrop {
@@ -5919,6 +6047,12 @@ button {
 
 .city-bank-column {
   min-width: 0;
+  min-height: 0;
+}
+
+.city-popup-main.storage-tab .city-bank-column {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .city-bank-column h4 {
@@ -5941,6 +6075,13 @@ button {
   overflow: auto;
   padding: 8px;
   background: rgba(0, 0, 0, 0.18);
+}
+
+.city-popup-main.storage-tab .city-bank-grid {
+  align-content: start;
+  grid-auto-rows: 48px;
+  max-height: none;
+  min-height: 0;
 }
 
 .city-item-slot {
@@ -6117,6 +6258,12 @@ button {
   .confirm-dialog .quest-overview-list,
   .quest-overview-detail {
     max-height: none;
+  }
+
+  .city-settings-grid,
+  .city-settings-cheat-grid,
+  .city-settings-cheat-inline {
+    grid-template-columns: 1fr;
   }
 }
 

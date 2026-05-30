@@ -2,10 +2,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { MAX_INVENTORY } from "./game/data.js";
 import { GameEngine } from "./game/GameEngine.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
+import { CITY_AREAS } from "./game/config/city-areas-config.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
+import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
 import { WORLD_MAP } from "./game/config/map-region-config.js";
-import { installValtoriaCheats } from "./game/config/cheat-config.js";
+import { CHEAT_SETTINGS, installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
+import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
+import { QUEST_DEFS } from "./game/config/quest-config.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import {
   calcThreatDeltaFromCityStats,
@@ -59,6 +63,106 @@ function loadUiImage(src) {
   });
 }
 
+const PERFORMANCE_MODE_STORAGE_KEY = "valtoria.performanceMode";
+const PERFORMANCE_CUSTOM_STORAGE_KEY = "valtoria.performanceCustom.v1";
+
+function clampNumber(value, min, max, fallback) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.max(min, Math.min(max, numeric));
+}
+
+function normalizePerformanceSettings(input = {}) {
+  const profile = resolvePerformanceProfile(input.mode ?? "balanced");
+  const custom = input.custom && typeof input.custom === "object" ? input.custom : {};
+  return {
+    mode: profile.id,
+    useCustom: Boolean(input.useCustom),
+    custom: {
+      targetFps: clampNumber(custom.targetFps, 30, 60, profile.targetFps),
+      maxDpr: clampNumber(custom.maxDpr, 1, 2, profile.maxDpr),
+      fogRenderScale: clampNumber(custom.fogRenderScale, 0.35, 1, profile.fogRenderScale),
+      particleQuality: ["low", "medium", "high"].includes(custom.particleQuality) ? custom.particleQuality : profile.particleQuality,
+      maxParticles: Math.floor(clampNumber(custom.maxParticles, 64, 1400, profile.maxParticles)),
+      particlesEnabled: custom.particlesEnabled !== false,
+      disableAmbientCritters: Boolean(custom.disableAmbientCritters ?? profile.disableAmbientCritters),
+      lowPowerMode: Boolean(custom.lowPowerMode),
+    },
+  };
+}
+
+function resolveRuntimePerformanceSettings(settings) {
+  const normalized = normalizePerformanceSettings(settings);
+  if (!normalized.useCustom) {
+    const profile = resolvePerformanceProfile(normalized.mode);
+    return {
+      mode: profile.id,
+      targetFps: profile.targetFps,
+      maxDpr: profile.maxDpr,
+      fogRenderScale: profile.fogRenderScale,
+      particleQuality: profile.particleQuality,
+      maxParticles: profile.maxParticles,
+      disableAmbientCritters: profile.disableAmbientCritters,
+      particlesEnabled: true,
+      lowPowerMode: false,
+      useCustom: false,
+    };
+  }
+  return {
+    mode: normalized.mode,
+    ...normalized.custom,
+    useCustom: true,
+  };
+}
+
+function readPerformanceSettings() {
+  if (typeof window === "undefined") return normalizePerformanceSettings({ mode: "balanced", useCustom: false });
+  const mode = window.localStorage?.getItem?.(PERFORMANCE_MODE_STORAGE_KEY) || "balanced";
+  try {
+    const rawCustom = window.localStorage?.getItem?.(PERFORMANCE_CUSTOM_STORAGE_KEY);
+    if (!rawCustom) return normalizePerformanceSettings({ mode, useCustom: false });
+    const parsed = JSON.parse(rawCustom);
+    return normalizePerformanceSettings({
+      mode,
+      useCustom: Boolean(parsed?.useCustom),
+      custom: parsed?.custom ?? {},
+    });
+  } catch {
+    return normalizePerformanceSettings({ mode, useCustom: false });
+  }
+}
+
+function persistPerformanceSettings(settings) {
+  if (typeof window === "undefined") return;
+  const normalized = normalizePerformanceSettings(settings);
+  window.localStorage?.setItem?.(PERFORMANCE_MODE_STORAGE_KEY, normalized.mode);
+  window.localStorage?.setItem?.(PERFORMANCE_CUSTOM_STORAGE_KEY, JSON.stringify({
+    useCustom: normalized.useCustom,
+    custom: normalized.custom,
+  }));
+}
+
+function cityAddonIds() {
+  const entries = [];
+  for (const building of CITY_BUILDINGS) {
+    const buildingTitle = String(building?.title ?? building?.name ?? building?.label ?? building?.id ?? "Bygning").trim();
+    for (const addon of building?.addons ?? []) {
+      const id = String(addon?.id ?? "").trim();
+      if (!id) continue;
+      const addonTitle = String(addon?.title ?? addon?.name ?? addon?.label ?? id).trim() || id;
+      entries.push({
+        id,
+        label: `${addonTitle} (${id}) - ${buildingTitle}`,
+      });
+    }
+  }
+  const byId = new Map();
+  for (const entry of entries) {
+    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+  }
+  return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label, "da"));
+}
+
 export default function App() {
   const canvasRef = useRef(null);
   const minimapRef = useRef(null);
@@ -86,6 +190,10 @@ export default function App() {
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
   const [cityStorageOpen, setCityStorageOpen] = useState(false);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
+  const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
+  const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
+  const [cheatResetQuestId, setCheatResetQuestId] = useState(() => Object.keys(QUEST_DEFS ?? {})[0] ?? "");
+  const [cheatClearCityTarget, setCheatClearCityTarget] = useState("all");
   const [cityMinimapHero, setCityMinimapHero] = useState(null);
   const [cityProgressHud, setCityProgressHud] = useState(() => loadCityProgress());
   const [cityProgressRefreshToken, setCityProgressRefreshToken] = useState(0);
@@ -235,13 +343,19 @@ export default function App() {
   useEffect(() => {
     if (!gameSession || !canvasRef.current) return undefined;
     const slot = gameSession.slot;
-    const performanceMode = typeof window !== "undefined"
-      ? window.localStorage?.getItem?.("valtoria.performanceMode") || "balanced"
-      : "balanced";
+    const runtimePerformance = resolveRuntimePerformanceSettings(performanceSettings);
     const engine = new GameEngine(canvasRef.current, setSnapshot, {
       saveStorageKey: slot.saveKey,
       newGame: gameSession.newGame,
-      performanceMode,
+      performanceMode: runtimePerformance.mode,
+      lowPowerMode: runtimePerformance.lowPowerMode,
+      disableAmbientCritters: runtimePerformance.disableAmbientCritters,
+      maxDpr: runtimePerformance.maxDpr,
+      targetFps: runtimePerformance.targetFps,
+      fogRenderScale: runtimePerformance.fogRenderScale,
+      particleQuality: runtimePerformance.particleQuality,
+      maxParticles: runtimePerformance.maxParticles,
+      particlesEnabled: runtimePerformance.particlesEnabled,
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
       deferAssetLoad: true,
@@ -428,6 +542,11 @@ export default function App() {
     setCitySettingsOpen(false);
   }, [cityOpen]);
 
+  useEffect(() => {
+    if (!citySettingsOpen) return;
+    setSettingsDraft(performanceSettings);
+  }, [citySettingsOpen, performanceSettings]);
+
   useEngineModalLock({
     acceptedQuestNotice,
     cityOpen,
@@ -492,6 +611,96 @@ export default function App() {
     () => activeQuests.filter((quest) => quest.tracked !== false),
     [activeQuests],
   );
+  const profileOptions = useMemo(
+    () => Object.values(PERFORMANCE_PROFILES),
+    [],
+  );
+  const clearCityTargets = useMemo(() => {
+    const base = [
+      { value: "all", label: "Alle omraader + bygninger (all)" },
+      { value: "allareas", label: "Alle omraader (allareas)" },
+      { value: "allbuildings", label: "Alle bygninger (allbuildings)" },
+      { value: "alladdons", label: "Alle addons (alladdons)" },
+    ];
+    const areaTargets = CITY_AREAS
+      .map((entry) => {
+        const id = String(entry?.id ?? "").trim();
+        if (!id) return null;
+        const title = String(entry?.title ?? entry?.name ?? entry?.label ?? id).trim() || id;
+        return { value: id, label: `${title} (${id})` };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label, "da"));
+    const buildingTargets = CITY_BUILDINGS
+      .map((entry) => {
+        const id = String(entry?.id ?? "").trim();
+        if (!id) return null;
+        const title = String(entry?.title ?? entry?.name ?? entry?.label ?? id).trim() || id;
+        return { value: id, label: `${title} (${id})` };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.label.localeCompare(b.label, "da"));
+    const addonTargets = cityAddonIds().map((entry) => ({ value: entry.id, label: entry.label }));
+    return [...base, ...areaTargets, ...buildingTargets, ...addonTargets];
+  }, []);
+  const questOptions = useMemo(() => (
+    Object.keys(QUEST_DEFS ?? {})
+      .map((id) => {
+        const quest = QUEST_DEFS?.[id] ?? null;
+        const title = String(quest?.title ?? quest?.name ?? id).trim() || id;
+        return { value: id, label: `${title} (${id})` };
+      })
+      .sort((a, b) => a.label.localeCompare(b.label, "da"))
+  ), []);
+
+  const applyPerformanceSettings = (nextSettings) => {
+    const normalized = normalizePerformanceSettings(nextSettings);
+    const resolved = resolveRuntimePerformanceSettings(normalized);
+    setPerformanceSettings(normalized);
+    persistPerformanceSettings(normalized);
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    engine.setPerformanceMode?.(resolved.mode);
+    engine.performanceMode = resolved.mode;
+    engine.lowPowerMode = Boolean(resolved.lowPowerMode);
+    engine.disableAmbientCritters = Boolean(resolved.disableAmbientCritters);
+    engine.targetFps = clampNumber(resolved.targetFps, 30, 60, engine.targetFps ?? 50);
+    engine.maxDpr = clampNumber(resolved.maxDpr, 1, 2, engine.maxDpr ?? 1.25);
+    engine.fogRenderScale = clampNumber(resolved.fogRenderScale, 0.35, 1, engine.fogRenderScale ?? 0.45);
+    engine.setParticleQuality?.(resolved.particleQuality);
+    if (engine.particleEngine) {
+      engine.particleEngine.enabled = resolved.particlesEnabled !== false;
+      engine.particleEngine.maxParticles = Math.max(64, Math.floor(Number(resolved.maxParticles) || 650));
+      engine.particleEngine.pool.max = engine.particleEngine.maxParticles;
+      while (engine.particleEngine.particles.length > engine.particleEngine.maxParticles) {
+        const particle = engine.particleEngine.particles.pop();
+        if (particle) engine.particleEngine.pool.release(particle);
+      }
+      if (!engine.particleEngine.enabled) engine.particleEngine.clearAll();
+    }
+    if (engine.disableAmbientCritters) engine.resetCritterRuntime?.();
+    else engine.spawnAmbientCritters?.();
+    engine.fogOverlayCanvas = null;
+    engine.nextFrameTime = performance.now();
+    engine.resize?.();
+    engine.publishSnapshot?.();
+  };
+
+  const runCheatCommand = (input, ...args) => {
+    if (!CHEAT_SETTINGS.enabled) return;
+    const cmd = window?.[CHEAT_SETTINGS.commandName] ?? (CHEAT_SETTINGS.exposeAlias ? window?.[CHEAT_SETTINGS.exposeAlias] : null);
+    if (typeof cmd !== "function") {
+      engineRef.current?.addToast?.("Cheat command ikke tilgaengelig");
+      return;
+    }
+    const output = cmd(input, ...args);
+    const message = output && typeof output === "object" ? output.message : "Cheat command koert";
+    engineRef.current?.addToast?.(`Cheat: ${message}`);
+  };
+
+  const resolvedDraft = resolveRuntimePerformanceSettings(settingsDraft);
+
   const startPlayableMapRegion = async (areaMapId, region) => {
     if (!areaMapId || !region?.id) return;
     const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
@@ -573,6 +782,13 @@ export default function App() {
     beginSession(slot, true);
   };
 
+  const deleteSaveSlot = (slot) => {
+    if (!slot) return;
+    const key = slot.legacy ? slot.saveKey : slot.id;
+    saveRepository.deleteSaveSync(key);
+    setSaveSlots(collectSaveSlots());
+  };
+
   const openWorldMapFromCity = () => {
     setRegionMapOpen(true);
     setMapOpen(false);
@@ -600,6 +816,7 @@ export default function App() {
           }}
           onBack={() => setMenuView("main")}
           onLoadGame={(slot) => beginSession(slot, false)}
+          onDeleteSave={deleteSaveSlot}
         />
       )}
 
@@ -667,10 +884,201 @@ export default function App() {
       {citySettingsOpen && cityOpen && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
-            <h2 id="city-settings-title">Setting</h2>
-            <p>Settings-panelet er reserveret til kommende valg.</p>
-            <div>
-              <button type="button" onClick={() => setCitySettingsOpen(false)}>Close</button>
+            <h2 id="city-settings-title">Indstillinger</h2>
+            <p className="city-settings-note">Vaelg en performance-profil eller brug custom for finjustering. Aendringer aktiveres ved OK.</p>
+            <div className="city-settings-section">
+              <h3>Performance profil</h3>
+              <label>
+                Profil
+                <select
+                  value={settingsDraft.mode}
+                  onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                    ...current,
+                    mode: event.target.value,
+                  }))}
+                >
+                  {profileOptions.map((profile) => (
+                    <option key={profile.id} value={profile.id}>{profile.id}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="city-settings-check">
+                <input
+                  type="checkbox"
+                  checked={settingsDraft.useCustom}
+                  onChange={(event) => setSettingsDraft((current) => ({
+                    ...current,
+                    useCustom: event.target.checked,
+                  }))}
+                />
+                Brug custom profil
+              </label>
+            </div>
+
+            {settingsDraft.useCustom && (
+              <div className="city-settings-section city-settings-grid">
+                <h3>Custom profil</h3>
+                <label>
+                  Target FPS
+                  <input
+                    type="number"
+                    min="30"
+                    max="60"
+                    step="1"
+                    value={resolvedDraft.targetFps}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, targetFps: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Max DPR
+                  <input
+                    type="number"
+                    min="1"
+                    max="2"
+                    step="0.05"
+                    value={resolvedDraft.maxDpr}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, maxDpr: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Fog Scale
+                  <input
+                    type="number"
+                    min="0.35"
+                    max="1"
+                    step="0.05"
+                    value={resolvedDraft.fogRenderScale}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, fogRenderScale: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Particle quality
+                  <select
+                    value={resolvedDraft.particleQuality}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, particleQuality: event.target.value },
+                    }))}
+                  >
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                  </select>
+                </label>
+                <label>
+                  Max particles
+                  <input
+                    type="number"
+                    min="64"
+                    max="1400"
+                    step="10"
+                    value={resolvedDraft.maxParticles}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, maxParticles: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label className="city-settings-check">
+                  <input
+                    type="checkbox"
+                    checked={resolvedDraft.particlesEnabled}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, particlesEnabled: event.target.checked },
+                    }))}
+                  />
+                  Partikler enabled
+                </label>
+                <label className="city-settings-check">
+                  <input
+                    type="checkbox"
+                    checked={resolvedDraft.disableAmbientCritters}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, disableAmbientCritters: event.target.checked },
+                    }))}
+                  />
+                  Disable ambient critters
+                </label>
+                <label className="city-settings-check">
+                  <input
+                    type="checkbox"
+                    checked={resolvedDraft.lowPowerMode}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, lowPowerMode: event.target.checked },
+                    }))}
+                  />
+                  Low power mode
+                </label>
+              </div>
+            )}
+
+            {CHEAT_SETTINGS.enabled && (
+              <div className="city-settings-section">
+                <h3>Cheats</h3>
+                <div className="city-settings-cheat-grid">
+                  <button type="button" onClick={() => runCheatCommand("clearBestiary")}>clearBestiary</button>
+                  <button type="button" onClick={() => runCheatCommand("clearCityMobs")}>clearCityMobs</button>
+                  <button type="button" onClick={() => runCheatCommand("resetAllQuests")}>resetAllQuests</button>
+                  <button type="button" onClick={() => runCheatCommand("repairCityBuildings")}>repairCityBuildings</button>
+                  <button type="button" onClick={() => runCheatCommand("repairCityAreas")}>repairCityAreas</button>
+                </div>
+
+                <div className="city-settings-cheat-inline">
+                  <label>
+                    resetQuest
+                    <select value={cheatResetQuestId} onChange={(event) => setCheatResetQuestId(event.target.value)}>
+                      {questOptions.map((quest) => (
+                        <option key={quest.value} value={quest.value}>{quest.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!cheatResetQuestId) return;
+                      runCheatCommand("resetQuest", cheatResetQuestId);
+                    }}
+                  >
+                    Koer resetQuest
+                  </button>
+                </div>
+
+                <div className="city-settings-cheat-inline">
+                  <label>
+                    clearCity
+                    <select value={cheatClearCityTarget} onChange={(event) => setCheatClearCityTarget(event.target.value)}>
+                      {clearCityTargets.map((target) => (
+                        <option key={`${target.value}:${target.label}`} value={target.value}>{target.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="button" onClick={() => runCheatCommand("clearCity", cheatClearCityTarget)}>Koer clearCity</button>
+                </div>
+              </div>
+            )}
+            <div className="city-settings-actions">
+              <button type="button" onClick={() => setCitySettingsOpen(false)}>Annuller</button>
+              <button
+                type="button"
+                onClick={() => {
+                  applyPerformanceSettings(settingsDraft);
+                  setCitySettingsOpen(false);
+                }}
+              >
+                OK
+              </button>
             </div>
           </section>
         </div>

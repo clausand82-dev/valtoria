@@ -63,6 +63,23 @@ export const CITY_STATS_RULES = {
     { resourceId: "meat", cost: 10, provision: 1, label: "Meat" },
     { resourceId: "fruit", cost: 20, provision: 1, label: "Fruit" },
   ],
+  sanctuaryDonationTrades: [
+    { id: "gold_bar_wealth", resourceId: "gold_bar", cost: 1, label: "Fund the Treasury", effects: { wealth: 5 } },
+    { id: "gold_bar_trade", resourceId: "gold_bar", cost: 1, label: "Sponsor Trade", effects: { trade: 2 } },
+    { id: "gold_bar_popularity", resourceId: "gold_bar", cost: 1, label: "Public Offering", effects: { popularity: 5 } },
+    { id: "food_provision", resourceId: "food", cost: 1, label: "Feed the Needy", effects: { provision: 10 } },
+    { id: "food_trade", resourceId: "food", cost: 1, label: "Support Markets", effects: { trade: 5 } },
+    { id: "food_popularity", resourceId: "food", cost: 1, label: "Festival Meals", effects: { popularity: 5 } },
+  ],
+  farmAleRecipe: {
+    outputResourceId: "ale",
+    outputCount: 1,
+    inputs: { wheat: 15, wood_plank: 1 },
+    statCosts: { water: 2 },
+  },
+  innAleTrades: [
+    { id: "sell_ale", resourceId: "ale", cost: 1, label: "Serve Ale", effects: { popularity: 5, water: 1 } },
+  ],
   // Farm conversion rule used for making food barrels from raw food resources.
   farmFoodBarrelRecipe: {
     // Resource id created by the conversion action.
@@ -74,11 +91,13 @@ export const CITY_STATS_RULES = {
       { resourceId: "meat", label: "Meat" },
       { resourceId: "fruit", label: "Fruit" },
       { resourceId: "wheat", label: "Wheat" },
+      { resourceId: "fruit_orange", label: "Orange", baseCost: 10, minCost: 5 },
+      { resourceId: "fruit_banana", label: "Banana", baseCost: 10, minCost: 5 },
     ],
-    // Base input cost before popularity discount is applied.
-    baseCost: 10,
-    // Lowest possible input cost after all discounts.
-    minCost: 10,
+    // Default base input cost before popularity discount is applied. Can be overridden per input option.
+    baseCost: 50,
+    // Default lowest possible input cost after all discounts. Can be overridden per input option.
+    minCost: 25,
     // Popularity value where discounting starts.
     popularityStart: 50,
     // Popularity points required per discount step.

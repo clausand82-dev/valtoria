@@ -452,7 +452,6 @@ function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, onSmelt,
 }
 
 function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarrel, onProduceProvision }) {
-  const foodBarrelCostValue = foodBarrelCost(popularity);
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const foodBarrelRecipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
   const foodBarrelOutputId = String(foodBarrelRecipe.outputResourceId ?? "food");
@@ -460,23 +459,26 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
   const foodBarrelOptions = (foodBarrelRecipe.inputOptions ?? []).map((option) => ({
     id: String(option?.resourceId ?? ""),
     label: option?.label ?? String(option?.resourceId ?? "Unknown"),
+    baseCost: option?.baseCost,
+    minCost: option?.minCost,
   })).filter((option) => option.id);
   const provisionOptions = CITY_STATS_RULES.farmProvisionRecipes ?? [];
   return (
     <section className="blacksmith-station">
       <header>
         <h4>Food Barrels</h4>
-        <span>{foodBarrelCostValue} raw food {"->"} 1 Food Barrel</span>
+        <span>Raw food {"->"} 1 Food Barrel</span>
       </header>
       {foodBarrelOptions.map((option) => {
         const available = countResource(option.id);
         const def = RESOURCE_DEFS[option.id];
+        const foodBarrelCostValue = foodBarrelCost(popularity, option);
         return (
           <div className="blacksmith-row" key={`barrel-${option.id}`}>
             <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
             <div>
               <b>{option.label}</b>
-              <span>Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
+              <span>{foodBarrelCostValue} needed | Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
             </div>
             <button
               type="button"
@@ -503,6 +505,107 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
               <span>{option.cost} {"->"} +{option.provision} provision | Available: {available}</span>
             </div>
             <button type="button" disabled={available < option.cost} onClick={() => onProduceProvision(option.resourceId, option.cost, option.provision)}>Convert</button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function cityRuleStatLabel(statId) {
+  const normalized = CITY_STAT_ALIASES[statId] ?? statId;
+  return String(normalized ?? "").replaceAll("_", " ");
+}
+
+function cityRuleEffectsText(effects = {}) {
+  return Object.entries(effects ?? {})
+    .map(([statId, amount]) => `${Number(amount) > 0 ? "+" : ""}${Math.floor(Number(amount) || 0)} ${cityRuleStatLabel(statId)}`)
+    .join(" | ");
+}
+
+function CitySanctuaryDonationPanel({ inventory, resourceCount, onDonate }) {
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Donation</h4>
+        <span>Donate one resource and choose one city benefit.</span>
+      </header>
+      {trades.map((trade) => {
+        const resourceId = String(trade.resourceId ?? "");
+        const cost = Math.max(1, Math.floor(Number(trade.cost) || 1));
+        const available = countResource(resourceId);
+        const def = RESOURCE_DEFS[resourceId];
+        return (
+          <div className="blacksmith-row" key={trade.id ?? `${resourceId}-${cityRuleEffectsText(trade.effects)}`}>
+            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
+            <div>
+              <b>{trade.label ?? def?.name ?? resourceId}</b>
+              <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
+            </div>
+            <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>Donate</button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
+function CityFarmAlePanel({ inventory, cityStats, resourceCount, onBrewAle }) {
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const recipe = CITY_STATS_RULES.farmAleRecipe ?? {};
+  const inputs = Object.entries(recipe.inputs ?? {});
+  const statCosts = Object.entries(recipe.statCosts ?? {});
+  const outputResourceId = String(recipe.outputResourceId ?? "ale");
+  const outputCount = Math.max(1, Math.floor(Number(recipe.outputCount) || 1));
+  const outputDef = RESOURCE_DEFS[outputResourceId];
+  const hasResources = inputs.every(([resourceId, amount]) => countResource(resourceId) >= Math.max(1, Math.floor(Number(amount) || 1)));
+  const hasStats = statCosts.every(([statId, amount]) => Math.max(0, Math.floor(Number(cityStats?.[statId]) || 0)) >= Math.max(1, Math.floor(Number(amount) || 1)));
+  const inputText = inputs
+    .map(([resourceId, amount]) => `${Math.max(1, Math.floor(Number(amount) || 1))} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`)
+    .concat(statCosts.map(([statId, amount]) => `${Math.max(1, Math.floor(Number(amount) || 1))} ${cityRuleStatLabel(statId)}`))
+    .join(" + ");
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Ale Brewing</h4>
+        <span>{inputText} {"->"} {outputCount} {outputDef?.name ?? outputResourceId}</span>
+      </header>
+      <div className="blacksmith-row">
+        <InventoryIcon iconSheet={outputDef?.sheet ?? "resources"} iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: outputResourceId }))} />
+        <div>
+          <b>{outputDef?.name ?? outputResourceId}</b>
+          <span>Water: {Math.max(0, Math.floor(Number(cityStats?.water) || 0))} | Wheat: {countResource("wheat")} | Wood Plank: {countResource("wood_plank")}</span>
+        </div>
+        <button type="button" disabled={!hasResources || !hasStats} onClick={() => onBrewAle(recipe)}>Brew</button>
+      </div>
+    </section>
+  );
+}
+
+function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
+  const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const trades = CITY_STATS_RULES.innAleTrades ?? [];
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Ale Sales</h4>
+        <span>Sell ale to improve city mood and water service.</span>
+      </header>
+      {trades.map((trade) => {
+        const resourceId = String(trade.resourceId ?? "ale");
+        const cost = Math.max(1, Math.floor(Number(trade.cost) || 1));
+        const available = countResource(resourceId);
+        const def = RESOURCE_DEFS[resourceId];
+        return (
+          <div className="blacksmith-row" key={trade.id ?? resourceId}>
+            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
+            <div>
+              <b>{trade.label ?? def?.name ?? resourceId}</b>
+              <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
+            </div>
+            <button type="button" disabled={available < cost} onClick={() => onServeAle(trade)}>Sell</button>
           </div>
         );
       })}
@@ -979,7 +1082,10 @@ function CityReadableMergePanel({ inventory, kind, onMerge }) {
 export {
   CityBlacksmithPanel,
   CityGoldBarPanel,
+  CityFarmAlePanel,
   CityFarmPanel,
+  CityInnAlePanel,
+  CitySanctuaryDonationPanel,
   CityTownHallPanel,
   CityResearchPanel,
   CitySocketPanel,

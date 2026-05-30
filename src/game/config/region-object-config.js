@@ -126,6 +126,11 @@ export const REGION_OBJECT_LOOT_TABLES = {
     { resource: "iron_bar", min: 1, max: 1, chance: 0.018 },
     { resource: "crystal", min: 1, max: 1, chance: 0.012 },
   ]),
+  FRUITBASKETS: Object.freeze([
+    { resource: "fruit_orange", min: 1, max: 2, chance: 0.01 },
+    { resource: "fruit_banana", min: 1, max: 2, chance: 0.01 },
+    { resource: "fruit", min: 1, max: 2, chance: 0.10 },
+  ]),
 
 };
 
@@ -755,6 +760,25 @@ export const REGION_OBJECT_DEFS = {
   renderScale: 0.25,
 },
     renderBiomeId: "mainland",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+  object_fruitbaskets: {
+    spawnTypes: [{ type: "object_fruitbaskets", weight: 1 }],
+    defaultDestructible: true,
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.FRUITBASKETS,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_fruitbaskets.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },

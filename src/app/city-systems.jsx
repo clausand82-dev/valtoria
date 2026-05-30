@@ -1669,12 +1669,14 @@ function addCityPermanentStatBonus(progress = {}, statId, amount) {
   const normalized = normalizeCityStatId(statId);
   const value = Math.floor(Number(amount) || 0);
   if (!normalized || normalized === "population" || value === 0) return progress;
+  const current = Math.floor(Number(progress.statBonuses?.[normalized]) || 0);
+  const nextValue = current + value;
+  const nextBonuses = { ...(progress.statBonuses ?? {}) };
+  if (nextValue === 0) delete nextBonuses[normalized];
+  else nextBonuses[normalized] = nextValue;
   return {
     ...progress,
-    statBonuses: {
-      ...(progress.statBonuses ?? {}),
-      [normalized]: Math.max(0, Math.floor(Number(progress.statBonuses?.[normalized]) || 0) + value),
-    },
+    statBonuses: nextBonuses,
   };
 }
 
