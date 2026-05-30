@@ -215,6 +215,11 @@ region({
   },
 
   mobs: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }], // Old format: fixed mob pool. Strings also work.
+  mobs: [                                                   // Entry-level shorthand conditions are filtered before weighted mob roll.
+    { type: "Rat", weight: 5, questCompleted: "check_inn_infestation" },
+    { type: "SickRat", weight: 2, blockedBy: { questCompleted: "check_inn_infestation" } },
+    { type: "MiniSpider", weight: 3 },
+  ],
   mobs: {                                                   // New format: conditional mob pool.
     value: [{ type: "Wolf", weight: 3 }, { type: "WolfCub", weight: 1 }], // Default mob pool.
     variants: [
@@ -287,7 +292,8 @@ Conditional config notes:
 - variant.patch merges into the default field. Lists merge by id/type/fileName depending on field.
 - variant.patch merges into the default field. Lists merge by id/type/fileName depending on field, including rareMobs by id/type.
 - requires must pass. blockedBy must not pass.
-- Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { value, equals/notEquals/in }, { stat, gte/... }, { all }, { any }, and { not }.
+- Supported conditions include { flag }, { counter, gte/gt/lte/lt/equals }, { all }, { any }, and { not }.
+- { value, equals/notEquals/in } and { stat, gte/... } are supported inside requires/conditions. Prefer wrapper syntax for these because "value" is also used by conditional field configs.
 - World energy balance is available as shorthand conditions anywhere this condition system is used:
   worldBalanceLydra: 30 means Ly'dra'thot percentage >= 30.
   worldBalanceNetdra: { min: 10, max: 20 } means Net'dra'thot percentage between 10 and 20.
@@ -296,6 +302,7 @@ Conditional config notes:
 
 Shorthand conditions:
 - List entries can add simple condition tags directly. Multiple tags on the same entry are AND.
+- Direct all/any/not also works on entries, for example { id: "x", all: [{ flag: "a" }, { notFlag: "b" }] }.
 - Direct shorthand and requires must both pass. blockedBy always removes the entry when it matches.
 - requires is still the recommended syntax for advanced all/any/not groups, and it also understands shorthand scopes.
 - corruption reads region.{id}.corruptionLevel from worldState values/counters first, then regionConfig.corruptionLevel, then falls back to region.{id}.corrupted where true means 10 and false means 0.
@@ -304,7 +311,7 @@ Shorthand conditions:
 - cityStorage and cityInventory use the same item counting shape; if the engine has not split them yet, they may be passed as aliases.
 - tileset strings are still valid. Object-form tilesets can use id (preferred) or fileName, plus weight and shorthand conditions.
 - rareMobs supports the same value/variants pattern as mobs when you need region-wide conditional rare encounter lists.
-- rareMobs entries and rare loot lines both support shorthand conditions plus requires/blockedBy.
+- rareMobs entries and nested rare loot lines both support shorthand conditions plus requires/conditions/blockedBy.
 - rareMobs is a lightweight instance layer, not a full monster definition. Allowed instance overrides include displayName, namePrefix, nameSuffix, levelOffset, scale, and tint.
 - combat-stat changes should be made in monster-config.js by creating a dedicated monster type and referencing it via rareMobs.type.
 - rare loot mode "add" keeps normal monster loot and appends rare loot. "override" skips normal monster loot entirely.
@@ -336,11 +343,17 @@ Any extra fields passed to region({...}) are preserved on the region object for 
 */
 function normalizeMobs(mobs) {
   if (!Array.isArray(mobs)) return mobs;
-  return mobs.map((m) =>
-    typeof m === "string"
-      ? { type: m, weight: 1 }
-      : { type: String(m.type), weight: Number(m.weight) || 1 }
-  );
+  return mobs
+    .map((m) => {
+      if (typeof m === "string") return { type: m, weight: 1 };
+      if (!m || typeof m !== "object" || Array.isArray(m)) return null;
+      return {
+        ...m,
+        type: String(m.type ?? m.typeName ?? "").trim(),
+        weight: Number(m.weight) || 1,
+      };
+    })
+    .filter((entry) => entry?.type);
 }
 
 function normalizeRareMobLootLines(entries) {

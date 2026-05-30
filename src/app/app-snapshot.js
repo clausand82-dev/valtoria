@@ -11,6 +11,7 @@ export const emptySnapshot = {
     nextXp: 1,
     gold: 0,
     popularity: 0,
+    factionRep: {},
     damage: "0-0",
     armor: 0,
     mode: "melee",

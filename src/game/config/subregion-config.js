@@ -119,7 +119,7 @@ export const SUBREGION_CONFIG = {
       objects: 7,
       foliage: 8,
       decals: 12,
-      monsters: { min: 6, max: 9 },
+      monsters: { min: 12, max: 15 },
     },
     onClear: {
       once: true,

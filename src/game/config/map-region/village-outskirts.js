@@ -223,7 +223,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "market-square",
       label: "Markedstorv",
       color: "#f0d58a",
-      //unlock: { locked: true, text: "Markedstorv kraever en senere historiequest." },
+      unlock: { locked: true, text: "Markedstorv kraever en senere historiequest." },
       labelX: 50,
       labelY: 45,
       // TODO:DELETE: weights: { house: 3, tree: 2, rock: 1, foilage: 4, fireplace: 2 }
@@ -244,7 +244,7 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Broenden",
       mapSize: "small",
       color: "#7fb6d6",
-      //unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
+      unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
       labelX: 53,
       labelY: 52,
       layout: {
@@ -385,7 +385,15 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       labelX: 60,
       labelY: 31,
-      mobs: [{ type: "Rat", weight: 5 }, { type: "SickRat", weight: 2 }, { type: "MiniSpider", weight: 3 }, "Spider", "MediumSpider", "LargeSpider", { type: "MotherSpider", weight: 0.5 },],
+      mobs: [
+        { type: "Rat", weight: 5, questCompleted: "check_inn_infestation"  },
+        { type: "SickRat", weight: 2, questActive: "clear_the_inn", blockedBy: {questCompleted: "check_inn_infestation", }, },
+        { type: "MiniSpider", weight: 3 }, 
+        { type: "MiniSpider", weight: 5, questCompleted: "check_inn_infestation" }, 
+        { type: "Spider", weight: 1, blockedBy: {questCompleted: "check_inn_infestation", },},
+        { type: "MediumSpider", weight: 1, blockedBy: {questCompleted: "check_inn_infestation", }, },
+        { type: "LargeSpider", weight: 1, blockedBy: {questCompleted: "check_inn_infestation", }, },
+      ],
       ambientCritters: [
         { id: "ambient_rat", mobId: "rat", count: { min: 7, max: 14 }, scale: 0.25, behavior: "flee", fleeDistance: 120, hp: 1, canTakeAreaDamage: true },
         { id: "ambient_spider", mobId: "spider", count: { min: 5, max: 8 }, scale: 0.1, behavior: "wander", hp: 1, canTakeAreaDamage: true },
@@ -399,6 +407,14 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Laden",
       mapSize: "small",
       color: "#c4a86a",
+      unlock: {
+      any: [
+        { questActive: "lost_anvil" },
+        { questCompleted: "lost_anvil" },
+        { questActive: "lost_hammer" },
+        { questCompleted: "lost_hammer" },
+      ],
+      },
       tileset: { fileName: "tileset/tileset_woodplank.png", x: 1, y: 1 },
       foliageSet: [{ fileName: "foilage/foilage_barn.png"},
         { fileName: "foilage/foilage_boneparts.png"},
@@ -418,7 +434,6 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "decay_dust", weight: 10 },
         { id: "decay_field", weight: 20 },
       ],
-      unlock: { completedQuests: ["clear_the_inn"] },
       labelX: 58,
       labelY: 59,
       mobs: [{ type: "Rat", weight: 4 }, { type: "SickRat", weight: 1.4 }, { type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden", { type: "Hellhound", weight: 0.85 }],
@@ -487,6 +502,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "northern-fields",
       label: "Nordlige marker",
       color: "#b4c46f",
+      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
         { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
@@ -570,7 +586,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2 },
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
-      //unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       labelX: 54,
       labelY: 16,
       // TODO:DELETE: weights: { tree: 11, rock: 2, foilage: 10, fireplace: 1 }

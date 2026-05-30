@@ -1,5 +1,8 @@
 import { MONSTER_DEFS, MONSTER_SHEETS, MONSTER_STATS, monsterSpriteId } from "./config/monster-config.js";
 import { getMonsterDiscovery } from "./world-state.js";
+import { FACTIONS } from "./config/faction-config.js";
+import { speciesLabel } from "./config/species-config.js";
+import { tagLabel } from "./config/tag-config.js";
 
 const STAT_LABELS = {
   hp: "HP",
@@ -76,3 +79,15 @@ export function bestiaryRegionRows(entry = {}) {
     .sort((a, b) => a.regionId.localeCompare(b.regionId, "da-DK"));
 }
 
+export function bestiaryMetadataRows(entry = {}) {
+  const { stage, stats = {} } = entry;
+  const fought = stage === "fought" || stage === "killed";
+  const killed = stage === "killed";
+  const rows = [];
+  if (fought && stats.speciesId) rows.push({ key: "species", label: "Species", value: speciesLabel(stats.speciesId) });
+  if (killed && stats.factionId) rows.push({ key: "faction", label: "Faction", value: FACTIONS[stats.factionId]?.label ?? stats.factionId });
+  if (fought && Array.isArray(stats.tags) && stats.tags.length) {
+    rows.push({ key: "tags", label: "Tags", value: stats.tags.map(tagLabel).join(", ") });
+  }
+  return rows;
+}

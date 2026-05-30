@@ -3,6 +3,7 @@ import { READABLE_DEF_BY_ID } from "../config/readable-config.js";
 import { QUEST_ITEM_DEFS } from "../config/quest-config.js";
 import { RESOURCE_DEFS } from "../config/resource-config.js";
 import { applyWorldEnergy } from "../world-energy.js";
+import { applyFactionRepEffects } from "../config/faction-config.js";
 import {
   incrementWorldCounter,
   normalizeWorldState,
@@ -278,6 +279,12 @@ function applyWorldEnergyIfAvailable(engine, worldEnergy) {
   return true;
 }
 
+function applyFactionRepIfAvailable(engine, factionRep) {
+  if (!factionRep || typeof factionRep !== "object" || Array.isArray(factionRep)) return false;
+  const applied = applyFactionRepEffects(engine.player, factionRep);
+  return Object.keys(applied).length > 0;
+}
+
 function applyQuestAdvance(engine, action) {
   let changed = false;
   if (action.questStepComplete) {
@@ -409,6 +416,7 @@ export function runAction({
   changed = applyCounters(engine, action) || changed;
   changed = applyQuestAdvance(engine, action) || changed;
   changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy) || changed;
+  changed = applyFactionRepIfAvailable(engine, action.factionRep) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;
 
   if (action.once) {

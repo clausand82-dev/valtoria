@@ -139,6 +139,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_mainland", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
@@ -163,6 +164,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
@@ -179,6 +181,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_sand", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
@@ -195,6 +198,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_jungle", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
     destructible: {
       hp: 40,
@@ -464,6 +468,7 @@ export const REGION_OBJECT_DEFS = {
   object_woodboxes_ground: {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "container"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -586,6 +591,7 @@ export const REGION_OBJECT_DEFS = {
   object_barrels_ground: {
     spawnTypes: [{ type: "object_barrels_ground", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "container"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -650,6 +656,7 @@ export const REGION_OBJECT_DEFS = {
   object_bones: {
     spawnTypes: [{ type: "object_bones", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant", "bones"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -678,6 +685,7 @@ export const REGION_OBJECT_DEFS = {
     object_treestumps: {
     spawnTypes: [{ type: "object_treestumps", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -700,6 +708,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTags: ["canopy"],
     spawnAvoidRadius: 1.8,
     foregroundFade: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -735,6 +744,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTags: ["canopy"],
     spawnAvoidRadius: 2.4,
     foregroundFade: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -973,6 +983,10 @@ export function resolveRegionObjectDestructibleDef(type) {
   return findRegionObjectDefBySpawnType(type)?.destructible ?? null;
 }
 
+export function resolveRegionObjectDefBySpawnType(type) {
+  return findRegionObjectDefBySpawnType(type);
+}
+
 export function resolveRegionObjectVariantCount(type) {
   const def = findRegionObjectDefBySpawnType(type);
   return def ? objectVariantCountFromDef(def) : 16;
@@ -1047,6 +1061,9 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
       ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
       : undefined,
     destroyRewards: normalizeDestroyRewards(def.destroyRewards),
+    tags: normalizeStringList(def.tags),
+    factionId: def.factionId ? String(def.factionId) : null,
+    onDestroyed: normalizeOnDestroyed(def.onDestroyed),
     defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
     actionId: null,
   };
@@ -1074,6 +1091,22 @@ function normalizeDestroyRewards(rewards) {
   const netdra = Number(rewards.netdra) || 0;
   if (!lydra && !netdra) return null;
   return { lydra, netdra };
+}
+
+function normalizeFactionRepEffect(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const result = {};
+  for (const [factionId, amount] of Object.entries(value)) {
+    const n = Number(amount);
+    if (String(factionId).trim() && Number.isFinite(n) && n !== 0) result[factionId] = n;
+  }
+  return Object.keys(result).length ? result : null;
+}
+
+function normalizeOnDestroyed(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const factionRep = normalizeFactionRepEffect(value.factionRep);
+  return factionRep ? { factionRep } : null;
 }
 
 // TODO:DELETE - legacy biodome weight mapping is disabled. Regions must now use explicit objects arrays.
@@ -1159,6 +1192,15 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     }
     if (normalized && entry.destroyRewards !== undefined) {
       normalized.destroyRewards = normalizeDestroyRewards(entry.destroyRewards);
+    }
+    if (normalized && entry.tags !== undefined) {
+      normalized.tags = normalizeStringList(entry.tags);
+    }
+    if (normalized && entry.factionId !== undefined) {
+      normalized.factionId = String(entry.factionId ?? "").trim() || null;
+    }
+    if (normalized && entry.onDestroyed !== undefined) {
+      normalized.onDestroyed = normalizeOnDestroyed(entry.onDestroyed);
     }
     if (normalized && entry.actionId !== undefined) {
       normalized.actionId = String(entry.actionId ?? "").trim() || null;

@@ -811,6 +811,48 @@ button {
   line-height: 1.25;
 }
 
+.city-faction-list {
+  display: grid;
+  gap: 8px;
+}
+
+.city-faction-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(244, 218, 150, 0.18);
+  background: rgba(12, 14, 18, 0.42);
+  border-radius: 6px;
+}
+
+.city-faction-row b,
+.city-faction-row span,
+.city-faction-row strong,
+.city-faction-row em {
+  display: block;
+}
+
+.city-faction-row span {
+  color: rgba(245, 243, 234, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.city-faction-row strong {
+  min-width: 64px;
+  text-align: right;
+  color: #f4da96;
+}
+
+.city-faction-row em {
+  margin-top: 2px;
+  color: rgba(245, 243, 234, 0.64);
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
 .monster-health span {
   background: linear-gradient(90deg, #7b151e, #d13842);
 }

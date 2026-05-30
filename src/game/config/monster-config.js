@@ -865,6 +865,49 @@ export const MONSTER_DEFS = {
   },
 };
 
+function inferMonsterSpecies(type, def = {}) {
+  if (def.speciesId) return def.speciesId;
+  const key = String(type ?? "").toLowerCase();
+  if (key.includes("spider")) return "spider";
+  if (key.includes("rat")) return "rat";
+  if (key.includes("wolf")) return "wolf";
+  if (key.includes("boar")) return "boar";
+  if (key.includes("troll")) return "troll";
+  if (key.includes("dragon")) return "dragon";
+  if (key.includes("skeleton") || key.includes("revenant") || key.includes("warden")) return "undead";
+  if (key.includes("ghost") || key.includes("shade") || key.includes("hollow")) return "spirit";
+  if (key.includes("demon") || key.includes("fallen") || key.includes("hellhound") || key.includes("infernus")) return "demon";
+  if (key.includes("flesheater") || key.includes("husk")) return "plant";
+  return undefined;
+}
+
+function inferMonsterTags(type, def = {}) {
+  const tags = new Set(Array.isArray(def.tags) ? def.tags : []);
+  const speciesId = inferMonsterSpecies(type, def);
+  const key = String(type ?? "").toLowerCase();
+  if (["spider", "rat", "wolf", "boar"].includes(speciesId) || ["bear", "lion", "snake", "scorpion"].some((name) => key.includes(name))) {
+    tags.add("beast");
+    tags.add("wildlife");
+  }
+  if (["human", "elf", "troll"].includes(speciesId) || key.includes("village") || key.includes("knight") || key.includes("wizard")) tags.add("humanoid");
+  if (["demon", "spirit", "undead"].includes(speciesId)) tags.add(speciesId);
+  if (def.isBoss) tags.add("boss");
+  if (key.includes("mini") || key.includes("cub") || key.includes("young")) tags.add("small");
+  else if (key.includes("large") || key.includes("mother") || key.includes("giant")) tags.add("large");
+  else tags.add("medium");
+  if (def.stats?.poisonResist || def.onHitStatus?.type === "dot" || key.includes("poison") || key.includes("sick")) tags.add("poison");
+  return [...tags];
+}
+
+function inferMonsterFaction(type, def = {}) {
+  if (def.factionId) return def.factionId;
+  const speciesId = inferMonsterSpecies(type, def);
+  if (["spider", "rat", "wolf", "boar"].includes(speciesId)) return "wilds";
+  if (["demon", "undead"].includes(speciesId)) return "corrupted_wilds";
+  if (speciesId === "troll") return "tornvalhed_trolls";
+  return undefined;
+}
+
 export const MONSTER_STATS = Object.fromEntries(
   Object.entries(MONSTER_DEFS).map(([type, def]) => {
     const isBoss = Boolean(def.isBoss);
@@ -878,6 +921,9 @@ export const MONSTER_STATS = Object.fromEntries(
       killNetdra: Math.max(0, Number(killNetdra) || 0),
       eliteKillLydra: Math.max(0, Number(def.eliteKillLydra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillLydra) || 0),
       eliteKillNetdra: Math.max(0, Number(def.eliteKillNetdra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillNetdra) || 0),
+      speciesId: inferMonsterSpecies(type, def),
+      factionId: inferMonsterFaction(type, def),
+      tags: inferMonsterTags(type, def),
       allowElite: def.allowElite !== false,
       isBoss,
       noLoot: Boolean(def.noLoot),

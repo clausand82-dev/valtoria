@@ -34,6 +34,7 @@ import { QUEST_BOARD_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/
 import { QUEST_NPCS } from "../game/config/npc-config.js";
 import { SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
+import { getKnownFactions, normalizeFactionRep } from "../game/config/faction-config.js";
 import {
   CITY_MOB_DAMAGE_PER_LEVEL_PCT,
   CITY_MOB_LEVELS,
@@ -3069,9 +3070,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   {building.id === "town_hall" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
                     <section className="blacksmith-station">
                       <header>
-                        <h4>Army Muster disabled</h4>
-                        <span>Army is now trained as units in the Barracks.</span>
+                        <h4>Civic Ledger</h4>
+                        <span>Faction reputation</span>
                       </header>
+                      <CityFactionPanel factionRep={snapshot.player?.factionRep} />
                     </section>
                   )}
                   {building.id === "barracks" && owned && activeAddon && (
@@ -3683,6 +3685,38 @@ function CityCampStats({ cityStats }) {
         )) : <span><b>Stable</b></span>}
       </div>
       <p>Events are derived from current city stats and can be used by later combat, loot, and quest logic.</p>
+    </div>
+  );
+}
+
+function factionStatusLabel(value) {
+  const rep = Number(value) || 0;
+  if (rep <= -50) return "Hostile";
+  if (rep <= -10) return "Distrust";
+  if (rep <= 9) return "Neutral";
+  if (rep <= 49) return "Friendly";
+  return "Allied";
+}
+
+function CityFactionPanel({ factionRep }) {
+  const rep = normalizeFactionRep(factionRep);
+  return (
+    <div className="city-faction-list">
+      {getKnownFactions().map((faction) => {
+        const value = Number(rep[faction.id]) || 0;
+        return (
+          <article className="city-faction-row" key={faction.id}>
+            <div>
+              <b>{faction.label}</b>
+              <span>{faction.description}</span>
+            </div>
+            <strong title={`Reputation ${value}`}>
+              {value}
+              <em>{factionStatusLabel(value)}</em>
+            </strong>
+          </article>
+        );
+      })}
     </div>
   );
 }

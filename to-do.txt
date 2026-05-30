@@ -9,8 +9,8 @@ Prøv at få gjort grass tile matchende
 - Få tilføjet flere objekter (objekter skal også have tre stadies hel, damaged, ruin)
 - begge ovenstående kodes, så findes variation ikke, så bruges normal billede bare
 - blizzard skal komme mere oppe fra, ikke fra spilleren (kun meget lidt orienteret fra spiller retning)
-- det nye class system skal bagud give point for lvl
-- critters (SE CHATGPT)
+
+
 
 - fix icebear, bear and lion animation
 - fix en af village - og nogle har stadig dårlig walk cycle

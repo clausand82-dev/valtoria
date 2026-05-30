@@ -59,7 +59,7 @@ export { ACTION_BAR_CONFIG, normalizeQuickSlots } from "../config/action-bar-con
 export { POTION_DEFS, POTION_IDS, normalizePotionId, potionDefById } from "../config/potion-config.js";
 export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG, QUEST_GLOBAL_RULES } from "../config/quest-config.js";
 export { QUEST_NPCS } from "../config/npc-config.js";
-export { getRegionObjectFamily, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";
+export { getRegionObjectFamily, resolveRegionObjectDefBySpawnType, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";
 export {
   randomInRange,
   randomIntInRange,

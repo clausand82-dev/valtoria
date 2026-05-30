@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   bestiaryRegionRows,
+  bestiaryMetadataRows,
   bestiarySpriteSheet,
   bestiaryStatRows,
   getBestiaryEntries,
@@ -61,6 +62,7 @@ function BestiaryBookModal({ entry, onClose }) {
   const fought = stage === "fought" || stage === "killed";
   const killed = stage === "killed";
   const statRows = bestiaryStatRows(stats);
+  const metadataRows = bestiaryMetadataRows(entry);
   const regionRows = bestiaryRegionRows(discovery);
   const loreText = String(library.text ?? "Feltstudierne er endnu sparsomme, men vaesenet er nu identificeret.").trim();
 
@@ -119,6 +121,9 @@ function BestiaryBookModal({ entry, onClose }) {
               {seen && !fought && <p>Stats og kampdata laases op efter foerste kamp.</p>}
               {fought && (
                 <div className="bestiary-stat-grid">
+                  {metadataRows.map((row) => (
+                    <span key={row.key}><b>{row.label}</b>{row.value}</span>
+                  ))}
                   {statRows.map((row) => (
                     <span key={row.key}><b>{row.label}</b>{row.value}</span>
                   ))}

@@ -91,6 +91,9 @@ function applyReplacementShape(object, objectDefId) {
   object.graphicsRef = def.graphicsRef ?? null;
   object.treeVariant = Math.abs(Math.floor(Number(object.treeVariant) || 0)) % resolveRegionObjectVariantCount(type);
   object.defaultActionId = def.defaultActionId ?? null;
+  object.tags = Array.isArray(def.tags) ? [...def.tags] : [];
+  object.factionId = def.factionId ?? null;
+  object.onDestroyed = def.onDestroyed ? { ...def.onDestroyed } : null;
   return true;
 }
 
@@ -300,6 +303,9 @@ export const actionsMethods = {
       depthMode: def.depthMode ?? "dynamic",
       sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
+      tags: Array.isArray(def.tags) ? [...def.tags] : [],
+      factionId: def.factionId ?? null,
+      onDestroyed: def.onDestroyed ? { ...def.onDestroyed } : null,
       defaultActionId: def.defaultActionId ?? null,
     };
     chunk.objects.push(object);

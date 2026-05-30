@@ -399,6 +399,9 @@ export function makeUniqueItem(definition, level = 1) {
     magic: Math.floor((stats.magic ?? 0) * scale),
     ...itemBonusStats(stats),
     effects: cloneItemEffects(definition.effects),
+    tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
+    target: Array.isArray(definition.target) ? [...definition.target] : undefined,
+    bonus: Array.isArray(definition.bonus) ? definition.bonus.map((entry) => Array.isArray(entry) ? [...entry] : entry) : undefined,
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);
@@ -458,6 +461,9 @@ export function makeNamedItem(definition, level = 1) {
     magic: Math.floor((stats.magic ?? 0) * scale * rarityScale),
     ...itemBonusStats(stats),
     effects: cloneItemEffects(definition.effects),
+    tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
+    target: Array.isArray(definition.target) ? [...definition.target] : undefined,
+    bonus: Array.isArray(definition.bonus) ? definition.bonus.map((entry) => Array.isArray(entry) ? [...entry] : entry) : undefined,
     iconUrl: definition.iconUrl || undefined,
   };
   return finalizeItem(item, { mergeable: false }, definition.id);
@@ -1100,6 +1106,9 @@ function objectSpawnMetadataFromDef(def) {
     foregroundFadeAlpha: Number.isFinite(Number(def?.foregroundFadeAlpha))
       ? Math.min(1, Math.max(0.1, Number(def.foregroundFadeAlpha)))
       : undefined,
+    tags: Array.isArray(def?.tags) ? def.tags.map(String).filter(Boolean) : [],
+    factionId: def?.factionId ? String(def.factionId) : null,
+    onDestroyed: def?.onDestroyed && typeof def.onDestroyed === "object" ? { ...def.onDestroyed } : null,
   };
 }
 
@@ -1189,6 +1198,9 @@ function addPrefabObjects(chunk, instance) {
     if (Number.isFinite(Number(item.foregroundFadeAlpha))) {
       spawnMetadata.foregroundFadeAlpha = Math.min(1, Math.max(0.1, Number(item.foregroundFadeAlpha)));
     }
+    if (Array.isArray(item.tags)) spawnMetadata.tags = item.tags.map(String).filter(Boolean);
+    if (item.factionId !== undefined) spawnMetadata.factionId = String(item.factionId ?? "").trim() || null;
+    if (item.onDestroyed && typeof item.onDestroyed === "object") spawnMetadata.onDestroyed = { ...item.onDestroyed };
     const treeVariant = Number.isFinite(Number(item.variant))
       ? Math.max(0, Math.floor(Number(item.variant)))
       : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type))));
@@ -1470,6 +1482,9 @@ function addPrefabMonsters(chunk, instance) {
       killNetdra: Math.max(0, Number(base.killNetdra) || 0),
       eliteKillLydra: Math.max(0, Number(base.eliteKillLydra) || 0),
       eliteKillNetdra: Math.max(0, Number(base.eliteKillNetdra) || 0),
+      speciesId: base.speciesId,
+      factionId: base.factionId,
+      tags: Array.isArray(base.tags) ? [...base.tags] : [],
       spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 8000 + i) * 1.5,
       statusEffects: [],
       allowElite: base.allowElite !== false,
@@ -1626,6 +1641,9 @@ function addObjects(chunk, safeChunk) {
       spawnAvoidRadius: selectedEntry?.spawnAvoidRadius ?? null,
       foregroundFade: Boolean(selectedEntry?.foregroundFade),
       foregroundFadeAlpha: selectedEntry?.foregroundFadeAlpha,
+      tags: [...(selectedEntry?.tags ?? [])],
+      factionId: selectedEntry?.factionId ?? null,
+      onDestroyed: selectedEntry?.onDestroyed ? { ...selectedEntry.onDestroyed } : null,
       destroyRewards: selectedEntry?.destroyRewards ? { ...selectedEntry.destroyRewards } : null,
       actionId: selectedEntry?.actionId ? String(selectedEntry.actionId) : null,
       defaultActionId: selectedEntry?.defaultActionId ? String(selectedEntry.defaultActionId) : null,
@@ -2001,6 +2019,9 @@ function createChunkMonster(chunk, slotIndex, monsterType, x, y, level, extra = 
     killNetdra: Math.max(0, Number(base.killNetdra) || 0),
     eliteKillLydra: Math.max(0, Number(base.eliteKillLydra) || 0),
     eliteKillNetdra: Math.max(0, Number(base.eliteKillNetdra) || 0),
+    speciesId: base.speciesId,
+    factionId: base.factionId,
+    tags: Array.isArray(base.tags) ? [...base.tags] : [],
     spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + slotIndex) * 1.5,
     statusEffects: [],
     allowElite: base.allowElite !== false,

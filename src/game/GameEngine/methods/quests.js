@@ -40,6 +40,7 @@ import {
   questHasSteps,
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
+import { applyFactionRepEffects } from "../../config/faction-config.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
 
 function questStepCompletedFlag(questId, stepId) {
@@ -81,6 +82,14 @@ export const questsMethods = {
     const questId = String(advance.questId ?? advance.id ?? "").trim();
     const stepId = String(advance.stepId ?? advance.step ?? "").trim();
     if (!questId || !stepId) return false;
+    const quest = this.questState.active.find((entry) => String(entry.questId) === questId);
+    const stepIndex = quest?.steps?.findIndex((step) => String(step?.id ?? "") === stepId) ?? -1;
+    const isFinalStep = stepIndex >= 0 && stepIndex === quest.steps.length - 1;
+    const alreadyCompleted = (quest?.progress?.completedStepIds ?? []).map(String).includes(stepId);
+    if (isFinalStep && !alreadyCompleted) {
+      const def = resolveQuestDefById(questId);
+      this.grantQuestRewards({ ...quest, rewards: { ...(def?.rewards ?? quest.rewards ?? {}) } });
+    }
     return Boolean(this.completeQuestStepById?.(questId, stepId, { grantRewards: false, consumeItems: false }));
   },
 
@@ -202,6 +211,8 @@ export const questsMethods = {
         if (completed.has(stepId)) continue;
         if (step.completeWhen && worldConditionMet(step.completeWhen, this.worldState, context)) {
           changed = Boolean(this.completeQuestStepById?.(quest.questId, stepId, { grantRewards: false, consumeItems: false })) || changed;
+          for (const completedStepId of quest.progress?.completedStepIds ?? []) completed.add(String(completedStepId));
+          for (const revealedStepId of quest.progress?.revealedStepIds ?? []) revealed.add(String(revealedStepId));
           break;
         }
       }
@@ -210,6 +221,15 @@ export const questsMethods = {
         ? worldConditionMet(quest.completeWhen, this.worldState, context)
         : false;
       const complete = completeBySteps || completeByCondition;
+      const currentStepId = String(quest.progress?.currentStepId ?? "");
+      const nextIncompleteStep = quest.steps.find((step) => !completed.has(String(step?.id ?? "")));
+      if (completed.has(currentStepId) && nextIncompleteStep?.id) {
+        const nextStepId = String(nextIncompleteStep.id);
+        revealed.add(nextStepId);
+        copyStepRuntimeFields(quest, nextIncompleteStep, resolveQuestDefById(quest.questId));
+        quest.progress = { ...(quest.progress ?? {}), currentStepId: nextStepId };
+        changed = true;
+      }
       const nextProgress = {
         ...(quest.progress ?? {}),
         completedStepIds: [...completed],
@@ -1225,6 +1245,10 @@ export const questsMethods = {
       summary.netdra = Number(rewards.netdra) || 0;
       if (summary.lydra) this.addFloater(this.player.x, this.player.y, `+${summary.lydra} Ly'dra'thot`, "#eaf4ff", 1);
       if (summary.netdra) this.addFloater(this.player.x, this.player.y, `+${summary.netdra} Net'dra'thot`, "#b8a4ff", 1);
+    }
+    if (rewards.factionRep && typeof rewards.factionRep === "object") {
+      applyFactionRepEffects(this.player, rewards.factionRep);
+      summary.factionRep = { ...rewards.factionRep };
     }
     if (xp) {
       this.player.xp += xp;

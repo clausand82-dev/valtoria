@@ -34,5 +34,5 @@ export const ITEM_GOLD_DEATH_LOSS_MAX = 0.05;
 
 // Blacksmith item repair costs
 // Repair cost is calculated as: gold per 1% * missing durability + junk per 1% * missing durability
-export const ITEM_REPAIR_GOLD_PER_PCT = 10;
-export const ITEM_REPAIR_JUNK_PER_PCT = 2;
+export const ITEM_REPAIR_GOLD_PER_PCT = 5;
+export const ITEM_REPAIR_JUNK_PER_PCT = 1;

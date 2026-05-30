@@ -49,6 +49,7 @@ import { normalizeWorldState } from "../../world-state.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
 import { normalizeActionState } from "../../actions/action-runner.js";
 import { normalizeCurrentExpedition } from "./subregions.js";
+import { normalizeFactionRep } from "../../config/faction-config.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -58,6 +59,18 @@ function normalizeItemEffects(effects) {
       .map((effect) => ({ ...effect }))
     : [];
   return onHit.length ? { onHit } : undefined;
+}
+
+function normalizeStringList(value) {
+  return Array.isArray(value) ? [...new Set(value.map((entry) => String(entry ?? "").trim()).filter(Boolean))] : undefined;
+}
+
+function normalizeTargetBonus(value) {
+  return Array.isArray(value)
+    ? value
+      .filter((entry) => Array.isArray(entry) && entry.length >= 2 && String(entry[0] ?? "").trim())
+      .map((entry) => [String(entry[0]), entry[1]])
+    : undefined;
 }
 
 function cleanupObsoleteQuestItems(player, questState) {
@@ -203,6 +216,9 @@ export const persistenceMethods = {
       mergeParts: Array.isArray(item.mergeParts) ? item.mergeParts.map(String) : undefined,
       consumableEffect: item.consumableEffect && typeof item.consumableEffect === "object" ? { ...item.consumableEffect } : undefined,
       effects: normalizeItemEffects(item.effects),
+      tags: normalizeStringList(item.tags),
+      target: normalizeStringList(item.target),
+      bonus: normalizeTargetBonus(item.bonus),
       iconIndex: Number.isFinite(Number(item.iconIndex)) ? Math.floor(Number(item.iconIndex)) : undefined,
       stackMax: isResourceItem(item) ? resourceStackMax(savedResourceId) : undefined,
       count: isPotionItem(item)
@@ -271,11 +287,17 @@ export const persistenceMethods = {
       // Always re-derive from definition — never trust the saved iconUrl for unique items.
       normalized.iconUrl = def?.iconUrl || iconUrlFromKey(deriveIconKey({ uniqueId: normalized.uniqueId }));
       normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
+      if (def?.tags !== undefined) normalized.tags = normalizeStringList(def.tags);
+      if (def?.target !== undefined) normalized.target = normalizeStringList(def.target);
+      if (def?.bonus !== undefined) normalized.bonus = normalizeTargetBonus(def.bonus);
     } else if (normalized.namedId) {
       const def = NAMED_ITEM_TEMPLATES.find((entry) => entry.id === normalized.namedId);
       // Named items: use definition iconUrl if set, else fall through to baseName mapping.
       normalized.iconUrl = def?.iconUrl || undefined;
       normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
+      if (def?.tags !== undefined) normalized.tags = normalizeStringList(def.tags);
+      if (def?.target !== undefined) normalized.target = normalizeStringList(def.target);
+      if (def?.bonus !== undefined) normalized.bonus = normalizeTargetBonus(def.bonus);
     } else if (!isResourceItem(normalized) && !isQuestItem(normalized)) {
       // Generic gear: clear stale saved iconUrl so baseName mapping takes over.
       normalized.iconUrl = undefined;
@@ -315,6 +337,7 @@ export const persistenceMethods = {
     this.player.unlockedSpells = [...new Set(["ember_spark", ...(Array.isArray(savedPlayer.unlockedSpells) ? savedPlayer.unlockedSpells.map(String) : [])])];
     this.player.activeSpellId = savedPlayer.activeSpellId ? String(savedPlayer.activeSpellId) : this.player.unlockedSpells[0] ?? "ember_spark";
     this.player.autoLoot = normalizeAutoLootRules(savedPlayer.autoLoot);
+    this.player.factionRep = normalizeFactionRep(savedPlayer.factionRep);
     this.player.statusEffects = [];
     this.player.stats = normalizeHeroStats(savedPlayer.stats);
     this.player.attackCooldown = Math.max(0, Number(savedPlayer.attackCooldown) || 0);
@@ -376,6 +399,11 @@ export const persistenceMethods = {
       this.player.equipment.offhand = null;
       this.addInventoryItem(offhand);
     }
+
+    // Re-evaluate persisted world flags after quest state has been restored.
+    // Older saves may contain later completed steps while an earlier automatic
+    // step is missing because refresh used to overwrite the new completion.
+    for (let pass = 0; pass < 100 && this.refreshQuestStepProgress?.(); pass += 1) {}
 
     if (Array.isArray(payload.loots)) {
       // If we're replacing active loots during load, ensure any existing loots
@@ -442,6 +470,7 @@ export const persistenceMethods = {
         ...(cfg.player.economy ? {
           gold: this.player.gold,
           popularity: this.player.popularity,
+          factionRep: normalizeFactionRep(this.player.factionRep),
         } : {}),
         ...(cfg.player.potions ? { potions: { ...this.player.potions } } : {}),
         quickSlots: normalizeQuickSlots(this.player.quickSlots),

@@ -38,6 +38,7 @@ import {
   pickupStatusText,
   randomInt
 } from "../helpers.js";
+import { worldEntryAllowed } from "../../world-state.js";
 
 const FOLIAGE_LOOT_INTERACT_RANGE = 0.78;
 
@@ -449,10 +450,14 @@ export const lootMethods = {
   dropRareMobLoot(monster) {
     const rareLoot = monster?.rareLoot;
     if (!rareLoot || typeof rareLoot !== "object") return;
-    this.dropResourceLoot(monster.x, monster.y, rareLoot.resources ?? []);
-    this.dropConfiguredItemEntries(monster, rareLoot.items ?? []);
-    this.dropConfiguredNamedEntries(monster, rareLoot.named ?? []);
-    this.dropConfiguredUniqueEntries(monster, rareLoot.uniques ?? []);
+    const context = this.questConditionContext?.({ monster }) ?? {};
+    const allowedLines = (entries) => (Array.isArray(entries)
+      ? entries.filter((entry) => worldEntryAllowed(entry, this.worldState, context))
+      : []);
+    this.dropResourceLoot(monster.x, monster.y, allowedLines(rareLoot.resources));
+    this.dropConfiguredItemEntries(monster, allowedLines(rareLoot.items));
+    this.dropConfiguredNamedEntries(monster, allowedLines(rareLoot.named));
+    this.dropConfiguredUniqueEntries(monster, allowedLines(rareLoot.uniques));
   },
 
   dropLoot(monster) {

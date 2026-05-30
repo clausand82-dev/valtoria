@@ -511,6 +511,9 @@ export const regionMethods = {
     monster.killNetdra = Math.max(0, Number(base.killNetdra) || 0);
     monster.eliteKillLydra = Math.max(0, Number(base.eliteKillLydra) || 0);
     monster.eliteKillNetdra = Math.max(0, Number(base.eliteKillNetdra) || 0);
+    monster.speciesId = base.speciesId;
+    monster.factionId = base.factionId;
+    monster.tags = Array.isArray(base.tags) ? [...base.tags] : [];
     monster.spellCooldown = Math.max(0, Number(monster.spellCooldown) || 0);
     monster.statusEffects = Array.isArray(monster.statusEffects) ? monster.statusEffects : [];
     monster.allowElite = base.allowElite !== false;

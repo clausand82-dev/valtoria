@@ -8,6 +8,11 @@ History over changes
 - added individuel baseCost and minCost to foodbarrel convertion
 - added res orange and banana (for quest and food barrel)
 - added ale and use for goldignot, foodbarrel and ale to game
+- added setting and cheat shotcuts when cheat is enabled
+- added fractions, species and tags and a system to use them
+- fraction, species and tags can work as conditions
+- fixed a lot of small bugs
+- added support for view of more rewards
 
 
 *V. 1.77

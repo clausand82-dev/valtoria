@@ -7,7 +7,7 @@ import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { getQuestStartNpcIds } from "../../game/GameEngine/helpers.js";
-import { resolveMapRegionConfig, worldEntryAllowed } from "../../game/world-state.js";
+import { resolveMapRegionConfig, worldConditionMet, worldEntryAllowed } from "../../game/world-state.js";
 import { getWorldEnergyState } from "../../game/world-energy.js";
 import { regionStatusKey } from "../save/save-keys.js";
 const cityPrebuildCache = { layout: null };
@@ -292,6 +292,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests);
                       const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                       const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
+                      const unlockText = locked ? regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests) : "";
                       return (
                     <g
                       className={`world-map-region ${locked ? "locked" : ""} ${hoveredRegionId === region.id || selectedRegion?.id === region.id ? "hovered" : ""}`}
@@ -299,7 +300,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       key={region.id}
                       role="button"
                       tabIndex={0}
-                      aria-label={locked ? `${region.label} er laast. ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
+                      aria-label={locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
                       onClick={() => activateRegion(entry)}
                       onKeyDown={(event) => handleRegionKeyDown(event, region)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
@@ -307,7 +308,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       onFocus={() => setHoveredRegionId(region.id)}
                       onBlur={() => setHoveredRegionId(null)}
                     >
-                      <title>{region.label} | ${hoverText}</title>
+                      <title>{locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${region.label} | ${hoverText}`}</title>
                       <polygon points={region.points} />
                     </g>
                       );
@@ -329,8 +330,8 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                         top: `${region.labelY}%`,
                       }}
                       key={`${region.id}-label`}
-                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
-                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy)} ${hoverText}` : `${region.label}. ${hoverText}`}
+                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
+                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${region.label}. ${hoverText}`}
                       onClick={() => activateRegion(entry)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
                       onMouseLeave={() => setHoveredRegionId(null)}
@@ -358,7 +359,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
           </div>
           <WorldEnergyBalanceBar state={worldEnergyState} />
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests) && (
-            <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy)}</p>
+            <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests)}</p>
           )}
         </div>
         {lockedRegion && (
@@ -366,6 +367,8 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
             completedQuestSet={completedQuestSet}
             army={currentArmy}
             region={lockedRegion}
+            worldState={worldState}
+            activeQuests={activeQuests}
             onClose={() => setLockedRegion(null)}
           />
         )}
@@ -437,7 +440,43 @@ function regionIsUnlocked(region, completedQuestSet, army = 0, worldState = null
   return worldEntryAllowed(region, worldState, context);
 }
 
-function regionUnlockText(region, completedQuestSet, army = 0) {
+function questLabel(questId) {
+  const raw = String(questId ?? "");
+  const swapped = raw.includes("-") ? raw.replace(/-/g, "_") : raw.replace(/_/g, "-");
+  return QUEST_DEFS[raw]?.title ?? QUEST_DEFS[swapped]?.title ?? raw;
+}
+
+function conditionRequirementLabel(condition) {
+  if (!condition || typeof condition !== "object") return String(condition ?? "");
+  if (condition.questActive) return `aktiv quest: ${questLabel(condition.questActive)}`;
+  if (condition.questCompleted) return `fuldfoert quest: ${questLabel(condition.questCompleted)}`;
+  if (condition.questStepCompleted) {
+    const questId = condition.questStepCompleted.questId ?? "";
+    const stepId = condition.questStepCompleted.stepId ?? condition.questStepCompleted;
+    return `quest-trin ${questLabel(questId)} / ${stepId}`;
+  }
+  if (condition.flag) return `flag: ${condition.flag}`;
+  if (condition.notFlag) return `ikke flag: ${condition.notFlag}`;
+  if (condition.factions || condition.factionRep) return "faction reputation";
+  if (condition.worldBalanceLydra) return "Ly'dra'thot-balance";
+  if (condition.worldBalanceNetdra) return "Net'dra'thot-balance";
+  if (condition.corruption) return "corruption";
+  return "world-state krav";
+}
+
+function unmetWorldConditionText(condition, worldState, context) {
+  if (!condition || worldConditionMet(condition, worldState, context)) return [];
+  if (Array.isArray(condition.all)) return condition.all.flatMap((entry) => unmetWorldConditionText(entry, worldState, context));
+  if (Array.isArray(condition.any)) return [`Kraever mindst et af: ${condition.any.map(conditionRequirementLabel).join(" eller ")}.`];
+  if (condition.requires) return unmetWorldConditionText(condition.requires, worldState, context);
+  if (condition.conditions) return unmetWorldConditionText(condition.conditions, worldState, context);
+  if (condition.blockedBy && worldConditionMet(condition.blockedBy, worldState, context)) {
+    return [`Blokeret af ${conditionRequirementLabel(condition.blockedBy)}.`];
+  }
+  return [`Kraever ${conditionRequirementLabel(condition)}.`];
+}
+
+function regionUnlockText(region, completedQuestSet, army = 0, worldState = null, activeQuests = []) {
   if (region?.unlock?.text) return region.unlock.text;
   const requiredArmy = Math.max(0, Math.floor(Number(region?.unlock?.army ?? region?.unlock?.requiredArmy) || 0));
   if (army < requiredArmy) return `Kraever ${requiredArmy} army. Du har ${Math.max(0, Math.floor(Number(army) || 0))}.`;
@@ -449,16 +488,14 @@ function regionUnlockText(region, completedQuestSet, army = 0) {
   };
   const missingQuests = (region?.unlock?.completedQuests ?? [])
     .filter((questId) => !hasQuestCompletion(questId));
-  if (!missingQuests.length) return "Ingen manglende krav.";
-  const questNames = missingQuests.map((questId) => {
-    const raw = String(questId ?? "");
-    const swapped = raw.includes("-") ? raw.replace(/-/g, "_") : raw.replace(/_/g, "-");
-    return QUEST_DEFS[raw]?.title ?? QUEST_DEFS[swapped]?.title ?? raw;
-  });
-  return `Kraever quest: ${questNames.join(", ")}.`;
+  if (missingQuests.length) return `Kraever quest: ${missingQuests.map(questLabel).join(", ")}.`;
+  const context = { regionId: region?.id, regionConfig: region, questState: { completed: [...completedQuestSet], active: activeQuests }, worldState };
+  const unmet = unmetWorldConditionText(region?.unlock, worldState, context);
+  if (unmet.length) return unmet.join(" ");
+  return "Ingen manglende krav.";
 }
 
-function LockedRegionDialog({ region, completedQuestSet, army = 0, onClose }) {
+function LockedRegionDialog({ region, completedQuestSet, army = 0, worldState = null, activeQuests = [], onClose }) {
   const hasQuestCompletion = (questId) => {
     const raw = String(questId ?? "");
     if (!raw) return false;
@@ -467,7 +504,7 @@ function LockedRegionDialog({ region, completedQuestSet, army = 0, onClose }) {
   };
   const missingQuestIds = (region?.unlock?.completedQuests ?? [])
     .filter((questId) => !hasQuestCompletion(questId));
-  const requiredArmy = Math.max(0, Math.floor(Number(region?.unlock?.army ?? region?.unlock?.requiredArmy) || 0));
+  const unlockText = regionUnlockText(region, completedQuestSet, army, worldState, activeQuests);
   return (
     <div className="map-lock-modal-backdrop" role="presentation" onClick={onClose}>
       <section className="map-lock-modal" role="dialog" aria-modal="true" aria-label={`${region.label} er laast`} onClick={(event) => event.stopPropagation()}>
@@ -481,8 +518,7 @@ function LockedRegionDialog({ region, completedQuestSet, army = 0, onClose }) {
           </div>
           <button type="button" onClick={onClose}>Luk</button>
         </header>
-        {region?.unlock?.text && <p>{region.unlock.text}</p>}
-        {requiredArmy > 0 && army < requiredArmy && <p>Kraever {requiredArmy} army. Du har {army}.</p>}
+        {unlockText && <p>{unlockText}</p>}
         {missingQuestIds.length > 0 && (
           <div className="map-lock-quests">
             {missingQuestIds.map((questId) => (

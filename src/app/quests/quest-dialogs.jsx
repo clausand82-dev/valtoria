@@ -4,6 +4,7 @@ import { MAP_REGION_SETS } from "../../game/config/map-region-config.js";
 import { QUEST_ITEM_DEFS } from "../../game/config/quest-config.js";
 import { QUEST_NPCS } from "../../game/config/npc-config.js";
 import { resolveQuestDefById } from "../../game/GameEngine/helpers/quests.js";
+import { FACTIONS } from "../../game/config/faction-config.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
@@ -150,6 +151,40 @@ function talkQuestTargetLabel(quest) {
       : [];
   const names = npcIds.map((npcId) => QUEST_NPCS[npcId]?.name ?? npcId).filter(Boolean);
   return names.length ? `Tal med ${names.join(", ")}` : "Tal med den rette NPC";
+}
+
+function questDisplayRewards(quest) {
+  const runtimeRewards = quest?.rewards && typeof quest.rewards === "object" ? quest.rewards : {};
+  if (Object.keys(runtimeRewards).length > 0) return runtimeRewards;
+  return resolveQuestDefById(quest?.questId ?? quest?.id)?.rewards ?? runtimeRewards;
+}
+
+function signedRewardValue(value) {
+  const amount = Number(value) || 0;
+  return amount > 0 ? `+ ${amount}` : `- ${Math.abs(amount)}`;
+}
+
+function QuestRewardList({ quest }) {
+  const rewards = questDisplayRewards(quest);
+  return (
+    <div className="comparison-list">
+      {(rewards.xp ?? 0) > 0 && <span className="diff-good">+ XP {rewards.xp}</span>}
+      {(rewards.gold ?? 0) > 0 && <span className="diff-good">+ Gold {rewards.gold}</span>}
+      {(rewards.lydra ?? 0) > 0 && <span className="diff-good">+ Ly'dra'thot {rewards.lydra}</span>}
+      {(rewards.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {rewards.netdra}</span>}
+      {Object.entries(rewards.factionRep ?? {}).map(([factionId, amount]) => (
+        <span className={Number(amount) >= 0 ? "diff-good" : "diff-bad"} key={`faction-${factionId}`}>
+          {signedRewardValue(amount)} reputation: {FACTIONS[factionId]?.label ?? factionId}
+        </span>
+      ))}
+      {(rewards.resources ?? []).map((r) => (
+        <span className="diff-good" key={`res-${r.resource ?? r.id}`}>+ {r.count}x {r.name ?? RESOURCE_DEFS[r.resource ?? r.id]?.name ?? r.resource ?? r.id}</span>
+      ))}
+      {(rewards.items ?? []).map((item, index) => (
+        <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
+      ))}
+    </div>
+  );
 }
 
 export function QuestObjectiveMeta({ quest, compact = false }) {
@@ -340,18 +375,7 @@ export function QuestDetailCard({ quest, npc, onClose, footer }) {
           </p>
         )}
         <QuestObjectiveMeta quest={quest} />
-        <div className="comparison-list">
-          {(quest.rewards?.xp ?? 0) > 0 && <span className="diff-good">+ XP {quest.rewards.xp}</span>}
-          {(quest.rewards?.gold ?? 0) > 0 && <span className="diff-good">+ Gold {quest.rewards.gold}</span>}
-          {(quest.rewards?.lydra ?? 0) > 0 && <span className="diff-good">+ Ly'dra'thot {quest.rewards.lydra}</span>}
-          {(quest.rewards?.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {quest.rewards.netdra}</span>}
-          {(quest.rewards?.resources ?? []).map((r) => (
-            <span className="diff-good" key={`res-${r.resource}`}>+ {r.count}x {r.resource}</span>
-          ))}
-          {(quest.rewards?.items ?? []).map((item, index) => (
-            <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
-          ))}
-        </div>
+        <QuestRewardList quest={quest} />
         <div>
           {footer}
         </div>
@@ -475,15 +499,7 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                     </p>
                   )}
                   <QuestObjectiveMeta quest={selectedQuest} />
-                  <div className="comparison-list">
-                    {(selectedQuest.rewards?.xp ?? 0) > 0 && <span className="diff-good">+ XP {selectedQuest.rewards.xp}</span>}
-                    {(selectedQuest.rewards?.gold ?? 0) > 0 && <span className="diff-good">+ Gold {selectedQuest.rewards.gold}</span>}
-                    {(selectedQuest.rewards?.lydra ?? 0) > 0 && <span className="diff-good">+ Ly'dra'thot {selectedQuest.rewards.lydra}</span>}
-                    {(selectedQuest.rewards?.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {selectedQuest.rewards.netdra}</span>}
-                    {(selectedQuest.rewards?.resources ?? []).map((r) => (
-                      <span className="diff-good" key={`ov-res-${selectedQuest.id}-${r.resource}`}>+ {r.count}x {r.resource}</span>
-                    ))}
-                  </div>
+                  <QuestRewardList quest={selectedQuest} />
                 </aside>
               )}
             </div>

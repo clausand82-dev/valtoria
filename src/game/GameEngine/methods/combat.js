@@ -17,6 +17,7 @@ import {
   incrementStatMap,
   isDestructibleObject,
   getDestructibleDef,
+  objectMetadataConfig,
   destructibleObjectScreenHit
 } from "../helpers.js";
 import { skillTreeBonuses } from "../../config/skill-tree-config.js";
@@ -32,7 +33,13 @@ import {
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
 import { applyWorldEnergy } from "../../world-energy.js";
-import { recordMonsterFought, recordMonsterKilled } from "../../world-state.js";
+import { getWorldFlag, incrementWorldCounter, recordMonsterFought, recordMonsterKilled, setWorldFlag } from "../../world-state.js";
+import { addFactionRepOnPlayer, applyFactionRepEffects, getFactionRepFrom, getKnownFactions, setFactionRepOnPlayer } from "../../config/faction-config.js";
+import {
+  canDamageTargetWithSource,
+  targetDamageBonus,
+  targetMetadata,
+} from "../../combat/target-metadata.js";
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
@@ -344,6 +351,9 @@ export const combatMethods = {
       killNetdra: 0,
       eliteKillLydra: 0,
       eliteKillNetdra: 0,
+      speciesId: base.speciesId,
+      factionId: base.factionId,
+      tags: Array.isArray(base.tags) ? [...base.tags] : [],
       spellCooldown: 999,
       statusEffects: [],
       allowElite: false,
@@ -401,10 +411,21 @@ export const combatMethods = {
         for (const monster of this.nearbyMonsters(2)) {
           if (monster.dead || projectile.owner === "monster") continue;
           if (projectile.noCollision) continue;
+          if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) continue;
           if (Math.hypot(monster.x - projectile.x, monster.y - projectile.y) <= monster.radius + projectile.radius) {
             this.applySpellImpact(projectile, projectile.x, projectile.y, monster);
             remove = true;
             break;
+          }
+        }
+        if (!remove && projectile.owner === "player" && !projectile.noCollision && Array.isArray(projectile.sourceConfig?.target)) {
+          for (const object of this.nearbyDestructibleObjects(1)) {
+            if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) continue;
+            if (Math.hypot(object.x - projectile.x, object.y - projectile.y) <= object.radius + projectile.radius) {
+              this.applySpellImpact(projectile, projectile.x, projectile.y, object);
+              remove = true;
+              break;
+            }
           }
         }
         if (!remove && !projectile.noCollision && projectile.owner === "monster" && Math.hypot(this.player.x - projectile.x, this.player.y - projectile.y) <= this.player.radius + projectile.radius) {
@@ -424,9 +445,11 @@ export const combatMethods = {
 
   primaryAttack(target = null) {
     const stats = this.calcStats();
-    target = target || this.nearestMonster(stats.range + 0.5) || this.nearestDestructibleObject(DESTRUCTIBLE_OBJECT_ATTACK_RANGE + 0.5);
+    const weapon = this.player.equipment?.weapon;
+    target = target || this.nearestMonster(stats.range + 0.5, weapon) || this.nearestDestructibleObject(DESTRUCTIBLE_OBJECT_ATTACK_RANGE + 0.5, weapon);
     if (!target || target.dead) return;
     const targetIsObject = isDestructibleObject(target);
+    if (!canDamageTargetWithSource(weapon, "weapon", this.targetMetadataFor(target))) return;
     const attackRange = targetIsObject ? DESTRUCTIBLE_OBJECT_ATTACK_RANGE : stats.range;
     const d = distance(this.player, target);
     if (d > attackRange + target.radius) return;
@@ -438,8 +461,20 @@ export const combatMethods = {
 
     if (targetIsObject) {
       this.player.stats.meleeAttacks += 1;
-      const { damage } = this.rollPlayerDamage(stats);
-      this.damageObject(target, damage);
+      const baseDamage = this.rollDamage(stats.damageMin, stats.damageMax);
+      const critical = Math.random() < (Number(stats.critChance) || 0);
+      const finalDamage = this.calculateDamage({
+        caster: this.player,
+        casterStats: stats,
+        target,
+        baseDamage,
+        element: "physical",
+        damageKind: "direct",
+        criticalOverride: critical,
+        source: { type: "weapon", id: weapon?.id ?? "weapon" },
+        sourceConfig: weapon,
+      }).damage;
+      this.damageObject(target, finalDamage);
       this.drainWeaponDurability();
       this.camera.shake = Math.max(this.camera.shake, 3);
       this.player.attackTargetId = null;
@@ -449,15 +484,18 @@ export const combatMethods = {
 
     if (stats.mode === "melee") {
       this.player.stats.meleeAttacks += 1;
-      const { damage, critical } = this.rollPlayerDamage(stats);
+      const baseDamage = this.rollDamage(stats.damageMin, stats.damageMax);
+      const critical = Math.random() < (Number(stats.critChance) || 0);
       const finalDamage = this.calculateDamage({
         caster: this.player,
         casterStats: stats,
         target,
-        baseDamage: damage,
+        baseDamage,
         element: "physical",
         damageKind: "direct",
-        source: "melee",
+        criticalOverride: critical,
+        source: { type: "weapon", id: weapon?.id ?? "weapon" },
+        sourceConfig: weapon,
       }).damage;
       this.damageMonster(target, finalDamage, "melee", critical);
       this.triggerWeaponOnHitEffects({
@@ -498,6 +536,7 @@ export const combatMethods = {
       color,
       element: stats.mode === "magic" ? "arcane" : "physical",
       baseDamage: projectileBaseDamage,
+      sourceConfig: weapon ? { ...weapon } : null,
       hitMagicScale: 0,
       casterStats: { ...stats },
       casterLevel: this.player.level,
@@ -529,6 +568,7 @@ export const combatMethods = {
 
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead || damaged.has(monster.id)) continue;
+      if (!canDamageTargetWithSource(effect, "weaponEffect", this.targetMetadataFor(monster))) continue;
       if (Math.hypot(monster.x - center.x, monster.y - center.y) > radius + monster.radius) continue;
       damaged.add(monster.id);
       const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
@@ -539,13 +579,15 @@ export const combatMethods = {
         baseDamage: (Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0),
         element: effect.element ?? "arcane",
         damageKind: "area",
-        source: effect.id ?? "weapon_effect",
+        source: { type: "weaponEffect", id: effect.id ?? "weapon_effect" },
+        sourceConfig: effect,
       }).damage;
       this.damageMonster(monster, damage, damageType, false);
     }
 
     for (const critter of this.nearbyCritters?.() ?? []) {
       if (critter.dead || critter.canTakeAreaDamage === false || damaged.has(critter.id)) continue;
+      if (!canDamageTargetWithSource(effect, "weaponEffect", this.targetMetadataFor(critter))) continue;
       if (Math.hypot(critter.x - center.x, critter.y - center.y) > radius + critter.radius) continue;
       damaged.add(critter.id);
       const scaleStat = effect.damageScale ? Number(stats[effect.damageScale]) || 0 : 0;
@@ -556,7 +598,8 @@ export const combatMethods = {
         baseDamage: (Number(effect.damage) || 0) + scaleStat * (Number(effect.damageScaleAmount) || 0),
         element: effect.element ?? "arcane",
         damageKind: "area",
-        source: effect.id ?? "weapon_effect",
+        source: { type: "weaponEffect", id: effect.id ?? "weapon_effect" },
+        sourceConfig: effect,
       }).damage;
       this.damageCritter?.(critter, damage, damageType, false);
     }
@@ -610,6 +653,7 @@ export const combatMethods = {
     canCrit = false,
     criticalOverride = null,
     source = "attack",
+    sourceConfig = null,
     debug = false,
   } = {}) {
     const stats = casterStats ?? (caster === this.player ? this.calcStats() : caster ?? {});
@@ -624,7 +668,9 @@ export const combatMethods = {
     const elementDamageBonus = Number(stats?.[damageBonusKeyForElement(resolvedElement)]) || 0;
     const kindDamageBonus = Number(stats?.[damageKindBonusKey(damageKind)]) || 0;
     const damageBeforeCrit = Math.max(0, base + magicContribution + levelContribution);
-    const damageBeforeResistRaw = damageBeforeCrit * (1 + spellDamageBonus + elementDamageBonus + kindDamageBonus);
+    const targetBonus = targetDamageBonus(sourceConfig, this.targetMetadataFor(target));
+    const damageBeforeTargetPercent = Math.max(0, damageBeforeCrit + targetBonus.flat);
+    const damageBeforeResistRaw = damageBeforeTargetPercent * targetBonus.multiplier * (1 + spellDamageBonus + elementDamageBonus + kindDamageBonus);
     const critical = criticalOverride === null
       ? Boolean(canCrit && Math.random() < (Number(stats?.critChance) || 0))
       : Boolean(criticalOverride);
@@ -646,6 +692,8 @@ export const combatMethods = {
         spellDamageBonus,
         elementDamageBonus,
         kindDamageBonus,
+        targetBonusFlat: targetBonus.flat,
+        targetBonusMultiplier: targetBonus.multiplier,
         resistBeforeClamp: resisted.resistBeforeClamp,
         resistAfterClamp: resisted.resistAfterClamp,
         damageBeforeResist,
@@ -760,6 +808,7 @@ export const combatMethods = {
       type: spell.id,
       spellId: spell.id,
       spellInstanceId,
+      sourceConfig: spell,
       owner,
       casterTypeName: caster.typeName ?? null,
       x: caster.x + n.x * 0.5,
@@ -832,6 +881,7 @@ export const combatMethods = {
         type: spell.id,
         spellId: spell.id,
         spellInstanceId,
+        sourceConfig: spell,
         owner,
         casterTypeName: caster.typeName ?? null,
         x: impactX - fallDirection.x * fallDistance - stagger * speed,
@@ -887,12 +937,19 @@ export const combatMethods = {
         if (monster.dead) continue;
         const direct = directTarget === monster;
         const inArea = projectile.areaRadius > 0 && Math.hypot(monster.x - x, monster.y - y) <= projectile.areaRadius + monster.radius;
-        if (direct || inArea) targets.push(monster);
+        if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) targets.push(monster);
       }
       for (const critter of this.nearbyCritters?.() ?? []) {
         if (critter.dead || critter.canTakeAreaDamage === false) continue;
         const inArea = projectile.areaRadius > 0 && Math.hypot(critter.x - x, critter.y - y) <= projectile.areaRadius + critter.radius;
-        if (inArea) targets.push(critter);
+        if (inArea && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(critter))) targets.push(critter);
+      }
+      if (Array.isArray(projectile.sourceConfig?.target)) {
+        for (const object of this.nearbyDestructibleObjects(2)) {
+          const direct = directTarget === object;
+          const inArea = projectile.areaRadius > 0 && Math.hypot(object.x - x, object.y - y) <= projectile.areaRadius + object.radius;
+          if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) targets.push(object);
+        }
       }
     } else {
       const direct = directTarget === this.player;
@@ -913,6 +970,7 @@ export const combatMethods = {
           magicScale: projectile.hitMagicScale ?? 0,
           criticalOverride: projectile.critical,
           source: { type: "spell", id: projectile.spellId ?? "spell" },
+          sourceConfig: projectile.sourceConfig,
         }).damage
         : this.calculateDamage({
           caster: { level: projectile.casterLevel },
@@ -923,16 +981,19 @@ export const combatMethods = {
           damageKind: "area",
           magicScale: projectile.areaMagicScale ?? 0,
           source: { type: "spell", id: projectile.spellId ?? "spell" },
+          sourceConfig: projectile.sourceConfig,
         }).damage;
       if (target === this.player) {
         if (projectile.casterTypeName) this.recordBestiaryFought?.({ typeName: projectile.casterTypeName });
         this.damagePlayer(damage, { typeName: projectile.casterTypeName ?? projectile.spellId }, projectile.critical && direct);
       } else if (target.runtimeType === "critter" || target.type === "critter") {
         this.damageCritter?.(target, damage, "magic", false);
+      } else if (isDestructibleObject(target)) {
+        this.damageObject(target, damage);
       } else {
         this.damageMonster(target, damage, "magic", projectile.critical && direct);
       }
-      if (!(target.runtimeType === "critter" || target.type === "critter")) this.applyProjectileStatus(target, projectile);
+      if (!(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) this.applyProjectileStatus(target, projectile);
     }
     const impact = projectile.particleVisuals?.impact;
     if (impact?.type) {
@@ -959,6 +1020,7 @@ export const combatMethods = {
       owner: projectile.owner,
       spellId: projectile.spellId,
       spellInstanceId: projectile.spellInstanceId ?? null,
+      sourceConfig: projectile.sourceConfig ?? null,
       x,
       y,
       radius,
@@ -1080,6 +1142,7 @@ export const combatMethods = {
     if (hazard.owner === "player") {
       for (const monster of this.nearbyMonsters(2)) {
         if (monster.dead) continue;
+        if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(monster))) continue;
         if (Math.hypot(monster.x - hazard.x, monster.y - hazard.y) > hazard.radius + monster.radius) continue;
         const damage = this.calculateDamage({
           caster: { level: hazard.casterLevel },
@@ -1090,11 +1153,13 @@ export const combatMethods = {
           damageKind: "hazard",
           magicScale: hazard.magicScale,
           source: { type: "spell", id: hazard.spellId ?? "hazard" },
+          sourceConfig: hazard.sourceConfig,
         }).damage;
         this.damageMonster(monster, damage, "magic", false);
       }
       for (const critter of this.nearbyCritters?.() ?? []) {
         if (critter.dead || critter.canTakeAreaDamage === false) continue;
+        if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(critter))) continue;
         if (Math.hypot(critter.x - hazard.x, critter.y - hazard.y) > hazard.radius + critter.radius) continue;
         const damage = this.calculateDamage({
           caster: { level: hazard.casterLevel },
@@ -1105,8 +1170,27 @@ export const combatMethods = {
           damageKind: "hazard",
           magicScale: hazard.magicScale,
           source: { type: "spell", id: hazard.spellId ?? "hazard" },
+          sourceConfig: hazard.sourceConfig,
         }).damage;
         this.damageCritter?.(critter, damage, "magic", false);
+      }
+      if (Array.isArray(hazard.sourceConfig?.target)) {
+        for (const object of this.nearbyDestructibleObjects(2)) {
+          if (Math.hypot(object.x - hazard.x, object.y - hazard.y) > hazard.radius + object.radius) continue;
+          if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(object))) continue;
+          const damage = this.calculateDamage({
+            caster: { level: hazard.casterLevel },
+            casterStats: hazard.casterStats,
+            target: object,
+            baseDamage: hazard.baseDamage,
+            element: hazard.element,
+            damageKind: "hazard",
+            magicScale: hazard.magicScale,
+            source: { type: "spell", id: hazard.spellId ?? "hazard" },
+            sourceConfig: hazard.sourceConfig,
+          }).damage;
+          this.damageObject(object, damage);
+        }
       }
       return;
     }
@@ -1120,6 +1204,7 @@ export const combatMethods = {
         damageKind: "hazard",
         magicScale: hazard.magicScale,
         source: { type: "spell", id: hazard.spellId ?? "hazard" },
+        sourceConfig: hazard.sourceConfig,
       }).damage;
       this.damagePlayer(damage, { typeName: hazard.spellId ?? "hazard" }, false);
     }
@@ -1136,6 +1221,7 @@ export const combatMethods = {
         magicScale: projectile.dotMagicScale ?? 0,
         element: projectile.element,
         sourceId: projectile.spellId,
+        sourceConfig: projectile.sourceConfig ?? null,
         casterStats: projectile.casterStats ? { ...projectile.casterStats } : null,
         casterLevel: projectile.casterLevel,
         duration: projectile.dotDuration * (1 + (Number(projectile.casterStats?.dotDurationBonus) || 0)),
@@ -1179,6 +1265,7 @@ export const combatMethods = {
               damageKind: "dot",
               magicScale: effect.magicScale,
               source: { type: "spell", id: effect.sourceId ?? "dot" },
+              sourceConfig: effect.sourceConfig,
             }).damage
             : Math.max(1, Math.floor(Number(effect.damage) || 1));
           if (isPlayer) {
@@ -1309,6 +1396,10 @@ export const combatMethods = {
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
     this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
     this.applyDestroyRewards(object, def);
+    this.applyDestroyedFactionRep(object, def);
+    for (const tag of objectMetadataConfig(object).tags) {
+      this.worldState = incrementWorldCounter(this.worldState, `destroyedObjectTag.${tag}`, 1);
+    }
     const popularityDelta = Number(object.popularityDelta ?? def?.popularityDelta);
     if (Number.isFinite(popularityDelta) && popularityDelta !== 0) {
       // If object was destroyed by any non-standard path, apply any remaining delta not already applied during damage ticks.
@@ -1327,6 +1418,24 @@ export const combatMethods = {
     applyWorldEnergy(this, { lydra, netdra });
     if (lydra) this.addFloater(object.x, object.y, `+${lydra} Ly'dra'thot`, "#eaf4ff", 0.95);
     if (netdra) this.addFloater(object.x, object.y, `+${netdra} Net'dra'thot`, "#b8a4ff", 0.95);
+  },
+
+  applyDestroyedFactionRep(object, def) {
+    const metaConfig = objectMetadataConfig(object);
+    const factionRep = object?.onDestroyed?.factionRep
+      ?? metaConfig.onDestroyed?.factionRep
+      ?? def?.onDestroyed?.factionRep;
+    if (!factionRep || typeof factionRep !== "object") return;
+    const objectKey = String(object?.runtimeId ?? object?.id ?? "").trim();
+    const appliedKey = objectKey ? `object.${objectKey}.factionRepApplied` : "";
+    if (appliedKey && getWorldFlag(this.worldState, appliedKey)) return;
+    applyFactionRepEffects(this.player, factionRep);
+    if (appliedKey) this.worldState = setWorldFlag(this.worldState, appliedKey, true);
+    for (const [factionId, amount] of Object.entries(factionRep)) {
+      const delta = Number(amount) || 0;
+      if (!delta) continue;
+      this.addFloater(object.x, object.y, `${factionId} ${delta > 0 ? "+" : ""}${delta}`, delta > 0 ? "#9ee8a4" : "#ff7272", 0.95);
+    }
   },
 
   killMonster(monster) {
@@ -1384,6 +1493,10 @@ export const combatMethods = {
       normal: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.normal) || 0)) + (bucket === "normal" ? 1 : 0),
       elite: Math.max(0, Math.floor(Number(this.player.stats.killsByMonster[typeName]?.elite) || 0)) + (bucket === "elite" ? 1 : 0),
     };
+    if (monster?.speciesId) this.worldState = incrementWorldCounter(this.worldState, `speciesKill.${monster.speciesId}`, 1);
+    for (const tag of Array.isArray(monster?.tags) ? monster.tags : []) {
+      this.worldState = incrementWorldCounter(this.worldState, `tagKill.${tag}`, 1);
+    }
   },
 
   bestiaryContext() {
@@ -1418,6 +1531,26 @@ export const combatMethods = {
     const decimals = Math.abs(actual) >= 10 || Number.isInteger(actual) ? 0 : 1;
     const text = `${actual > 0 ? "+" : ""}${actual.toFixed(decimals)} pop`;
     this.addFloater(x, y, text, actual > 0 ? "#8be9ff" : "#ff7272", 0.95);
+  },
+
+  getFactionRep(factionId) {
+    return getFactionRepFrom(this.player, factionId);
+  },
+
+  addFactionRep(factionId, amount) {
+    const value = addFactionRepOnPlayer(this.player, factionId, amount);
+    this.publishSnapshot?.();
+    return value;
+  },
+
+  setFactionRep(factionId, value) {
+    const next = setFactionRepOnPlayer(this.player, factionId, value);
+    this.publishSnapshot?.();
+    return next;
+  },
+
+  getKnownFactions(options = {}) {
+    return getKnownFactions(options);
   },
 
   rollDamage(min, max) {
@@ -1643,11 +1776,12 @@ export const combatMethods = {
     return Math.floor(80 + this.player.level * this.player.level * 42);
   },
 
-  nearestMonster(maxRange) {
+  nearestMonster(maxRange, sourceConfig = null) {
     let best = null;
     let bestD = maxRange;
     for (const monster of this.nearbyMonsters(2)) {
       if (monster.dead) continue;
+      if (sourceConfig && !canDamageTargetWithSource(sourceConfig, "weapon", this.targetMetadataFor(monster))) continue;
       if (!this.isPointVisible(monster)) continue;
       const d = distance(this.player, monster);
       if (d < bestD) {
@@ -1658,12 +1792,34 @@ export const combatMethods = {
     return best;
   },
 
-  nearestDestructibleObject(maxRange) {
+  targetMetadataFor(target) {
+    if (target === this.player) return { targetType: "player", id: "player", tags: [] };
+    if (isDestructibleObject(target)) {
+      const config = objectMetadataConfig(target);
+      return targetMetadata({ ...target, ...config }, "object");
+    }
+    return targetMetadata(target);
+  },
+
+  nearbyDestructibleObjects(range = 1) {
+    const objects = [];
+    for (const chunk of this.nearbyChunks(range)) {
+      for (const object of chunk.objects) {
+        if (!isDestructibleObject(object)) continue;
+        if (!this.isPointVisible(object)) continue;
+        objects.push(object);
+      }
+    }
+    return objects;
+  },
+
+  nearestDestructibleObject(maxRange, sourceConfig = null) {
     let best = null;
     let bestD = maxRange;
     for (const chunk of this.nearbyChunks(1)) {
       for (const object of chunk.objects) {
         if (!isDestructibleObject(object)) continue;
+        if (!canDamageTargetWithSource(sourceConfig, "weapon", this.targetMetadataFor(object))) continue;
         if (!this.isPointVisible(object)) continue;
         const d = distance(this.player, object);
         if (d < bestD) {

@@ -1,4 +1,5 @@
 import { getWorldEnergyState } from "./world-energy.js";
+import { getFactionRepFrom } from "./config/faction-config.js";
 
 const EMPTY_WORLD_STATE = Object.freeze({
   flags: Object.freeze({}),
@@ -10,6 +11,9 @@ const CONDITION_KEYS = new Set([
   "requires",
   "conditions",
   "blockedBy",
+  "all",
+  "any",
+  "not",
   "worldBalanceLydra",
   "worldBalanceNetdra",
   "corruption",
@@ -35,6 +39,11 @@ const CONDITION_KEYS = new Set([
   "cityInventory",
   "player",
   "playerStat",
+  "factions",
+  "factionRep",
+  "speciesKills",
+  "tagKills",
+  "destroyedObjectTags",
   "rootRegionId",
   "rootMapId",
   "rootMapInstanceId",
@@ -580,6 +589,28 @@ function shorthandConditionMet(key, expected, worldState, context) {
       return statMapMatches(context.player, expected);
     case "playerStat":
       return statMapMatches(context.player?.stats, expected);
+    case "factions":
+    case "factionRep":
+      if (!expected || typeof expected !== "object" || Array.isArray(expected)) return false;
+      return statMapMatches(
+        Object.fromEntries(Object.keys(expected ?? {}).map((factionId) => [
+          factionId,
+          getFactionRepFrom(context.player, factionId),
+        ])),
+        expected,
+      );
+    case "speciesKills":
+      return statMapMatches(normalized.counters, Object.fromEntries(
+        Object.entries(expected ?? {}).map(([speciesId, condition]) => [`speciesKill.${speciesId}`, condition]),
+      ));
+    case "tagKills":
+      return statMapMatches(normalized.counters, Object.fromEntries(
+        Object.entries(expected ?? {}).map(([tagId, condition]) => [`tagKill.${tagId}`, condition]),
+      ));
+    case "destroyedObjectTags":
+      return statMapMatches(normalized.counters, Object.fromEntries(
+        Object.entries(expected ?? {}).map(([tagId, condition]) => [`destroyedObjectTag.${tagId}`, condition]),
+      ));
     case "rootRegionId":
     case "rootMapId":
     case "rootMapInstanceId":
@@ -608,9 +639,13 @@ export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, con
   if (Array.isArray(condition.all) && !condition.all.every((entry) => worldConditionMet(entry, normalized, context))) return false;
   if (Array.isArray(condition.any) && !condition.any.some((entry) => worldConditionMet(entry, normalized, context))) return false;
   if (condition.not !== undefined && worldConditionMet(condition.not, normalized, context)) return false;
+  if (condition.conditions && !worldConditionMet(condition.conditions, normalized, context)) return false;
+  if (condition.requires && !worldConditionMet(condition.requires, normalized, context)) return false;
+  if (condition.blockedBy && worldConditionMet(condition.blockedBy, normalized, context)) return false;
 
   for (const key of CONDITION_KEYS) {
     if (key === "requires" || key === "conditions" || key === "blockedBy") continue;
+    if (key === "all" || key === "any" || key === "not") continue;
     if (key === "flag" || key === "notFlag" || key === "counter") continue;
     if (!Object.prototype.hasOwnProperty.call(condition, key)) continue;
     if (!shorthandConditionMet(key, condition[key], normalized, context)) return false;
@@ -647,8 +682,12 @@ function isConditionalValue(value) {
 
 function entryAllowed(entry, worldState, context) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return true;
+  if (Array.isArray(entry.all) && !entry.all.every((condition) => worldConditionMet(condition, worldState, context))) return false;
+  if (Array.isArray(entry.any) && !entry.any.some((condition) => worldConditionMet(condition, worldState, context))) return false;
+  if (entry.not !== undefined && worldConditionMet(entry.not, worldState, context)) return false;
   for (const key of CONDITION_KEYS) {
     if (key === "requires" || key === "conditions" || key === "blockedBy") continue;
+    if (key === "all" || key === "any" || key === "not") continue;
     if (!Object.prototype.hasOwnProperty.call(entry, key)) continue;
     if (!shorthandConditionMet(key, entry[key], worldState, context)) return false;
   }
@@ -694,9 +733,10 @@ function deepMerge(base, patch) {
   return result;
 }
 
-function patchList(baseList, patchListValue, mergeKeys) {
+function patchList(baseList, patchListValue, mergeKeys, worldState, context) {
   const result = (Array.isArray(baseList) ? baseList : []).map((entry) => clone(entry));
   for (const rawPatch of Array.isArray(patchListValue) ? patchListValue : []) {
+    if (!entryAllowed(rawPatch, worldState, context)) continue;
     const patch = stripConditionFields(rawPatch);
     const key = mergeKeyFor(patch, mergeKeys);
     const index = key ? result.findIndex((entry) => mergeKeyFor(entry, mergeKeys) === key) : -1;
@@ -709,8 +749,8 @@ function patchList(baseList, patchListValue, mergeKeys) {
   return result;
 }
 
-function patchValue(baseValue, patch, mergeKeys) {
-  if (Array.isArray(baseValue) && Array.isArray(patch)) return patchList(baseValue, patch, mergeKeys);
+function patchValue(baseValue, patch, mergeKeys, worldState, context) {
+  if (Array.isArray(baseValue) && Array.isArray(patch)) return patchList(baseValue, patch, mergeKeys, worldState, context);
   return deepMerge(baseValue, patch);
 }
 
@@ -723,7 +763,7 @@ export function resolveWorldValue(rawValue, worldState = EMPTY_WORLD_STATE, cont
     return filterWorldList(variant.value, worldState, context);
   }
   if (Object.prototype.hasOwnProperty.call(variant, "patch")) {
-    return patchValue(baseValue, variant.patch, options.mergeKeys ?? []);
+    return patchValue(baseValue, variant.patch, options.mergeKeys ?? [], worldState, context);
   }
   return baseValue;
 }
@@ -736,11 +776,21 @@ export function filterWorldList(rawValue, worldState = EMPTY_WORLD_STATE, contex
 }
 
 function resolveNestedConditionalLists(value, worldState, context) {
-  if (Array.isArray(value)) return filterWorldList(value, worldState, context);
+  if (Array.isArray(value)) {
+    return value
+      .filter((entry) => entryAllowed(entry, worldState, context))
+      .map((entry) => resolveNestedConditionalLists(
+        stripConditionFields(resolveWorldValue(entry, worldState, context)),
+        worldState,
+        context,
+      ));
+  }
   if (!value || typeof value !== "object" || isConditionalValue(value)) return resolveWorldValue(value, worldState, context);
   const result = {};
   for (const [key, child] of Object.entries(value)) {
-    result[key] = resolveNestedConditionalLists(child, worldState, context);
+    result[key] = CONDITION_KEYS.has(key)
+      ? clone(child)
+      : resolveNestedConditionalLists(child, worldState, context);
   }
   return result;
 }

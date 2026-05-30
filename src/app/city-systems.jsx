@@ -387,7 +387,8 @@ function applyCityMobBuildingDamage(progress = {}) {
     if (!targetArea) continue;
     const state = getCityAreaState(next, targetArea);
     if (!state.unlocked) continue;
-    const currentDurability = Math.max(0, Math.min(100, Number(state.durability) || 100));
+    const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
+    const currentDurability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
     const damage = CITY_MOB_DAMAGE_PER_LEVEL_PCT * mob.level * Math.max(1, mob.count);
     const nextDurability = Math.max(0, parseFloat((currentDurability - damage).toFixed(2)));
     if (nextDurability === currentDurability) continue;

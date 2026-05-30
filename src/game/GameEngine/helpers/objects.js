@@ -1,4 +1,4 @@
-import { getRegionObjectFamily, resolveRegionObjectDestructibleDef } from "../dependencies.js";
+import { getRegionObjectFamily, resolveRegionObjectDefBySpawnType, resolveRegionObjectDestructibleDef } from "../dependencies.js";
 
 const DEFAULT_DESTRUCTIBLE_DEF = {
   hp: 1,
@@ -20,6 +20,19 @@ export function getDestructibleDef(object) {
   const regionDef = resolveRegionObjectDestructibleDef(object.type);
   if (regionDef) return regionDef;
   return object.destructible ? DEFAULT_DESTRUCTIBLE_DEF : null;
+}
+
+export function objectMetadataConfig(object) {
+  const def = resolveRegionObjectDefBySpawnType(object?.type);
+  const tags = [
+    ...(Array.isArray(def?.tags) ? def.tags : []),
+    ...(Array.isArray(object?.tags) ? object.tags : []),
+  ].map(String).filter(Boolean);
+  return {
+    tags: [...new Set(tags)],
+    factionId: object?.factionId ?? def?.factionId,
+    onDestroyed: object?.onDestroyed ?? def?.onDestroyed ?? null,
+  };
 }
 
 export function destructibleObjectScreenHit(object) {

@@ -30,6 +30,7 @@ import { classPointsAvailable, getClassConfig, normalizeClassId, normalizeClassN
 import { normalizeAutoLootRules } from "./loot.js";
 import { normalizeWorldState } from "../../world-state.js";
 import { getWorldEnergyState } from "../../world-energy.js";
+import { normalizeFactionRep } from "../../config/faction-config.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -70,6 +71,7 @@ export const snapshotMethods = {
         nextXp: this.xpForNextLevel(),
         gold: this.player.gold,
         popularity: Math.round(clamp(Number(this.player.popularity) || 0, POPULARITY_CONFIG.min, POPULARITY_CONFIG.max)),
+        factionRep: normalizeFactionRep(this.player.factionRep),
         damage: `${stats.damageMin}-${stats.damageMax}`,
         armor: stats.armor,
         mode: stats.mode,

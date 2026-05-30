@@ -25,6 +25,7 @@ import {
 } from "../helpers.js";
 import { normalizeSkillTree } from "../../config/skill-tree-config.js";
 import { DEFAULT_CLASS_ID } from "../../config/class-config.js";
+import { normalizeFactionRep } from "../../config/faction-config.js";
 import { createAutoLootRules } from "./loot.js";
 import { resolvePerformanceProfile } from "../../config/performance-config.js";
 
@@ -52,6 +53,7 @@ export const lifecycleMethods = {
       xp: 0,
       gold: 0,
       popularity: 0,
+      factionRep: normalizeFactionRep(),
       hp: 120,
       mana: 64,
       potions: { health: 0, mana: 0 },
