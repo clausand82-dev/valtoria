@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { MAX_INVENTORY, RARITIES, TILE_H, TILE_W } from "../game/data.js";
+import {
+  MAX_INVENTORY,
+  RARITIES,
+  TILE_H,
+  TILE_W,
+  inventorySlotRequiredLevel,
+  inventoryUnlockedSlotCount,
+} from "../game/data.js";
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue } from "../game/world.js";
@@ -32,7 +39,7 @@ import {
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
 import { QUEST_BOARD_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
-import { SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
+import { MAX_POTION_STACK, SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
 import { getKnownFactions, normalizeFactionRep } from "../game/config/faction-config.js";
 import {
@@ -221,6 +228,7 @@ function CityPage({
   storageOpen = false,
   onCloseStorage,
 }) {
+  const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
   const snapshotRef = useRef(snapshot);
   const cityStorageKeyRef = useRef(cityStorageKey);
   const [loadingCity, setLoadingCity] = useState(!cityAssetCache.assets);
@@ -560,7 +568,14 @@ function CityPage({
       if (!currentTarget) return current;
       const nextInventories = normalizeCityInventories(currentTarget.state, currentTarget.building);
       const items = [...(nextInventories[sectionKey] ?? [])];
-      applyCityInventoryDepositPlan(items, taken, depositPlan);
+      const takenWithSnapshotIcon = normalizeCityStoredItem({
+        ...taken,
+        iconKey: item?.iconKey ?? taken.iconKey,
+        iconUrl: item?.iconUrl ?? taken.iconUrl,
+        iconSheet: item?.iconSheet ?? taken.iconSheet,
+        iconIndex: item?.iconIndex ?? taken.iconIndex,
+      });
+      applyCityInventoryDepositPlan(items, takenWithSnapshotIcon, depositPlan);
       return {
         ...current,
         [buildingId]: {
@@ -684,7 +699,7 @@ function CityPage({
       && String(item.resourceId) === String(resourceId)
       && Math.max(1, Math.floor(Number(item.count) || 1)) < stackMax
     ))) return true;
-    return inventory.length < MAX_INVENTORY;
+    return inventory.length < backpackCapacity;
   };
 
   const convertCityResourceToResource = (inputResourceId, inputCount, outputResourceId, outputCount = 1) => {
@@ -959,6 +974,8 @@ function CityPage({
       {storageOpen && (
         <CityStorageOverviewModal
           inventory={snapshot.inventory}
+          equipment={snapshot.equipment}
+          backpackUnlockedSlots={backpackCapacity}
           storageEntries={storageEntries}
           draggedCityItem={globalStorageDrag}
           onDragCityItem={setGlobalStorageDrag}
@@ -2105,6 +2122,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const [confirmStoreItem, setConfirmStoreItem] = useState(null);
   const [questBoard, setQuestBoard] = useState(null);
   if (!building) return null;
+  const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
 
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
@@ -2349,7 +2367,14 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       const currentBuildingState = getCityBuildingState(current, building);
       const nextInventories = normalizeCityInventories(currentBuildingState, building);
       const items = [...(nextInventories[sectionKey] ?? [])];
-      applyCityInventoryDepositPlan(items, taken, depositPlan);
+      const takenWithSnapshotIcon = normalizeCityStoredItem({
+        ...taken,
+        iconKey: item?.iconKey ?? taken.iconKey,
+        iconUrl: item?.iconUrl ?? taken.iconUrl,
+        iconSheet: item?.iconSheet ?? taken.iconSheet,
+        iconIndex: item?.iconIndex ?? taken.iconIndex,
+      });
+      applyCityInventoryDepositPlan(items, takenWithSnapshotIcon, depositPlan);
       return {
         ...current,
         [building.id]: {
@@ -2687,7 +2712,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       item?.mode === "resource"
       && String(item.resourceId) === String(recipe.output)
       && Math.max(1, Math.floor(Number(item.count) || 1)) < stackMax
-    )) || (snapshotRef?.current?.inventory ?? []).length < MAX_INVENTORY;
+    )) || (snapshotRef?.current?.inventory ?? []).length < backpackCapacity;
     if (!canFit) {
       engineRef.current?.addToast?.("Rygsaekken er fuld");
       return;
@@ -3000,6 +3025,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       buildingState={buildingState}
                       owned={owned}
                       inventory={snapshot.inventory}
+                      equipment={snapshot.equipment}
+                      backpackUnlockedSlots={backpackCapacity}
                       activeSectionKey={activeStorageSection.key}
                       draggedCityItem={draggedCityItem}
                       onDragCityItem={setDraggedCityItem}
@@ -3325,10 +3352,18 @@ function normalizeCityInventories(state, building) {
 
 function normalizeCityStoredItem(item) {
   if (!item) return null;
-  if (isResourceItem(item) || isPotionItem(item)) return item;
-  if (item.count === undefined) return item;
   const next = { ...item };
-  delete next.count;
+  if (isReadableItem(next)) {
+    const readableDef = READABLE_DEF_BY_ID[next.readableId];
+    if (!next.iconUrl && readableDef?.iconUrl) next.iconUrl = readableDef.iconUrl;
+  }
+  if (!next.iconKey) next.iconKey = deriveIconKey(next);
+  if (!next.iconUrl && (next.iconIndex === undefined || next.iconIndex === null)) {
+    next.iconUrl = iconUrlFromKey(next.iconKey);
+  }
+  if (!isResourceItem(next) && !isPotionItem(next) && next.count !== undefined) {
+    delete next.count;
+  }
   return next;
 }
 
@@ -3402,37 +3437,33 @@ function fixedSectionAlreadyHasReadable(item, section, slotIndex, storedItems = 
 }
 
 function cityInventoryStackMax(item) {
-  if (!isResourceItem(item)) return 1;
-  return Math.max(1, Math.floor(Number(item.stackMax ?? resourceStackMax(item.resourceId)) || 1));
+  if (isResourceItem(item)) {
+    return Math.max(1, Math.floor(Number(item.stackMax ?? resourceStackMax(item.resourceId)) || 1));
+  }
+  if (isPotionItem(item)) {
+    return Math.max(1, Math.floor(Number(item.stackMax ?? MAX_POTION_STACK) || 1));
+  }
+  return 1;
 }
 
 function cityInventoryItemsCanStack(incoming, target) {
-  if (!isResourceItem(incoming) || !isResourceItem(target)) return false;
-  if (String(incoming.resourceId ?? "") !== String(target.resourceId ?? "")) return false;
-  return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
-}
-
-function cityInventoryItemsSameTransferIdentity(expected, actual) {
-  if (!expected || !actual) return false;
-  if (isResourceItem(expected) || isResourceItem(actual)) {
-    return isResourceItem(expected)
-      && isResourceItem(actual)
-      && String(expected.resourceId ?? "") === String(actual.resourceId ?? "");
+  if (isResourceItem(incoming) && isResourceItem(target)) {
+    if (String(incoming.resourceId ?? "") !== String(target.resourceId ?? "")) return false;
+    return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
   }
-  const expectedId = expected.id ?? expected.itemId;
-  const actualId = actual.id ?? actual.itemId;
-  if (expectedId !== undefined || actualId !== undefined) {
-    return String(expectedId ?? "") === String(actualId ?? "");
+  if (isPotionItem(incoming) && isPotionItem(target)) {
+    const incomingPotionId = String(incoming.potionId ?? incoming.potionType ?? "");
+    const targetPotionId = String(target.potionId ?? target.potionType ?? "");
+    if (incomingPotionId !== targetPotionId) return false;
+    return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
   }
-  return String(expected.mode ?? "") === String(actual.mode ?? "")
-    && String(expected.slot ?? "") === String(actual.slot ?? "")
-    && String(expected.name ?? "") === String(actual.name ?? "");
+  return false;
 }
 
 function planCityInventoryDeposit(item, section, slotIndex, storedItems = []) {
   if (!item || !section) return null;
   const target = storedItems[slotIndex] ?? null;
-  if (!isResourceItem(item)) {
+  if (!isResourceItem(item) && !isPotionItem(item)) {
     if (target || !itemMatchesCityInventorySlot(item, section, slotIndex)) return null;
     return { movedCount: 1, steps: [{ type: "place", slotIndex, count: 1 }] };
   }
@@ -3473,6 +3504,23 @@ function planCityInventoryDeposit(item, section, slotIndex, storedItems = []) {
 
   const movedCount = steps.reduce((sum, step) => sum + step.count, 0);
   return movedCount > 0 ? { movedCount, steps } : null;
+}
+
+function cityInventoryItemsSameTransferIdentity(expected, actual) {
+  if (!expected || !actual) return false;
+  if (isResourceItem(expected) || isResourceItem(actual)) {
+    return isResourceItem(expected)
+      && isResourceItem(actual)
+      && String(expected.resourceId ?? "") === String(actual.resourceId ?? "");
+  }
+  const expectedId = expected.id ?? expected.itemId;
+  const actualId = actual.id ?? actual.itemId;
+  if (expectedId !== undefined || actualId !== undefined) {
+    return String(expectedId ?? "") === String(actualId ?? "");
+  }
+  return String(expected.mode ?? "") === String(actual.mode ?? "")
+    && String(expected.slot ?? "") === String(actual.slot ?? "")
+    && String(expected.name ?? "") === String(actual.name ?? "");
 }
 
 function applyCityInventoryDepositPlan(items, item, plan) {
@@ -3786,6 +3834,8 @@ function CityCostIcon({ resourceId }) {
 
 function CityStorageOverviewModal({
   inventory,
+  equipment,
+  backpackUnlockedSlots,
   storageEntries,
   draggedCityItem,
   onDragCityItem,
@@ -3815,7 +3865,7 @@ function CityStorageOverviewModal({
         </header>
         <div className="city-storage-overview-body">
           <section className="city-storage-overview-panel backpack-drop">
-            <h4>Back pack <span>{backpackSlots.filter(({ item }) => item).length} / {MAX_INVENTORY}</span></h4>
+            <h4>Back pack <span>{backpackSlots.filter(({ item }) => item).length} / {backpackUnlockedSlots}</span></h4>
             <div
               className="city-storage-overview-grid"
               onDragOver={(event) => {
@@ -3831,11 +3881,26 @@ function CityStorageOverviewModal({
               }}
             >
               {backpackSlots.map(({ item, index }) => {
+                const locked = !item && index >= backpackUnlockedSlots;
+                const requiredLevel = inventorySlotRequiredLevel(index);
                 const target = firstTargetForItem(item);
+                if (locked) {
+                  return (
+                    <CityItemSlot
+                      key={`overview-inv-${index}`}
+                      item={null}
+                      equipment={equipment}
+                      locked
+                      lockLabel={`L${requiredLevel ?? "?"}`}
+                      draggable={false}
+                    />
+                  );
+                }
                 return (
                   <CityItemSlot
                     key={`overview-inv-${index}`}
                     item={item}
+                    equipment={equipment}
                     locked={false}
                     draggable={Boolean(item) && Boolean(target)}
                     accepted={Boolean(item) && Boolean(target)}
@@ -3875,6 +3940,7 @@ function CityStorageOverviewModal({
                       <CityItemSlot
                         key={`${entry.buildingId}-${entry.section.key}-${slotIndex}`}
                         item={item}
+                        equipment={equipment}
                         placeholder={entry.section.fixedDefs?.[slotIndex]}
                         locked={false}
                         draggable={Boolean(item) && !entry.section.fixedDefs?.[slotIndex]}
@@ -3931,6 +3997,8 @@ function CityStoragePanel({
   buildingState,
   owned,
   inventory,
+  equipment,
+  backpackUnlockedSlots,
   activeSectionKey,
   draggedCityItem,
   onDragCityItem,
@@ -3945,9 +4013,12 @@ function CityStoragePanel({
   const inventories = normalizeCityInventories(buildingState, building);
   const storedItems = inventories[activeSection?.key] ?? [];
   const inventorySlots = Array.from({ length: MAX_INVENTORY }, (_, index) => ({ item: inventory[index] ?? null, index }))
-    .filter(({ item }) => (
+    .filter(({ item, index }) => (
+      (!item && index >= backpackUnlockedSlots)
+      || (
       !activeSection?.fixedDefs?.length
       || (Boolean(item) && itemCanEnterAnyCityInventorySlot(item, activeSection, storedItems))
+      )
     ));
 
   if (!activeSection) return null;
@@ -3956,7 +4027,7 @@ function CityStoragePanel({
     <section className="city-bank-panel">
       <div className="city-bank-column">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-          <h4>Backpack</h4>
+          <h4>Backpack <span>{inventory.filter(Boolean).length} / {backpackUnlockedSlots}</span></h4>
           <button 
             type="button" 
             onClick={() => onTransferAllResources?.(activeSection.key)}
@@ -3975,11 +4046,26 @@ function CityStoragePanel({
           }}
         >
           {inventorySlots.map(({ item, index }) => {
+            const locked = !item && index >= backpackUnlockedSlots;
+            const requiredLevel = inventorySlotRequiredLevel(index);
+            if (locked) {
+              return (
+                <CityItemSlot
+                  key={`inv-${index}`}
+                  item={null}
+                  equipment={equipment}
+                  locked
+                  lockLabel={`L${requiredLevel ?? "?"}`}
+                  draggable={false}
+                />
+              );
+            }
             const canEnter = itemCanEnterAnyCityInventorySlot(item, activeSection, storedItems);
             return (
             <CityItemSlot
               key={`inv-${index}`}
               item={item}
+              equipment={equipment}
               locked={false}
               draggable={Boolean(item) && canEnter}
               accepted={Boolean(item) && canEnter}
@@ -4006,6 +4092,7 @@ function CityStoragePanel({
               <CityItemSlot
                 key={`${activeSection.key}-${index}`}
                 item={storedItems[index]}
+                equipment={equipment}
                 placeholder={activeSection.fixedDefs?.[index]}
                 locked={locked}
                 draggable={owned && Boolean(storedItems[index]) && !activeSection.fixedDefs?.[index]}

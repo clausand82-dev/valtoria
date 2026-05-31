@@ -175,6 +175,7 @@ Rewards:
   Example: rewards: { xp: 100, gold: 25, lydra: 3, netdra: 0.5 }
 - rewards.resources: Resource rewards, for example [{ resource: "red_gemstone", count: 1 }].
 - rewards.randomItem: Gives a random equipment item. Current support uses { minRarity: "upgraded" } as a hint.
+- rewards.namedItems: Gives named equipment rewards, for example [{ namedId: "devils_judge" }].
 - rewards.xpPerKill / rewards.goldPerKill: Used by kill quests to scale reward from target.count.
 
 World energy conditions:

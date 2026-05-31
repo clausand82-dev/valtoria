@@ -1972,6 +1972,22 @@ button {
   font-weight: 800;
 }
 
+.item-detail-section-label {
+  color: #9f9583;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.item-detail-summary-lines {
+  display: grid;
+  gap: 2px;
+}
+
+.item-detail-summary-lines span {
+  overflow-wrap: anywhere;
+}
+
 .item-hover-panel {
   position: fixed;
   right: 18px;
@@ -2500,7 +2516,7 @@ button {
 
 .backpack-sheet {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) minmax(72px, 92px);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 6px;
   padding: 18px;
   overflow: hidden;
@@ -2767,8 +2783,35 @@ button {
   height: 36px;
 }
 
-.item-card > span:not(.equipment-slot-corners):not(.item-card-dur-bar-wrap) {
+.item-card > span:not(.equipment-slot-corners):not(.item-card-dur-bar-wrap):not(.locked-slot-level) {
   display: none;
+}
+
+.item-card.locked-slot {
+  border-color: rgba(201, 149, 67, 0.26);
+  background:
+    linear-gradient(145deg, rgba(11, 10, 9, 0.9), rgba(5, 5, 5, 0.94));
+  opacity: 0.78;
+}
+
+.item-card.locked-slot::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(201, 149, 67, 0.2);
+  background:
+    linear-gradient(45deg, transparent 46%, rgba(201, 149, 67, 0.12) 47% 53%, transparent 54%),
+    linear-gradient(-45deg, transparent 46%, rgba(201, 149, 67, 0.12) 47% 53%, transparent 54%);
+}
+
+.locked-slot-level {
+  position: relative;
+  z-index: 1;
+  display: block;
+  color: rgba(201, 149, 67, 0.88);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
 }
 
 .item-card-dur-bar-wrap {
@@ -2897,6 +2940,33 @@ button {
 
 .item-hover-panel {
   display: none;
+}
+
+.item-hover-panel.is-floating {
+  display: block;
+  z-index: 48;
+}
+
+.item-hover-panel.is-floating .comparison-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  max-height: none;
+  overflow: visible;
+}
+
+.item-hover-panel.is-floating .comparison-list span {
+  display: block;
+}
+
+.item-hover-panel-title {
+  display: block;
+  margin-bottom: 3px;
+  color: #9f9583;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
 }
 
 .auto-loot-panel {
@@ -3505,6 +3575,13 @@ button {
   justify-content: flex-start;
   justify-items: start;
   text-align: left;
+}
+
+.quest-parchment-dialog .comparison-list,
+.quest-parchment-panel .comparison-list {
+  max-height: 132px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .quest-parchment-dialog .comparison-list span,
@@ -6177,6 +6254,21 @@ button {
   );
 }
 
+.city-slot-lock-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(201, 149, 67, 0.9);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.2px;
+}
+
+.city-item-hover-panel {
+  z-index: 75;
+}
+
 .city-item-slot .inventory-icon {
   width: 100%;
   height: 100%;
@@ -6436,7 +6528,7 @@ button {
   }
 
   .backpack-sheet {
-    grid-template-rows: auto auto minmax(330px, 1fr) minmax(72px, auto);
+    grid-template-rows: auto auto minmax(330px, 1fr);
     min-height: 0;
     padding: 12px;
   }

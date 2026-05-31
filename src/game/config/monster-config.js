@@ -1,4 +1,4 @@
-import { GEMSTONE_RESOURCE_IDS } from "./resource-config.js";
+﻿import { GEMSTONE_RESOURCE_IDS } from "./resource-config.js";
 
 /*
 Monster world energy notes:
@@ -468,56 +468,78 @@ export const MONSTER_DEFS = {
   Fallen: {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "demon",
+    tags: ["demon", "medium"],
     stats: { hp: 35, damage: 7, speed: 1.62, range: 0.52, radius: 0.26, color: "#b84d43", xp: 12 },
   },
   "Thorn Husk": {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "plant",
+    tags: ["plant", "medium"],
     stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
   },
   "Mire Brute": {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "plant",
+    tags: ["plant", "large"],
     stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
   },
   Hollow: {
     sprite: "ghost",
     spriteUrl: sheetUrl("ghost"),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
     stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
   },
   "Shard Crawler": {
     sprite: "ghost",
     spriteUrl: sheetUrl("ghost"),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
   },
   "Deep Guard": {
     sprite: "skeleton",
     spriteUrl: sheetUrl("skeleton"),
+    speciesId: "undead",
+    tags: ["undead", "large"],
     stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
   },
   Raider: {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
   },
   Ashbound: {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "demon",
+    tags: ["demon", "medium"],
     stats: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
   },
   "Gate Warden": {
     sprite: "skeleton",
     spriteUrl: sheetUrl("skeleton"),
+    speciesId: "undead",
+    tags: ["undead", "large"],
     stats: { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
   },
   "Bone Warden": {
     sprite: "skeleton",
     spriteUrl: sheetUrl("skeleton"),
+    speciesId: "undead",
+    tags: ["undead", "medium"],
     stats: { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
   },
   Knight: {
     sprite: "knight",
     spriteUrl: sheetUrl("knight"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 96, damage: 17, speed: 1.18, range: 0.68, radius: 0.34, color: "#b8a06f", xp: 34, blockChance: 0.1 },
     lootProfile: { goldChance: 0.72, goldMult: 1.2, weights: { health: 6, mana: 4, weapon: 28, armor: 28, none: 34 } },
     popularity: { change: 0.9 },
@@ -525,6 +547,8 @@ export const MONSTER_DEFS = {
   "Wild Boar": {
     sprite: "wildboar",
     spriteUrl: sheetUrl("wildboar"),
+    speciesId: "boar",
+    tags: ["beast", "wildlife", "medium"],
     stats: { hp: 76, damage: 15, speed: 1.82, range: 0.56, radius: 0.34, color: "#8a5e3d", xp: 28 },
     lootProfile: animalLoot,
     resources: { loot: [{ resource: "meat", min: 1, max: 2, chance: 0.32 }, { resource: "hide", min: 1, max: 1, chance: 0.12 }] },
@@ -533,6 +557,8 @@ export const MONSTER_DEFS = {
   Bear: {
     sprite: "bear",
     spriteUrl: sheetUrl("bear"),
+    speciesId: "bear",
+    tags: ["beast", "wildlife", "large"],
     stats: { hp: 132, damage: 22, speed: 1.14, range: 0.72, radius: 0.45, color: "#8a6244", xp: 42, blockChance: 0.08 },
     lootProfile: animalLoot,
     resources: { loot: [{ resource: "meat", min: 2, max: 4, chance: 0.42 }, { resource: "hide", min: 1, max: 2, chance: 0.24 }] },
@@ -542,6 +568,8 @@ export const MONSTER_DEFS = {
   Icebear: {
     sprite: "icebear",
     spriteUrl: sheetUrl("icebear"),
+    speciesId: "bear",
+    tags: ["beast", "wildlife", "large"],
     stats: { hp: 158, damage: 24, speed: 1.08, range: 0.76, radius: 0.48, color: "#d8edf2", xp: 50, blockChance: 0.1, iceResist: 35, fireResist: -20 },
     lootProfile: { goldChance: 0.22, goldMult: 0.8, weights: { health: 8, mana: 4, weapon: 5, armor: 5, none: 78 } },
     resources: { loot: [{ resource: "meat", min: 2, max: 4, chance: 0.38 }, { resource: "hide", min: 1, max: 2, chance: 0.28 }, { resource: "crystal_piece", min: 1, max: 2, chance: 0.08 }] },
@@ -551,6 +579,8 @@ export const MONSTER_DEFS = {
   Lion: {
     sprite: "lion",
     spriteUrl: sheetUrl("lion"),
+    speciesId: "lion",
+    tags: ["beast", "wildlife", "medium"],
     stats: { hp: 96, damage: 20, speed: 2.04, range: 0.62, radius: 0.38, color: "#c6924d", xp: 38, critChance: 0.08, critDamage: 1.45 },
     lootProfile: animalLoot,
     resources: { loot: [{ resource: "meat", min: 1, max: 3, chance: 0.34 }, { resource: "hide", min: 1, max: 1, chance: 0.18 }] },
@@ -560,6 +590,8 @@ export const MONSTER_DEFS = {
   Rat: {
     sprite: "rat",
     spriteUrl: sheetUrl("rat"),
+    speciesId: "rat",
+    tags: ["beast", "wildlife", "small"],
     stats: { hp: 18, damage: 6, speed: 2.28, range: 0.34, radius: 0.18, color: "#7b6b5e", xp: 7 },
     lootProfile: ratLoot,
     resources: { loot: [{ resource: "meat", min: 1, max: 1, chance: 0.05 }, { resource: "junk", min: 1, max: 1, chance: 0.12 }] },
@@ -575,6 +607,8 @@ export const MONSTER_DEFS = {
   SickRat: {
     sprite: "sickrat",
     spriteUrl: sheetUrl("sickrat"),
+    speciesId: "rat",
+    tags: ["beast", "wildlife", "small", "poison"],
     stats: { hp: 24, damage: 7, speed: 2.08, range: 0.36, radius: 0.19, color: "#7d8f55", xp: 10, poisonResist: 35 },
     lootProfile: ratLoot,
     resources: { loot: [{ resource: "junk", min: 1, max: 2, chance: 0.18 }, { resource: "bonedust", min: 1, max: 1, chance: 0.08 }] },
@@ -584,6 +618,8 @@ export const MONSTER_DEFS = {
   Village01: {
     sprite: "village01",
     spriteUrl: sheetUrl("village01"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
     lootProfile: { goldChance: 0.45, goldMult: 0.85, weights: { health: 8, mana: 4, weapon: 10, armor: 8, none: 70 } },
     popularity: { change: 0.35 },
@@ -591,6 +627,8 @@ export const MONSTER_DEFS = {
   Village02: {
     sprite: "village02",
     spriteUrl: sheetUrl("village02"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
     lootProfile: { goldChance: 0.5, goldMult: 0.9, weights: { health: 8, mana: 4, weapon: 12, armor: 10, none: 66 } },
     popularity: { change: 0.4 },
@@ -598,6 +636,8 @@ export const MONSTER_DEFS = {
   Village03: {
     sprite: "village03",
     spriteUrl: sheetUrl("village03"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
     lootProfile: { goldChance: 0.46, goldMult: 0.86, weights: { health: 8, mana: 4, weapon: 10, armor: 9, none: 69 } },
     popularity: { change: 0.35 },
@@ -605,6 +645,8 @@ export const MONSTER_DEFS = {
   Village04: {
     sprite: "village04",
     spriteUrl: sheetUrl("village04"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
     lootProfile: { goldChance: 0.48, goldMult: 0.88, weights: { health: 8, mana: 4, weapon: 11, armor: 10, none: 67 } },
     popularity: { change: 0.38 },
@@ -612,6 +654,8 @@ export const MONSTER_DEFS = {
   Village05: {
     sprite: "village05",
     spriteUrl: sheetUrl("village05"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
     lootProfile: { goldChance: 0.47, goldMult: 0.87, weights: { health: 8, mana: 4, weapon: 10, armor: 9, none: 69 } },
     popularity: { change: 0.36 },
@@ -619,6 +663,8 @@ export const MONSTER_DEFS = {
   Village06: {
     sprite: "village06",
     spriteUrl: sheetUrl("village06"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
     stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
     lootProfile: { goldChance: 0.5, goldMult: 0.9, weights: { health: 8, mana: 4, weapon: 12, armor: 10, none: 66 } },
     popularity: { change: 0.4 },
@@ -626,6 +672,8 @@ export const MONSTER_DEFS = {
   Wizard: {
     sprite: "wizard",
     spriteUrl: sheetUrl("wizard"),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium", "arcane"],
     stats: { hp: 64, damage: 16, speed: 1.12, range: 3.4, radius: 0.3, color: "#6f68c7", xp: 32, magic: 1.1 },
     spells: ["fireball", "energy_beam"],
     lootProfile: { goldChance: 0.62, goldMult: 1.05, weights: { health: 4, mana: 24, weapon: 8, armor: 6, none: 58 } },
@@ -635,6 +683,8 @@ export const MONSTER_DEFS = {
   "Spawn of Hydra": {
     sprite: "hydra",
     spriteUrl: sheetUrl("hydra"),
+    speciesId: "hydra",
+    tags: ["beast", "wildlife", "large", "poison"],
     stats: { hp: 118, damage: 17, speed: 1.08, range: 4.4, radius: 0.42, color: "#67b957", xp: 42, magic: 10, spells: ["poison_cloud"] },
     lootProfile: { goldChance: 0.52, goldMult: 1.05, weights: { health: 8, mana: 18, weapon: 8, armor: 8, none: 58 } },
     resources: { loot: [{ resource: "magic_essence", min: 1, max: 1, chance: 0.05 }, { resource: "green_gemstone", min: 1, max: 1, chance: 0.01 }] },
@@ -643,6 +693,8 @@ export const MONSTER_DEFS = {
   Hellhound: {
     sprite: "hellhound",
     spriteUrl: sheetUrl("hellhound"),
+    speciesId: "demon",
+    tags: ["demon", "beast", "medium"],
     stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18, fireResist: 30, iceResist: -20 },
     lootProfile: { goldChance: 0.5, goldMult: 0.95, weights: { health: 10, mana: 2, weapon: 12, armor: 14, none: 62 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.18 }, { resource: "coal", min: 1, max: 2, chance: 0.12 }] },
@@ -651,6 +703,8 @@ export const MONSTER_DEFS = {
   Flesheater: {
     sprite: "flesheater",
     spriteUrl: sheetUrl("flesheater"),
+    speciesId: "plant",
+    tags: ["plant", "large", "poison"],
     stats: { hp: 168, damage: 46, speed: 0.34, range: 1.35, radius: 0.44, color: "#6b9f42", xp: 46, poisonResist: 25 },
     lootProfile: { goldChance: 0.25, goldMult: 0.7, weights: { health: 16, mana: 8, weapon: 4, armor: 4, none: 68 } },
     resources: { loot: [{ resource: "fruit", min: 1, max: 2, chance: 0.18 }, { resource: "magic_essence", min: 1, max: 1, chance: 0.025 }] },
@@ -668,6 +722,8 @@ export const MONSTER_DEFS = {
   "Flesheater Young": {
     sprite: "flesheater_young",
     spriteUrl: sheetUrl("flesheater_young"),
+    speciesId: "plant",
+    tags: ["plant", "small"],
     stats: { hp: 24, damage: 12, speed: 2.55, range: 0.35, radius: 0.18, color: "#8dba4d", xp: 6 },
     lootProfile: { goldChance: 0.08, goldMult: 0.25, weights: { health: 3, mana: 1, none: 96 } },
     allowElite: false,
@@ -675,6 +731,8 @@ export const MONSTER_DEFS = {
   "Spawn of Archnogrim": {
     sprite: "archnogrim",
     spriteUrl: sheetUrl("archnogrim"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "large"],
     stats: { hp: 104, damage: 20, speed: 1.48, range: 0.68, radius: 0.36, color: "#7b607d", xp: 38 },
     lootProfile: { goldChance: 0.48, goldMult: 1, weights: { health: 7, mana: 5, weapon: 14, armor: 14, none: 60 } },
     popularity: { change: 1.0 },
@@ -684,6 +742,8 @@ export const MONSTER_DEFS = {
   "Infernus Minion": {
     sprite: "infernus",
     spriteUrl: sheetUrl("infernus"),
+    speciesId: "demon",
+    tags: ["demon", "medium", "fire"],
     stats: { hp: 90, damage: 16, speed: 1.16, range: 4.2, radius: 0.35, color: "#e56d35", xp: 36, magic: 9, spells: ["fireball"] },
     lootProfile: { goldChance: 0.54, goldMult: 1.05, weights: { health: 6, mana: 16, weapon: 8, armor: 10, none: 60 } },
     resources: { inheritDefaultLoot: false, loot: [{ resource: "coal", min: 1, max: 3, chance: 0.22 }, { resource: "magic_essence", min: 1, max: 1, chance: 0.035 }] },
@@ -693,6 +753,8 @@ export const MONSTER_DEFS = {
   Shadowdragon: {
     sprite: "shadowdragon",
     spriteUrl: sheetUrl("shadowdragon"),
+    speciesId: "dragon",
+    tags: ["dragon", "boss", "large"],
     stats: { hp: 520, damage: 36, speed: 1.0, range: 0.9, radius: 0.72, color: "#363046", xp: 0, critChance: 0.08, critDamage: 1.75 },
     allowElite: false,
     isBoss: true,
@@ -710,6 +772,8 @@ export const MONSTER_DEFS = {
   Bjergtroll: {
     sprite: "mountaintroll",
     spriteUrl: sheetUrl("mountaintroll"),
+    speciesId: "troll",
+    tags: ["humanoid", "troll", "large"],
     stats: { hp: 320, damage: 42, speed: 0.62, range: 0.86, radius: 0.62, color: "#8d846f", xp: 72, blockChance: 0.12 },
     lootProfile: { goldChance: 0.7, goldMult: 1.35, weights: { health: 8, mana: 2, weapon: 24, armor: 28, none: 38 } },
     resources: { loot: [{ resource: "rock_piece", min: 2, max: 4, chance: 0.3 }, { resource: "iron_piece", min: 1, max: 2, chance: 0.1 }] },
@@ -719,6 +783,8 @@ export const MONSTER_DEFS = {
   Gigantisktroll: {
     sprite: "gianttroll",
     spriteUrl: sheetUrl("gianttroll"),
+    speciesId: "troll",
+    tags: ["humanoid", "troll", "large"],
     stats: { hp: 540, damage: 46, speed: 0.5, range: 1.05, radius: 0.82, color: "#746b5c", xp: 110, blockChance: 0.16 },
     lootProfile: { goldChance: 0.76, goldMult: 1.55, weights: { health: 8, mana: 2, weapon: 26, armor: 30, none: 34 } },
     resources: { loot: [{ resource: "rock_piece", min: 3, max: 6, chance: 0.36 }, { resource: "iron_piece", min: 1, max: 3, chance: 0.16 }] },
@@ -729,16 +795,22 @@ export const MONSTER_DEFS = {
   "Rune Shade": {
     sprite: "ghost",
     spriteUrl: sheetUrl("ghost"),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
     stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
   },
   "Iron Revenant": {
     sprite: "skeleton",
     spriteUrl: sheetUrl("skeleton"),
+    speciesId: "undead",
+    tags: ["undead", "large"],
     stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
   },
   Demon: {
     sprite: "demon",
     spriteUrl: sheetUrl("demon"),
+    speciesId: "demon",
+    tags: ["demon", "medium"],
     stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
     lootProfile: { goldChance: 0.72, goldMult: 1.15, weights: { health: 28, armor: 24, weapon: 4, mana: 2, none: 42 } },
     resources: { inheritDefaultLoot: false, loot: [{ resource: "coal", min: 1, max: 3, chance: 0.2 }] },
@@ -747,6 +819,8 @@ export const MONSTER_DEFS = {
   Ghost: {
     sprite: "ghost",
     spriteUrl: sheetUrl("ghost"),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
     lootProfile: { goldChance: 0.95, goldMult: 3.8, weights: { mana: 34, health: 2, weapon: 2, armor: 2, none: 60 } },
     resources: { inheritDefaultLoot: false, loot: [{ resource: "crystal_piece", min: 1, max: 2, chance: 0.16 }] },
@@ -755,6 +829,8 @@ export const MONSTER_DEFS = {
   Skeleton: {
     sprite: "skeleton",
     spriteUrl: sheetUrl("skeleton"),
+    speciesId: "undead",
+    tags: ["undead", "medium"],
     stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
     lootProfile: { goldChance: 0.65, goldMult: 1, weights: { weapon: 31, armor: 31, health: 3, mana: 3, none: 32 } },
     popularity: { change: 1.2 },
@@ -762,12 +838,16 @@ export const MONSTER_DEFS = {
   Scorpion: {
     sprite: "scorpion",
     spriteUrl: sheetUrl("scorpion"),
+    speciesId: "scorpion",
+    tags: ["beast", "wildlife", "medium", "poison"],
     stats: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
     lootProfile: { goldChance: 0.7, goldMult: 1, weights: { all: 18, health: 12, mana: 12, weapon: 14, armor: 14, none: 30 } },
   },
   Snake: {
     sprite: "snake",
     spriteUrl: sheetUrl("snake"),
+    speciesId: "snake",
+    tags: ["beast", "wildlife", "medium", "poison"],
     stats: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
     lootProfile: { goldChance: 0.16, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 3, armor: 3, none: 86 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 1, chance: 0.06 }] },
@@ -776,6 +856,8 @@ export const MONSTER_DEFS = {
   Spider: {
     sprite: "spider",
     spriteUrl: sheetUrl("spider"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "medium"],
     stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22, spells: ["web_slow"] },
     lootProfile: spiderLoot,
     popularity: { change: 0.85 },
@@ -790,6 +872,8 @@ export const MONSTER_DEFS = {
   MiniSpider: {
     sprite: "minispider",
     spriteUrl: sheetUrl("minispider"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "small"],
     stats: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10},
     lootProfile: smallSpiderLoot,
     allowElite: false,
@@ -797,18 +881,24 @@ export const MONSTER_DEFS = {
   MediumSpider: {
     sprite: "mediumspider",
     spriteUrl: sheetUrl("mediumspider"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "medium"],
     stats: { hp: 36, damage: 18, speed: 2.0, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16, spells: ["web_slow"] },
     lootProfile: smallSpiderLoot,
   },
   LargeSpider: {
     sprite: "largespider",
     spriteUrl: sheetUrl("largespider"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "large"],
     stats: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32, spells: ["web_slow"] },
     lootProfile: { goldChance: 0.42, goldMult: 0.75, weights: { health: 5, mana: 5, weapon: 10, armor: 10, none: 25 } },
   },
   MotherSpider: {
     sprite: "motherspider",
     spriteUrl: sheetUrl("motherspider"),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "boss", "large"],
     stats: { hp: 220, damage: 36, speed: 1.2, range: 0.8, radius: 0.4, color: "#6d5b83", xp: 48, spells: ["web_slow", "poison_cloud"] },
     lootProfile: { goldChance: 0.42, goldMult: 0.75, weights: { health: 5, mana: 5, weapon: 25, armor: 25, none: 25 } },
     allowElite: false,
@@ -825,6 +915,8 @@ export const MONSTER_DEFS = {
     WolfCub: {
     sprite: "wolf_cub",
     spriteUrl: sheetUrl("wolf_cub"),
+    speciesId: "wolf",
+    tags: ["beast", "wildlife", "small"],
     stats: { hp: 52, damage: 14, speed: 2.00, range: 0.12, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
@@ -840,6 +932,8 @@ export const MONSTER_DEFS = {
   Wolf: {
     sprite: "wolf",
     spriteUrl: sheetUrl("wolf"),
+    speciesId: "wolf",
+    tags: ["beast", "wildlife", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
@@ -848,6 +942,8 @@ export const MONSTER_DEFS = {
     WolfFenris: {
     sprite: "wolf_fenris",
     spriteUrl: sheetUrl("wolf_fenris"),
+    speciesId: "wolf",
+    tags: ["beast", "wildlife", "boss", "large"],
     stats: { hp: 220, damage: 30, speed: 1.25, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 2 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
@@ -865,43 +961,10 @@ export const MONSTER_DEFS = {
   },
 };
 
-function inferMonsterSpecies(type, def = {}) {
-  if (def.speciesId) return def.speciesId;
-  const key = String(type ?? "").toLowerCase();
-  if (key.includes("spider")) return "spider";
-  if (key.includes("rat")) return "rat";
-  if (key.includes("wolf")) return "wolf";
-  if (key.includes("boar")) return "boar";
-  if (key.includes("troll")) return "troll";
-  if (key.includes("dragon")) return "dragon";
-  if (key.includes("skeleton") || key.includes("revenant") || key.includes("warden")) return "undead";
-  if (key.includes("ghost") || key.includes("shade") || key.includes("hollow")) return "spirit";
-  if (key.includes("demon") || key.includes("fallen") || key.includes("hellhound") || key.includes("infernus")) return "demon";
-  if (key.includes("flesheater") || key.includes("husk")) return "plant";
-  return undefined;
-}
-
-function inferMonsterTags(type, def = {}) {
-  const tags = new Set(Array.isArray(def.tags) ? def.tags : []);
-  const speciesId = inferMonsterSpecies(type, def);
-  const key = String(type ?? "").toLowerCase();
-  if (["spider", "rat", "wolf", "boar"].includes(speciesId) || ["bear", "lion", "snake", "scorpion"].some((name) => key.includes(name))) {
-    tags.add("beast");
-    tags.add("wildlife");
-  }
-  if (["human", "elf", "troll"].includes(speciesId) || key.includes("village") || key.includes("knight") || key.includes("wizard")) tags.add("humanoid");
-  if (["demon", "spirit", "undead"].includes(speciesId)) tags.add(speciesId);
-  if (def.isBoss) tags.add("boss");
-  if (key.includes("mini") || key.includes("cub") || key.includes("young")) tags.add("small");
-  else if (key.includes("large") || key.includes("mother") || key.includes("giant")) tags.add("large");
-  else tags.add("medium");
-  if (def.stats?.poisonResist || def.onHitStatus?.type === "dot" || key.includes("poison") || key.includes("sick")) tags.add("poison");
-  return [...tags];
-}
-
 function inferMonsterFaction(type, def = {}) {
   if (def.factionId) return def.factionId;
-  const speciesId = inferMonsterSpecies(type, def);
+  const speciesId = String(def.speciesId ?? "").trim();
+  if ((def.tags ?? []).includes("wildlife")) return "wilds";
   if (["spider", "rat", "wolf", "boar"].includes(speciesId)) return "wilds";
   if (["demon", "undead"].includes(speciesId)) return "corrupted_wilds";
   if (speciesId === "troll") return "tornvalhed_trolls";
@@ -921,9 +984,9 @@ export const MONSTER_STATS = Object.fromEntries(
       killNetdra: Math.max(0, Number(killNetdra) || 0),
       eliteKillLydra: Math.max(0, Number(def.eliteKillLydra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillLydra) || 0),
       eliteKillNetdra: Math.max(0, Number(def.eliteKillNetdra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillNetdra) || 0),
-      speciesId: inferMonsterSpecies(type, def),
+      speciesId: def.speciesId,
       factionId: inferMonsterFaction(type, def),
-      tags: inferMonsterTags(type, def),
+      tags: Array.isArray(def.tags) ? [...def.tags] : [],
       allowElite: def.allowElite !== false,
       isBoss,
       noLoot: Boolean(def.noLoot),
@@ -970,3 +1033,5 @@ export function monsterSpriteId(typeName) {
   if (typeName?.includes("Shade")) return "ghost";
   return "demon";
 }
+
+

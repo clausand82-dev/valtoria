@@ -58,8 +58,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
     ],
     objects: [
       { id: "object_field", weight: 8, destructible: true },
-      { id: "object_hay01", weight: 3, destructible: true },
-      { id: "object_hay02", weight: 3, destructible: true },
+      { id: "object_hay", weight: 6, destructible: true },
       { id: "object_sacks_ground", weight: 2, destructible: true },
     ],
     decay: [

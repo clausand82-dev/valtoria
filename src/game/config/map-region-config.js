@@ -1123,8 +1123,7 @@ export const MAP_REGION_SETS = {
         //{ id: "object_tree_mainland", weight: 8 },
         //{ id: "object_barn", weight: 15, destructible: true },
         { id: "object_sacks_ground", weight: 5, destructible: true },
-        { id: "object_hay01", weight: 5, destructible: true },
-        { id: "object_hay02", weight: 5, destructible: true },
+        { id: "object_hay", weight: 10, destructible: true },
         //{ id: "object_firebeacon_snow", weight: 1, destructible: false },
       ],
       decay: [
@@ -1219,8 +1218,7 @@ export const MAP_REGION_SETS = {
       weights: { foilage: 100 },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
-        { id: "object_hay01", weight: 3 },
-        { id: "object_hay02", weight: 3 },
+        { id: "object_hay", weight: 6 },
         { id: "object_sacks_ground", weight: 5, destructible: true },
       ],
       weather: {

@@ -17,7 +17,7 @@ vengeance: {
     storyTemplate: "{npcName} har mistet folk, varer eller ro til {monster}. Ryd flokken ud, saa byen kan traekke vejret igen.",
     acceptTextTemplate: "Faeld {count} {monster}. Elite taeller med, hvis du finder dem.",
     turnInTextTemplate: "De vil huske, at nogen slog igen.",
-    rewards: { xpPerKill: 22, goldPerKill: 9, randomItem: { minRarity: "upgraded" } },
+    rewards: { xpPerKill: 22, goldPerKill: 9, randomItem: { minRarity: "upgraded" }, factionRep: { village_outskirt: 2 } },
   },
 mage_papers: {
     id: "mage_papers",
@@ -34,7 +34,7 @@ mage_papers: {
     story: "Darium mangler opslagsvaerkenes sider for at fuldende sine noter. Han sender dig ud for at samle nogle stykker papir.",
     acceptText: "Bring mig 12 stykker papir til mine noter.",
     turnInText: "Mine noter er fuldendt takket vaere dig.",
-    rewards: { xp: 90, gold: 45, resources: [{ resource: "yellow_gemstone", count: 1 }] },
+    rewards: { xp: 90, gold: 45, resources: [{ resource: "yellow_gemstone", count: 1 }], factionRep: { village_outskirt: 2 } },
   },
 farmer_supply: {
     id: "farmer_supply",
@@ -51,7 +51,7 @@ farmer_supply: {
     story: "Willis har brug for forraad til sine dyr. Han beder dig hente kød og frugt til at klare vinteren.",
     acceptText: "Saml 100 kød og 50 frugt til farmen.",
     turnInText: "Tak! Dyrene vil klare sig en maengde bedre nu.",
-    rewards: { xp: 240, gold: 210, resources: [] },
+    rewards: { xp: 240, gold: 210, resources: [], factionRep: { village_outskirt: 2 } },
   },
 wiseman_scrolls: {
     id: "wiseman_scrolls",
@@ -68,7 +68,7 @@ wiseman_scrolls: {
     story: "Vitlias soeger gamle skrifter. Find 10 scrolls og bring dem til biblioteket.",
     acceptText: "Find 10 scrolls til mit bibliotek.",
     turnInText: "Disse vil give indsigt til mine studier. Godt fundet.",
-    rewards: { xp: 330, gold: 80, resources: [{ resource: "red_gemstone", count: 1 }] },
+    rewards: { xp: 330, gold: 80, resources: [{ resource: "red_gemstone", count: 1 }], factionRep: { village_outskirt: 2 } },
   },
 annelise_spider_task: {
     id: "annelise_spider_task",
@@ -79,14 +79,15 @@ annelise_spider_task: {
     repeatable: false,
     npcIds: ["lady"],
     regionIds: ["city"],
-    demands: { questActive: ["vitlias_kings_relics"] },
+    questActive: ["vitlias_kings_relics"], //demands
+    //demands: { questActive: ["vitlias_kings_relics"] },
     spawnChance: 1,
     type: "kill_monsters",
     target: { count: 100, monster: ["MiniSpider", "MediumSpider", "LargeSpider", "Spider"], allowElite: true },
     story: "Annelise har en frygt for edderkopper. Hun beder dig dræbe 100 edderkopper i området. Når du har gjort det, vil hun belønne dig med noget særligt.",
     acceptText: "Dræb 100 edderkopper for mig, og jeg vil overveje at give dig noget værdifuldt.",
     turnInText: "Du gjorde det... disse kryb var ikke sjove. Her er scepteret, som jeg har holdt tilbage indtil nu.",
-    rewards: { xp: 800, questItems: [{ questItemId: "king_scepter", count: 1 }] },
+    rewards: { xp: 800, questItems: [{ questItemId: "king_scepter", count: 1 }], factionRep: { village_outskirt: 2 } },
   },
 himus_sell_king_orb: {
     id: "himus_sell_king_orb",
@@ -104,7 +105,7 @@ himus_sell_king_orb: {
     story: "Himus vil gerne se din støtte for et lille stykke magi. Giv ham 5 guldbarre, og han vil sælge dig noget sjældent.",
     acceptText: "Giv mig 5 guldbarre, så skal jeg se, hvad jeg kan gøre.",
     turnInText: "Tak. Her er orb'en som aftalt.",
-    rewards: { xp: 300, questItems: [{ questItemId: "king_orb", count: 1 }] },
+    rewards: { xp: 300, questItems: [{ questItemId: "king_orb", count: 1 }], factionRep: { village_outskirt: 2 } },
   },
 sail_to_tornvalhed: {
     id: "sail_to_tornvalhed",

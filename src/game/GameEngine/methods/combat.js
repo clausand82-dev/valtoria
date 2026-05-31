@@ -44,11 +44,12 @@ import {
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
   "maxHp", "maxMana", "range", "damageMin", "damageMax", "armor", "speed",
-  "maxHpPct", "maxManaPct", "armorFlat", "damagePct", "speedPct", "attackSpeed",
+  "maxHpPct", "maxManaPct", "armorFlat", "armorPct", "damagePct", "speedPct", "attackSpeed",
   "magic", "critChance", "critDamage", "blockChance", "blockAmount", "dodgeChance",
   "lifeSteal", "magicFind", "goldFind", "resourceFind", "xpGain",
   "physicalResist", "fireResist", "iceResist", "lightningResist", "poisonResist",
   "arcaneResist", "holyResist", "shadowResist", "natureResist", "allResist",
+  "magicResist",
   "physicalDamageBonus", "fireDamageBonus", "iceDamageBonus", "lightningDamageBonus",
   "poisonDamageBonus", "arcaneDamageBonus", "holyDamageBonus", "shadowDamageBonus",
   "natureDamageBonus", "spellDamageBonus", "directDamageBonus", "areaDamageBonus",
@@ -504,6 +505,7 @@ export const combatMethods = {
         target,
         sourceType: "melee",
         stats,
+        directDamage: finalDamage,
       });
       this.drainWeaponDurability();
       this.addParticles(target.x, target.y, "#f1d08d", 14, 0.1);
@@ -553,8 +555,30 @@ export const combatMethods = {
       if (chance <= 0 || Math.random() > chance) continue;
       if (effect.type === "areaDamage") {
         this.applyWeaponAreaDamageEffect(effect, context);
+      } else if (effect.type === "targetDamage") {
+        this.applyWeaponTargetDamageEffect(effect, context);
       }
     }
+  },
+
+  applyWeaponTargetDamageEffect(effect, context = {}) {
+    const target = context.target;
+    if (!target || target.dead) return;
+    if (!canDamageTargetWithSource(effect, "weaponEffect", this.targetMetadataFor(target))) return;
+    const baseDamage = (Number(effect.damage) || 0) + (Number(context.directDamage) || 0) * (Number(effect.damagePct) || 0);
+    if (baseDamage <= 0) return;
+    const damage = this.calculateDamage({
+      caster: context.player ?? this.player,
+      casterStats: context.stats ?? this.calcStats(),
+      target,
+      baseDamage,
+      element: effect.element ?? "physical",
+      damageKind: "direct",
+      source: { type: "weaponEffect", id: effect.id ?? "weapon_target_effect" },
+      sourceConfig: effect,
+    }).damage;
+    this.damageMonster(target, damage, effect.damageType ?? "magic", false);
+    this.addParticles(target.x, target.y, effect.color ?? "#ff7b38", 8, 0.08);
   },
 
   applyWeaponAreaDamageEffect(effect, context = {}) {
@@ -622,7 +646,8 @@ export const combatMethods = {
 
   getElementResist(targetStats = {}, element = "physical") {
     const key = resistKeyForElement(element);
-    const resistBeforeClamp = (Number(targetStats?.[key]) || 0) + (Number(targetStats?.allResist) || 0);
+    const magicResist = safeElement(element) === "physical" ? 0 : Number(targetStats?.magicResist) || 0;
+    const resistBeforeClamp = (Number(targetStats?.[key]) || 0) + (Number(targetStats?.allResist) || 0) + magicResist;
     return {
       resistBeforeClamp,
       resistAfterClamp: clamp(resistBeforeClamp, -100, 75),
@@ -1290,6 +1315,7 @@ export const combatMethods = {
   statusSpeedMultiplier(entity) {
     const rooted = (entity.statusEffects ?? []).some((effect) => effect.type === "root" && effect.duration > 0);
     if (rooted) return 0;
+    if (entity === this.player && this.calcStats().slowImmune) return 1;
     const slow = (entity.statusEffects ?? [])
       .filter((effect) => effect.type === "slow" && effect.duration > 0)
       .reduce((max, effect) => Math.max(max, Number(effect.pct) || 0), 0);
@@ -1577,6 +1603,7 @@ export const combatMethods = {
     stats.maxHp *= 1 + n("maxHpPct");
     stats.maxMana *= 1 + n("maxManaPct");
     stats.armor += n("armorFlat");
+    stats.armorPct += n("armorPct");
     stats.damageMin *= 1 + n("damagePct");
     stats.damageMax *= 1 + n("damagePct");
     stats.speed *= 1 + n("speedPct");
@@ -1606,6 +1633,7 @@ export const combatMethods = {
       maxHp: 112 + this.player.level * 8,
       maxMana: 60 + this.player.level * 5,
       armor: 0,
+      armorPct: 0,
       damageMin: 5 + this.player.level,
       damageMax: 9 + this.player.level * 2,
       range: 1.15,
@@ -1632,6 +1660,7 @@ export const combatMethods = {
       shadowResist: 0,
       natureResist: 0,
       allResist: 0,
+      magicResist: 0,
       physicalDamageBonus: 0,
       fireDamageBonus: 0,
       iceDamageBonus: 0,
@@ -1648,6 +1677,7 @@ export const combatMethods = {
       hazardDamageBonus: 0,
       dotDurationBonus: 0,
       statusDurationBonus: 0,
+      slowImmune: false,
       mode: "melee",
     };
     const skillBonus = skillTreeBonuses(this.player.skillTree);
@@ -1675,6 +1705,7 @@ export const combatMethods = {
       stats.maxMana += s(item.maxMana);
       stats.speed += s(item.speed);
       stats.magic += s(item.magic);
+      if (item.slowImmune) stats.slowImmune = true;
       stats.maxHp *= 1 + s(item.maxHpPct);
       stats.maxMana *= 1 + s(item.maxManaPct);
       stats.armor += s(item.armorFlat);
@@ -1716,6 +1747,7 @@ export const combatMethods = {
     stats.maxMana = Math.floor(stats.maxMana);
     stats.damageMin = Math.max(1, Math.floor(stats.damageMin));
     stats.damageMax = Math.max(stats.damageMin + 1, Math.floor(stats.damageMax));
+    stats.armor *= 1 + stats.armorPct;
     stats.armor = Math.max(0, Math.floor(stats.armor));
     stats.critChance = clamp(stats.critChance, 0, 0.75);
     stats.critDamage = Math.max(1, stats.critDamage);

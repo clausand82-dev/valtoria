@@ -11,6 +11,8 @@ import {
   QUEST_BOARD_CONFIG,
   QUEST_DEFS,
   QUEST_NPCS,
+  NAMED_ITEM_TEMPLATES,
+  makeNamedItem,
   isPotionItem,
   isResourceItem,
   QUEST_INTERACT_RADIUS,
@@ -40,7 +42,7 @@ import {
   questHasSteps,
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
-import { applyFactionRepEffects } from "../../config/faction-config.js";
+import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-config.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
 
 function questStepCompletedFlag(questId, stepId) {
@@ -427,6 +429,16 @@ export const questsMethods = {
     if (level > 0 && this.player.level < level) return false;
     if (demands.cityLevel !== undefined && !this.demandNumberMet(context.cityStats?.cityLevel ?? context.cityStats?.level ?? 1, demands.cityLevel)) return false;
 
+    const factionRepDemands = demands.factionRep && typeof demands.factionRep === "object" && !Array.isArray(demands.factionRep)
+      ? demands.factionRep
+      : null;
+    if (factionRepDemands) {
+      for (const [factionId, condition] of Object.entries(factionRepDemands)) {
+        const actual = getFactionRepFrom(context.player, factionId);
+        if (!this.demandNumberMet(actual, condition)) return false;
+      }
+    }
+
     const requiredQuests = Array.isArray(demands.completedQuests)
       ? demands.completedQuests
       : Array.isArray(demands.requiresQuests)
@@ -442,7 +454,17 @@ export const questsMethods = {
       const needed = Math.max(1, Math.floor(Number(req?.count) || 1));
       if (this.countDemandItems(req) < needed) return false;
     }
-    if (!worldEntryAllowed(demands, this.worldState, context)) return false;
+
+    const worldDemands = { ...demands };
+    if (factionRepDemands) {
+      worldDemands.factionRep = Object.fromEntries(
+        Object.entries(factionRepDemands).map(([factionId, condition]) => [
+          factionId,
+          typeof condition === "number" ? { min: condition } : condition,
+        ]),
+      );
+    }
+    if (!worldEntryAllowed(worldDemands, this.worldState, context)) return false;
     return true;
   },
 
@@ -891,8 +913,9 @@ export const questsMethods = {
     if (!pendingItems.length) return true;
 
     const simulated = this.player.inventory.map((item) => ({ ...item }));
+    const maxSlots = this.inventorySlotCapacity?.() ?? MAX_INVENTORY;
     for (const item of pendingItems) {
-      if (!inventoryCanAccept(simulated, item)) {
+      if (!inventoryCanAccept(simulated, item, maxSlots)) {
         this.addToast("Rygsaekken er fuld. Lav plads foer questen startes");
         return false;
       }
@@ -1151,6 +1174,7 @@ export const questsMethods = {
         return false;
       }
       const step = currentQuestStep(quest);
+      const turnInInventorySnapshot = (this.player.inventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
       const rewardSummary = this.grantQuestRewards(quest);
       if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
       const completed = this.completeQuestStepById(quest.questId, step?.id, { grantRewards: false, consumeItems: false });
@@ -1160,7 +1184,7 @@ export const questsMethods = {
         ok: true,
         questTitle: step?.title ?? quest.title,
         rewards: rewardSummary,
-        questInfo: questSnapshot(quest, this.player.inventory),
+        questInfo: questSnapshot(quest, turnInInventorySnapshot),
       } : false;
     }
     if (!isQuestComplete(quest, this.player.inventory)) {
@@ -1174,6 +1198,7 @@ export const questsMethods = {
       return false;
     }
 
+  const turnInInventorySnapshot = (this.player.inventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
     const rewardSummary = this.grantQuestRewards(quest);
     if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
     this.questState.active.splice(index, 1);
@@ -1193,7 +1218,7 @@ export const questsMethods = {
       ok: true,
       questTitle: quest.title,
       rewards: rewardSummary,
-      questInfo: questSnapshot(quest, this.player.inventory),
+      questInfo: questSnapshot(quest, turnInInventorySnapshot),
     };
   },
 
@@ -1279,6 +1304,13 @@ export const questsMethods = {
         rarity: item.rarity,
       });
     }
+    for (const reward of rewards.namedItems ?? []) {
+      const definition = NAMED_ITEM_TEMPLATES.find((entry) => entry.id === reward.namedId);
+      const item = definition ? makeNamedItem(definition, reward.level ?? this.player.level) : null;
+      if (item && this.addInventoryItem(item)) {
+        summary.items.push({ id: item.id, name: item.name, rarity: item.rarity });
+      }
+    }
     // grant quest items if present in rewards
     if (Array.isArray(rewards.questItems) && rewards.questItems.length > 0) {
       for (const q of rewards.questItems) {
@@ -1327,9 +1359,12 @@ export const questsMethods = {
     }
     for (const reward of quest.rewards?.resources ?? []) {
       const resource = makeResourceItem(reward.resource, reward.count ?? 1);
-      if (resource && !inventoryCanAccept(simulated, resource)) return false;
+      if (resource && !inventoryCanAccept(simulated, resource, this.inventorySlotCapacity?.() ?? MAX_INVENTORY)) return false;
     }
-    if (quest.rewards?.randomItem && simulated.length >= MAX_INVENTORY) return false;
+    const maxSlots = this.inventorySlotCapacity?.() ?? MAX_INVENTORY;
+    if (quest.rewards?.randomItem && simulated.length >= maxSlots) return false;
+    const namedRewardCount = Array.isArray(quest.rewards?.namedItems) ? quest.rewards.namedItems.length : 0;
+    if (namedRewardCount > 0 && simulated.length + namedRewardCount > maxSlots) return false;
     return true;
   },
 

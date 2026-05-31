@@ -1,6 +1,11 @@
 export {
   CHUNK_SIZE,
+  INVENTORY_COLUMNS,
+  INVENTORY_ROWS,
+  INVENTORY_SLOT_LOCKS,
   MAX_INVENTORY,
+  inventorySlotRequiredLevel,
+  inventoryUnlockedSlotCount,
   TILE_H,
   TILE_W,
   WORLD_SEED,

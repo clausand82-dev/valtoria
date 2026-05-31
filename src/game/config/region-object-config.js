@@ -3,8 +3,6 @@ import { OBJECT_SOCKET_CONFIG } from "./object-sockets-config.js";
 
 // TODO:DELETE - TREE_OBJECT_BY_BIOME is only used by legacyRegionObjectsFromWeights. All regions now use explicit objects: arrays.
 // const TREE_OBJECT_BY_BIOME = {
-//   snow: "object_tree_snow",
-//   desert: "object_tree_sand",
 //   sand: "object_tree_sand",
 //   jungle: "object_tree_jungle",
 //   rock: "object_tree_rock",
@@ -493,6 +491,7 @@ export const REGION_OBJECT_DEFS = {
   object_shelfs: {
     spawnTypes: [{ type: "object_shelfs", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "container"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -552,6 +551,7 @@ export const REGION_OBJECT_DEFS = {
   object_well: {
     spawnTypes: [{ type: "object_well", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "stone"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -569,6 +569,7 @@ export const REGION_OBJECT_DEFS = {
   object_sacks_ground: {
     spawnTypes: [{ type: "object_sacks_ground", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "leather", "container"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -611,9 +612,10 @@ export const REGION_OBJECT_DEFS = {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.88 },
   },
-  object_hay01: {
-    spawnTypes: [{ type: "object_hay01", weight: 1 }],
+  object_hay: {
+    spawnTypes: [{ type: "object_hay", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "thatch"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -628,13 +630,20 @@ export const REGION_OBJECT_DEFS = {
       ],
     },
     renderBiomeId: "mainland",
-    graphicsRef: "object/object_hay01.png",
+    graphics: {
+      mode: "sheet",
+      files: [
+        "object/object_hay01.png",
+        "object/object_hay02.png",
+      ],
+    },
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
-  object_hay02: {
+  /*object_hay02: {
     spawnTypes: [{ type: "object_hay02", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "thatch"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -652,7 +661,7 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_hay02.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
-  },
+  },*/
   object_bones: {
     spawnTypes: [{ type: "object_bones", weight: 1 }],
     defaultDestructible: true,

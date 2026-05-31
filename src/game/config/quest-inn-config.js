@@ -17,7 +17,7 @@ lost_watch: {
     story: "Turanios' familieur blev taget under en kaotisk flugt gennem oede stier. Uret er ikke bare guld; det indeholder navne paa slaegten, og elitebaesterne samler paa den slags skinnende trofaeer.",
     acceptText: "Mit ur er uvurderligt. Find det i oedemarken, og jeg betaler i erfaring, ikke smaamoenter.",
     turnInText: "Min slaegts tikken er vendt tilbage. Det skal huskes.",
-    rewards: { xp: 520, gold: 0, resources: [] },
+    rewards: { xp: 520, gold: 0, resources: [], lydra: 5, factionRep: { village_outskirt: 1 } },
   },
 mage_sunforged: {
     id: "mage_sunforged",
@@ -35,7 +35,7 @@ mage_sunforged: {
     story: "Darium har brug for et Sunforged Sword til et ritual. Find et svard med det rigtige navn og bring det til ham.",
     acceptText: "Find et Sunforged Sword og tag det til mig.",
     turnInText: "Dette vil hjælpe ritualet. Tak.",
-    rewards: { xp: 420, gold: 140, resources: [{ resource: "blue_gemstone", count: 1 }] },
+    rewards: { xp: 420, gold: 140, resources: [{ resource: "blue_gemstone", count: 1 }], lydra: 5, factionRep: { village_outskirt: 2 } },
   },
 sam_tylion_lion_gold_idols: {
     id: "sam_tylion_lion_gold_idols",
@@ -51,6 +51,6 @@ sam_tylion_lion_gold_idols: {
     story: "Noten beskriver Sam Tylions forsvundne kasse med sjældne lion gold idols. Væsner har spredt dem over alle regioner, og Himus kan hjælpe med at sende dem tilbage til familien.",
     acceptText: "Find alle 24 lion gold idols, som væsnerne har spredt, og aflever dem til Himus i byen.",
     turnInText: "Det er alle 24. Sam skylder dig mere end en tak, og jeg skal nok få dem sikkert tilbage til ham.",
-    rewards: { xp: 900, gold: 240 },
+    rewards: { xp: 900, gold: 240, lydra: 5, factionRep: { village_outskirt: 3 } },
   },
 };

@@ -10,7 +10,7 @@ export const DURABILITY_DEGRADE_MAX_PCT = 1;
 // Item/equipment durability
 
 // Random durability range for new drops (%)
-export const ITEM_DURABILITY_RANDOM_MIN = 55;
+export const ITEM_DURABILITY_RANDOM_MIN = 75;
 export const ITEM_DURABILITY_RANDOM_MAX = 100;
 
 // Below this percent, stats start degrading gradually (0% = unusable)

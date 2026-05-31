@@ -303,8 +303,9 @@ export const lootMethods = {
       .map((entry) => makeResourceItem(entry.resource, entry.count))
       .filter(Boolean);
     const simulatedInventory = this.player.inventory.map((item) => ({ ...item }));
+    const maxSlots = this.inventorySlotCapacity?.() ?? simulatedInventory.length;
     for (const item of items) {
-      if (inventoryCanAccept(simulatedInventory, item)) continue;
+      if (inventoryCanAccept(simulatedInventory, item, maxSlots)) continue;
       this.addToast("Rygsaekken er fuld");
       this.publishSnapshot();
       return false;

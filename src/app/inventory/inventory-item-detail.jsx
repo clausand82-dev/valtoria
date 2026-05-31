@@ -1,4 +1,61 @@
 import React from "react";
+import { ITEM_DURABILITY_PENALTY_THRESHOLD } from "../../game/config/durability-config.js";
+
+const EFFECTIVE_STAT_ROWS = [
+  { key: "damageMin", label: "Skade min", decimals: 0 },
+  { key: "damageMax", label: "Skade max", decimals: 0 },
+  { key: "armor", label: "Armor", decimals: 0 },
+  { key: "maxHp", label: "Liv", decimals: 0 },
+  { key: "maxMana", label: "Mana", decimals: 0 },
+  { key: "magic", label: "Magi", decimals: 0 },
+  { key: "speed", label: "Fart", decimals: 2 },
+  { key: "range", label: "Range", decimals: 2 },
+  { key: "cooldown", label: "Cooldown", decimals: 2, lowerIsBetter: true },
+];
+
+function durabilityMultiplier(item) {
+  if (!item || item.mode === "resource" || item.mode === "potion" || item.mode === "readable") return 1;
+  const durability = Math.max(0, Math.min(100, Number(item.durability ?? 100)));
+  if (durability <= 0) return 0;
+  if (durability >= ITEM_DURABILITY_PENALTY_THRESHOLD) return 1;
+  return durability / ITEM_DURABILITY_PENALTY_THRESHOLD;
+}
+
+function durabilityAdjustedStat(item, key) {
+  const multiplier = durabilityMultiplier(item);
+  return Number(item?.[key] || 0) * multiplier;
+}
+
+function formatScaledSummaryNumber(rawToken, scaledValue, suffix) {
+  const isPercent = suffix.includes("%");
+  const hadDecimals = String(rawToken).includes(".");
+  const decimals = hadDecimals ? (String(rawToken).split(".")[1]?.length ?? 0) : (isPercent ? 1 : 0);
+  const rounded = Number(scaledValue.toFixed(decimals));
+  const absoluteText = decimals > 0 ? Math.abs(rounded).toFixed(decimals) : String(Math.round(Math.abs(rounded)));
+  const sign = rounded < 0 ? "-" : "+";
+  return `${sign}${absoluteText}`;
+}
+
+function effectiveSummaryText(item) {
+  const baseSummary = String(item?.summary ?? "").trim();
+  if (!baseSummary) return "";
+  const multiplier = durabilityMultiplier(item);
+  if (multiplier >= 1 || multiplier <= 0) return baseSummary;
+
+  const segments = baseSummary.split("|").map((part) => part.trim()).filter(Boolean);
+  const scaledSegments = segments.map((segment) => {
+    if (/\bg\s*$/i.test(segment)) return segment;
+    const match = segment.match(/^([+-]?\d+(?:\.\d+)?)(\s*.*)$/);
+    if (!match) return segment;
+    const rawNumber = Number(match[1]);
+    if (!Number.isFinite(rawNumber)) return segment;
+    const scaledNumber = rawNumber * multiplier;
+    const suffix = match[2] ?? "";
+    return `${formatScaledSummaryNumber(match[1], scaledNumber, suffix)}${suffix}`.trim();
+  });
+
+  return scaledSegments.join(" | ");
+}
 
 function findEquippedComparison(item, equipment) {
   if (!item || item.index === undefined) return null;
@@ -12,17 +69,12 @@ function findEquippedComparison(item, equipment) {
 }
 
 function getItemDiffs(item, equipped) {
-  const rows = [
-    diffNumber("Skade min", item.damageMin, equipped.damageMin),
-    diffNumber("Skade max", item.damageMax, equipped.damageMax),
-    diffNumber("Armor", item.armor, equipped.armor),
-    diffNumber("Liv", item.maxHp, equipped.maxHp),
-    diffNumber("Mana", item.maxMana, equipped.maxMana),
-    diffNumber("Magi", item.magic, equipped.magic),
-    diffNumber("Fart", item.speed, equipped.speed, { decimals: 2 }),
-    diffNumber("Range", item.range, equipped.range, { decimals: 2 }),
-    diffNumber("Cooldown", item.cooldown, equipped.cooldown, { decimals: 2, lowerIsBetter: true }),
-  ];
+  const rows = EFFECTIVE_STAT_ROWS.map((entry) => diffNumber(
+    entry.label,
+    durabilityAdjustedStat(item, entry.key),
+    durabilityAdjustedStat(equipped, entry.key),
+    { decimals: entry.decimals, lowerIsBetter: entry.lowerIsBetter }
+  ));
   return rows.filter(Boolean);
 }
 
@@ -38,18 +90,20 @@ function diffNumber(label, next, current, options = {}) {
   };
 }
 
-export function InventoryItemDetail({ selectedItem, equipment }) {
+export function InventoryItemDetail({ selectedItem, equipment, showSummary = true }) {
   if (!selectedItem) return null;
 
   const comparisonItem = findEquippedComparison(selectedItem, equipment);
   const diffs = comparisonItem ? getItemDiffs(selectedItem, comparisonItem) : [];
+  const itemNameColor = selectedItem.rarityColor ?? undefined;
+  const displaySummary = effectiveSummaryText(selectedItem);
   const showDurability = selectedItem.mode !== "resource" && selectedItem.mode !== "potion" && selectedItem.mode !== "readable";
   const durPct = showDurability ? Math.max(0, Math.min(100, Number(selectedItem.durability ?? 100))) : null;
   const durColor = durPct === null ? null : durPct >= 75 ? "#58d96d" : durPct >= 40 ? "#ffd85d" : "#ff6b5f";
 
   return (
     <div className="item-detail">
-      <b className={selectedItem.mode === "resource" ? "resource-rarity" : selectedItem.rarity}>{selectedItem.name}</b>
+      <b className={selectedItem.mode === "resource" ? "resource-rarity" : selectedItem.rarity} style={{ color: itemNameColor }}>{selectedItem.name}</b>
       {selectedItem.mode === "resource" && <em>Stack: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
       {selectedItem.mode === "potion" && selectedItem.count > 1 && <em>Stack: {selectedItem.count}</em>}
       {showDurability && (
@@ -63,15 +117,18 @@ export function InventoryItemDetail({ selectedItem, equipment }) {
         </div>
       )}
       {comparisonItem && diffs.length > 0 && (
-        <div className="comparison-list">
-          {diffs.map((diff) => (
-            <span className={diff.good ? "diff-good" : "diff-bad"} key={diff.label}>
-              {diff.good ? "+" : "-"} {diff.label} {diff.text}
-            </span>
-          ))}
-        </div>
+        <>
+          <span className="item-detail-section-label">Sammenlignet med udstyret item</span>
+          <div className="comparison-list">
+            {diffs.map((diff) => (
+              <span className={diff.good ? "diff-good" : "diff-bad"} key={diff.label}>
+                {diff.good ? "+" : "-"} {diff.label} {diff.text}
+              </span>
+            ))}
+          </div>
+        </>
       )}
-      <span>{selectedItem.summary}</span>
+      {showSummary && <span>{displaySummary}</span>}
     </div>
   );
 }

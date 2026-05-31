@@ -1,5 +1,6 @@
 import {
   MAX_INVENTORY,
+  inventoryUnlockedSlotCount,
   PREFIXES,
   RARITIES,
   createId,
@@ -89,6 +90,12 @@ function weaponHands(item) {
 }
 
 export const inventoryMethods = {
+  inventorySlotCapacity() {
+    const level = Number(this.player?.level) || 1;
+    const unlocked = Math.floor(Number(inventoryUnlockedSlotCount(level)) || 0);
+    return Math.max(0, Math.min(MAX_INVENTORY, unlocked));
+  },
+
   setAutoLootRule(group, id, enabled) {
     const groupId = group === "rarities" ? "rarities" : "types";
     const allowed = groupId === "rarities" ? AUTO_LOOT_RARITY_IDS : AUTO_LOOT_TYPE_IDS;
@@ -437,11 +444,42 @@ export const inventoryMethods = {
     return true;
   },
 
+  unequipItemFromSlot(slotId, toIndex = null) {
+    const targetSlotId = String(slotId ?? "").trim();
+    if (!targetSlotId) return false;
+    const item = this.player.equipment?.[targetSlotId];
+    if (!item) return false;
+
+    const maxSlots = this.inventorySlotCapacity();
+    if (this.player.inventory.length >= maxSlots) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+
+    const parsedTarget = Number(toIndex);
+    const hasTargetIndex = Number.isInteger(parsedTarget) && parsedTarget >= 0 && parsedTarget < maxSlots;
+    if (hasTargetIndex) {
+      const insertIndex = Math.min(parsedTarget, this.player.inventory.length);
+      this.player.inventory.splice(insertIndex, 0, item);
+    } else {
+      this.player.inventory.push(item);
+    }
+
+    this.player.equipment[targetSlotId] = null;
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.addToast(`Afudstyret: ${item.name}`);
+    this.publishSnapshot();
+    return true;
+  },
+
   moveInventoryItem(fromIndex, toIndex) {
     const from = Math.floor(Number(fromIndex));
     const to = Math.floor(Number(toIndex));
     if (!Number.isInteger(from) || !Number.isInteger(to)) return false;
-    if (from < 0 || from >= this.player.inventory.length || to < 0 || to >= MAX_INVENTORY || from === to) return false;
+    const maxSlots = this.inventorySlotCapacity();
+    if (from < 0 || from >= this.player.inventory.length || to < 0 || to >= maxSlots || from === to) return false;
     const [item] = this.player.inventory.splice(from, 1);
     const target = Math.min(to, this.player.inventory.length);
     this.player.inventory.splice(target, 0, item);
@@ -713,7 +751,8 @@ export const inventoryMethods = {
       return false;
     }
     const simulated = this.player.inventory.map((item) => ({ ...item }));
-    if (!inventoryCanAccept(simulated, output)) {
+    const maxSlots = this.inventorySlotCapacity();
+    if (!inventoryCanAccept(simulated, output, maxSlots)) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -745,7 +784,8 @@ export const inventoryMethods = {
       return false;
     }
     const simulated = this.player.inventory.map((item) => ({ ...item }));
-    if (!inventoryCanAccept(simulated, output)) {
+    const maxSlots = this.inventorySlotCapacity();
+    if (!inventoryCanAccept(simulated, output, maxSlots)) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -775,7 +815,7 @@ export const inventoryMethods = {
     }
     const simulated = this.player.inventory.map((item) => ({ ...item }));
     consumeResourceInputs(simulated, { [inputResourceId]: cost });
-    if (!inventoryCanAccept(simulated, output)) {
+    if (!inventoryCanAccept(simulated, output, this.inventorySlotCapacity())) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -800,7 +840,7 @@ export const inventoryMethods = {
     if (!output) return false;
     const simulated = this.player.inventory.map((item) => ({ ...item }));
     consumeResourceInputs(simulated, recipe.inputs ?? {});
-    if (!inventoryCanAccept(simulated, output)) {
+    if (!inventoryCanAccept(simulated, output, this.inventorySlotCapacity())) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -832,7 +872,7 @@ export const inventoryMethods = {
       return false;
     }
     const simulated = this.player.inventory.map((entry, entryIndex) => (entryIndex === index ? null : entry)).filter(Boolean);
-    if (!inventoryCanAccept(simulated, essence)) {
+    if (!inventoryCanAccept(simulated, essence, this.inventorySlotCapacity())) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -1036,7 +1076,7 @@ export const inventoryMethods = {
     }
     const simulated = this.player.inventory.map((entry) => ({ ...entry }));
     consumeReadableInputs(simulated, recipe.inputs);
-    if (!inventoryCanAccept(simulated, output)) {
+    if (!inventoryCanAccept(simulated, output, this.inventorySlotCapacity())) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -1064,7 +1104,7 @@ export const inventoryMethods = {
     }
     const output = makeResourceItem(recipe.output, recipe.count ?? 1);
     if (!output) return false;
-    if (!resourceOutputCanFitAfterMerge(this.player.inventory, recipe, output)) {
+    if (!resourceOutputCanFitAfterMerge(this.player.inventory, recipe, output, this.inventorySlotCapacity())) {
       this.addToast("Rygsaekken er fuld");
       return false;
     }
@@ -1116,6 +1156,7 @@ export const inventoryMethods = {
   },
 
   addPotionLoot(item) {
+      const maxSlots = this.inventorySlotCapacity();
     const potionId = normalizePotionId(item?.potionId ?? item?.potionType);
     const def = potionDefById(potionId);
     if (!def) return false;
@@ -1131,7 +1172,7 @@ export const inventoryMethods = {
       if (remaining <= 0) return true;
     }
     while (remaining > 0) {
-      if (this.player.inventory.length >= MAX_INVENTORY) {
+      if (this.player.inventory.length >= maxSlots) {
         item.count = remaining;
         return false;
       }
@@ -1154,6 +1195,7 @@ export const inventoryMethods = {
   },
 
   addInventoryItem(item) {
+    const maxSlots = this.inventorySlotCapacity();
     if (!item) return false;
     if (isResourceItem(item)) {
       let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
@@ -1169,7 +1211,7 @@ export const inventoryMethods = {
         if (remaining <= 0) return true;
       }
       while (remaining > 0) {
-        if (this.player.inventory.length >= MAX_INVENTORY) {
+        if (this.player.inventory.length >= maxSlots) {
           item.count = remaining;
           return false;
         }
@@ -1182,7 +1224,7 @@ export const inventoryMethods = {
     if (isPotionItem(item)) {
       return this.addPotionLoot(item);
     }
-    if (this.player.inventory.length >= MAX_INVENTORY) return false;
+    if (this.player.inventory.length >= maxSlots) return false;
     this.player.inventory.push(item);
     return true;
   },
@@ -1210,6 +1252,7 @@ export const inventoryMethods = {
       if (item.maxHpPct) parts.push(`+${pct(item.maxHpPct)} liv`);
       if (item.maxManaPct) parts.push(`+${pct(item.maxManaPct)} mana`);
       if (item.armorFlat) parts.push(`+${item.armorFlat} armor`);
+      if (item.armorPct) parts.push(`+${pct(item.armorPct)} armor`);
       if (item.damagePct) parts.push(`+${pct(item.damagePct)} skade`);
       if (item.speedPct) parts.push(`+${pct(item.speedPct)} fart`);
       if (item.attackSpeed) parts.push(`+${pct(item.attackSpeed)} attack speed`);
@@ -1223,11 +1266,12 @@ export const inventoryMethods = {
       if (item.goldFind) parts.push(`+${pct(item.goldFind)} gold find`);
       if (item.resourceFind) parts.push(`+${pct(item.resourceFind)} resource find`);
       if (item.xpGain) parts.push(`+${pct(item.xpGain)} XP gain`);
+      if (item.slowImmune) parts.push("Immune to slow");
       const resistLabels = [
         ["physicalResist", "physical resist"], ["fireResist", "fire resist"], ["iceResist", "ice resist"],
         ["lightningResist", "lightning resist"], ["poisonResist", "poison resist"], ["arcaneResist", "arcane resist"],
         ["holyResist", "holy resist"], ["shadowResist", "shadow resist"], ["natureResist", "nature resist"],
-        ["allResist", "all resist"],
+        ["allResist", "all resist"], ["magicResist", "magic resist"],
       ];
       for (const [key, label] of resistLabels) {
         if (item[key]) parts.push(`${item[key] > 0 ? "+" : ""}${item[key]} ${label}`);

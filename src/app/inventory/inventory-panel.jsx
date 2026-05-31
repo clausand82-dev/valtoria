@@ -1,5 +1,5 @@
 import React from "react";
-import { MAX_INVENTORY } from "../../game/data.js";
+import { MAX_INVENTORY, inventorySlotRequiredLevel, inventoryUnlockedSlotCount } from "../../game/data.js";
 import {
   iconUrlFromKey,
   isEquippableItem,
@@ -35,6 +35,18 @@ function itemFitsEquipmentSlot(item, slotId) {
   if (!item || !slotId || item.mode === "resource" || item.mode === "potion" || item.mode === "readable") return false;
   if (slotId === "ring1" || slotId === "ring2") return item.slot === "ring";
   return item.slot === slotId;
+}
+
+function parseDraggedInventoryIndex(event) {
+  const raw = String(event.dataTransfer.getData("application/x-inventory-index") ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
+function parseDraggedEquipmentSlot(event) {
+  const raw = String(event.dataTransfer.getData("application/x-equipment-slot") ?? "").trim();
+  return raw || null;
 }
 
 const CHARACTER_SLOT_LAYOUT = [
@@ -95,23 +107,56 @@ const AUTO_LOOT_RARITY_OPTIONS = [
   { id: "unique", label: "Unique", color: "#ff9f1c" },
 ];
 
+const HOVER_PANEL_WIDTH = 360;
+const HOVER_PANEL_HEIGHT_ESTIMATE = 260;
+const HOVER_PANEL_GAP = 16;
+const HOVER_STACK_VERTICAL_GAP = 10;
+
 function autoLootEnabled(settings, group, id) {
   return settings?.[group]?.[id] !== false;
 }
 
-function EquipmentSlotButton({ className = "", draggingItem, engineRef, slot, setSelectedItem }) {
+function findEquippedComparisonItem(item, equipmentSlots = []) {
+  if (!item || item.index === undefined) return null;
+  const slotId = item.slot;
+  if (slotId === "ring") {
+    const ring1 = equipmentSlots.find((slot) => slot.id === "ring1")?.item;
+    const ring2 = equipmentSlots.find((slot) => slot.id === "ring2")?.item;
+    return ring1 || ring2 || null;
+  }
+  return equipmentSlots.find((slot) => slot.id === slotId)?.item ?? null;
+}
+
+function EquipmentSlotButton({
+  className = "",
+  draggingItem,
+  engineRef,
+  slot,
+  setSelectedItem,
+  onHoverMove,
+  onHoverLeave,
+}) {
   if (!slot) return <span aria-hidden="true" />;
   const acceptsDraggedItem = itemFitsEquipmentSlot(draggingItem, slot.id);
+  const canDragFromSlot = Boolean(slot.item);
   const durability = gearDurability(slot.item);
   const durabilityColor = durability === null ? "transparent" : durability >= 75 ? "#58d96d" : durability >= 40 ? "#ffd85d" : "#ff6b5f";
   return (
     <button
       type="button"
       className={`equipment-slot equipment-${slot.id} ${className} ${slot.item ? "equipped has-durability" : "empty"} ${acceptsDraggedItem ? "drag-ready" : ""}`}
+      draggable={canDragFromSlot}
       style={{
         "--item-quality": slot.item?.rarityColor ?? "rgba(255,255,255,0.16)",
         "--equipment-durability": `${durability ?? 0}%`,
         "--equipment-durability-color": durabilityColor,
+      }}
+      onDragStart={(event) => {
+        if (!canDragFromSlot) return;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/x-equipment-slot", String(slot.id));
+        const iconElement = event.currentTarget.querySelector(".equipment-icon");
+        if (iconElement) event.dataTransfer.setDragImage(iconElement, 12, 12);
       }}
       onDragOver={(event) => {
         if (!acceptsDraggedItem) return;
@@ -120,11 +165,23 @@ function EquipmentSlotButton({ className = "", draggingItem, engineRef, slot, se
       }}
       onDrop={(event) => {
         event.preventDefault();
-        const index = Number(event.dataTransfer.getData("application/x-inventory-index"));
-        if (Number.isInteger(index)) engineRef.current?.equipInventoryItemToSlot?.(index, slot.id);
+        const index = parseDraggedInventoryIndex(event);
+        if (index !== null) engineRef.current?.equipInventoryItemToSlot?.(index, slot.id);
       }}
-      onMouseEnter={() => setSelectedItem(slot.item)}
+      onDoubleClick={() => {
+        if (!slot.item) return;
+        engineRef.current?.unequipItemFromSlot?.(slot.id);
+      }}
+      onMouseEnter={(event) => {
+        setSelectedItem(slot.item);
+        if (slot.item) onHoverMove?.(event, slot.item);
+      }}
+      onMouseMove={(event) => {
+        if (slot.item) onHoverMove?.(event, slot.item);
+      }}
+      onMouseLeave={() => onHoverLeave?.()}
       onFocus={() => setSelectedItem(slot.item)}
+      onBlur={() => onHoverLeave?.()}
     >
       <span className="equipment-slot-corners" aria-hidden="true" />
       <span className="equipment-icon" aria-hidden="true">
@@ -189,8 +246,91 @@ export function InventoryPanel({
   const usedSlotCounts = new Map();
   const [autoLootOpen, setAutoLootOpen] = React.useState(false);
   const [draggingItem, setDraggingItem] = React.useState(null);
+  const [hoveredItem, setHoveredItem] = React.useState(null);
+  const [hoverPointer, setHoverPointer] = React.useState(null);
   const panelRef = React.useRef(null);
   const autoLoot = snapshot.autoLoot ?? {};
+  const playerLevel = Math.max(1, Math.floor(Number(snapshot.player?.level) || 1));
+  const unlockedInventorySlots = inventoryUnlockedSlotCount(playerLevel);
+
+  const handleHoverMove = React.useCallback((event, item) => {
+    if (!item) return;
+    setHoveredItem(item);
+    setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
+  }, []);
+
+  const clearHoverPanel = React.useCallback(() => {
+    setHoveredItem(null);
+    setHoverPointer(null);
+  }, []);
+
+  const hoverPanelLayout = React.useMemo(() => {
+    if (!hoverPointer) return null;
+    const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 720;
+    const maxLeft = Math.max(8, viewportWidth - HOVER_PANEL_WIDTH - 8);
+    const preferredLeft = hoverPointer.x + HOVER_PANEL_GAP;
+    const left = preferredLeft <= maxLeft
+      ? preferredLeft
+      : Math.max(8, hoverPointer.x - HOVER_PANEL_WIDTH - HOVER_PANEL_GAP);
+    const maxTop = Math.max(8, viewportHeight - HOVER_PANEL_HEIGHT_ESTIMATE - 8);
+    const top = Math.min(Math.max(8, hoverPointer.y - 24), maxTop);
+    return { left, top, viewportWidth, viewportHeight };
+  }, [hoverPointer]);
+
+  const hoveredEquippedItem = React.useMemo(() => {
+    if (!hoveredItem) return null;
+    return findEquippedComparisonItem(hoveredItem, snapshot.equipment);
+  }, [hoveredItem, snapshot.equipment]);
+
+  const showEquippedHover = Boolean(
+    hoveredItem
+    && hoveredEquippedItem
+    && String(hoveredEquippedItem.id ?? "") !== String(hoveredItem.id ?? "")
+  );
+
+  const hoverPanelStyle = React.useMemo(() => {
+    if (!hoverPanelLayout) return null;
+    return {
+      left: `${hoverPanelLayout.left}px`,
+      top: `${hoverPanelLayout.top}px`,
+      right: "auto",
+      bottom: "auto",
+    };
+  }, [hoverPanelLayout]);
+
+  const equippedHoverPanelStyle = React.useMemo(() => {
+    if (!hoverPanelLayout || !showEquippedHover) return null;
+    const { left, top, viewportWidth, viewportHeight } = hoverPanelLayout;
+    const rightCandidate = left + HOVER_PANEL_WIDTH + HOVER_PANEL_GAP;
+    if (rightCandidate + HOVER_PANEL_WIDTH <= viewportWidth - 8) {
+      return {
+        left: `${rightCandidate}px`,
+        top: `${top}px`,
+        right: "auto",
+        bottom: "auto",
+      };
+    }
+    const leftCandidate = left - HOVER_PANEL_WIDTH - HOVER_PANEL_GAP;
+    if (leftCandidate >= 8) {
+      return {
+        left: `${leftCandidate}px`,
+        top: `${top}px`,
+        right: "auto",
+        bottom: "auto",
+      };
+    }
+    const belowTop = top + HOVER_PANEL_HEIGHT_ESTIMATE + HOVER_STACK_VERTICAL_GAP;
+    const stackedTop = belowTop + HOVER_PANEL_HEIGHT_ESTIMATE <= viewportHeight - 8
+      ? belowTop
+      : Math.max(8, top - HOVER_PANEL_HEIGHT_ESTIMATE - HOVER_STACK_VERTICAL_GAP);
+    return {
+      left: `${left}px`,
+      top: `${stackedTop}px`,
+      right: "auto",
+      bottom: "auto",
+    };
+  }, [hoverPanelLayout, showEquippedHover]);
 
   React.useEffect(() => {
     if (!draggingItem) return undefined;
@@ -221,7 +361,14 @@ export function InventoryPanel({
 
   return (
     <>
-      <aside className="inventory-panel" ref={panelRef} onMouseLeave={() => setSelectedItem(null)}>
+      <aside
+        className="inventory-panel"
+        ref={panelRef}
+        onMouseLeave={() => {
+          setSelectedItem(null);
+          clearHoverPanel();
+        }}
+      >
         <header className="inventory-titlebar">
           <span className="inventory-title-flourish" aria-hidden="true" />
           <div>
@@ -229,7 +376,7 @@ export function InventoryPanel({
             <strong>Valtoria</strong>
           </div>
           <span className="inventory-capacity">
-            {snapshot.inventory.length} / {MAX_INVENTORY}
+            {snapshot.inventory.length} / {unlockedInventorySlots}
           </span>
           <button type="button" className="close-button" onClick={() => setInventoryOpen(false)} title="Luk">
             x
@@ -259,6 +406,8 @@ export function InventoryPanel({
                     key={`${slotId}-${count}`}
                     slot={slot}
                     setSelectedItem={setSelectedItem}
+                    onHoverMove={handleHoverMove}
+                    onHoverLeave={clearHoverPanel}
                   />
                 );
               })}
@@ -285,7 +434,21 @@ export function InventoryPanel({
 
             <div className="item-grid">
               {inventorySlots.map((item, slotIndex) => {
+                const requiredLevel = inventorySlotRequiredLevel(slotIndex);
+                const lockedSlot = !item && slotIndex >= unlockedInventorySlots;
                 if (!item) {
+                  if (lockedSlot) {
+                    return (
+                      <article
+                        className="item-card empty-slot locked-slot"
+                        key={`locked-${slotIndex}`}
+                        aria-hidden="true"
+                        title={`Laases op ved level ${requiredLevel ?? "?"}`}
+                      >
+                        <span className="locked-slot-level">L{requiredLevel ?? "?"}</span>
+                      </article>
+                    );
+                  }
                   return (
                     <article
                       className="item-card empty-slot"
@@ -297,8 +460,13 @@ export function InventoryPanel({
                       }}
                       onDrop={(event) => {
                         event.preventDefault();
-                        const from = Number(event.dataTransfer.getData("application/x-inventory-index"));
-                        if (Number.isInteger(from)) engineRef.current?.moveInventoryItem?.(from, slotIndex);
+                        const from = parseDraggedInventoryIndex(event);
+                        if (from !== null) {
+                          engineRef.current?.moveInventoryItem?.(from, slotIndex);
+                          return;
+                        }
+                        const fromSlotId = parseDraggedEquipmentSlot(event);
+                        if (fromSlotId) engineRef.current?.unequipItemFromSlot?.(fromSlotId, slotIndex);
                       }}
                     />
                   );
@@ -326,11 +494,22 @@ export function InventoryPanel({
                     }}
                     onDrop={(event) => {
                       event.preventDefault();
-                      const from = Number(event.dataTransfer.getData("application/x-inventory-index"));
-                      if (Number.isInteger(from)) engineRef.current?.moveInventoryItem?.(from, slotIndex);
+                      const from = parseDraggedInventoryIndex(event);
+                      if (from !== null) {
+                        engineRef.current?.moveInventoryItem?.(from, slotIndex);
+                        return;
+                      }
+                      const fromSlotId = parseDraggedEquipmentSlot(event);
+                      if (fromSlotId) engineRef.current?.unequipItemFromSlot?.(fromSlotId, slotIndex);
                     }}
-                    onMouseEnter={() => setSelectedItem(item)}
+                    onMouseEnter={(event) => {
+                      setSelectedItem(item);
+                      handleHoverMove(event, item);
+                    }}
+                    onMouseMove={(event) => handleHoverMove(event, item)}
+                    onMouseLeave={() => clearHoverPanel()}
                     onFocus={() => setSelectedItem(item)}
+                    onBlur={() => clearHoverPanel()}
                     onClick={() => {
                       if (isEquippableItem(item)) engineRef.current?.equipItem(item.index);
                     }}
@@ -402,20 +581,6 @@ export function InventoryPanel({
                 );
               })}
             </div>
-
-            <div className={`inventory-detail-card ${selectedItem ? "has-item" : ""}`}>
-              {selectedItem ? (
-                <InventoryItemDetail selectedItem={selectedItem} equipment={snapshot.equipment} />
-              ) : (
-                <>
-                  <span className="inventory-detail-empty-icon" aria-hidden="true" />
-                  <div>
-                    <b>Item Name</b>
-                    <span>Hover an item or equipment slot to inspect stats.</span>
-                  </div>
-                </>
-              )}
-            </div>
           </section>
         </div>
 
@@ -473,6 +638,18 @@ export function InventoryPanel({
           </div>
         </aside>
       </aside>
+      {hoveredItem && hoverPanelStyle && (
+        <aside className="item-hover-panel is-floating" style={hoverPanelStyle} aria-hidden="true">
+          <span className="item-hover-panel-title">Valgt item</span>
+          <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
+        </aside>
+      )}
+      {showEquippedHover && hoveredEquippedItem && equippedHoverPanelStyle && (
+        <aside className="item-hover-panel is-floating equipped" style={equippedHoverPanelStyle} aria-hidden="true">
+          <span className="item-hover-panel-title">Udstyret item</span>
+          <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
+        </aside>
+      )}
     </>
   );
 }

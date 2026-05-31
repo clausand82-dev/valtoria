@@ -8,6 +8,7 @@ import { FACTIONS } from "../../game/config/faction-config.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
+import { NAMED_ITEM_TEMPLATES } from "../../game/config/item-config.js";
 
 const ENABLE_RUNTIME_CHROMA_KEY = false;
 
@@ -182,6 +183,11 @@ function QuestRewardList({ quest }) {
       ))}
       {(rewards.items ?? []).map((item, index) => (
         <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
+      ))}
+      {(rewards.namedItems ?? []).map((item, index) => (
+        <span className="diff-good" key={`reward-named-item-${item.namedId ?? index}`}>
+          + {NAMED_ITEM_TEMPLATES.find((entry) => entry.id === item.namedId)?.name ?? item.namedId}
+        </span>
       ))}
     </div>
   );

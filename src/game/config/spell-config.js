@@ -207,7 +207,7 @@ export const SPELL_DEFS = {
     speed: 12.2,
     element: "fire",
     tags: ["magic", "projectile", "aoe", "fire"],
-    target: ["monster", "critter", "object:wood", "object:plant", "object:web"],
+    target: ["monster", "critter", "object:wood", "object:plant", "object:web", "object:thatch", "object:leather"],
     bonus: [
       ["tag:wood", "50%"],
       ["tag:plant", "50%"],

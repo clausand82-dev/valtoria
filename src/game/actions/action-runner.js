@@ -18,6 +18,7 @@ import {
   resourceCount,
 } from "../GameEngine/helpers/items.js";
 import { makeQuestItem } from "../GameEngine/helpers/quests.js";
+import { inventoryUnlockedSlotCount } from "../config/game-constants-config.js";
 
 const IMPLEMENTED_TYPES = new Set([
   "inspect",
@@ -225,8 +226,9 @@ function buildRewardItems(rewards = {}, engine) {
 
 function canApplyRewards(engine, rewards = {}) {
   const simulated = (engine.player?.inventory ?? []).map((item) => ({ ...item }));
+  const maxSlots = inventoryUnlockedSlotCount(engine.player?.level);
   for (const item of buildRewardItems(rewards, engine)) {
-    if (!inventoryCanAccept(simulated, item)) return false;
+    if (!inventoryCanAccept(simulated, item, maxSlots)) return false;
   }
   return true;
 }

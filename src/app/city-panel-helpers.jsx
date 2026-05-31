@@ -73,42 +73,102 @@ import {
 import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
 import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
+import { InventoryItemDetail } from "./inventory/inventory-item-detail.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 
+const CITY_HOVER_PANEL_WIDTH = 360;
+const CITY_HOVER_PANEL_HEIGHT = 260;
+const CITY_HOVER_PANEL_GAP = 16;
 
-function CityItemName({ item }) {
-  if (!item) return null;
-  const className = item.mode === "resource" ? "resource-rarity" : item.rarity ?? "";
-  return <b className={className} style={{ color: cityItemQualityColor(item) ?? undefined }}>{item.name}</b>;
+function cityHoverPanelStyle(pointer) {
+  if (!pointer) return null;
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 720;
+  const maxLeft = Math.max(8, viewportWidth - CITY_HOVER_PANEL_WIDTH - 8);
+  const preferredLeft = pointer.x + CITY_HOVER_PANEL_GAP;
+  const left = preferredLeft <= maxLeft
+    ? preferredLeft
+    : Math.max(8, pointer.x - CITY_HOVER_PANEL_WIDTH - CITY_HOVER_PANEL_GAP);
+  const maxTop = Math.max(8, viewportHeight - CITY_HOVER_PANEL_HEIGHT - 8);
+  const top = Math.min(Math.max(8, pointer.y - 24), maxTop);
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    right: "auto",
+    bottom: "auto",
+  };
 }
 
-function CityItemSlot({ item, placeholder, locked, draggable, accepted, muted, onClick, onDoubleClick, onDragStart, onDrop }) {
+
+function CityItemName({ item, equipment = [] }) {
+  if (!item) return null;
+  const [hoverPointer, setHoverPointer] = useState(null);
+  const className = item.mode === "resource" ? "resource-rarity" : item.rarity ?? "";
+  const hoverStyle = cityHoverPanelStyle(hoverPointer);
+  return (
+    <>
+      <b
+        className={className}
+        style={{ color: cityItemQualityColor(item) ?? undefined }}
+        onMouseEnter={(event) => setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 })}
+        onMouseMove={(event) => setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 })}
+        onMouseLeave={() => setHoverPointer(null)}
+      >
+        {item.name}
+      </b>
+      {hoverStyle && (
+        <aside className="item-hover-panel is-floating city-item-hover-panel" style={hoverStyle} aria-hidden="true">
+          <InventoryItemDetail selectedItem={item} equipment={equipment} />
+        </aside>
+      )}
+    </>
+  );
+}
+
+function CityItemSlot({ item, equipment = [], placeholder, locked, lockLabel = "LOCK", draggable, accepted, muted, onClick, onDoubleClick, onDragStart, onDrop }) {
+  const [hoverPointer, setHoverPointer] = useState(null);
   const rarityClass = cityItemRarityClass(item);
   const qualityColor = cityItemQualityColor(item);
-  const itemIconUrl = (item && placeholder?.iconUrl) ? placeholder.iconUrl : (item?.iconUrl ?? null);
+  const fallbackIconUrl = item ? iconUrlFromKey(item.iconKey ?? deriveIconKey(item)) : null;
+  const itemIconUrl = (item && placeholder?.iconUrl) ? placeholder.iconUrl : (item?.iconUrl ?? fallbackIconUrl);
+  const hoverStyle = !locked && item ? cityHoverPanelStyle(hoverPointer) : null;
   return (
-    <button
-      type="button"
-      className={`city-item-slot ${locked ? "locked" : ""} ${item ? "filled" : ""} ${rarityClass} ${accepted ? "accepted" : ""} ${muted ? "muted" : ""}`}
-      style={qualityColor ? { "--city-item-quality": qualityColor } : undefined}
-      draggable={draggable}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
-      onDragStart={onDragStart}
-      onDragOver={(event) => {
-        if (onDrop) event.preventDefault();
-      }}
-      onDrop={onDrop}
-      title={locked ? "Locked" : item?.name ?? placeholder?.title ?? "Empty"}
-    >
-      {locked ? <span>LOCK</span> : item ? (
-        <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={itemIconUrl} />
-      ) : placeholder ? (
-        <img className="city-slot-placeholder" src={placeholder.iconUrl} alt="" draggable="false" />
-      ) : null}
-      {!locked && item?.count > 1 && <b>{item.count}</b>}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`city-item-slot ${locked ? "locked" : ""} ${item ? "filled" : ""} ${rarityClass} ${accepted ? "accepted" : ""} ${muted ? "muted" : ""}`}
+        style={qualityColor ? { "--city-item-quality": qualityColor } : undefined}
+        draggable={draggable}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        onDragStart={onDragStart}
+        onDragOver={(event) => {
+          if (onDrop) event.preventDefault();
+        }}
+        onDrop={onDrop}
+        onMouseEnter={(event) => {
+          if (!locked && item) setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
+        }}
+        onMouseMove={(event) => {
+          if (!locked && item) setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
+        }}
+        onMouseLeave={() => setHoverPointer(null)}
+        title={locked ? lockLabel : item?.name ?? placeholder?.title ?? "Empty"}
+      >
+        {locked ? <span className="city-slot-lock-label">{lockLabel}</span> : item ? (
+          <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={itemIconUrl} />
+        ) : placeholder ? (
+          <img className="city-slot-placeholder" src={placeholder.iconUrl} alt="" draggable="false" />
+        ) : null}
+        {!locked && item?.count > 1 && <b>{item.count}</b>}
+      </button>
+      {hoverStyle && (
+        <aside className="item-hover-panel is-floating city-item-hover-panel" style={hoverStyle} aria-hidden="true">
+          <InventoryItemDetail selectedItem={item} equipment={equipment} />
+        </aside>
+      )}
+    </>
   );
 }
 

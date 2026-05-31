@@ -1,6 +1,18 @@
 History over changes
 
-*V. 1.78
+*V. 0.79
+- added species and tags to mobs
+- added drag and drop from slot to inventory - double click will do the same
+- fixed that some items used default.png i city inventory but normal png i own inventory
+- potions can now also stack in city inventory
+- change info panel in inventory to a hover instead
+- new hover can show both current item and equipt item
+- item name in hover now use rarity color instead of the golden one for all
+- stats in info hover now take durability into account
+- object hay01 and hay02 is now just hay, but use hay from both sheets
+- all items everywhere in city now use new item hover
+
+*V. 0.78
 - deactivated greenscreen and greenspill processing as all sheets now have alpha
 - added a decay iso para (not using it for now)
 - added a critter system
@@ -14,8 +26,7 @@ History over changes
 - fixed a lot of small bugs
 - added support for view of more rewards
 
-
-*V. 1.77
+*V. 0.77
 - changed end chest to be a object with E action and removed animated chest
 - cleaned up npc's and added more
 - changed quest to come from town hall (grind quest), inn (rumour) and npc's (story)
@@ -32,12 +43,12 @@ History over changes
 - fixed a bug whre prebuilt building would stay prebuilt after prebuilt sat to false
 - slowly started to convert/used 2048x2048, 1024x1024 sheets instead of 1254x1254
 
-*V. 1.76
+*V. 0.76
 - added sublevel system - building on top of action system form early
 - npc can now be placed in prefabs, regions and subregions
 - added standard loot table in object drops
 
-*V. 1.75
+*V. 0.75
 - added a particle system to object where pixel points can have speciel particles attatched
 - reduced DPR and set dps to lower than max before (got form 84 degress to 64)
 - blizzard ground effect added a faded/blurred border instead of harsh one
@@ -46,14 +57,14 @@ History over changes
 - fixed a transfer all resourcer at bank - it would also transfer items on second try - now fixed
 - reduced GPU heat problem even more
 
-*V. 1.74
+*V. 0.74
 - Netdra og Lydra system tilføjet
 - fixed particle error where some blue dots remained after Blizzard was completed
 - added worldState og worldEnergy til map-abandon-reset-config
 - more old greenscreen pictures cleaned up
 - added more mobs (icebear, bear, lion, sickrat, rat) - need animation tweak
 
-* V. 1.73
+* V. 0.73
 - added options to have 1x1 or 2x2 object sheets
 - added options to have more than one sheets on a object
 - added player occulision fade options
@@ -65,7 +76,7 @@ History over changes
 - added new player class system
 - 
 
-* V. 1.72
+* V. 0.72
 - added a new particle system, visuel better and can use png's
 - new city stats added, some old one removed and other replaced
 - regions now have a 10 level corruption system
@@ -75,7 +86,7 @@ History over changes
 - new building: Armory - use to convert items (weapon and armor) to weaponPoint and armorPoints to be uses at payment for units
 - added durability visual effect to city (smoke, flames and ruin pictures of buildings)
 
-- V 1.71
+- V 0.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
 - changed a bit i particle system (leaves works on tree now also, not just as weather)
 - added new mobs (Spawn of Hydra, Hellhound, Gigant Troll, Mountain Troll, Shadwo Dragon, Infernus Minions, Spawn of Archnogrim, Flesheater)
@@ -86,7 +97,7 @@ History over changes
 - opdated shadows (same, but more blurred so more realistic)
 
 
-* V. 1.70
+* V. 0.70
 - removed old legacy biodome use (a fragment is still there to make system works with old saves, but it's less used)
 - changed prefabs to use new decay system instead of lagacy
 - made a better popup for city mobs attack (more prety, but can still use more work)
@@ -96,14 +107,14 @@ History over changes
 - repair list now shows if item is equept or i back pack
 - city menu bottom now have texture picture (background)
 
-* V. 1.63
+* V. 0.63
 - added a new back pack/charater sheet - more graphic
 - changed default back pack slot count from 30 to 42
 - added settings for auto pickup (combine type of item with rarity)
 - repairlist i blacksmith will now show both equipt and items in back pack and have symbol for each
 - made a menu city mode menu at bottom instead of same quick iron menu as in battle maps
 
-* V. 1.62
+* V. 0.62
 - added wolf\_cub og wolf\_fenris (last as boss)
 - moved food barrel recipes from code to config file
 - loading battle maps now only loads nessacery assets and base core, next map will load not allready nessecary assets
@@ -117,7 +128,7 @@ History over changes
 - added magic damage to weapons
 - a small prefeb system is implemented, is a light version and can be more advandced later
 
-* V. 1.61
+* V. 0.61
 - app.jsx is reduced more
 - shared.jsx is split into smaller files and deleted
 - fixed bank stacking
@@ -129,7 +140,7 @@ History over changes
 - use of resources now draw from every inventory slot (back pack first)
 - redesigned army system (now you buy different army unit to use defending city)
 
-* V. 1.60
+* V. 0.60
 - total new city map look
 - area are introduced i city
 - city stats is introduced (population, provision, water, housing, health, city defence aso ...)
@@ -138,7 +149,7 @@ History over changes
 - items now have durability (won't save still)
 - app.jsx was a big 6000+ lines files, it has been split to more managed files
 
-* V. 1.50
+* V. 0.50
 - added armor slot for belt, cape, relic and shoulders
 - loottable added for new items
 - added lord kealand unique items
@@ -151,12 +162,12 @@ History over changes
 - foilage can now have fixed scale
 - added more foilage sets
 
-* V. 1.40
+* V. 0.40
 - removed hero movement fra city mode - using mouse clikc instead
 - change a lot behind the scenes (rearranged files)
 - added boss system, socket system and many function to houses
 
-* V. 1.31
+* V. 0.31
 - changed quest system (added quest demands)
 - NPC are now permanent placed in city
 - NPC can give more quest at a time
@@ -166,7 +177,7 @@ History over changes
 - changed label color on open region on map
 - added visualization to quests
 
-* V. 1.30
+* V. 0.30
 - change a bit in map layout
 - locked all regions off and make my way by making quest as I'm unlocking it
 - introduced new foilage, object, decay, tileset, mapSize options on region setting (old one is still in effect but are legazy forward on)
@@ -174,7 +185,7 @@ History over changes
 - added more new graphic (foilage, tileset, decay, object)
 - added more mobs based on spider mob (MiniSpider, MediumSpider and LargeSpider)
 
-* V. 1.20
+* V. 0.20
 - added NPC and quest
 - added new icon in bottom menu
 - added big map and character view modals
@@ -185,7 +196,7 @@ History over changes
 - region is the main source for controlling mobs, biodome and loot lock
 - world map and region can be locked (region maybe still can't)
 
-* V. 1.10
+* V. 0.10
 - added more foilage for each biodome
 - added resources to collect
 - changed stone and crystal as destructable objects
@@ -196,6 +207,7 @@ History over changes
 - statusbar shows how many of one items picked up (stacked items)
 - added hero picture at stats bars
 - added city map with 9 buildings (function will be added later)
-- V. 1.00
+
+* V. 0.01
 - first working edition
 

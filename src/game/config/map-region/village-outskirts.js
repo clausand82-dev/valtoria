@@ -424,8 +424,7 @@ export function createVillageOutskirtsMapRegions(region) {
         //{ id: "object_tree_mainland", weight: 8 },
         //{ id: "object_barn", weight: 15, destructible: true },
         { id: "object_sacks_ground", weight: 5, destructible: true },
-        { id: "object_hay01", weight: 5, destructible: true },
-        { id: "object_hay02", weight: 5, destructible: true },
+        { id: "object_hay", weight: 5, destructible: true },
         //{ id: "object_firebeacon_snow", weight: 1, destructible: false },
       ],
       decay: [
@@ -483,11 +482,13 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "smithy",
       label: "Smedjen",
       color: "#c4a86a",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { questCompleted: ["devils_judge"] },
       labelX: 44,
       labelY: 35,
-      // TODO:DELETE: weights: { house: 4, tree: 2, rock: 4, foilage: 3, fireplace: 3 }
-      weights: { foilage: 3 },
+      tileset: [
+        { id: "tileset/tileset_bricktiles.png", weight: 8, x: 1, y: 1 },
+        { id: "tileset/tileset_debriswithblood.png", weight: 20, corruption: { min: 5 } },
+      ],
       objects: [
         { id: "object_house_mainland", weight: 4 },
         { id: "object_stone_cluster", weight: 4 },
@@ -520,8 +521,7 @@ export function createVillageOutskirtsMapRegions(region) {
       weights: { foilage: 100 },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
-        { id: "object_hay01", weight: 3 },
-        { id: "object_hay02", weight: 3 },
+        { id: "object_hay", weight: 3 },
         { id: "object_sacks_ground", weight: 5, destructible: true },
       ],
       weather: {

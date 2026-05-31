@@ -27,6 +27,7 @@ export const PREFIXES = {
 // maxHpPct: multiplies maximum health.
 // maxManaPct: multiplies maximum mana.
 // armorFlat: flat armor bonus for bonus-style configs; same effect as armor.
+// armorPct: multiplies total armor.
 // damagePct: multiplies min and max damage.
 // speedPct: multiplies movement speed.
 // attackSpeed: reduces cooldown; 0.10 = 10% faster attacks.
@@ -41,9 +42,9 @@ export const PREFIXES = {
 // resourceFind: increases resource drop chance and amount.
 // xpGain: increases XP gained.
 // Elemental resist er procentpoint: fireResist 25 = 25% mindre fire damage, -25 = 25% mere.
-// allResist laegges oveni elementets specifikke resist. Resist clamped i combat pipeline.
+// allResist laegges oveni alle elementers resist. magicResist laegges oveni alle ikke-fysiske elementer.
 // Resist stats: physicalResist, fireResist, iceResist, lightningResist, poisonResist,
-// arcaneResist, holyResist, shadowResist, natureResist, allResist.
+// arcaneResist, holyResist, shadowResist, natureResist, allResist, magicResist.
 // Elemental damage bonuses er decimaler: fireDamageBonus 0.05 = 5% mere fire damage.
 // Damage bonus stats: physicalDamageBonus, fireDamageBonus, iceDamageBonus,
 // lightningDamageBonus, poisonDamageBonus, arcaneDamageBonus, holyDamageBonus,
@@ -51,6 +52,7 @@ export const PREFIXES = {
 // Damage form bonuses er decimaler: spellDamageBonus, directDamageBonus,
 // areaDamageBonus, dotDamageBonus, hazardDamageBonus.
 // Duration/status bonuses er decimaler: dotDurationBonus, statusDurationBonus.
+// slowImmune: ignores movement slow effects while the item is equipped.
 // Requirements er optional:
 // classReq: ["warrior", "cleric"] kraever en af disse classes.
 // levelReq: 5 kraever player level 5.
@@ -169,13 +171,13 @@ export const UNIQUE_ITEMS = [
       fireResist: -5,
     },
   },
-    {
+  {
     id: "lordkealand_chestplate",
     name: "Lord Kealand's Chestplate",
     baseName: "Chestplate",
     rarity: "unique",
     slot: "chest",
-    mode: "melee",
+    mode: "armor",
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
     iconUrl: "/assets/generated/item/item_unique_lordkealand_chestplate.png",
@@ -187,13 +189,13 @@ export const UNIQUE_ITEMS = [
       dodgeChance: 0.03,
     },
   },
-      {
+  {
     id: "lordkealand_shoulders",
     name: "Lord Kealand's Pauldrons",
     baseName: "Pauldrons",
     rarity: "unique",
     slot: "shoulder",
-    mode: "melee",
+    mode: "armor",
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
     iconUrl: "/assets/generated/item/item_unique_lordkealand_shoulders.png",
@@ -205,9 +207,174 @@ export const UNIQUE_ITEMS = [
       dodgeChance: 0.01,
     },
   },
+  {
+    id: "lordkealand_arms",
+    name: "Lord Kealand's Vambraces",
+    baseName: "Vambraces",
+    rarity: "unique",
+    slot: "arms",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_lordkealand_arms.png",
+    scaleWithLevel: true,
+    stats: { armor: 18, magic: 16, damageMin: 4, damageMax: 7, maxMana: 18 },
+  },
+  {
+    id: "lordkealand_cape",
+    name: "Lord Kealand's Cape",
+    baseName: "Cape",
+    rarity: "unique",
+    slot: "cape",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_lordkealand_cape.png",
+    scaleWithLevel: true,
+    stats: { armor: 8, magic: 18, maxMana: 22, speedPct: 0.05, dodgeChance: 0.02 },
+  },
+  {
+    id: "lordkealand_sword",
+    name: "Lord Kealand's Sword",
+    baseName: "Sword",
+    rarity: "unique",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_lordkealand_sword.png",
+    scaleWithLevel: true,
+    stats: { damageMin: 34, damageMax: 52, range: 1.34, cooldown: 0.46, magic: 16 },
+  },
+  {
+    id: "ladylirian_arms",
+    name: "Lady Lirian's Vambraces",
+    baseName: "Vambraces",
+    rarity: "unique",
+    slot: "arms",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_arms.png",
+    scaleWithLevel: true,
+    stats: { armor: 16, magic: 18, maxMana: 14, spellDamageBonus: 0.04 },
+  },
+  {
+    id: "ladylirian_cape",
+    name: "Lady Lirian's Cape",
+    baseName: "Cape",
+    rarity: "unique",
+    slot: "cape",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_cape.png",
+    scaleWithLevel: true,
+    stats: { armor: 7, magic: 22, maxMana: 26, speedPct: 0.06, allResist: 3 },
+  },
+  {
+    id: "ladylirian_chestplate",
+    name: "Lady Lirian's Chestplate",
+    baseName: "Chestplate",
+    rarity: "unique",
+    slot: "chest",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_chestplate.png",
+    scaleWithLevel: true,
+    stats: { armor: 42, magic: 26, maxMana: 34, allResist: 4 },
+  },
+  {
+    id: "ladylirian_legs",
+    name: "Lady Lirian's Greaves",
+    baseName: "Greaves",
+    rarity: "unique",
+    slot: "legs",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_legs.png",
+    scaleWithLevel: true,
+    stats: { armor: 22, magic: 14, maxMana: 16, speedPct: 0.04 },
+  },
+  {
+    id: "ladylirian_shoulders",
+    name: "Lady Lirian's Pauldrons",
+    baseName: "Pauldrons",
+    rarity: "unique",
+    slot: "shoulder",
+    mode: "armor",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_shoulders.png",
+    scaleWithLevel: true,
+    stats: { armor: 15, magic: 20, maxMana: 20, spellDamageBonus: 0.03 },
+  },
+  {
+    id: "ladylirian_sword",
+    name: "Lady Lirian's Sword",
+    baseName: "Sword",
+    rarity: "unique",
+    slot: "weapon",
+    mode: "melee",
+    levelMin: 1,
+    sources: ["chest", "boss", "monster"],
+    iconUrl: "/assets/generated/item/item_unique_ladylirien_sword.png",
+    scaleWithLevel: true,
+    stats: { damageMin: 30, damageMax: 48, range: 1.36, cooldown: 0.44, magic: 24, arcaneDamageBonus: 0.08 },
+  },
 ];
 
 export const NAMED_ITEM_TEMPLATES = [
+  {
+    id: "devils_judge",
+    name: "Devil's Judge",
+    baseName: "Sword",
+    slot: "weapon",
+    mode: "melee",
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_devils_judge.png",
+    scaleWithLevel: true,
+    stats: { damageMin: 9, damageMax: 16, range: 1.25, cooldown: 0.52 },
+    effects: {
+      onHit: [{ type: "targetDamage", id: "devils_judge_beast_burn", target: ["tag:beast"], damagePct: 0.1, element: "fire", damageType: "magic", color: "#ff7b38" }],
+    },
+  },
+  {
+    id: "devils_protector",
+    name: "Devil's Protector",
+    baseName: "Iron Shield",
+    slot: "offhand",
+    mode: "shield",
+    type: "shield",
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_devils_protector.png",
+    scaleWithLevel: true,
+    stats: { armor: 9, blockChance: 0.05, blockAmount: 4, fireResist: 10, armorPct: 0.1, slowImmune: true },
+  },
+  {
+    id: "devils_boots",
+    name: "Devil's Boots",
+    baseName: "Boots",
+    slot: "feet",
+    mode: "armor",
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_devils_boots.png",
+    scaleWithLevel: true,
+    stats: { armor: 5, magicResist: 5, speedPct: 0.1 },
+  },
+  {
+    id: "devils_touch",
+    name: "Devil's Touch",
+    baseName: "Gloves",
+    slot: "hands",
+    mode: "armor",
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_devils_touch.png",
+    scaleWithLevel: true,
+    stats: { armor: 4, magicResist: 5, goldFind: 0.05, resourceFind: 0.05 },
+  },
   {
     id: "nethrendor_soldier_sword",
     name: "Nethrendor Soldier Sword",

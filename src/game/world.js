@@ -46,6 +46,7 @@ const ITEM_BONUS_STAT_KEYS = [
   "maxHpPct",
   "maxManaPct",
   "armorFlat",
+  "armorPct",
   "damagePct",
   "speedPct",
   "attackSpeed",
@@ -69,6 +70,7 @@ const ITEM_BONUS_STAT_KEYS = [
   "shadowResist",
   "natureResist",
   "allResist",
+  "magicResist",
   "physicalDamageBonus",
   "fireDamageBonus",
   "iceDamageBonus",
@@ -223,6 +225,7 @@ export function itemValue(item) {
     (Number(item.maxHpPct) || 0) * 115 +
     (Number(item.maxManaPct) || 0) * 90 +
     (Number(item.armorFlat) || 0) * 1.8 +
+    (Number(item.armorPct) || 0) * 180 +
     (Number(item.damagePct) || 0) * 150 +
     (Number(item.speedPct) || 0) * 120 +
     (Number(item.attackSpeed) || 0) * 150 +
@@ -237,6 +240,7 @@ export function itemValue(item) {
     (Number(item.resourceFind) || 0) * 70 +
     (Number(item.xpGain) || 0) * 75 +
     (Number(item.allResist) || 0) * 9 +
+    (Number(item.magicResist) || 0) * 8 +
     (Number(item.physicalResist) || 0) * 5 +
     (Number(item.fireResist) || 0) * 5 +
     (Number(item.iceResist) || 0) * 5 +
@@ -398,6 +402,7 @@ export function makeUniqueItem(definition, level = 1) {
     speed: Number(((stats.speed ?? 0) * scale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale),
     ...itemBonusStats(stats),
+    slowImmune: Boolean(stats.slowImmune),
     effects: cloneItemEffects(definition.effects),
     tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
     target: Array.isArray(definition.target) ? [...definition.target] : undefined,
@@ -460,6 +465,7 @@ export function makeNamedItem(definition, level = 1) {
     speed: Number(((stats.speed ?? 0) * scale * rarityScale).toFixed(2)),
     magic: Math.floor((stats.magic ?? 0) * scale * rarityScale),
     ...itemBonusStats(stats),
+    slowImmune: Boolean(stats.slowImmune),
     effects: cloneItemEffects(definition.effects),
     tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
     target: Array.isArray(definition.target) ? [...definition.target] : undefined,

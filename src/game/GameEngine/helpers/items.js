@@ -346,7 +346,7 @@ export function consumeResourceInputs(inventory, inputs) {
   }
 }
 
-export function resourceOutputCanFitAfterMerge(inventory, recipe, output) {
+export function resourceOutputCanFitAfterMerge(inventory, recipe, output, maxInventory = MAX_INVENTORY) {
   const outputMax = resourceStackMax(output.resourceId);
   if (inventory.some((item) => (
     isResourceItem(item)
@@ -365,7 +365,7 @@ export function resourceOutputCanFitAfterMerge(inventory, recipe, output) {
       needed -= used;
     }
   }
-  return inventory.length - freedSlots < MAX_INVENTORY;
+  return inventory.length - freedSlots < maxInventory;
 }
 
 export function resourceStackMax(resourceId) {
@@ -379,9 +379,9 @@ export function normalizeResourceId(resourceId) {
   return id;
 }
 
-export function inventoryCanAccept(inventory, item) {
+export function inventoryCanAccept(inventory, item, maxInventory = MAX_INVENTORY) {
   if (!item) return true;
-  if (item.mode !== "resource") return inventory.length < MAX_INVENTORY;
+  if (item.mode !== "resource") return inventory.length < maxInventory;
   let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
   const stackMax = resourceStackMax(item.resourceId);
   for (const stack of inventory) {
@@ -393,7 +393,7 @@ export function inventoryCanAccept(inventory, item) {
     if (remaining <= 0) return true;
   }
   while (remaining > 0) {
-    if (inventory.length >= MAX_INVENTORY) return false;
+    if (inventory.length >= maxInventory) return false;
     const count = Math.min(stackMax, remaining);
     inventory.push({ ...item, count });
     remaining -= count;
