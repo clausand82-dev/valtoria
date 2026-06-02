@@ -292,8 +292,9 @@ export class ParticleEngine {
     if (!id) return null;
     if (config.attachTo === "projectile" || config.projectileId) return context.projectiles?.find((entry) => entry.id === id) ?? null;
     if (config.attachTo === "object") return context.objectById?.get?.(id) ?? context.nearbyObjects?.().find((entry) => entry.id === id) ?? null;
-    if (context.player?.id === id) return context.player;
-    return context.monsters?.get?.(id) ?? context.nearbyMonsters?.().find((entry) => entry.id === id) ?? null;
+    if (context.player?.id === id) return context.player.deadTimer > 0 || context.player.hp <= 0 ? null : context.player;
+    const entity = context.monsters?.get?.(id) ?? context.nearbyMonsters?.().find((entry) => entry.id === id) ?? null;
+    return entity?.dead || entity?.hp <= 0 ? null : entity;
   }
 
   isAnchorVisible(anchor, config, context) {

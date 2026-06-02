@@ -102,7 +102,7 @@ Top-level quest fields:
   - region ids without "city": quest can only be offered in those wilderness regions.
   - Omit to default to "city".
 - spawnChance: For repeatable city quests, chance that the quest appears in town. For wilderness quests, chance when rolling a wilderness quest. 1 means guaranteed if valid.
-- type: Supported values are "collect_quest_item", "kill_monsters", "clear_map", and "talk_to_npc".
+- type: Supported values are "collect_quest_item", "kill_monsters", "clear_map", "action_targets", and "talk_to_npc".
 - demands: Optional gate requirements before quest can be offered.
   Supported fields:
   - level: Minimum player level.

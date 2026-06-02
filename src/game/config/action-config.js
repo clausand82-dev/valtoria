@@ -103,9 +103,33 @@ export const ACTION_CONFIG = {
     type: "repair",
     label: "Reparer",
     costs: {
-      resources: { wood_piece: 5, rock_piece: 2 },
+      resources: { wood_piece: 2, rock_piece: 1 },
     },
     setFlags: ["planks.old.repaired"],
+    once: true,
+  },
+
+  repair_village_house: {
+    id: "repair_village_house",
+    type: "repair",
+    label: "Reparer hus",
+    prompt: "Reparer huset",
+    costs: {
+      resources: { wood_piece: 2},
+    },
+    replaceTargetWith: "object_house_mainland",
+    replaceTargetDestructible: false,
+    once: true,
+  },
+
+  bury_village_dead: {
+    id: "bury_village_dead",
+    type: "cleanse",
+    label: "Begrav landsbyboer",
+    prompt: "Begrav den doede landsbyboer",
+    requires: { questActive: "mayor_repair_village_houses" },    
+    replaceFoliageWith: "object/object_gravestone.png",
+    replaceFoliageSize: 0.7,
     once: true,
   },
 

@@ -93,6 +93,22 @@ export function questHasSteps(quest) {
   return Array.isArray(quest?.steps) && quest.steps.length > 0;
 }
 
+export function actionTargetGroupsForQuest(quest) {
+  const target = quest?.target ?? {};
+  const rawGroups = Array.isArray(target.groups) && target.groups.length
+    ? target.groups
+    : target.questTargetKey
+      ? [{ questTargetKey: target.questTargetKey, label: target.label }]
+      : [];
+  const seen = new Set();
+  return rawGroups
+    .map((group) => ({
+      questTargetKey: String(group?.questTargetKey ?? "").trim(),
+      label: String(group?.label ?? target.label ?? "maal repareret"),
+    }))
+    .filter((group) => group.questTargetKey && !seen.has(group.questTargetKey) && seen.add(group.questTargetKey));
+}
+
 // Step quests expose only the active step through the legacy quest fields.
 export function currentQuestStep(quest) {
   if (!questHasSteps(quest)) return null;
@@ -214,6 +230,27 @@ export function questConsumesQuestItem(quest, item) {
   return questItemTargetsForQuest(quest).some((target) => String(target.questItemId) === String(item.questItemId));
 }
 
+function withoutQuestDisplayText(source = {}) {
+  const {
+    story: _story,
+    acceptText: _acceptText,
+    turnInText: _turnInText,
+    ...rest
+  } = source;
+  return rest;
+}
+
+export function questSavePayload(quest) {
+  const payload = withoutQuestDisplayText(quest);
+  return {
+    ...payload,
+    progress: { ...(quest?.progress ?? {}) },
+    steps: Array.isArray(quest?.steps)
+      ? quest.steps.map((step) => withoutQuestDisplayText(step))
+      : quest?.steps,
+  };
+}
+
 export function makeQuestInstance(def, npcId, context = {}) {
   const steps = Array.isArray(def.steps) ? def.steps.map((step) => ({ ...step })) : undefined;
   const firstStep = steps?.[0] ?? null;
@@ -299,6 +336,8 @@ export function makeQuestInstance(def, npcId, context = {}) {
         ? { items: 0 }
         : def.type === "clear_map"
           ? { kills: 0, total: null, cleared: false }
+          : def.type === "action_targets"
+            ? { done: 0, total: null, targets: {} }
           : def.type === "talk_to_npc"
             ? { talked: false }
             : {},
@@ -328,6 +367,11 @@ export function isQuestComplete(quest, inventory = []) {
   }
   if (quest.type === "clear_map") {
     return quest.progress?.cleared === true;
+  }
+  if (quest.type === "action_targets") {
+    const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
+    const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
+    return quest.progress?.total !== null && quest.progress?.total !== undefined && done >= total;
   }
   if (quest.type === "kill_monsters") {
     return Math.max(0, Math.floor(Number(quest.progress?.kills) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));
@@ -455,7 +499,22 @@ export function questProgressText(quest, inventory = []) {
     if (quest.progress?.cleared) return "Ryddet – klar til indlevering";
     const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
     const total = quest.progress?.total ?? "?";
-    return `${kills} / ${total} edderkopper`;
+    const label = quest.target?.label ?? resolveQuestDefById(quest.questId)?.target?.label ?? "monstre";
+    return `${kills} / ${total} ${label}`;
+  }
+  if (quest.type === "action_targets") {
+    const groups = actionTargetGroupsForQuest(quest);
+    if (groups.length > 1) {
+      return groups.map((group) => {
+        const progress = quest.progress?.targets?.[group.questTargetKey] ?? {};
+        const done = Math.max(0, Math.floor(Number(progress.done) || 0));
+        const total = progress.total ?? "?";
+        return `${done} / ${total} ${group.label}`;
+      }).join(", ");
+    }
+    const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
+    const total = quest.progress?.total ?? "?";
+    return `${done} / ${total} ${quest.target?.label ?? "maal repareret"}`;
   }
   if (quest.type === "kill_monsters") {
     return `${Math.max(0, Math.floor(Number(quest.progress?.kills) || 0))} / ${Math.max(1, Math.floor(Number(quest.target?.count) || 1))} ${quest.target?.monster ?? "kills"}`;
@@ -536,14 +595,14 @@ export function normalizeSavedQuestState(saved) {
           turnInNpcIds: getQuestTurnInNpcIds(quest).length > 0 ? getQuestTurnInNpcIds(quest) : defTurnInNpcIds,
           type: String(quest.type ?? def?.type ?? ""),
           repeatable: Boolean(quest.repeatable),
-          turnInText: String(quest.turnInText ?? ""),
+          turnInText: String(def?.turnInText ?? quest.turnInText ?? ""),
           target: { ...(quest.target ?? {}) },
           progress: { ...(quest.progress ?? {}) },
           rewards: { ...(quest.rewards ?? {}) },
-          steps: Array.isArray(quest.steps)
-            ? quest.steps.map((step) => ({ ...step }))
-            : Array.isArray(def?.steps)
-              ? def.steps.map((step) => ({ ...step }))
+          steps: Array.isArray(def?.steps)
+            ? def.steps.map((step) => ({ ...step }))
+            : Array.isArray(quest.steps)
+              ? quest.steps.map((step) => ({ ...step }))
               : undefined,
           completeWhen: quest.completeWhen ?? def?.completeWhen,
           autoComplete: Boolean(quest.autoComplete ?? def?.autoComplete),
@@ -561,9 +620,9 @@ export function normalizeSavedQuestState(saved) {
         };
 
         // Always coerce basic text fields to strings
-        base.title = String(quest.title ?? quest.questId);
-        base.story = String(quest.story ?? "");
-        base.acceptText = String(quest.acceptText ?? "");
+        base.title = String(def?.title ?? quest.title ?? quest.questId);
+        base.story = String(def?.story ?? quest.story ?? "");
+        base.acceptText = String(def?.acceptText ?? quest.acceptText ?? "");
 
         if (Array.isArray(base.steps) && base.steps.length > 0) {
           const completed = Array.isArray(base.progress.completedStepIds) ? base.progress.completedStepIds.map(String) : [];
@@ -632,6 +691,14 @@ export function normalizeSavedQuestState(saved) {
           base.target = mergedTarget;
         }
 
+        if (base.type === "action_targets" && def?.target && typeof def.target === "object") {
+          base.target = {
+            ...def.target,
+            ...(base.target ?? {}),
+            ...(Array.isArray(def.target.groups) ? { groups: def.target.groups.map((group) => ({ ...group })) } : {}),
+          };
+        }
+
         // Ensure monster target is normalized (handles older saves where monster may be an object)
         if (base.target && base.target.monster) {
           const normalized = Array.isArray(base.target.monster)
@@ -646,6 +713,7 @@ export function normalizeSavedQuestState(saved) {
             if (def.titleTemplate) base.title = String(def.titleTemplate.replace("{monster}", monsterText));
             if (def.storyTemplate) base.story = String((def.storyTemplate || "").replace("{npcName}", npc?.name ?? "En questgiver").replace("{monster}", monsterText));
             if (def.acceptTextTemplate) base.acceptText = String((def.acceptTextTemplate || "").replace("{count}", String(base.target?.count ?? "")).replace("{monster}", monsterText));
+            if (def.turnInTextTemplate) base.turnInText = String(def.turnInTextTemplate.replace("{count}", String(base.target?.count ?? "")).replace("{monster}", monsterText));
           }
         }
 

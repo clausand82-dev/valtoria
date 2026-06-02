@@ -78,6 +78,7 @@ import {
 } from "./hud/resource-bar.jsx";
 import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
+import { InventorySortSelect } from "./inventory/inventory-sort-select.jsx";
 import { BestiaryViewer } from "./bestiary-viewer.jsx";
 import { QuestDetailCard, QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
@@ -85,6 +86,7 @@ import { emptySnapshot } from "./app-snapshot.js";
 import {
   CITY_BUILDING_CHIPS_ALWAYS_VISIBLE,
 } from "./city-constants.js";
+import { sortInventorySlots } from "../game/inventory-sort.js";
 import {
   CityArcaneExtractorPanel,
   CityBlacksmithPanel,
@@ -677,6 +679,10 @@ function CityPage({
     });
   };
 
+  const sortStoredItems = (buildingId, sectionKey, sortId) => {
+    setCityProgress((current) => sortCityStorageSection(current, buildingId, sectionKey, sortId));
+  };
+
   const backpackResourceCanAccept = (resourceId, count = 1, paidEntries = []) => {
     const output = makeResourceItem(resourceId, count);
     if (!output) return false;
@@ -982,6 +988,8 @@ function CityPage({
           onDepositInventoryItem={depositInventoryItemToStorage}
           onWithdrawStoredItem={withdrawStoredItemToBackpack}
           onMoveStoredItem={moveStoredItemBetweenStorage}
+          onSortBackpack={(sortId) => engineRef.current?.sortInventory?.(sortId)}
+          onSortStoredItems={sortStoredItems}
           onClose={onCloseStorage}
         />
       )}
@@ -2476,6 +2484,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     }
   };
 
+  const sortStoredItems = (sectionKey, sortId) => {
+    onChangeProgress((current) => sortCityStorageSection(current, building.id, sectionKey, sortId));
+  };
+
   const repairBuilding = (percent = null) => {
     if (!building) return;
     const state = progress?.[building.id] ?? {};
@@ -3035,6 +3047,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       onMoveStoredItem={moveStoredItem}
                       onReadStoredItem={(item) => setStoredReadable(readableDialogFromItem(item))}
                       onTransferAllResources={transferAllResources}
+                      onSortBackpack={(sortId) => engineRef.current?.sortInventory?.(sortId)}
+                      onSortStoredItems={sortStoredItems}
                     />
                   )}
                   {building.id === "mage_tower" && owned && activeAddonId === "arcane_extractor" && purchasedAddons.has("arcane_extractor") && (
@@ -3348,6 +3362,27 @@ function normalizeCityInventories(state, building) {
     next[section.key] = normalized;
   }
   return next;
+}
+
+function sortCityStorageSection(progress, buildingId, sectionKey, sortId) {
+  const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
+  if (!building || !isCityBuildingOwned(progress, building)) return progress;
+  const state = getCityBuildingState(progress, building);
+  const section = cityInventorySections(building, state, true).find((entry) => entry.key === sectionKey);
+  if (!section || section.fixedDefs?.length) return progress;
+  const inventories = normalizeCityInventories(state, building);
+  return {
+    ...progress,
+    [buildingId]: {
+      ...(progress[buildingId] ?? {}),
+      inventories: {
+        ...inventories,
+        [sectionKey]: sortInventorySlots((inventories[sectionKey] ?? []).map((item) => (
+          item && item.value === undefined ? { ...item, value: itemValue(item) } : item
+        )), sortId),
+      },
+    },
+  };
 }
 
 function normalizeCityStoredItem(item) {
@@ -3842,6 +3877,8 @@ function CityStorageOverviewModal({
   onDepositInventoryItem,
   onWithdrawStoredItem,
   onMoveStoredItem,
+  onSortBackpack,
+  onSortStoredItems,
   onClose,
 }) {
   const backpackSlots = Array.from({ length: MAX_INVENTORY }, (_, index) => ({ item: inventory[index] ?? null, index }));
@@ -3865,7 +3902,10 @@ function CityStorageOverviewModal({
         </header>
         <div className="city-storage-overview-body">
           <section className="city-storage-overview-panel backpack-drop">
-            <h4>Back pack <span>{backpackSlots.filter(({ item }) => item).length} / {backpackUnlockedSlots}</span></h4>
+            <div className="city-inventory-heading">
+              <h4>Back pack <span>{backpackSlots.filter(({ item }) => item).length} / {backpackUnlockedSlots}</span></h4>
+              <InventorySortSelect onSort={onSortBackpack} />
+            </div>
             <div
               className="city-storage-overview-grid"
               onDragOver={(event) => {
@@ -3929,10 +3969,15 @@ function CityStorageOverviewModal({
             )}
             {storageEntries.map((entry) => (
               <section className="city-storage-overview-panel" key={`${entry.buildingId}-${entry.section.key}`}>
-                <h4>
-                  {entry.section.label}
-                  <span>{entry.building.title} | {entry.section.typeLabel} | {entry.items.filter(Boolean).length}/{entry.section.slots}</span>
-                </h4>
+                <div className="city-inventory-heading">
+                  <h4>
+                    {entry.section.label}
+                    <span>{entry.building.title} | {entry.section.typeLabel} | {entry.items.filter(Boolean).length}/{entry.section.slots}</span>
+                  </h4>
+                  {!entry.section.fixedDefs?.length && (
+                    <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(entry.buildingId, entry.section.key, sortId)} />
+                  )}
+                </div>
                 <div className="city-storage-overview-grid">
                   {Array.from({ length: entry.section.slots }, (_, slotIndex) => {
                     const item = entry.items[slotIndex] ?? null;
@@ -4007,6 +4052,8 @@ function CityStoragePanel({
   onMoveStoredItem,
   onReadStoredItem,
   onTransferAllResources,
+  onSortBackpack,
+  onSortStoredItems,
 }) {
   const sections = cityInventorySections(building, buildingState, owned);
   const activeSection = sections.find((section) => section.key === activeSectionKey) ?? sections[0];
@@ -4026,8 +4073,9 @@ function CityStoragePanel({
   return (
     <section className="city-bank-panel">
       <div className="city-bank-column">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+        <div className="city-inventory-heading">
           <h4>Backpack <span>{inventory.filter(Boolean).length} / {backpackUnlockedSlots}</span></h4>
+          <InventorySortSelect onSort={onSortBackpack} />
           <button 
             type="button" 
             onClick={() => onTransferAllResources?.(activeSection.key)}
@@ -4084,7 +4132,10 @@ function CityStoragePanel({
         </div>
       </div>
       <div className="city-bank-column">
-        <h4>{activeSection.label} <span>{activeSection.typeLabel}</span></h4>
+        <div className="city-inventory-heading">
+          <h4>{activeSection.label} <span>{activeSection.typeLabel}</span></h4>
+          {!activeSection.fixedDefs?.length && <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(activeSection.key, sortId)} />}
+        </div>
         <div className="city-bank-grid">
           {Array.from({ length: activeSection.slots }, (_, index) => {
             const locked = !owned;

@@ -1,6 +1,7 @@
 Ting at få gjort
 
-
+NEW QUEST:
+Borgmester vil gerne have en til at rydde village området for vrede villager: næste part er at reperarer alle husene (kan object destrutable betingelser ændres undervejs, eller kræver det retur til borgmester først)? - svar: lav det som to quest - bemærk at del 2 skal være fiks X antal huse eller prefab - se CHATGPT chat
 
 
 

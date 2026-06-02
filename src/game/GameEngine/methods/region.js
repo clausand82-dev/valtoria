@@ -9,7 +9,7 @@ import {
   distance,
   MAX_ELITE_MONSTERS_PER_REGION
 } from "../dependencies.js";
-import { rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
+import { actionTargetGroupsForQuest, rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
 import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.js";
 import {
   mobWorldStateKey,
@@ -186,6 +186,24 @@ export const regionMethods = {
       const total = [...this.monsters.values()].filter((m) => validTypes.includes(m.typeName)).length;
       quest.progress = { ...(quest.progress ?? {}), total, kills: 0, cleared: false };
     }
+    // Dynamic action targets are only known after every chunk in this run exists.
+    for (const quest of this.questState.active) {
+      if (quest.type !== "action_targets") continue;
+      if (quest.target?.regionId !== preparedRegionConfig.id) continue;
+      const groups = actionTargetGroupsForQuest(quest);
+      if (!groups.length) continue;
+      const targets = Object.fromEntries(groups.map((group) => {
+        const total = [...this.chunks.values()].reduce((sum, chunk) => (
+          sum + (chunk.objects ?? []).filter((object) => !object?.removed && object?.questTargetKey === group.questTargetKey).length
+        ), 0);
+        return [group.questTargetKey, { done: 0, total }];
+      }));
+      const total = Object.values(targets).reduce((sum, target) => sum + target.total, 0);
+      // These targets belong to the newly generated run. Do not carry repaired
+      // houses or buried villagers forward from an earlier run.
+      quest.progress = { ...(quest.progress ?? {}), targets, total, done: 0 };
+    }
+    this.rebuildRegionStats?.({ ensureFullRegionGenerated: false });
     this.addToast(`${this.activeMapRegion.label} startet. Find den gyldne exit mod nordoest.`);
     this.publishSnapshot();
     return true;
@@ -348,6 +366,7 @@ export const regionMethods = {
   },
 
   resetRegionRuntime() {
+    this.currentRegionStats = null;
     this.chunks.clear();
     this.monsters.clear();
     this.resetCritterRuntime?.();

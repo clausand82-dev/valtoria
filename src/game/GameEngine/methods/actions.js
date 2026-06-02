@@ -3,6 +3,7 @@ import { CHUNK_SIZE } from "../../config/game-constants-config.js";
 import {
   getRegionObjectFamily,
   REGION_OBJECT_DEFS,
+  resolveRegionObjectDestructibleDef,
   resolveRegionObjectVariantCount,
 } from "../../config/region-object-config.js";
 import { distance } from "../../iso.js";
@@ -57,13 +58,22 @@ function firstActionFromList(engine, actions, target) {
   return entry?.actionId ? String(entry.actionId) : null;
 }
 
+function allowedDirectActionId(engine, actionId, target) {
+  if (!actionId) return null;
+  const action = getActionConfig(actionId);
+  if (!action) return String(actionId);
+  return worldEntryAllowed(action, engine.worldState, actionContextForTarget(engine, { target }))
+    ? String(actionId)
+    : null;
+}
+
 function targetActionId(engine, target) {
   if (!target) return null;
   const npcDef = target.npcId ? QUEST_NPCS[target.npcId] : null;
   return firstActionFromList(engine, target.actions, target)
-    ?? (target.actionId ? String(target.actionId) : null)
+    ?? allowedDirectActionId(engine, target.actionId, target)
     ?? firstActionFromList(engine, target.defaultActions ?? npcDef?.defaultActions, target)
-    ?? (target.defaultActionId ?? npcDef?.defaultActionId ?? null);
+    ?? allowedDirectActionId(engine, target.defaultActionId ?? npcDef?.defaultActionId, target);
 }
 
 function objectStateKey(object) {
@@ -76,7 +86,7 @@ function firstSpawnType(objectDefId) {
   return spawnTypes[0]?.type ?? null;
 }
 
-function applyReplacementShape(object, objectDefId) {
+function applyReplacementShape(object, objectDefId, options = {}) {
   const def = REGION_OBJECT_DEFS[objectDefId];
   const type = firstSpawnType(objectDefId);
   if (!def || !type) return false;
@@ -86,14 +96,43 @@ function applyReplacementShape(object, objectDefId) {
   object.objectDefId = objectDefId;
   object.type = type;
   object.radius = tuning.radius ?? object.radius;
-  object.size = tuning.sizeBase ?? object.size;
   object.renderBiomeId = def.renderBiomeId ?? null;
   object.graphicsRef = def.graphicsRef ?? null;
   object.treeVariant = Math.abs(Math.floor(Number(object.treeVariant) || 0)) % resolveRegionObjectVariantCount(type);
   object.defaultActionId = def.defaultActionId ?? null;
+  object.actionId = def.defaultActionId ?? null;
+  object.actions = null;
+  object.questTargetKey = def.questTargetKey ?? null;
+  object.completedQuestTargetKey = options.completedQuestTargetKey ?? null;
+  object.destructible = typeof options.destructible === "boolean"
+    ? options.destructible
+    : def.defaultDestructible !== false && Boolean(resolveRegionObjectDestructibleDef(type));
+  object.particles = [];
+  object.__particleEmitterIds = {};
+  object.__attachedEffectsResolved = false;
+  delete object.maxHp;
+  delete object.hp;
+  delete object.harvestHits;
   object.tags = Array.isArray(def.tags) ? [...def.tags] : [];
   object.factionId = def.factionId ?? null;
   object.onDestroyed = def.onDestroyed ? { ...def.onDestroyed } : null;
+  return true;
+}
+
+function applyFoliageReplacementShape(object, options = {}) {
+  if (!object || object.type !== "foliage" || !options.foliageSheet) return false;
+  object.foliageSheet = options.foliageSheet;
+  object.foliageVariant = Math.max(0, Math.floor(Number(options.foliageVariant) || 0));
+  if (Number.isFinite(Number(options.size)) && Number(options.size) > 0) object.size = Number(options.size);
+  object.actionId = null;
+  object.actions = null;
+  object.questTargetKey = null;
+  object.completedQuestTargetKey = options.completedQuestTargetKey ?? null;
+  object.resourceDrops = [];
+  object.foliageLooted = true;
+  object.particles = [];
+  object.__particleEmitterIds = {};
+  object.__attachedEffectsResolved = false;
   return true;
 }
 
@@ -159,6 +198,18 @@ export const actionsMethods = {
 
   nearestActionTarget(maxRange = OBJECT_ACTION_INTERACT_RANGE) {
     return this.actionTargetsInRange(maxRange)[0]?.target ?? null;
+  },
+
+  minimapActionTargets(chunkRange = 3) {
+    const targets = [];
+    for (const chunk of this.nearbyChunks(chunkRange)) {
+      for (const object of chunk.objects) {
+        if (!object || object.removed || object.actionRemoved) continue;
+        if (!targetActionId(this, object)) continue;
+        targets.push(object);
+      }
+    }
+    return targets;
   },
 
   cycleNearbyActionTarget(direction = 1) {
@@ -253,14 +304,44 @@ export const actionsMethods = {
     return true;
   },
 
-  replaceActionTargetObject(object, objectDefId) {
+  replaceActionTargetObject(object, objectDefId, options = {}) {
     if (!object || !objectDefId) return false;
-    if (!applyReplacementShape(object, objectDefId)) {
+    const completedQuestTargetKey = object.questTargetKey ?? null;
+    this.particleEngine?.removeEmittersByOwner(object.id);
+    if (!applyReplacementShape(object, objectDefId, { ...options, completedQuestTargetKey })) {
       console.warn(`[actions] Cannot replace object with unknown object id: ${objectDefId}`);
       this.addToast?.("Replacement object mangler config");
       return false;
     }
-    this.recordActionObjectState(object, { replaceWith: objectDefId });
+    this.recordActionObjectState(object, {
+      replaceWith: objectDefId,
+      ...(completedQuestTargetKey ? { completedQuestTargetKey } : {}),
+      ...(typeof options.destructible === "boolean" ? { destructible: options.destructible } : {}),
+    });
+    return true;
+  },
+
+  replaceActionTargetFoliage(object, fileName, options = {}) {
+    if (!object || object.type !== "foliage" || !fileName) return false;
+    const foliageSet = (this.region?.mapRegion?.foliageSets ?? []).find((entry) => entry.fileName === fileName);
+    if (!foliageSet?.sheetId) {
+      console.warn(`[actions] Cannot replace foliage with unloaded sheet: ${fileName}`);
+      this.addToast?.("Replacement foliage mangler config");
+      return false;
+    }
+    const completedQuestTargetKey = object.questTargetKey ?? null;
+    const replacement = {
+      foliageSheet: foliageSet.sheetId,
+      foliageVariant: 0,
+      size: Number(options.size) > 0 ? Number(options.size) : (foliageSet.scale ?? object.size),
+      completedQuestTargetKey,
+    };
+    this.particleEngine?.removeEmittersByOwner(object.id);
+    if (!applyFoliageReplacementShape(object, replacement)) return false;
+    this.recordActionObjectState(object, {
+      replaceFoliageWith: fileName,
+      ...replacement,
+    });
     return true;
   },
 
@@ -320,7 +401,8 @@ export const actionsMethods = {
       const state = states[object.runtimeId];
       if (!state) return true;
       if (state.removed) return false;
-      if (state.replaceWith) applyReplacementShape(object, state.replaceWith);
+      if (state.replaceWith) applyReplacementShape(object, state.replaceWith, state);
+      if (state.replaceFoliageWith) applyFoliageReplacementShape(object, state);
       return true;
     });
   },

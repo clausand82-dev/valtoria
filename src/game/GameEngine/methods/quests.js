@@ -40,6 +40,7 @@ import {
   normalizeQuestBoards,
   currentQuestStep,
   questHasSteps,
+  actionTargetGroupsForQuest,
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
 import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-config.js";
@@ -93,6 +94,34 @@ export const questsMethods = {
       this.grantQuestRewards({ ...quest, rewards: { ...(def?.rewards ?? quest.rewards ?? {}) } });
     }
     return Boolean(this.completeQuestStepById?.(questId, stepId, { grantRewards: false, consumeItems: false }));
+  },
+
+  advanceActionTargetQuestProgress(target, amount = 1) {
+    const questTargetKey = String(target?.questTargetKey ?? "").trim();
+    if (!questTargetKey) return false;
+    const regionId = String(this.region?.mapRegion?.id ?? "").trim();
+    const delta = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!regionId || delta <= 0) return false;
+    let changed = false;
+    for (const quest of this.questState.active) {
+      if (quest.type !== "action_targets") continue;
+      if (String(quest.target?.regionId ?? "") !== regionId) continue;
+      const group = actionTargetGroupsForQuest(quest).find((entry) => entry.questTargetKey === questTargetKey);
+      if (!group) continue;
+      const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
+      const targets = { ...(quest.progress?.targets ?? {}) };
+      const targetProgress = targets[questTargetKey] ?? {};
+      const targetTotal = Math.max(0, Math.floor(Number(targetProgress.total) || 0));
+      const targetDone = Math.max(0, Math.floor(Number(targetProgress.done) || 0));
+      const nextTargetDone = Math.min(targetTotal, targetDone + delta);
+      if (nextTargetDone === targetDone) continue;
+      targets[questTargetKey] = { ...targetProgress, done: nextTargetDone };
+      const done = Object.values(targets).reduce((sum, entry) => sum + Math.max(0, Math.floor(Number(entry?.done) || 0)), 0);
+      quest.progress = { ...(quest.progress ?? {}), targets, done };
+      changed = true;
+      if (done >= total) this.addToast?.(`${quest.title} klar til indlevering`);
+    }
+    return changed;
   },
 
   applyQuestStepEffects(effects = {}) {

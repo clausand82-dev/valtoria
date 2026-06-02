@@ -206,6 +206,8 @@ function normalizeFoliageEntry(entry, defaults = {}) {
     sheetId: buildFoliageSheetId(fileName, rows, cols),
     resourceDrops: normalizeResourceDrops(raw.resourceDrops ?? raw.resourceDrop),
     particles: normalizeParticleConfigs(raw.particles),
+    actionId: raw.actionId ? String(raw.actionId) : null,
+    questTargetKey: raw.questTargetKey ? String(raw.questTargetKey) : null,
     depthMode: normalizeDepthMode(raw.depthMode, "ground"),
     sortAnchor: normalizeSortAnchor(raw.sortAnchor),
     depthOffset: Number.isFinite(Number(raw.depthOffset)) ? Number(raw.depthOffset) : 0,
@@ -235,7 +237,7 @@ export function normalizeRegionFoliageSets(regionConfig = {}) {
   const deduped = [];
   const seen = new Set();
   for (const entry of normalized) {
-    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}|${JSON.stringify(entry.particles)}|${entry.depthMode}|${JSON.stringify(entry.sortAnchor)}|${entry.depthOffset}`;
+    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}|${JSON.stringify(entry.particles)}|${entry.actionId ?? ""}|${entry.questTargetKey ?? ""}|${entry.depthMode}|${JSON.stringify(entry.sortAnchor)}|${entry.depthOffset}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(entry);

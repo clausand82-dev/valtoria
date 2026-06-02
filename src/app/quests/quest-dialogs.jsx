@@ -14,7 +14,7 @@ const ENABLE_RUNTIME_CHROMA_KEY = false;
 
 function normalizeQuestRegions(quest) {
   const target = quest?.target ?? {};
-  if (quest?.type === "clear_map" && target.regionId) return [String(target.regionId)];
+  if ((quest?.type === "clear_map" || quest?.type === "action_targets") && target.regionId) return [String(target.regionId)];
 
   const regions = new Set();
   if (Array.isArray(target.dropRegionIds)) {
@@ -226,7 +226,7 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
 
       {quest.type === "kill_monsters" && (
         <div className="quest-objective-row quest-objective-kills">
-          <span className="quest-chip kill-count">DrÃ¦b: {killQuestCountLabel(quest)}</span>
+          <span className="quest-chip kill-count">Dræb: {killQuestCountLabel(quest)}</span>
           {killMonsters.length > 0 ? killMonsters.map((monster) => (
             <span className="quest-monster-chip" key={monster}>
               <QuestMonsterSprite monsterType={monster} />
@@ -250,6 +250,16 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
       {quest.type === "talk_to_npc" && (
         <div className="quest-objective-row quest-objective-regions">
           <span className="quest-chip region-chip">{talkQuestTargetLabel(quest)}</span>
+        </div>
+      )}
+
+      {quest.type === "action_targets" && (
+        <div className="quest-objective-row quest-objective-regions">
+          {(quest.target?.groups ?? [{ label: quest.target?.label }]).map((group, index) => (
+            <span key={group?.questTargetKey ?? index} className="quest-chip region-chip">
+              {group?.label ?? "Interager med alle quest-maal"}
+            </span>
+          ))}
         </div>
       )}
 

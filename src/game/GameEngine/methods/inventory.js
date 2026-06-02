@@ -78,6 +78,7 @@ import {
   cityRequirementContext,
   hasCityBuilding,
 } from "../../config/city-state-helpers.js";
+import { sortInventorySlots } from "../../inventory-sort.js";
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -94,6 +95,16 @@ export const inventoryMethods = {
     const level = Number(this.player?.level) || 1;
     const unlocked = Math.floor(Number(inventoryUnlockedSlotCount(level)) || 0);
     return Math.max(0, Math.min(MAX_INVENTORY, unlocked));
+  },
+
+  sortInventory(sortId) {
+    const items = this.player.inventory.map((item) => (
+      item.value === undefined ? { ...item, value: itemValue(item) } : item
+    ));
+    this.player.inventory = sortInventorySlots(items, sortId).filter(Boolean);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
   },
 
   setAutoLootRule(group, id, enabled) {

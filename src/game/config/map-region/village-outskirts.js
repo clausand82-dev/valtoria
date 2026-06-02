@@ -538,34 +538,98 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Landsbyen",
       color: "#d7a85b",
       mapSize: "large",
-      tileset: [{ fileName: "tileset/tileset_bricktiles.png"}, { fileName: "tileset/tileset_grass.png"}, { fileName: "tileset/tileset_debris.png"}],
+      spawnCounts: {
+        value: { objects: 15, foliage: 28, decals: 24, monsters: { min: 8, max: 12 }, water: 0 },
+        variants: [
+          { questActive: "mayor_repair_village_houses", patch: {objects: 10, foliage: 20,monsters: { min: 4, max: 6 } } },
+        ],
+      },
+      tileset: [{ fileName: "tileset/tileset_bricktiles.png"}, { fileName: "tileset/tileset_grass.png"}, { fileName: "tileset/tileset_debris.png", blockedBy: {questCompleted: "mayor_repair_village_houses"}}],
       labelX: 38,
       labelY: 54,
             foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 25, resourceDrop: { wheat: 0.02 } },
+        { fileName: "foilage/foilage_field.png", weight: 25, blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { wheat: 0.02 } },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
-        { fileName: "foilage/foilage_deadvillages.png", weight: 50, scale: 1.5, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
-        { fileName: "foilage/foilage_village_items_broken.png", weight: 10, scale: 0.7},
-        { fileName: "foilage/foilage_village_debris.png", weight: 10, },
+        { fileName: "foilage/foilage_deadvillages.png", weight: 35, scale: 1.5, actionId: "bury_village_dead", questTargetKey: "bury_village_dead", blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "object/object_gravestone.png", weight: 0, scale: 0.7, rows: 4, cols: 4 },
+        { fileName: "foilage/foilage_village_items_broken.png", weight: 10, scale: 0.7, blockedBy: {questCompleted: "mayor_repair_village_houses"}},
+        { fileName: "foilage/foilage_village_debris.png", weight: 10, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
         { fileName: "foilage/foilage_cityplant.png", weight: 25, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
       ],
       decay: [
-        { id: "decay_blood", weight: 50 },
+        { id: "decay_blood", weight: 50, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
         { id: "decay_field", weight: 20 },
-        { id: "decay_cracks", weight: 8 },
+        { id: "decay_cracks", weight: 8, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
         
       ],
-      unlock: { completedQuests: ["vitlias_kings_relics"] },
-      // TODO:DELETE: weights: { house: 8, tree: 3, rock: 2, foilage: 5, fireplace: 3 }
-      weights: { foilage: 5 },
-      
-      mobs: ["Wild Boar", "Village01", "Village02", "Village03", "Village04", "Village05", "Village06"],
-      objects: [
-        { id: "object_house_mainland", weight: 20 },
-        { id: "object_tree_mainland", weight: 3 },
-        { id: "object_fireplace_mainland", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
-      ],
+      unlock: {
+        any: [
+          { questActive: "mayor_cleanse_village" },
+          { questCompleted: "mayor_cleanse_village" },
+          { questCompleted: "vitlias_kings_relics" },
+        ],
+      },      
+      mobs: {
+        value: ["Wild Boar", "Village01", "Village02", "Village03", "Village04", "Village05", "Village06"],
+        variants: [
+          { questActive: "mayor_repair_village_houses", value: ["Wild Boar"] },
+          { questCompleted: "mayor_repair_village_houses", value: ["Wild Boar","Wolf "] }
+        ],
+      },
+      objects: {
+        value: [
+          { id: "object_house_mainland", weight: 20, spawnDamage: "damaged" },
+          { id: "object_tree_mainland", weight: 3 },
+          { id: "object_fireplace_mainland", weight: 1 },
+          { id: "object_ruin_mainland", weight: 1 },
+        ],
+        variants: [
+          {
+            questActive: "mayor_repair_village_houses",
+            value: [
+              {
+                id: "object_house_mainland",
+                weight: 5,
+                destructible: false,
+                spawnDamage: "damaged",
+                actionId: "repair_village_house",
+                questTargetKey: "repair_village_houses",
+                particles: [
+                  {
+                    type: "smoke",
+                    count: [18, 26],
+                    maxParticles: 56,
+                    spawnRate: 11,
+                    lifetime: [2.8, 5.4],
+                    size: [18, 34],
+                    endSize: [42, 82],
+                    alpha: [0.16, 0.36],
+                    colors: ["#242424", "#44413d", "#66615a"],
+                    radius: 15,
+                    heightOffset: -38,
+                    velocityScale: 0.012,
+                    chance: 1,
+                  },
+                ],
+              },
+              { id: "object_tree_mainland", weight: 5 },
+              { id: "object_fireplace_mainland", weight: 1 },
+              { id: "object_ruin_mainland", weight: 3 },
+            ],
+          },
+          {
+            questCompleted: "mayor_repair_village_houses",
+            value: [
+              { id: "object_house_mainland", weight: 5, destructible: false, spawnDamage: "repaired" },
+              { id: "object_tree_mainland", weight: 5 },
+              { id: "object_fireplace_mainland", weight: 1 },
+              { id: "object_wagons", weight: 3, size: 1.5 },
+              { id: "object_marketstalls", weight: 1, size: 1.2},
+              { id: "object_fruitbaskets", weight: 1 },
+            ],
+          },
+        ],
+      },
       points: "23.92,29.76 34.69,36.13 44.26,46.76 46.65,51.01 49.04,57.39 56.22,74.39 35.89,68.01 14.35,68.01",
     }),
     region({

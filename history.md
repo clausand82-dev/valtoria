@@ -1,5 +1,18 @@
 History over changes
 
+TO DO:
+måske få alle bygnings funktioner ned som "addons" med værdier, der kan ændres. Så alle tabs bliver en slags addon eller lignende
+Hover på bygninger skal vise informationer om den bygning (formål, byggede addons, sslots x/y, osv)
+kun en farm, resten er bare areas der hedder farm!
+
+*V. 0.80
+- added two quest for village area (kill villager and repair houses)
+- added small system to handle count of object when making map for region
+- changed quest text to be taken from config instead of save (this way text can be updated)
+- added graphic for outer fields lvl 1 to 3. Data still needs adjustment.
+- added sorting to backpacks
+- changed inn's chest to 50 slots, up from 10
+
 *V. 0.79
 - added species and tags to mobs
 - added drag and drop from slot to inventory - double click will do the same

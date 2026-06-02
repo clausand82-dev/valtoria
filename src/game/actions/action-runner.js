@@ -306,7 +306,14 @@ function removeOrReplaceTarget(engine, action, target, sourceType) {
     changed = Boolean(engine.removeActionTargetObject?.(target)) || changed;
   }
   if (action.replaceTargetWith) {
-    changed = Boolean(engine.replaceActionTargetObject?.(target, action.replaceTargetWith)) || changed;
+    changed = Boolean(engine.replaceActionTargetObject?.(target, action.replaceTargetWith, {
+      destructible: action.replaceTargetDestructible,
+    })) || changed;
+  }
+  if (action.replaceFoliageWith) {
+    changed = Boolean(engine.replaceActionTargetFoliage?.(target, action.replaceFoliageWith, {
+      size: action.replaceFoliageSize,
+    })) || changed;
   }
   if (action.spawnObject) {
     changed = Boolean(engine.spawnActionObjectNear?.(target, action.spawnObject)) || changed;
@@ -417,6 +424,7 @@ export function runAction({
   changed = applyFlags(engine, action) || changed;
   changed = applyCounters(engine, action) || changed;
   changed = applyQuestAdvance(engine, action) || changed;
+  changed = Boolean(engine.advanceActionTargetQuestProgress?.(target, 1)) || changed;
   changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy) || changed;
   changed = applyFactionRepIfAvailable(engine, action.factionRep) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;

@@ -37,6 +37,7 @@ import {
   normalizeHeroStats,
   normalizeQuestBoards,
   normalizeSavedQuestState,
+  questSavePayload,
   questItemTargetsForQuest
 } from "../helpers.js";
 import { normalizeAutoLootRules } from "./loot.js";
@@ -507,7 +508,7 @@ export const persistenceMethods = {
       },
       quests: {
         active: cfg.quests.active
-          ? this.questState.active.map((quest) => ({ ...quest, progress: { ...(quest.progress ?? {}) } }))
+          ? this.questState.active.map((quest) => questSavePayload(quest))
           : [],
         completed: cfg.quests.completed ? [...this.questState.completed] : [],
         questBoards: cfg.quests.questBoards ? normalizeQuestBoards(this.questState.questBoards) : {},

@@ -13,6 +13,7 @@ import {
 import { InventoryIcon } from "../ui/icons.jsx";
 import { InventoryItemDetail } from "./inventory-item-detail.jsx";
 import { SPELL_DEFS } from "../../game/config/spell-config.js";
+import { InventorySortSelect } from "./inventory-sort-select.jsx";
 
 function gearDurability(item) {
   if (!item || item.mode === "resource" || item.mode === "potion" || item.mode === "readable") return null;
@@ -431,6 +432,7 @@ export function InventoryPanel({
                 </button>
               ))}
             </div>
+            <InventorySortSelect onSort={(sortId) => engineRef.current?.sortInventory?.(sortId)} />
 
             <div className="item-grid">
               {inventorySlots.map((item, slotIndex) => {

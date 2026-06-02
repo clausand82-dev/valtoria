@@ -965,6 +965,10 @@ export const renderingMethods = {
         ctx.fillRect(x - 1, y - 1, 2, 2);
       }
     }
+    for (const target of this.minimapActionTargets?.(3) ?? []) {
+      if (!this.isPointExplored(target)) continue;
+      this.drawMinimapActionPoint(ctx, target, center, scale);
+    }
     ctx.fillStyle = "#f5f3ea";
     ctx.beginPath();
     ctx.arc(center, center, 4, 0, Math.PI * 2);
@@ -1023,6 +1027,21 @@ export const renderingMethods = {
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
+  },
+
+  drawMinimapActionPoint(ctx, point, center, scale) {
+    const x = center + (point.x - this.player.x) * scale;
+    const y = center + (point.y - this.player.y) * scale;
+    if (x < 0 || y < 0 || x > ctx.canvas.width || y > ctx.canvas.height) return;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(Math.PI / 4);
+    ctx.fillStyle = "#ffb347";
+    ctx.strokeStyle = "rgba(32, 18, 4, 0.9)";
+    ctx.lineWidth = 1;
+    ctx.fillRect(-3, -3, 6, 6);
+    ctx.strokeRect(-3, -3, 6, 6);
+    ctx.restore();
   },
 
   currentChunk() {

@@ -302,6 +302,7 @@ function addLegendEntry(result, entry, x, y) {
       foregroundFadeAlpha: entry.foregroundFadeAlpha,
       actionId: entry.actionId,
       actions: entry.actions,
+      questTargetKey: entry.questTargetKey,
     });
   }
   if (entry.foliage) {

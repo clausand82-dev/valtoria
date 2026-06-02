@@ -221,6 +221,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_tree_rock", weight: 1 }],
     // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "stone",],
     destructible: {
       hp: 40,
       damageStages: 3,
@@ -251,6 +252,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_house_mainland", weight: 1 }],
     // legacyWeightKey: "house", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "building"],
     destructible: {
       hp: 70,
       damageStages: 3,
@@ -785,6 +787,7 @@ export const REGION_OBJECT_DEFS = {
   object_fruitbaskets: {
     spawnTypes: [{ type: "object_fruitbaskets", weight: 1 }],
     defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "container"],
     destructible: {
       hp: 52,
       damageStages: 3,
@@ -797,11 +800,59 @@ export const REGION_OBJECT_DEFS = {
       ],  
     },
     renderBiomeId: "mainland",
-    graphicsRef: "object/object_fruitbaskets.png",
+    graphics: {
+      mode: "sheet",
+      files: [
+        "object/object_fruitbaskets_01.png",
+        "object/object_fruitbaskets_02.png",
+      ],
+      renderScale: 0.5,
+    },
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
-};
+  object_marketstalls: {
+    spawnTypes: [{ type: "object_marketstalls", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.FRUITBASKETS,
+      ...REGION_OBJECT_LOOT_TABLES.WOOD,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_marketstalls.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_wagons: {
+    spawnTypes: [{ type: "object_wagons", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.WOOD,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],  
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_wagons.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+}
 
 function clampNumber(value, min, max) {
   const parsed = Number(value);
@@ -1075,6 +1126,7 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
     onDestroyed: normalizeOnDestroyed(def.onDestroyed),
     defaultActionId: def.defaultActionId ? String(def.defaultActionId) : null,
     actionId: null,
+    questTargetKey: def.questTargetKey ? String(def.questTargetKey) : null,
   };
 }
 
@@ -1213,6 +1265,9 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     }
     if (normalized && entry.actionId !== undefined) {
       normalized.actionId = String(entry.actionId ?? "").trim() || null;
+    }
+    if (normalized && entry.questTargetKey !== undefined) {
+      normalized.questTargetKey = String(entry.questTargetKey ?? "").trim() || null;
     }
     if (normalized) entries.push(normalized);
   }

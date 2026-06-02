@@ -208,6 +208,20 @@ Eksempler på action-typer:
 - `questStart`
 - `questAdvance`
 
+### Region manifest / debug
+
+Efter fuld generering af en map-region kan engine bygge et read-only runtime-manifest via
+`engine.rebuildRegionStats({ includeTiles })`. Manifestet ligger senest som
+`engine.currentRegionStats` og tæller objekter, actions, quest-targets, monsters, foliage,
+decals, chests, mulige resource drops og valgfrit tiles.
+
+Når `CHEAT_SETTINGS.enabled` er slået til, åbner og lukker `Ctrl+Shift+D` et kompakt
+debug-panel over combat HUD'et. Panelet viser de vigtigste totals samt
+`objects.byQuestTargetKey`, `objects.byActionId` og `monsters.byType`. `Refresh` bygger et
+nyt snapshot; panelet observerer ikke verden per frame.
+Panelet viser desuden lette live-diagnostics for FPS, particles, emitters, particle-typer,
+projectiles, hazards, loot og critters. Live-delen opdateres kun, mens panelet er åbent.
+
 Nogle action-typer er fuldt implementeret, mens andre stadig er tidlige/stubbede afhængigt af flowet.
 
 ### NPC'er

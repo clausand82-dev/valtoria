@@ -82,4 +82,3 @@ function constrainToAnchor(p) {
   p.x = p.anchorX + (dx / dist) * max;
   p.y = p.anchorY + (dy / dist) * max;
 }
-

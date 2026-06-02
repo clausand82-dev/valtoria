@@ -711,6 +711,8 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         variantCount: set.variantCount,
         resourceDrops: set.resourceDrops.map((entry) => ({ ...entry })),
         particles: set.particles.map((entry) => ({ ...entry })),
+        actionId: set.actionId,
+        questTargetKey: set.questTargetKey,
         depthMode: set.depthMode,
         sortAnchor: set.sortAnchor ? { ...set.sortAnchor } : null,
         depthOffset: set.depthOffset,
@@ -739,6 +741,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         destroyRewards: entry.destroyRewards ? { ...entry.destroyRewards } : null,
         actionId: entry.actionId ?? null,
         defaultActionId: entry.defaultActionId ?? null,
+        questTargetKey: entry.questTargetKey ?? null,
       })),
       decaySets: normalizedDecaySets.map((set) => ({
         id: set.id,
@@ -1115,6 +1118,7 @@ function objectSpawnMetadataFromDef(def) {
     tags: Array.isArray(def?.tags) ? def.tags.map(String).filter(Boolean) : [],
     factionId: def?.factionId ? String(def.factionId) : null,
     onDestroyed: def?.onDestroyed && typeof def.onDestroyed === "object" ? { ...def.onDestroyed } : null,
+    questTargetKey: def?.questTargetKey ? String(def.questTargetKey) : null,
   };
 }
 
@@ -1191,7 +1195,7 @@ function addPrefabObjects(chunk, instance) {
     const effectiveDestructible = typeof item.destructible === "boolean"
       ? item.destructible
       : def.defaultDestructible !== false && Boolean(resolvedDef);
-    const damageState = effectiveDestructible
+    const damageState = resolvedDef && (effectiveDestructible || item.spawnDamage || item.damageState || item.damageSpawn)
       ? initialObjectDamageState(resolvedDef, item.spawnDamage ?? item.damageState ?? item.damageSpawn, rand01(chunk.cx, chunk.cy, 7940 + i))
       : {};
     const spawnMetadata = objectSpawnMetadataFromDef(def);
@@ -1207,6 +1211,7 @@ function addPrefabObjects(chunk, instance) {
     if (Array.isArray(item.tags)) spawnMetadata.tags = item.tags.map(String).filter(Boolean);
     if (item.factionId !== undefined) spawnMetadata.factionId = String(item.factionId ?? "").trim() || null;
     if (item.onDestroyed && typeof item.onDestroyed === "object") spawnMetadata.onDestroyed = { ...item.onDestroyed };
+    if (item.questTargetKey !== undefined) spawnMetadata.questTargetKey = String(item.questTargetKey ?? "").trim() || null;
     const treeVariant = Number.isFinite(Number(item.variant))
       ? Math.max(0, Math.floor(Number(item.variant)))
       : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type))));
@@ -1599,7 +1604,7 @@ function addObjects(chunk, safeChunk) {
       ? selectedEntry.destructible
       : null;
     const effectiveDestructible = explicitDestructible ?? selectedEntry?.defaultDestructible ?? Boolean(resolvedDef);
-    const damageState = effectiveDestructible
+    const damageState = resolvedDef && (effectiveDestructible || selectedEntry?.spawnDamage)
       ? initialObjectDamageState(resolvedDef, selectedEntry?.spawnDamage, rand01(chunk.cx, chunk.cy, 7950 + i))
       : {};
     
@@ -1653,6 +1658,7 @@ function addObjects(chunk, safeChunk) {
       destroyRewards: selectedEntry?.destroyRewards ? { ...selectedEntry.destroyRewards } : null,
       actionId: selectedEntry?.actionId ? String(selectedEntry.actionId) : null,
       defaultActionId: selectedEntry?.defaultActionId ? String(selectedEntry.defaultActionId) : null,
+      questTargetKey: selectedEntry?.questTargetKey ? String(selectedEntry.questTargetKey) : null,
       // TODO: Support occluder metadata here for future pixel/shape masking.
       ...damageState,
     };
@@ -1742,6 +1748,7 @@ function addFoliage(chunk, safeChunk) {
 
     chunk.objects.push({
       id: createId(),
+      runtimeId: `${chunk.region?.mapRegion?.id ?? "region"}:chunk:${chunk.cx},${chunk.cy}:foliage:procedural:${i}`,
       type: "foliage",
       x: chunk.x + localX,
       y: chunk.y + localY,
@@ -1757,6 +1764,8 @@ function addFoliage(chunk, safeChunk) {
       wind: rand01(chunk.cx, chunk.cy, 7000 + i) * 0.5,
       resourceDrops,
       particles,
+      actionId: selectedFoliageSet?.actionId ?? null,
+      questTargetKey: selectedFoliageSet?.questTargetKey ?? null,
       depthMode: selectedFoliageSet?.depthMode ?? "ground",
       sortAnchor: selectedFoliageSet?.sortAnchor ? { ...selectedFoliageSet.sortAnchor } : { x: 0.5, y: 1 },
       depthOffset: Number.isFinite(Number(selectedFoliageSet?.depthOffset)) ? Number(selectedFoliageSet.depthOffset) : 0,

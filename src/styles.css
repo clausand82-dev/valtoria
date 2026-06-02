@@ -1088,6 +1088,89 @@ button {
   text-transform: capitalize;
 }
 
+.region-debug-panel {
+  position: fixed;
+  z-index: 32;
+  left: 16px;
+  bottom: 88px;
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(46vh, 380px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid rgba(244, 218, 150, 0.28);
+  border-radius: 8px;
+  background: rgba(7, 9, 10, 0.9);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.region-debug-panel header,
+.region-debug-panel header > div,
+.region-debug-totals,
+.region-debug-list span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.region-debug-panel header {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.region-debug-panel header span {
+  color: var(--muted);
+}
+
+.region-debug-panel button {
+  padding: 4px 8px;
+  border: 1px solid rgba(244, 218, 150, 0.28);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.region-debug-totals {
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.region-debug-totals span {
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.region-debug-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.region-debug-list {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+}
+
+.region-debug-list span {
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.region-debug-list code {
+  overflow: hidden;
+  color: #d8ccb0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-debug-list em {
+  color: var(--muted);
+}
+
 .skillbar {
   position: fixed;
   z-index: 31;
@@ -2516,7 +2599,7 @@ button {
 
 .backpack-sheet {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 6px;
   padding: 18px;
   overflow: hidden;
@@ -2736,6 +2819,31 @@ button {
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--filter-color) 22%, rgba(70, 43, 14, 0.9)), rgba(7, 6, 5, 0.92));
   color: #fff0c8;
+}
+
+.inventory-sort-select {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  min-width: 0;
+  color: #d7bd84;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.inventory-sort-select select {
+  min-width: 118px;
+  padding: 4px 7px;
+  border: 1px solid rgba(201, 149, 67, 0.48);
+  border-radius: 3px;
+  background: rgba(14, 10, 7, 0.94);
+  color: #f2d99b;
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .item-grid {
@@ -6149,6 +6257,29 @@ button {
   font-size: 15px;
 }
 
+.city-inventory-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.city-inventory-heading h4 {
+  margin-bottom: 0;
+}
+
+.city-inventory-heading .inventory-sort-select span {
+  display: none;
+}
+
+.city-inventory-heading .inventory-sort-select select {
+  min-width: 102px;
+  max-width: 128px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
 .city-storage-overview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(42px, 1fr));
@@ -6178,6 +6309,10 @@ button {
   margin: 0 0 8px;
   color: #f4da96;
   font-size: 14px;
+}
+
+.city-bank-column .city-inventory-heading h4 {
+  margin-bottom: 0;
 }
 
 .city-bank-column h4 span {
@@ -6319,6 +6454,17 @@ button {
 
   .skillbar {
     bottom: 12px;
+  }
+
+  .region-debug-panel {
+    right: 8px;
+    bottom: 82px;
+    left: 8px;
+    width: auto;
+  }
+
+  .region-debug-columns {
+    grid-template-columns: 1fr;
   }
 
   .city-menu-bar {

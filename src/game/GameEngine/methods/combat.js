@@ -1092,6 +1092,8 @@ export const combatMethods = {
         if (hazard.particleEmitterId) {
           this.particleEngine?.removeEmitter(hazard.particleEmitterId);
         }
+        this.removeHazardLegacyParticles(hazard);
+        this.removeHazardAreaParticles(hazard);
         this.groundHazards.splice(i, 1);
       }
     }
@@ -1133,6 +1135,8 @@ export const combatMethods = {
         if (hazard.particleEmitterId) {
           this.particleEngine?.removeEmitter(hazard.particleEmitterId);
         }
+        this.removeHazardLegacyParticles(hazard);
+        this.removeHazardAreaParticles(hazard);
         return false;
       });
     }
@@ -1148,19 +1152,7 @@ export const combatMethods = {
 
   removeHazardAreaParticles(hazard) {
     if (!hazard) return;
-    const cleanupRadius = Math.max(0.25, (Number(hazard.radius) || 0) + 0.9);
-    const hazardColor = String(hazard.color ?? "").toLowerCase();
-    this.particleEngine?.removeParticlesInWorldCircle(hazard.x, hazard.y, cleanupRadius, (particle) => {
-      const color = String(particle.color ?? "").toLowerCase();
-      return !hazardColor || color === hazardColor;
-    });
-    if (Array.isArray(this.particles)) {
-      this.particles = this.particles.filter((particle) => {
-        const color = String(particle.color ?? "").toLowerCase();
-        if (hazardColor && color !== hazardColor) return true;
-        return Math.hypot((Number(particle.x) || 0) - hazard.x, (Number(particle.y) || 0) - hazard.y) > cleanupRadius;
-      });
-    }
+    if (hazard.particleEmitterId) this.particleEngine?.removeParticlesByEmitter(hazard.particleEmitterId);
   },
 
   applyGroundHazardTick(hazard) {
@@ -1310,6 +1302,16 @@ export const combatMethods = {
       if (effect.particleEmitterId) this.particleEngine?.removeEmitter(effect.particleEmitterId);
     }
     entity.statusEffects = entity.statusEffects.filter((effect) => effect.duration > 0);
+  },
+
+  clearStatusEffectParticles(entity) {
+    if (!Array.isArray(entity?.statusEffects)) return;
+    for (const effect of entity.statusEffects) {
+      if (!effect.particleEmitterId) continue;
+      this.particleEngine?.removeEmitter(effect.particleEmitterId);
+      this.particleEngine?.removeParticlesByEmitter(effect.particleEmitterId);
+    }
+    entity.statusEffects = [];
   },
 
   statusSpeedMultiplier(entity) {
@@ -1466,6 +1468,7 @@ export const combatMethods = {
 
   killMonster(monster) {
     if (monster.dead) return;
+    this.clearStatusEffectParticles(monster);
     monster.dead = true;
     this.recordBestiaryKilled?.(monster);
     this.recordMonsterKill(monster);
@@ -1505,6 +1508,7 @@ export const combatMethods = {
   despawnMonsterMinions(ownerId) {
     for (const minion of this.monsters.values()) {
       if (minion.minionOwnerId !== ownerId || minion.dead) continue;
+      this.clearStatusEffectParticles(minion);
       minion.dead = true;
       minion.hp = 0;
       this.addParticles(minion.x, minion.y, minion.color, 8, 0.08);

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { CHEAT_SETTINGS } from "../../game/config/cheat-config.js";
 import {
   AtlasIcon,
   CityStatsTopBar,
@@ -11,6 +12,74 @@ import {
   QuestObjectiveMeta,
   ResourceBar,
 } from "../index.jsx";
+import { isRegionDebugShortcut } from "./region-debug-shortcut.js";
+
+function DebugStatsList({ title, values }) {
+  const entries = Object.entries(values ?? {})
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!entries.length) return null;
+  return (
+    <div className="region-debug-list">
+      <b>{title}</b>
+      {entries.map(([key, value]) => (
+        <span key={key}><code>{key}</code><strong>{value}</strong></span>
+      ))}
+    </div>
+  );
+}
+
+function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
+  const totals = [
+    ["Objekter", stats?.objects?.total ?? 0],
+    ["Monsters", stats?.monsters?.total ?? 0],
+    ["Foliage", stats?.foliage?.total ?? 0],
+    ["Decals", stats?.decals?.total ?? 0],
+    ["Tiles", stats?.tiles?.total ?? "-"],
+  ];
+  const liveTotals = [
+    ["FPS", `${liveStats?.averageFps ?? 0} / ${liveStats?.targetFps ?? "-"}`],
+    ["Particles", `${liveStats?.particles?.active ?? 0} / ${liveStats?.particles?.max ?? 0}`],
+    ["Emitters", liveStats?.particles?.emitters ?? 0],
+    ["Legacy particles", liveStats?.particles?.legacy ?? 0],
+    ["Projectiles", liveStats?.runtime?.projectiles ?? 0],
+    ["Hazards", liveStats?.runtime?.groundHazards ?? 0],
+    ["Loot", liveStats?.runtime?.loots ?? 0],
+    ["Critters", liveStats?.runtime?.critters ?? 0],
+  ];
+  return (
+    <section className="region-debug-panel" aria-label="Region debug manifest">
+      <header>
+        <div>
+          <b>Region manifest</b>
+          <span>{stats?.region?.label ?? stats?.region?.id ?? "Ingen aktiv region"}</span>
+        </div>
+        <div>
+          <button type="button" onClick={onRefresh}>Refresh</button>
+          <button type="button" onClick={onClose}>Luk</button>
+        </div>
+      </header>
+      <div className="region-debug-totals">
+        {totals.map(([label, value]) => <span key={label}>{label} <b>{value}</b></span>)}
+      </div>
+      <div className="region-debug-totals region-debug-live">
+        {liveTotals.map(([label, value]) => <span key={label}>{label} <b>{value}</b></span>)}
+      </div>
+      <div className="region-debug-columns">
+        <DebugStatsList title="objects.byQuestTargetKey" values={stats?.objects?.byQuestTargetKey} />
+        <DebugStatsList title="objects.byCompletedQuestTargetKey" values={stats?.objects?.byCompletedQuestTargetKey} />
+        <DebugStatsList title="objects.byObjectDefId" values={stats?.objects?.byObjectDefId} />
+        <DebugStatsList title="objects.byActionId" values={stats?.objects?.byActionId} />
+        <DebugStatsList title="foliage.byQuestTargetKey" values={stats?.foliage?.byQuestTargetKey} />
+        <DebugStatsList title="foliage.byCompletedQuestTargetKey" values={stats?.foliage?.byCompletedQuestTargetKey} />
+        <DebugStatsList title="foliage.byActionId" values={stats?.foliage?.byActionId} />
+        <DebugStatsList title="monsters.byType" values={stats?.monsters?.byType} />
+        <DebugStatsList title="particles.byType (live)" values={liveStats?.particles?.byType} />
+        <DebugStatsList title="emitters.byType (live)" values={liveStats?.particles?.emittersByType} />
+        <DebugStatsList title="legacyParticles.byType (live)" values={liveStats?.particles?.legacyByType} />
+      </div>
+    </section>
+  );
+}
 
 function CooldownClock({ progress }) {
   const pct = Math.max(0, Math.min(1, Number(progress) || 0));
@@ -142,9 +211,40 @@ export function GameHud({
   xpPct,
 }) {
   const [openPicker, setOpenPicker] = useState(null);
+  const [regionDebugOpen, setRegionDebugOpen] = useState(false);
+  const [regionDebugStats, setRegionDebugStats] = useState(null);
+  const [regionDebugLiveStats, setRegionDebugLiveStats] = useState(null);
   const questBadgeCount = Math.max(0, (snapshot.quests?.active ?? []).filter((quest) => quest.complete).length);
   const handleOpenPicker = (slotId) => setOpenPicker(slotId);
   const handleClosePicker = (slotId) => setOpenPicker((current) => (current === slotId ? null : current));
+  const refreshRegionDebug = () => {
+    setRegionDebugStats(engineRef.current?.rebuildRegionStats?.({ includeTiles: true }) ?? null);
+  };
+
+  useEffect(() => {
+    if (!CHEAT_SETTINGS.enabled) return undefined;
+    const handleRegionDebugShortcut = (event) => {
+      if (!isRegionDebugShortcut(event, CHEAT_SETTINGS.enabled)) return;
+      event.preventDefault();
+      setRegionDebugOpen((current) => !current);
+    };
+    window.addEventListener("keydown", handleRegionDebugShortcut);
+    return () => window.removeEventListener("keydown", handleRegionDebugShortcut);
+  }, [engineRef]);
+
+  useEffect(() => {
+    if (CHEAT_SETTINGS.enabled && regionDebugOpen) refreshRegionDebug();
+  }, [engineRef, regionDebugOpen, snapshot.regionStats]);
+
+  useEffect(() => {
+    if (!CHEAT_SETTINGS.enabled || !regionDebugOpen) return undefined;
+    const refreshLiveStats = () => {
+      setRegionDebugLiveStats(engineRef.current?.runtimeDebugStats?.() ?? null);
+    };
+    refreshLiveStats();
+    const intervalId = window.setInterval(refreshLiveStats, 250);
+    return () => window.clearInterval(intervalId);
+  }, [engineRef, regionDebugOpen]);
 
   return (
     <>
@@ -207,6 +307,15 @@ export function GameHud({
           </div>
           <ResourceBar type="monster-health" value={monsterHpPct} label={`${hoverMonster.hp} / ${hoverMonster.maxHp}`} />
         </section>
+      )}
+
+      {CHEAT_SETTINGS.enabled && regionDebugOpen && !cityOpen && (
+        <RegionDebugPanel
+          liveStats={regionDebugLiveStats}
+          onClose={() => setRegionDebugOpen(false)}
+          onRefresh={refreshRegionDebug}
+          stats={regionDebugStats ?? snapshot.regionStats}
+        />
       )}
 
       {!cityOpen && (

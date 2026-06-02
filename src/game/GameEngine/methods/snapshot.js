@@ -121,6 +121,7 @@ export const snapshotMethods = {
           : { id: "none", label: "No weather" },
       },
       regionRun: this.activeMapRegion ? { ...this.activeMapRegion } : null,
+      regionStats: this.currentRegionStats,
       subregionTransition: this.subregionTransition ? { ...this.subregionTransition } : null,
       currentExpedition: this.currentExpedition ? {
         rootRegionId: this.currentExpedition.rootRegionId ?? null,

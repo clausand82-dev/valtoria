@@ -3,6 +3,7 @@ import { createRegion, isRegionPointPlayable, AUTOSAVE_INTERVAL_SECONDS, WORLD_S
 import { lifecycleMethods } from "./methods/lifecycle.js";
 import { effectsMethods } from "./methods/effects.js";
 import { regionMethods } from "./methods/region.js";
+import { regionStatsMethods } from "./methods/region-stats.js";
 import { combatMethods } from "./methods/combat.js";
 import { lootMethods } from "./methods/loot.js";
 import { questsMethods } from "./methods/quests.js";
@@ -52,6 +53,7 @@ export class GameEngine {
     this.keys = new Set();
     this.chunks = new Map();
     this.monsters = new Map();
+    this.currentRegionStats = null;
     this.critters = new Map();
     this.critterStats = { alive: 0, rendered: 0, updated: 0, killed: 0, drawCalls: 0 };
     this.loots = [];
@@ -137,6 +139,7 @@ for (const methods of [
   lifecycleMethods,
   effectsMethods,
   regionMethods,
+  regionStatsMethods,
   combatMethods,
   lootMethods,
   questsMethods,
