@@ -131,6 +131,7 @@ export function makeResourceItem(resourceId, count = 1) {
     iconIndex: def.iconIndex,
     iconSheet: def.sheet ?? "resources",
     iconUrl: def.iconUrl ?? undefined,
+    description: def.description,
     value: def.value,
   }));
 }

@@ -101,6 +101,14 @@ function cloneItemEffects(effects) {
   };
 }
 
+function cloneDurabilityLossOnEvents(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const entries = Object.entries(value)
+    .map(([event, loss]) => [String(event ?? "").trim(), Math.max(0, Number(loss) || 0)])
+    .filter(([event, loss]) => event && loss > 0);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 export function createId() {
   nextId += 1;
   return nextId;
@@ -119,6 +127,18 @@ export function hashInt(x, y, salt = 0) {
 
 export function rand01(x, y, salt = 0) {
   return hashInt(x, y, salt) / 4294967295;
+}
+
+function chunkRand01(chunk, salt = 0, x = chunk?.cx ?? 0, y = chunk?.cy ?? 0) {
+  const seed = Number.isFinite(Number(chunk?.region?.seed)) ? Math.floor(Number(chunk.region.seed)) : 0;
+  if (!seed) return rand01(x, y, salt);
+  return rand01(x + seed, y - seed, salt);
+}
+
+function regionHashInt(region, x, y, salt = 0) {
+  const seed = Number.isFinite(Number(region?.seed)) ? Math.floor(Number(region.seed)) : 0;
+  if (!seed) return hashInt(x, y, salt);
+  return hashInt(x + seed, y - seed, salt);
 }
 
 function seededRand(seed, salt = 0) {
@@ -404,6 +424,10 @@ export function makeUniqueItem(definition, level = 1) {
     ...itemBonusStats(stats),
     slowImmune: Boolean(stats.slowImmune),
     effects: cloneItemEffects(definition.effects),
+    description: definition.description ? String(definition.description) : undefined,
+    nonRepairable: Boolean(definition.nonRepairable),
+    destroyWhenDurabilityDepleted: Boolean(definition.destroyWhenDurabilityDepleted),
+    durabilityLossOnEvents: cloneDurabilityLossOnEvents(definition.durabilityLossOnEvents),
     tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
     target: Array.isArray(definition.target) ? [...definition.target] : undefined,
     bonus: Array.isArray(definition.bonus) ? definition.bonus.map((entry) => Array.isArray(entry) ? [...entry] : entry) : undefined,
@@ -467,6 +491,10 @@ export function makeNamedItem(definition, level = 1) {
     ...itemBonusStats(stats),
     slowImmune: Boolean(stats.slowImmune),
     effects: cloneItemEffects(definition.effects),
+    description: definition.description ? String(definition.description) : undefined,
+    nonRepairable: Boolean(definition.nonRepairable),
+    destroyWhenDurabilityDepleted: Boolean(definition.destroyWhenDurabilityDepleted),
+    durabilityLossOnEvents: cloneDurabilityLossOnEvents(definition.durabilityLossOnEvents),
     tags: Array.isArray(definition.tags) ? [...definition.tags] : undefined,
     target: Array.isArray(definition.target) ? [...definition.target] : undefined,
     bonus: Array.isArray(definition.bonus) ? definition.bonus.map((entry) => Array.isArray(entry) ? [...entry] : entry) : undefined,
@@ -488,18 +516,28 @@ export function makePotion(type = Math.random() < 0.5 ? "health" : "mana", level
   const potionId = normalizePotionId(type) || "small_health";
   const def = potionDefById(potionId);
   const health = def?.type === "health";
+  const rarity = RARITIES.find((entry) => entry.id === def?.rarity) ?? RARITIES[1];
   return finalizeItem({
     id: createId(),
     name: def?.name ?? (health ? "Small Health Potion" : "Mana Potion"),
     baseName: def?.name ?? (health ? "Small Health Potion" : "Mana Potion"),
-    rarity: "normal",
-    rarityLabel: "Normal",
-    rarityColor: def?.color ?? (health ? "#c52c38" : "#2d8ed8"),
+    rarity: rarity.id,
+    rarityLabel: rarity.label,
+    rarityColor: def?.color ?? rarity.color ?? (health ? "#c52c38" : "#2d8ed8"),
     slot: "consumable",
     mode: "potion",
     potionId,
     potionType: def?.type ?? (health ? "health" : "mana"),
     restorePct: Number(def?.restorePct) || 0.25,
+    restoreHealthPct: Number(def?.restoreHealthPct) || undefined,
+    restoreManaPct: Number(def?.restoreManaPct) || undefined,
+    armorBuffPct: Number(def?.armorBuffPct) || undefined,
+    armorBuffDurationMs: Number(def?.armorBuffDurationMs) || undefined,
+    durationMs: Number(def?.durationMs) || undefined,
+    tickMs: Number(def?.tickMs) || undefined,
+    healthRegenPct: Number(def?.healthRegenPct) || undefined,
+    manaRegenPct: Number(def?.manaRegenPct) || undefined,
+    description: def?.description ? String(def.description) : undefined,
     iconKey: def?.iconKey,
     iconUrl: def?.iconUrl,
     level: Math.max(1, Math.floor(Number(level) || 1)),
@@ -927,7 +965,7 @@ export function createChunk(cx, cy, region = null) {
       const worldX = chunk.x + tx;
       const worldY = chunk.y + ty;
       if (region && !isRegionTilePlayable(region, worldX, worldY)) continue;
-      const noise = hashInt(worldX, worldY, 31);
+      const noise = regionHashInt(region, worldX, worldY, 31);
       const regionTileset = region?.mapRegion?.tileset;
       const chosenTileset = Array.isArray(regionTileset) && regionTileset.length
         ? pickWeightedTileset(regionTileset, noise / 4294967295)
@@ -1040,11 +1078,35 @@ function pickRegionObjectEntry(entries, cx, cy, salt) {
   return entries[entries.length - 1];
 }
 
+function pickRegionObjectEntryForChunk(entries, chunk, salt) {
+  if (!entries?.length) return null;
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  if (total <= 0) return null;
+  let cursor = chunkRand01(chunk, 3300 + salt) * total;
+  for (const entry of entries) {
+    cursor -= entry.weight;
+    if (cursor <= 0) return entry;
+  }
+  return entries[entries.length - 1];
+}
+
 function pickWeightedFoliageSet(entries, cx, cy, salt) {
   if (!entries?.length) return null;
   const total = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.weight) || 0), 0);
   if (total <= 0) return entries[Math.floor(rand01(cx, cy, salt) * entries.length)] ?? entries[0];
   let cursor = rand01(cx, cy, salt) * total;
+  for (const entry of entries) {
+    cursor -= Math.max(0, Number(entry.weight) || 0);
+    if (cursor <= 0) return entry;
+  }
+  return entries[entries.length - 1];
+}
+
+function pickWeightedFoliageSetForChunk(entries, chunk, salt) {
+  if (!entries?.length) return null;
+  const total = entries.reduce((sum, entry) => sum + Math.max(0, Number(entry.weight) || 0), 0);
+  if (total <= 0) return entries[Math.floor(chunkRand01(chunk, salt) * entries.length)] ?? entries[0];
+  let cursor = chunkRand01(chunk, salt) * total;
   for (const entry of entries) {
     cursor -= Math.max(0, Number(entry.weight) || 0);
     if (cursor <= 0) return entry;
@@ -1063,6 +1125,25 @@ function rollFoliageResourceDrops(entry, cx, cy, foliageIndex) {
     const min = Math.max(1, Math.floor(Number(drop.min) || 1));
     const max = Math.max(min, Math.floor(Number(drop.max) || min));
     const count = min + Math.floor(rand01(cx, cy, 7070 + foliageIndex * 97 + i * 13) * (max - min + 1));
+    rolled.push({
+      resource: drop.resource,
+      count,
+    });
+  }
+  return rolled;
+}
+
+function rollFoliageResourceDropsForChunk(entry, chunk, foliageIndex) {
+  const drops = Array.isArray(entry?.resourceDrops) ? entry.resourceDrops : [];
+  if (!drops.length) return [];
+  const rolled = [];
+  for (let i = 0; i < drops.length; i += 1) {
+    const drop = drops[i];
+    const chance = Math.max(0, Math.min(1, Number(drop.chance) || 0));
+    if (chance <= 0 || chunkRand01(chunk, 7060 + foliageIndex * 97 + i * 13) > chance) continue;
+    const min = Math.max(1, Math.floor(Number(drop.min) || 1));
+    const max = Math.max(min, Math.floor(Number(drop.max) || min));
+    const count = min + Math.floor(chunkRand01(chunk, 7070 + foliageIndex * 97 + i * 13) * (max - min + 1));
     rolled.push({
       resource: drop.resource,
       count,
@@ -1577,11 +1658,11 @@ function addObjects(chunk, safeChunk) {
   const center = SPAWN_CONFIG.safeCenter;
 
   for (let i = 0; i < objectCount; i += 1) {
-    const selectedEntry = pickRegionObjectEntry(objectPool, chunk.cx, chunk.cy, i);
-    const type = selectedEntry ? pickObjectSpawnType(selectedEntry, rand01(chunk.cx, chunk.cy, 3320 + i)) : null;
+    const selectedEntry = pickRegionObjectEntryForChunk(objectPool, chunk, i);
+    const type = selectedEntry ? pickObjectSpawnType(selectedEntry, chunkRand01(chunk, 3320 + i)) : null;
     if (!type) continue;
-    const localX = 1 + rand01(chunk.cx, chunk.cy, 100 + i) * (CHUNK_SIZE - 2);
-    const localY = 1 + rand01(chunk.cx, chunk.cy, 200 + i) * (CHUNK_SIZE - 2);
+    const localX = 1 + chunkRand01(chunk, 100 + i) * (CHUNK_SIZE - 2);
+    const localY = 1 + chunkRand01(chunk, 200 + i) * (CHUNK_SIZE - 2);
     const x = chunk.x + localX;
     const y = chunk.y + localY;
     if (isWaterAt(chunk, x, y)) continue;
@@ -1597,7 +1678,7 @@ function addObjects(chunk, safeChunk) {
       ?? OBJECT_SPAWN_TUNING[getRegionObjectFamily(type)]
       ?? OBJECT_SPAWN_TUNING.default;
     const radius = tuning.radius;
-    const size = tuning.sizeBase + (tuning.sizeRange ? rand01(chunk.cx, chunk.cy, tuning.sizeSalt + i) * tuning.sizeRange : 0);
+    const size = tuning.sizeBase + (tuning.sizeRange ? chunkRand01(chunk, tuning.sizeSalt + i) * tuning.sizeRange : 0);
 
     const resolvedDef = resolveRegionObjectDestructibleDef(type);
     const explicitDestructible = typeof selectedEntry?.destructible === "boolean"
@@ -1605,7 +1686,7 @@ function addObjects(chunk, safeChunk) {
       : null;
     const effectiveDestructible = explicitDestructible ?? selectedEntry?.defaultDestructible ?? Boolean(resolvedDef);
     const damageState = resolvedDef && (effectiveDestructible || selectedEntry?.spawnDamage)
-      ? initialObjectDamageState(resolvedDef, selectedEntry?.spawnDamage, rand01(chunk.cx, chunk.cy, 7950 + i))
+      ? initialObjectDamageState(resolvedDef, selectedEntry?.spawnDamage, chunkRand01(chunk, 7950 + i))
       : {};
     
     // Handle scale: fixed, range, or default (1.0)
@@ -1614,12 +1695,12 @@ function addObjects(chunk, safeChunk) {
     if (objectScale?.type === "fixed") {
       visualScale = objectScale.value;
     } else if (objectScale?.type === "range") {
-      visualScale = objectScale.min + rand01(chunk.cx, chunk.cy, 590 + i) * (objectScale.max - objectScale.min);
+      visualScale = objectScale.min + chunkRand01(chunk, 590 + i) * (objectScale.max - objectScale.min);
     } else {
       visualScale = 1; // Default: no variation, normal size
     }
     
-    const treeVariant = Math.floor(rand01(chunk.cx, chunk.cy, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16)));
+    const treeVariant = Math.floor(chunkRand01(chunk, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16)));
     const selectedDef = REGION_OBJECT_DEFS[selectedEntry?.id] ?? null;
     const variantInfo = objectGraphicsVariantInfo(selectedDef, treeVariant);
     const runtimeObject = {
@@ -1631,12 +1712,12 @@ function addObjects(chunk, safeChunk) {
       y,
       radius,
       size,
-      rotation: rand01(chunk.cx, chunk.cy, 400 + i) * Math.PI * 2,
-      colorShift: rand01(chunk.cx, chunk.cy, 500 + i),
-      flip: rand01(chunk.cx, chunk.cy, 530 + i) > 0.5,
+      rotation: chunkRand01(chunk, 400 + i) * Math.PI * 2,
+      colorShift: chunkRand01(chunk, 500 + i),
+      flip: chunkRand01(chunk, 530 + i) > 0.5,
       treeVariant,
       ...variantInfo,
-      animSeed: rand01(chunk.cx, chunk.cy, 560 + i) * Math.PI * 2,
+      animSeed: chunkRand01(chunk, 560 + i) * Math.PI * 2,
       visualScale,
       blocking: true,
       destructible: effectiveDestructible,
@@ -1662,7 +1743,7 @@ function addObjects(chunk, safeChunk) {
       // TODO: Support occluder metadata here for future pixel/shape masking.
       ...damageState,
     };
-    runtimeObject.particles = runtimeObjectParticles(selectedDef, runtimeObject, selectedEntry, () => rand01(chunk.cx, chunk.cy, 7600 + i));
+    runtimeObject.particles = runtimeObjectParticles(selectedDef, runtimeObject, selectedEntry, () => chunkRand01(chunk, 7600 + i));
     chunk.objects.push(runtimeObject);
   }
 
@@ -1732,17 +1813,17 @@ function addFoliage(chunk, safeChunk) {
   if (!regionFoliageSets.length) return;
 
   for (let i = 0; i < count; i += 1) {
-    const localX = -0.15 + rand01(chunk.cx, chunk.cy, 6100 + i) * (CHUNK_SIZE + 0.3);
-    const localY = -0.15 + rand01(chunk.cx, chunk.cy, 6200 + i) * (CHUNK_SIZE + 0.3);
+    const localX = -0.15 + chunkRand01(chunk, 6100 + i) * (CHUNK_SIZE + 0.3);
+    const localY = -0.15 + chunkRand01(chunk, 6200 + i) * (CHUNK_SIZE + 0.3);
     if (isWaterAt(chunk, chunk.x + localX, chunk.y + localY)) continue;
     if (chunk.region && isReservedTile(chunk.region, chunk.x + localX, chunk.y + localY)) continue;
     if (chunk.region && !isRegionPointPlayable(chunk.region, chunk.x + localX, chunk.y + localY, 0.2)) continue;
     if (safeChunk && Math.hypot(localX - center.x, localY - center.y) < SPAWN_CONFIG.foliageSafeRadius) continue;
 
-    const selectedFoliageSet = pickWeightedFoliageSet(regionFoliageSets, chunk.cx, chunk.cy, 6650 + i);
+    const selectedFoliageSet = pickWeightedFoliageSetForChunk(regionFoliageSets, chunk, 6650 + i);
     const variantCount = Math.max(1, Number(selectedFoliageSet?.variantCount) || 16);
-    const resourceDrops = rollFoliageResourceDrops(selectedFoliageSet, chunk.cx, chunk.cy, i);
-    const particles = rollParticleConfigs(selectedFoliageSet?.particles, () => rand01(chunk.cx, chunk.cy, 7100 + i));
+    const resourceDrops = rollFoliageResourceDropsForChunk(selectedFoliageSet, chunk, i);
+    const particles = rollParticleConfigs(selectedFoliageSet?.particles, () => chunkRand01(chunk, 7100 + i));
     const fixedScale = Number(selectedFoliageSet?.scale);
     const hasFixedScale = Number.isFinite(fixedScale) && fixedScale > 0;
 
@@ -1753,15 +1834,15 @@ function addFoliage(chunk, safeChunk) {
       x: chunk.x + localX,
       y: chunk.y + localY,
       radius: 0,
-      size: hasFixedScale ? fixedScale : 0.72 + rand01(chunk.cx, chunk.cy, 6300 + i) * 0.72,
-      rotation: (rand01(chunk.cx, chunk.cy, 6400 + i) - 0.5) * 0.55,
-      colorShift: rand01(chunk.cx, chunk.cy, 6500 + i),
-      flip: rand01(chunk.cx, chunk.cy, 6600 + i) > 0.5,
-      foliageVariant: Math.floor(rand01(chunk.cx, chunk.cy, 6700 + i) * variantCount),
+      size: hasFixedScale ? fixedScale : 0.72 + chunkRand01(chunk, 6300 + i) * 0.72,
+      rotation: (chunkRand01(chunk, 6400 + i) - 0.5) * 0.55,
+      colorShift: chunkRand01(chunk, 6500 + i),
+      flip: chunkRand01(chunk, 6600 + i) > 0.5,
+      foliageVariant: Math.floor(chunkRand01(chunk, 6700 + i) * variantCount),
       foliageSheet: selectedFoliageSet?.sheetId,
-      animSeed: rand01(chunk.cx, chunk.cy, 6800 + i) * Math.PI * 2,
-      visualScale: hasFixedScale ? 1 : 0.84 + rand01(chunk.cx, chunk.cy, 6900 + i) * 0.38,
-      wind: rand01(chunk.cx, chunk.cy, 7000 + i) * 0.5,
+      animSeed: chunkRand01(chunk, 6800 + i) * Math.PI * 2,
+      visualScale: hasFixedScale ? 1 : 0.84 + chunkRand01(chunk, 6900 + i) * 0.38,
+      wind: chunkRand01(chunk, 7000 + i) * 0.5,
       resourceDrops,
       particles,
       actionId: selectedFoliageSet?.actionId ?? null,
@@ -1785,7 +1866,7 @@ function addDecals(chunk, safeChunk) {
     if (!regionDecaySets.length) return null;
     const total = regionDecaySets.reduce((sum, entry) => sum + (Number(entry.weight) || 0), 0);
     if (total <= 0) return regionDecaySets[0];
-    let cursor = rand01(chunk.cx, chunk.cy, salt) * total;
+    let cursor = chunkRand01(chunk, salt) * total;
     for (const entry of regionDecaySets) {
       cursor -= Number(entry.weight) || 0;
       if (cursor <= 0) return entry;
@@ -1796,18 +1877,18 @@ function addDecals(chunk, safeChunk) {
   const pickDecayVariant = (entry, salt) => {
     const variants = Array.isArray(entry?.variants) ? entry.variants : [];
     if (!variants.length) return 0;
-    return variants[Math.floor(rand01(chunk.cx, chunk.cy, salt) * variants.length)] ?? variants[0];
+    return variants[Math.floor(chunkRand01(chunk, salt) * variants.length)] ?? variants[0];
   };
 
   for (let i = 0; i < count; i += 1) {
-    const localX = -0.2 + rand01(chunk.cx, chunk.cy, 1200 + i) * (CHUNK_SIZE + 0.4);
-    const localY = -0.2 + rand01(chunk.cx, chunk.cy, 1300 + i) * (CHUNK_SIZE + 0.4);
-    const sizeRoll = rand01(chunk.cx, chunk.cy, 1490 + i);
+    const localX = -0.2 + chunkRand01(chunk, 1200 + i) * (CHUNK_SIZE + 0.4);
+    const localY = -0.2 + chunkRand01(chunk, 1300 + i) * (CHUNK_SIZE + 0.4);
+    const sizeRoll = chunkRand01(chunk, 1490 + i);
     const size = sizeRoll < 0.12
-      ? 1.22 + rand01(chunk.cx, chunk.cy, 1491 + i) * 0.36
+      ? 1.22 + chunkRand01(chunk, 1491 + i) * 0.36
       : sizeRoll < 0.56
-        ? 0.92 + rand01(chunk.cx, chunk.cy, 1492 + i) * 0.36
-        : 0.78 + rand01(chunk.cx, chunk.cy, 1493 + i) * 0.24;
+        ? 0.92 + chunkRand01(chunk, 1492 + i) * 0.36
+        : 0.78 + chunkRand01(chunk, 1493 + i) * 0.24;
 
     const selectedDecaySet = pickDecaySet(1400 + i);
 
@@ -1830,13 +1911,13 @@ function addDecals(chunk, safeChunk) {
       y: chunk.y + localY,
       size,
       rotation: selectedDecaySet.randomRotation
-        ? rand01(chunk.cx, chunk.cy, 1600 + i) * Math.PI * 2
+        ? chunkRand01(chunk, 1600 + i) * Math.PI * 2
         : selectedDecaySet.rotation ?? 0,
-      color: rand01(chunk.cx, chunk.cy, 1700 + i),
+      color: chunkRand01(chunk, 1700 + i),
       alpha: selectedDecaySet.alpha ?? (
         selectedDecaySet.projection === "iso"
           ? 1
-          : 0.2 + rand01(chunk.cx, chunk.cy, 1750 + i) * 0.32
+          : 0.2 + chunkRand01(chunk, 1750 + i) * 0.32
       ),
       decaySheetId: selectedDecaySet.sheetId,
       decayVariant: pickDecayVariant(selectedDecaySet, 1450 + i),
@@ -1850,8 +1931,8 @@ function addDecals(chunk, safeChunk) {
       decayAnchorX: selectedDecaySet.anchorX,
       decayAnchorY: selectedDecaySet.anchorY,
       decayAlphaExplicit: selectedDecaySet.alpha !== null,
-      animSeed: rand01(chunk.cx, chunk.cy, 1800 + i) * Math.PI * 2,
-      particles: rollParticleConfigs(selectedDecaySet.particles, () => rand01(chunk.cx, chunk.cy, 1810 + i)),
+      animSeed: chunkRand01(chunk, 1800 + i) * Math.PI * 2,
+      particles: rollParticleConfigs(selectedDecaySet.particles, () => chunkRand01(chunk, 1810 + i)),
     });
   }
 }
@@ -1947,7 +2028,7 @@ function pickRegionRareMob(chunk, slotIndex) {
     const chance = Math.max(0, Math.min(1, Number(entry?.chance) || 0));
     if (chance <= 0) continue;
 
-    const roll = rand01(chunk.cx + rareIndex * 37, chunk.cy + slotIndex * 53, 1110 + rareIndex * 97 + slotIndex * 131);
+    const roll = chunkRand01(chunk, 1110 + rareIndex * 97 + slotIndex * 131, chunk.cx + rareIndex * 37, chunk.cy + slotIndex * 53);
     if (roll >= chance) continue;
 
     if (roll < selectedRoll) {
@@ -1989,7 +2070,7 @@ function pickSpecialSpawnMonster(chunk) {
     const chance = Math.max(0, Math.min(1, Number(rule.chance) || 0));
     if (chance <= 0) continue;
     const salt = Number.isFinite(Number(rule.salt)) ? Number(rule.salt) : 1100;
-    if (rand01(chunk.cx, chunk.cy, salt) < chance) return monsterType;
+    if (chunkRand01(chunk, salt) < chance) return monsterType;
   }
   return null;
 }
@@ -2037,7 +2118,7 @@ function createChunkMonster(chunk, slotIndex, monsterType, x, y, level, extra = 
     speciesId: base.speciesId,
     factionId: base.factionId,
     tags: Array.isArray(base.tags) ? [...base.tags] : [],
-    spellCooldown: 0.6 + rand01(chunk.cx, chunk.cy, 985 + slotIndex) * 1.5,
+    spellCooldown: 0.6 + chunkRand01(chunk, 985 + slotIndex) * 1.5,
     statusEffects: [],
     allowElite: base.allowElite !== false,
     isBoss: Boolean(base.isBoss),
@@ -2055,16 +2136,16 @@ function createChunkMonster(chunk, slotIndex, monsterType, x, y, level, extra = 
     isMinion: false,
     minionOwnerId: null,
     aggro: base.range > 1 ? 8.2 : 6.7,
-    attackCooldown: 0.3 + rand01(chunk.cx, chunk.cy, 980 + slotIndex),
+    attackCooldown: 0.3 + chunkRand01(chunk, 980 + slotIndex),
     color: base.color,
     xp: Math.floor(base.xp * (1 + level * 0.15)),
-    animSeed: rand01(chunk.cx, chunk.cy, 1010 + slotIndex) * Math.PI * 2,
-    breathSpeed: 1.6 + rand01(chunk.cx, chunk.cy, 1020 + slotIndex) * 1.4,
-    visualScale: 0.9 + rand01(chunk.cx, chunk.cy, 1030 + slotIndex) * 0.22,
+    animSeed: chunkRand01(chunk, 1010 + slotIndex) * Math.PI * 2,
+    breathSpeed: 1.6 + chunkRand01(chunk, 1020 + slotIndex) * 1.4,
+    visualScale: 0.9 + chunkRand01(chunk, 1030 + slotIndex) * 0.22,
     facingX: 1,
     facingY: 0,
     moving: false,
-    gait: rand01(chunk.cx, chunk.cy, 1040 + slotIndex) * Math.PI * 2,
+    gait: chunkRand01(chunk, 1040 + slotIndex) * Math.PI * 2,
     moveSpeed: 0,
     attackAnim: 0,
     dead: false,
@@ -2077,14 +2158,14 @@ function addMonsters(chunk, safeChunk) {
   const monsterCounts = chunk.region?.mapRegion?.spawnCounts?.monsters ?? { min: 0, max: 0 };
   const minCount = Math.max(0, Math.round(Number(monsterCounts.min) || 0));
   const maxCount = Math.max(minCount, Math.round(Number(monsterCounts.max) || minCount));
-  const count = minCount + Math.floor(rand01(chunk.cx, chunk.cy, 700) * (maxCount - minCount + 1));
+  const count = minCount + Math.floor(chunkRand01(chunk, 700) * (maxCount - minCount + 1));
   const safeCenter = { x: 3.2, y: 3.1 };
   const monsterTypes = chunk.region?.mapRegion?.mobs ?? [];
   if (!monsterTypes.length) return;
 
   for (let i = 0; i < count; i += 1) {
-    let localX = 1.1 + rand01(chunk.cx, chunk.cy, 760 + i) * (CHUNK_SIZE - 2.2);
-    let localY = 1.1 + rand01(chunk.cx, chunk.cy, 810 + i) * (CHUNK_SIZE - 2.2);
+    let localX = 1.1 + chunkRand01(chunk, 760 + i) * (CHUNK_SIZE - 2.2);
+    let localY = 1.1 + chunkRand01(chunk, 810 + i) * (CHUNK_SIZE - 2.2);
     if (chunk.region && isReservedTile(chunk.region, chunk.x + localX, chunk.y + localY)) continue;
     if (chunk.region && !isRegionPointPlayable(chunk.region, chunk.x + localX, chunk.y + localY, 0.5)) continue;
     if (isWaterAt(chunk, chunk.x + localX, chunk.y + localY)) continue;
@@ -2099,8 +2180,8 @@ function addMonsters(chunk, safeChunk) {
       || (chunk.region && isReservedTile(chunk.region, x, y))
       || (chunk.region && !isRegionPointPlayable(chunk.region, x, y, 0.5))
     ); tries += 1) {
-      localX = 1.1 + rand01(chunk.cx + tries, chunk.cy, 840 + i) * (CHUNK_SIZE - 2.2);
-      localY = 1.1 + rand01(chunk.cx, chunk.cy + tries, 880 + i) * (CHUNK_SIZE - 2.2);
+      localX = 1.1 + chunkRand01(chunk, 840 + i, chunk.cx + tries, chunk.cy) * (CHUNK_SIZE - 2.2);
+      localY = 1.1 + chunkRand01(chunk, 880 + i, chunk.cx, chunk.cy + tries) * (CHUNK_SIZE - 2.2);
       x = chunk.x + localX;
       y = chunk.y + localY;
     }
@@ -2108,7 +2189,7 @@ function addMonsters(chunk, safeChunk) {
     if (chunk.region && !isRegionPointPlayable(chunk.region, x, y, 0.5)) continue;
 
     const rareMob = pickRegionRareMob(chunk, i);
-    const monsterType = rareMob?.type ?? pickSpecialSpawnMonster(chunk) ?? pickWeightedMob(monsterTypes, rand01(chunk.cx, chunk.cy, 900 + i));
+    const monsterType = rareMob?.type ?? pickSpecialSpawnMonster(chunk) ?? pickWeightedMob(monsterTypes, chunkRand01(chunk, 900 + i));
     const base = MONSTER_STATS[monsterType];
     if (!base) continue;
     if (base.isBoss) {
@@ -2118,10 +2199,10 @@ function addMonsters(chunk, safeChunk) {
       if (spawnedBossTypes.has(monsterType)) continue;
       spawnedBossTypes.add(monsterType);
     }
-    const baseLevel = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 930 + i) * 2);
+    const baseLevel = chunk.level + Math.floor(chunkRand01(chunk, 930 + i) * 2);
     const levelOffset = rareMob ? normalizeRareMobLevelOffset(rareMob.levelOffset) : 0;
     const level = Math.max(1, baseLevel + levelOffset);
-    const baseVisualScale = 0.9 + rand01(chunk.cx, chunk.cy, 1030 + i) * 0.22;
+    const baseVisualScale = 0.9 + chunkRand01(chunk, 1030 + i) * 0.22;
     const scaleMultiplier = rareMob ? clampRareMobScale(rareMob.scale) : 1;
     const rareDisplayName = rareMob ? composeRareMobDisplayName(monsterType, rareMob) : undefined;
     const rareTint = rareMob?.tint !== undefined ? String(rareMob.tint).trim() : "";

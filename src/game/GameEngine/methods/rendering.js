@@ -25,6 +25,8 @@ import {
 const TERRAIN_GROUND_COLOR = "#3f6f34";
 const TERRAIN_WATER_COLOR = "#1f5f7f";
 const TERRAIN_PATH_COLOR = "rgba(112, 86, 48, 0.24)";
+const MAX_CACHED_TERRAIN_LAYERS = 120;
+const TERRAIN_LAYER_KEEP_RADIUS_CHUNKS = 3;
 import {
   drawRegionMarkerIfInChunk,
   drawQuestgiver,
@@ -342,30 +344,66 @@ export const renderingMethods = {
       this.drawLoadingScreen(ctx);
       return;
     }
+    const renderStartedAt = performance.now();
+    const timings = {
+      totalMs: 0,
+      tilesMs: 0,
+      objectsMs: 0,
+      particlesMs: 0,
+      fogMs: 0,
+      minimapMs: this.renderTimings?.minimapMs ?? null,
+    };
+    this.renderDebugCounts = {
+      drawables: 0,
+      monsters: this.monsters?.size ?? 0,
+      objects: 0,
+      particles: (this.particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0),
+      cachedTerrainLayers: this.countCachedTerrainLayers?.() ?? 0,
+      terrainLayersCleared: this.terrainLayersCleared ?? 0,
+    };
     const shakeX = this.camera.shake ? (Math.random() - 0.5) * this.camera.shake : 0;
     const shakeY = this.camera.shake ? (Math.random() - 0.5) * this.camera.shake : 0;
     ctx.save();
     ctx.clearRect(0, 0, this.width, this.height);
     ctx.translate(shakeX, shakeY);
     this.drawBackdrop(ctx);
+    let t = performance.now();
     this.drawParticles(ctx, "backgroundParticles");
+    timings.particlesMs += performance.now() - t;
+    t = performance.now();
     this.drawTiles(ctx);
+    timings.tilesMs += performance.now() - t;
+    t = performance.now();
     this.drawParticles(ctx, "aboveGround");
     this.drawParticles(ctx, "belowUnits");
     this.drawParticles(ctx, "belowEntities");
+    timings.particlesMs += performance.now() - t;
+    t = performance.now();
     this.drawWorldObjects(ctx);
+    timings.objectsMs += performance.now() - t;
     this.drawAttachedEffectDebug(ctx);
+    t = performance.now();
     this.drawParticles(ctx, "aboveObjects");
     this.drawParticles(ctx, "aboveUnits");
     this.drawParticles(ctx, "effects");
     this.drawParticles(ctx, "aboveEntities");
+    timings.particlesMs += performance.now() - t;
     this.drawFloaters(ctx);
+    t = performance.now();
     this.drawParticles(ctx, "weatherOverlay");
+    timings.particlesMs += performance.now() - t;
     this.drawWeatherEvents(ctx);
+    t = performance.now();
     this.drawFogOfWar(ctx);
+    timings.fogMs += performance.now() - t;
+    t = performance.now();
     this.drawParticles(ctx, "screenOverlay");
+    timings.particlesMs += performance.now() - t;
     this.drawVignette(ctx);
     ctx.restore();
+    timings.totalMs = performance.now() - renderStartedAt;
+    this.renderDebugCounts.cachedTerrainLayers = this.countCachedTerrainLayers?.() ?? 0;
+    this.renderTimings = timings;
   },
 
   drawBackdrop(ctx) {
@@ -399,9 +437,12 @@ export const renderingMethods = {
         const y = origin.y - originY;
         if (x > this.width + 160 || y > this.height + 160 || x + layerWidth < -160 || y + layerHeight < -160) continue;
         const layer = this.getTerrainLayer(chunk);
+        layer.lastUsedFrame = this.frame;
+        layer.lastUsedAt = performance.now();
         ctx.drawImage(layer.canvas, x, y);
       }
     }
+    this.cleanupTerrainLayers?.();
   },
 
   getTerrainLayer(chunk) {
@@ -473,6 +514,40 @@ export const renderingMethods = {
 
     chunk.terrainLayer = { canvas, originX, originY, width, height };
     return chunk.terrainLayer;
+  },
+
+  countCachedTerrainLayers() {
+    let count = 0;
+    for (const chunk of this.chunks?.values?.() ?? []) {
+      if (chunk.terrainLayer) count += 1;
+    }
+    return count;
+  },
+
+  cleanupTerrainLayers() {
+    const cached = [];
+    const { cx: playerCx, cy: playerCy } = chunkCoords(this.player.x, this.player.y);
+    for (const chunk of this.chunks?.values?.() ?? []) {
+      if (!chunk.terrainLayer) continue;
+      const chunkDistance = Math.max(Math.abs((chunk.cx ?? 0) - playerCx), Math.abs((chunk.cy ?? 0) - playerCy));
+      cached.push({ chunk, chunkDistance, lastUsedFrame: chunk.terrainLayer.lastUsedFrame ?? -1 });
+    }
+    if (cached.length <= MAX_CACHED_TERRAIN_LAYERS) return 0;
+    cached.sort((a, b) => {
+      const nearA = a.chunkDistance <= TERRAIN_LAYER_KEEP_RADIUS_CHUNKS ? 1 : 0;
+      const nearB = b.chunkDistance <= TERRAIN_LAYER_KEEP_RADIUS_CHUNKS ? 1 : 0;
+      return nearA - nearB || a.lastUsedFrame - b.lastUsedFrame || b.chunkDistance - a.chunkDistance;
+    });
+    let cleared = 0;
+    const target = MAX_CACHED_TERRAIN_LAYERS;
+    for (const entry of cached) {
+      if (cached.length - cleared <= target) break;
+      if (entry.chunkDistance <= TERRAIN_LAYER_KEEP_RADIUS_CHUNKS) continue;
+      entry.chunk.terrainLayer = null;
+      cleared += 1;
+    }
+    if (cleared > 0) this.terrainLayersCleared = (this.terrainLayersCleared ?? 0) + cleared;
+    return cleared;
   },
 
   drawWorldObjects(ctx) {
@@ -575,6 +650,10 @@ export const renderingMethods = {
       if (drawable.type === "object") drawable.foregroundAlpha = foregroundFadeAlpha(drawable, drawables);
     }
     drawables.sort((a, b) => a.layer - b.layer || a.depth - b.depth || getTypeSortOrder(a.type) - getTypeSortOrder(b.type));
+    if (this.renderDebugCounts) {
+      this.renderDebugCounts.drawables = drawables.length;
+      this.renderDebugCounts.objects = drawables.filter((entry) => entry.type === "object").length;
+    }
 
     const stats = this.calcStats();
     for (const item of drawables) {
@@ -918,6 +997,7 @@ export const renderingMethods = {
 
   renderMinimap(canvas) {
     if (!canvas) return;
+    const startedAt = performance.now();
     const ctx = canvas.getContext("2d");
     const size = canvas.width;
     const center = size / 2;
@@ -973,6 +1053,10 @@ export const renderingMethods = {
     ctx.beginPath();
     ctx.arc(center, center, 4, 0, Math.PI * 2);
     ctx.fill();
+    this.renderTimings = {
+      ...(this.renderTimings ?? {}),
+      minimapMs: performance.now() - startedAt,
+    };
   },
 
   drawMinimapFog(ctx, center, scale) {

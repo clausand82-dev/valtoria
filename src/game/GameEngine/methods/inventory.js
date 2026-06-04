@@ -12,6 +12,7 @@ import {
   isPotionItem,
   isQuestItem,
   isReadableItem,
+  isEquippableItem,
   isResourceItem,
   isStackableItem,
   READABLE_DEF_BY_ID,
@@ -556,20 +557,53 @@ export const inventoryMethods = {
     const item = inventory[index];
 
     const stats = this.calcStats();
-    const pct = Number(item.restorePct ?? def.restorePct) || 0.25;
-    if (def.type === "health") {
-      this.player.hp = clamp(this.player.hp + stats.maxHp * pct, 0, stats.maxHp);
+    const restoreHealthPct = Number(item.restoreHealthPct ?? def.restoreHealthPct) || (def.type === "health" ? Number(item.restorePct ?? def.restorePct) || 0.25 : 0);
+    const restoreManaPct = Number(item.restoreManaPct ?? def.restoreManaPct) || (def.type === "mana" ? Number(item.restorePct ?? def.restorePct) || 0.25 : 0);
+    if (restoreHealthPct > 0) {
+      this.player.hp = clamp(this.player.hp + stats.maxHp * restoreHealthPct, 0, stats.maxHp);
       this.spawnHeroHealingEffect?.();
-      this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxHp * pct)} liv`, "#58d96d", 0.95);
-    } else {
-      this.player.mana = clamp(this.player.mana + stats.maxMana * pct, 0, stats.maxMana);
-      this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * pct)} mana`, "#58bfff", 0.95);
+      this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxHp * restoreHealthPct)} liv`, "#58d96d", 0.95);
+    }
+    if (restoreManaPct > 0) {
+      this.player.mana = clamp(this.player.mana + stats.maxMana * restoreManaPct, 0, stats.maxMana);
+      this.addFloater(this.player.x, this.player.y, `+${Math.floor(stats.maxMana * restoreManaPct)} mana`, "#58bfff", 0.95);
+    }
+    const armorBuffPct = Number(item.armorBuffPct ?? def.armorBuffPct) || 0;
+    if (armorBuffPct > 0) {
+      const armorBonus = Math.max(1, Math.floor(Math.max(1, Number(stats.armor) || 1) * armorBuffPct));
+      this.player.statusEffects = Array.isArray(this.player.statusEffects) ? this.player.statusEffects : [];
+      this.player.statusEffects.push({
+        type: "statBuff",
+        sourceId: id,
+        duration: Math.max(1, Number(item.armorBuffDurationMs ?? def.armorBuffDurationMs) || 60000) / 1000,
+        bonuses: { armorFlat: armorBonus },
+        color: def.color ?? "#b579ff",
+      });
+      this.addFloater(this.player.x, this.player.y, `+${armorBonus} armor`, def.color ?? "#b579ff", 0.95);
+    }
+    const durationMs = Number(item.durationMs ?? def.durationMs) || 0;
+    const healthRegenPct = Number(item.healthRegenPct ?? def.healthRegenPct) || 0;
+    const manaRegenPct = Number(item.manaRegenPct ?? def.manaRegenPct) || 0;
+    if (durationMs > 0 && (healthRegenPct > 0 || manaRegenPct > 0)) {
+      const tickSeconds = Math.max(0.1, (Number(item.tickMs ?? def.tickMs) || 1000) / 1000);
+      this.player.statusEffects = Array.isArray(this.player.statusEffects) ? this.player.statusEffects : [];
+      this.player.statusEffects.push({
+        type: "regen",
+        sourceId: id,
+        duration: durationMs / 1000,
+        tick: tickSeconds,
+        tickMax: tickSeconds,
+        healthPct: healthRegenPct,
+        manaPct: manaRegenPct,
+        color: def.color ?? "#ff9f1c",
+      });
+      this.addFloater(this.player.x, this.player.y, "Regen", def.color ?? "#ff9f1c", 0.95);
     }
     const count = Math.max(1, Math.floor(Number(item.count) || 1));
     if (count > 1) item.count = count - 1;
     else inventory.splice(index, 1);
-    if (def.type === "health") this.player.stats.healthPotionsUsed += 1;
-    if (def.type === "mana") this.player.stats.manaPotionsUsed += 1;
+    if (restoreHealthPct > 0 || def.type === "health" || def.type === "hybrid" || def.type === "regen") this.player.stats.healthPotionsUsed += 1;
+    if (restoreManaPct > 0 || def.type === "mana" || def.type === "regen") this.player.stats.manaPotionsUsed += 1;
     this.potionCooldown = 0.5;
     this.publishSnapshot();
   },
@@ -740,8 +774,8 @@ export const inventoryMethods = {
   forgeDestroyInventoryWeapon(index) {
     const item = this.player.inventory[index];
     if (!item) return false;
-    if (item.slot !== "weapon") {
-      this.addToast("Forge kan kun destruere vaaben");
+    if (!isEquippableItem(item)) {
+      this.addToast("Forge kan kun destruere gear");
       return false;
     }
     this.destroyInventoryItem(index, true);
@@ -1196,6 +1230,15 @@ export const inventoryMethods = {
         potionId,
         potionType: def.type,
         restorePct: def.restorePct,
+        restoreHealthPct: def.restoreHealthPct,
+        restoreManaPct: def.restoreManaPct,
+        armorBuffPct: def.armorBuffPct,
+        armorBuffDurationMs: def.armorBuffDurationMs,
+        durationMs: def.durationMs,
+        tickMs: def.tickMs,
+        healthRegenPct: def.healthRegenPct,
+        manaRegenPct: def.manaRegenPct,
+        description: def.description,
         iconKey: def.iconKey,
         iconUrl: def.iconUrl,
         count,
@@ -1300,6 +1343,7 @@ export const inventoryMethods = {
     };
     if (isResourceItem(item)) {
       parts.push(`Resource stack ${item.count ?? 1} / ${resourceStackMax(item.resourceId)}`);
+      if (item.description) parts.push(item.description);
     } else if (isReadableItem(item)) {
       const status = String(item.readableStatus ?? "readable");
       parts.push(status === "mergeable" ? "Fragment" : status === "consumable" ? "Consumable" : "Readable");
@@ -1309,7 +1353,7 @@ export const inventoryMethods = {
     } else if (isQuestItem(item)) {
       parts.push("Quest item");
     } else if (isPotionItem(item)) {
-      parts.push(item.potionType === "health" ? "Giver 25% liv" : "Giver 25% mana");
+      parts.push(item.description || (item.potionType === "health" ? "Giver 25% liv" : "Giver 25% mana"));
     } else if (item.slot === "weapon") {
       parts.push(`${item.damageMin}-${item.damageMax} skade`);
       parts.push(`${item.range} range`);
@@ -1327,6 +1371,8 @@ export const inventoryMethods = {
     if (Array.isArray(item.classReq) && item.classReq.length) parts.push(`Class: ${item.classReq.join(", ")}`);
     if (item.levelReq) parts.push(`Requires level ${item.levelReq}`);
     if (item.requiresClassNode) parts.push(`Requires ${item.requiresClassNode}`);
+    if (item.description && !isPotionItem(item)) parts.push(item.description);
+    if (item.nonRepairable) parts.push("Kan ikke repareres");
     parts.push(`${item.value ?? itemValue(item)} g`);
     return parts.join(" | ");
   },
@@ -1337,6 +1383,7 @@ export const inventoryMethods = {
   repairEquippedItem(slotId, options = {}) {
     const item = this.player.equipment?.[slotId];
     if (!item) { this.addToast("Intet udstyr i den slot."); return false; }
+    if (item.nonRepairable) { this.addToast(`${item.name} kan ikke repareres.`); return false; }
 
     const dur = Number(item.durability ?? 100);
     const missing = Math.ceil(100 - dur);
@@ -1376,6 +1423,7 @@ export const inventoryMethods = {
       this.addToast("Intet gear i den slot.");
       return false;
     }
+    if (item.nonRepairable) { this.addToast(`${item.name} kan ikke repareres.`); return false; }
 
     const dur = Number(item.durability ?? 100);
     const missing = Math.ceil(100 - dur);

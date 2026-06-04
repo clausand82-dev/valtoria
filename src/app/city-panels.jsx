@@ -118,8 +118,8 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
-  const forgeWeapons = useMemo(() => (
-    (snapshot.inventory ?? []).filter((item) => item?.slot === "weapon")
+  const forgeGear = useMemo(() => (
+    (snapshot.inventory ?? []).filter((item) => isForgeGear(item))
   ), [snapshot.inventory]);
 
   return (
@@ -157,7 +157,7 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
       {activeAddonId === "forge" && (
         <BlacksmithForgeStation
           enabled={hasForge}
-          weapons={forgeWeapons}
+          gear={forgeGear}
           onDestroy={(index) => engineRef.current?.forgeDestroyInventoryWeapon?.(index)}
         />
       )}
@@ -236,6 +236,7 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
   const dur = Number(item.durability ?? 100);
   const missing = Math.ceil(100 - dur);
   const isFullyRepaired = missing <= 0;
+  const isNonRepairable = Boolean(item.nonRepairable);
   const color = durabilityColor(dur);
 
   // Calculate repair costs
@@ -245,7 +246,7 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
   // Check if player has enough resources
   const goldHave = Math.max(0, Math.floor(Number(snapshot.player?.gold) || 0));
   const junkHave = resourceCount ? resourceCount("junk") : cityResourceCount(snapshot.inventory, "junk");
-  const canAfford = goldHave >= goldCost && junkHave >= junkCost;
+  const canAfford = !isNonRepairable && goldHave >= goldCost && junkHave >= junkCost;
 
   return (
     <div className={`repair-slot repair-source-${slot.source}${isFullyRepaired ? " repaired" : ""}`}>
@@ -270,7 +271,7 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
           {dur <= 0 && " ✕ Ubrugeligt"}
         </span>
       </div>
-      {!isFullyRepaired && (
+      {!isFullyRepaired && !isNonRepairable && (
         <div className="repair-slot-action">
           <div className={`repair-cost-display${canAfford ? " affordable" : " unaffordable"}`}>
             <span className="cost-item">
@@ -298,6 +299,9 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
             Reparer
           </button>
         </div>
+      )}
+      {!isFullyRepaired && isNonRepairable && (
+        <span className="repair-done">Kan ikke repareres</span>
       )}
       {isFullyRepaired && (
         <span className="repair-done">OK</span>
@@ -395,21 +399,33 @@ function BlacksmithMergeStation({ title, enabled, lockedText, inventory, categor
   );
 }
 
-function BlacksmithForgeStation({ enabled, weapons, onDestroy }) {
+function isForgeGear(item) {
+  if (!item) return false;
+  if (item.flags?.equippable) return true;
+  return item.slot === "weapon"
+    || item.mode === "armor"
+    || item.mode === "shield"
+    || item.mode === "relic"
+    || item.mode === "melee"
+    || item.mode === "ranged"
+    || item.mode === "magic";
+}
+
+function BlacksmithForgeStation({ enabled, gear, onDestroy }) {
   return (
     <section className={`blacksmith-station ${enabled ? "" : "locked"}`}>
       <header>
         <h4>Forge Addon</h4>
-        <span>{enabled ? "Destroy weapons for resources" : "Build Forge Addon to extract weapon resources."}</span>
+        <span>{enabled ? "Destroy gear for resources" : "Build Forge Addon to extract gear resources."}</span>
       </header>
-      {!enabled && <p>Build Forge Addon to destroy weapons here.</p>}
-      {enabled && weapons.length === 0 && <p>No weapons in backpack.</p>}
-      {enabled && weapons.map((item) => (
+      {!enabled && <p>Build Forge Addon to destroy gear here.</p>}
+      {enabled && gear.length === 0 && <p>No gear in backpack.</p>}
+      {enabled && gear.map((item) => (
         <div className="blacksmith-row" key={item.id}>
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
           <div>
             <CityItemName item={item} />
-            <span>{item.rarityLabel} | L{item.level} | {item.damageMin}-{item.damageMax} damage</span>
+            <span>{item.rarityLabel} | L{item.level} | {item.slot ?? item.mode}</span>
           </div>
           <button type="button" className="danger-action" onClick={() => onDestroy(item.index)}>
             Destroy

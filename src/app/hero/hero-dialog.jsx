@@ -4,7 +4,70 @@ import { QuestObjectiveMeta } from "../quests/quest-dialogs.jsx";
 
 export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
   const [tab, setTab] = useState("overview");
+  const player = snapshot.player;
   const stats = snapshot.player.stats ?? {};
+  const coreStats = [
+    { label: "HP", value: `${player.hp} / ${player.maxHp}` },
+    { label: "Mana", value: `${player.mana} / ${player.maxMana}` },
+    { label: "Level", value: player.level },
+    { label: "XP", value: `${player.xp} / ${player.nextXp}` },
+    { label: "Gold", value: player.gold },
+    { label: "Popularity", value: `${player.popularity}%` },
+  ];
+  const offenseStats = [
+    { label: "Damage", value: player.damage },
+    { label: "Mode", value: player.mode },
+    { label: "Magic", value: numberStat(player.magic) },
+    { label: "Speed", value: decimalStat(player.speed) },
+    { label: "Cooldown", value: `${decimalStat(player.cooldown)}s` },
+    { label: "Crit chance", value: pct(player.critChance) },
+    { label: "Crit damage", value: pct(player.critDamage, { multiplier: true }) },
+    { label: "Life steal", value: pct(player.lifeSteal) },
+    { label: "Spell bonus", value: signedPct(player.spellDamageBonus) },
+    { label: "Direct bonus", value: signedPct(player.directDamageBonus) },
+    { label: "Area bonus", value: signedPct(player.areaDamageBonus) },
+    { label: "DoT bonus", value: signedPct(player.dotDamageBonus) },
+  ];
+  const defenseStats = [
+    { label: "Armor", value: player.armor },
+    { label: "Block chance", value: pct(player.blockChance) },
+    { label: "Block amount", value: numberStat(player.blockAmount) },
+    { label: "Dodge", value: pct(player.dodgeChance) },
+    { label: "All resist", value: resist(player.allResist) },
+    { label: "Magic resist", value: resist(player.magicResist) },
+    { label: "Physical", value: resist(player.physicalResist) },
+    { label: "Fire", value: resist(player.fireResist) },
+    { label: "Ice", value: resist(player.iceResist) },
+    { label: "Lightning", value: resist(player.lightningResist) },
+    { label: "Poison", value: resist(player.poisonResist) },
+    { label: "Arcane", value: resist(player.arcaneResist) },
+    { label: "Holy", value: resist(player.holyResist) },
+    { label: "Shadow", value: resist(player.shadowResist) },
+    { label: "Nature", value: resist(player.natureResist) },
+  ];
+  const utilityStats = [
+    { label: "Gold find", value: pct(player.goldFind) },
+    { label: "Magic find", value: pct(player.magicFind) },
+    { label: "Resource find", value: pct(player.resourceFind) },
+    { label: "XP gain", value: pct(player.xpGain) },
+    { label: "Skill points", value: player.skillPoints ?? 0 },
+    { label: "Class points", value: player.classPoints ?? 0 },
+    { label: "Deaths", value: stats.deaths ?? 0 },
+  ];
+  const elementalDamageStats = [
+    { label: "Physical damage", value: signedPct(player.physicalDamageBonus) },
+    { label: "Fire damage", value: signedPct(player.fireDamageBonus) },
+    { label: "Ice damage", value: signedPct(player.iceDamageBonus) },
+    { label: "Lightning damage", value: signedPct(player.lightningDamageBonus) },
+    { label: "Poison damage", value: signedPct(player.poisonDamageBonus) },
+    { label: "Arcane damage", value: signedPct(player.arcaneDamageBonus) },
+    { label: "Holy damage", value: signedPct(player.holyDamageBonus) },
+    { label: "Shadow damage", value: signedPct(player.shadowDamageBonus) },
+    { label: "Nature damage", value: signedPct(player.natureDamageBonus) },
+    { label: "Hazard damage", value: signedPct(player.hazardDamageBonus) },
+    { label: "DoT duration", value: signedPct(player.dotDurationBonus) },
+    { label: "Status duration", value: signedPct(player.statusDurationBonus) },
+  ];
   const monsterRows = Object.entries(stats.killsByMonster ?? {})
     .sort(([a], [b]) => a.localeCompare(b));
   const objectsDestroyed = detailEntries(stats.objectsDestroyedByType);
@@ -20,7 +83,7 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
             <img src="/assets/generated/ui_hero.png" alt="" />
             <div>
               <h2>Hero</h2>
-              <span>Level {snapshot.player.level} | XP {snapshot.player.xp} / {snapshot.player.nextXp}</span>
+              <span>{player.className ?? "Adventurer"} | Level {player.level} | XP {player.xp} / {player.nextXp}</span>
             </div>
           </div>
           <button type="button" className="city-popup-close" onClick={onClose}>X</button>
@@ -31,28 +94,35 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
           ))}
         </div>
         {tab === "overview" && (
-          <div className="hero-stat-grid">
-            <HeroStat label="HP" value={`${snapshot.player.hp} / ${snapshot.player.maxHp}`} />
-            <HeroStat label="Mana" value={`${snapshot.player.mana} / ${snapshot.player.maxMana}`} />
-            <HeroStat label="Gold" value={snapshot.player.gold} />
-            <HeroStat label="Popularity" value={`${snapshot.player.popularity}%`} />
-            <HeroStat label="Damage" value={snapshot.player.damage} />
-            <HeroStat label="Armor" value={snapshot.player.armor} />
-            <HeroStat label="Mode" value={snapshot.player.mode} />
-            <HeroStat label="Active spell" value={snapshot.player.activeSpellTitle ?? "None"} />
-            <HeroStat label="Skill points" value={snapshot.player.skillPoints ?? 0} />
-            <HeroStat label="Crit" value={`${Math.round((snapshot.player.critChance ?? 0) * 100)}% / ${Math.round((snapshot.player.critDamage ?? 1.5) * 100)}%`} />
-            <HeroStat label="Block" value={`${Math.round((snapshot.player.blockChance ?? 0) * 100)}%`} />
-            <HeroStat label="Find" value={`G ${Math.round((snapshot.player.goldFind ?? 0) * 100)}% / M ${Math.round((snapshot.player.magicFind ?? 0) * 100)}%`} />
-            <HeroStat label="Deaths" value={stats.deaths ?? 0} />
+          <div className="hero-overview">
+            <section className="hero-profile-panel">
+              <div className="hero-portrait-ring">
+                <img src="/assets/generated/ui_hero.png" alt="" />
+              </div>
+              <div className="hero-profile-copy">
+                <span>{player.className ?? "Adventurer"}</span>
+                <b>Level {player.level}</b>
+                <em>{player.activeSpellTitle ?? "No active spell"}</em>
+              </div>
+              <div className="hero-vital-bars" aria-label="Hero vitals">
+                <HeroBar label="HP" value={player.hp} max={player.maxHp} tone="health" />
+                <HeroBar label="Mana" value={player.mana} max={player.maxMana} tone="mana" />
+                <HeroBar label="XP" value={player.xp} max={player.nextXp} tone="xp" />
+              </div>
+            </section>
+            <HeroStatSection title="Core" stats={coreStats} />
+            <HeroStatSection title="Offense" stats={offenseStats} />
+            <HeroStatSection title="Defense & resist" stats={defenseStats} />
+            <HeroStatSection title="Utility" stats={utilityStats} />
+            <HeroStatSection title="Damage bonuses" stats={elementalDamageStats} compact />
           </div>
         )}
-        {tab === "overview" && (snapshot.player.unlockedSpells?.length ?? 0) > 0 && (
+        {tab === "overview" && (player.unlockedSpells?.length ?? 0) > 0 && (
           <div className="spell-picker">
-            {snapshot.player.unlockedSpells.map((spellId) => (
+            {player.unlockedSpells.map((spellId) => (
               <button
                 type="button"
-                className={snapshot.player.activeSpellId === spellId ? "active" : ""}
+                className={player.activeSpellId === spellId ? "active" : ""}
                 key={spellId}
                 onClick={() => onSelectSpell?.(spellId)}
               >
@@ -122,6 +192,32 @@ function HeroStat({ label, value, details = [] }) {
   );
 }
 
+function HeroStatSection({ title, stats, compact = false }) {
+  return (
+    <section className={`hero-stat-section ${compact ? "compact" : ""}`}>
+      <h3>{title}</h3>
+      <div className="hero-stat-grid">
+        {stats.map((stat) => (
+          <HeroStat key={stat.label} label={stat.label} value={stat.value} details={stat.details} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HeroBar({ label, value, max, tone }) {
+  const current = Math.max(0, Number(value) || 0);
+  const maximum = Math.max(1, Number(max) || 1);
+  const pctValue = Math.max(0, Math.min(100, (current / maximum) * 100));
+  return (
+    <div className={`hero-vital-bar ${tone}`}>
+      <span>{label}</span>
+      <b>{Math.round(current)} / {Math.round(maximum)}</b>
+      <i style={{ width: `${pctValue}%` }} />
+    </div>
+  );
+}
+
 function HeroDetailSection({ title, rows, empty }) {
   return (
     <section className="hero-quest-section">
@@ -136,4 +232,31 @@ function detailEntries(record = {}) {
     .filter(([, value]) => Number(value) > 0)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => `${key}: ${value}`);
+}
+
+function numberStat(value) {
+  return Math.round(Number(value) || 0);
+}
+
+function decimalStat(value) {
+  return (Math.round((Number(value) || 0) * 100) / 100).toFixed(2);
+}
+
+function pct(value, options = {}) {
+  const raw = Number(value);
+  const safe = Number.isFinite(raw) ? raw : 0;
+  const amount = options.multiplier ? safe * 100 : safe * 100;
+  return `${Math.round(amount)}%`;
+}
+
+function signedPct(value) {
+  const raw = Number(value);
+  const amount = Math.round((Number.isFinite(raw) ? raw : 0) * 100);
+  return `${amount > 0 ? "+" : ""}${amount}%`;
+}
+
+function resist(value) {
+  const raw = Number(value);
+  const amount = Math.round(Number.isFinite(raw) ? raw : 0);
+  return `${amount > 0 ? "+" : ""}${amount}%`;
 }

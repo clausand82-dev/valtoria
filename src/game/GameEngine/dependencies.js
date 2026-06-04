@@ -78,6 +78,7 @@ export {
   isPotionItem,
   isQuestItem,
   isReadableItem,
+  isEquippableItem,
   isResourceItem,
   isStackableItem,
   withItemFlags,

@@ -28,6 +28,7 @@ import { DEFAULT_CLASS_ID } from "../../config/class-config.js";
 import { normalizeFactionRep } from "../../config/faction-config.js";
 import { createAutoLootRules } from "./loot.js";
 import { resolvePerformanceProfile } from "../../config/performance-config.js";
+import { CHEAT_SETTINGS } from "../../config/cheat-config.js";
 
 function makeDevTestInventory() {
   if (!import.meta.env.DEV) return [];
@@ -95,6 +96,9 @@ export const lifecycleMethods = {
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.addEventListener("contextmenu", preventDefault);
+    if (CHEAT_SETTINGS.enabled && typeof window !== "undefined") {
+      window.__valtoriaDebugSubregionState = () => this.debugSubregionState?.();
+    }
     if (this.atlas) {
       for (const chunk of this.chunks.values()) {
         chunk.terrainLayer = null;
@@ -135,6 +139,9 @@ export const lifecycleMethods = {
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
     this.canvas.removeEventListener("contextmenu", preventDefault);
+    if (typeof window !== "undefined" && window.__valtoriaDebugSubregionState) {
+      delete window.__valtoriaDebugSubregionState;
+    }
   },
 
   resize() {

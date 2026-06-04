@@ -517,8 +517,6 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { completedQuests: ["lost_watch"] },
       labelX: 72,
       labelY: 39,
-      // TODO:DELETE: weights: { tree: 3, rock: 2, foilage: 6, house: 1 }
-      weights: { foilage: 100 },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
         { id: "object_hay", weight: 3 },

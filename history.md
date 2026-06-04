@@ -5,6 +5,10 @@ måske få alle bygnings funktioner ned som "addons" med værdier, der kan ændr
 Hover på bygninger skal vise informationer om den bygning (formål, byggede addons, sslots x/y, osv)
 kun en farm, resten er bare areas der hedder farm!
 
+*V. 0.81
+- Blacksmith Forge Addon can now destroy gear and not only items now
+- fixed a bug where chunk generation not was so random after all (tileset, object, deacy, foliage, mobs and world generation)
+
 *V. 0.80
 - added two quest for village area (kill villager and repair houses)
 - added small system to handle count of object when making map for region

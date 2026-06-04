@@ -1295,6 +1295,22 @@ export const combatMethods = {
             this.damageMonster(entity, damage, "magic", false);
           }
         }
+      } else if (effect.type === "regen" && isPlayer) {
+        effect.tick -= dt;
+        if (effect.tick <= 0) {
+          effect.tick += Math.max(0.1, Number(effect.tickMax) || 1);
+          const stats = this.calcStats();
+          const hpGain = Math.max(0, Math.floor(stats.maxHp * (Number(effect.healthPct) || 0)));
+          const manaGain = Math.max(0, Math.floor(stats.maxMana * (Number(effect.manaPct) || 0)));
+          if (hpGain > 0 && entity.hp < stats.maxHp) {
+            entity.hp = clamp(entity.hp + hpGain, 0, stats.maxHp);
+            this.addFloater(entity.x, entity.y, `+${hpGain}`, effect.color ?? "#58d96d", 0.65);
+          }
+          if (manaGain > 0 && entity.mana < stats.maxMana) {
+            entity.mana = clamp(entity.mana + manaGain, 0, stats.maxMana);
+            this.addFloater(entity.x, entity.y, `+${manaGain} mana`, effect.color ?? "#58bfff", 0.65);
+          }
+        }
       }
     }
     for (const effect of entity.statusEffects) {
@@ -1370,6 +1386,7 @@ export const combatMethods = {
     monster.hp = Math.max(0, monster.hp - damage);
     if (damage > 0) this.recordBestiaryFought?.(monster);
     this.player.stats.damageDealt += Math.min(beforeHp, damage);
+    if (critical && damage > 0) this.triggerEquipmentDurabilityEvent?.("criticalHit");
     monster.hurt = 0.18;
     this.addFloater(monster.x, monster.y, block.blocked ? `Block -${damage}` : critical ? `CRIT -${damage}` : `-${damage}`, critical ? "#ffdf5f" : sourceType === "magic" ? "#9de9ff" : "#f1d08d");
     const stats = this.calcStats();
@@ -1747,6 +1764,11 @@ export const combatMethods = {
 
     this.applyStatBonuses(stats, skillBonus);
     this.applyStatBonuses(stats, classBonus);
+    for (const effect of this.player.statusEffects ?? []) {
+      if (effect?.type === "statBuff" && effect.duration > 0) {
+        this.applyStatBonuses(stats, effect.bonuses);
+      }
+    }
     stats.maxHp = Math.floor(stats.maxHp);
     stats.maxMana = Math.floor(stats.maxMana);
     stats.damageMin = Math.max(1, Math.floor(stats.damageMin));
@@ -1787,6 +1809,37 @@ export const combatMethods = {
       }
     }
     if (changed) this.publishSnapshot();
+  },
+
+  durabilityEventLoss(item, eventName) {
+    const events = item?.durabilityLossOnEvents;
+    if (!events || typeof events !== "object") return 0;
+    return Math.max(0, Number(events[eventName]) || 0);
+  },
+
+  triggerEquipmentDurabilityEvent(eventName) {
+    const key = String(eventName ?? "").trim();
+    if (!key || !this.player?.equipment) return;
+    let changed = false;
+    for (const [slotId, item] of Object.entries(this.player.equipment)) {
+      if (!item) continue;
+      const loss = this.durabilityEventLoss(item, key);
+      if (loss <= 0) continue;
+      const before = Number(item.durability ?? 100);
+      item.durability = Math.max(0, parseFloat((before - loss).toFixed(2)));
+      changed = true;
+      if (item.durability <= 0 && item.destroyWhenDurabilityDepleted) {
+        this.player.equipment[slotId] = null;
+        this.addToast(`${item.name} forsvandt.`);
+      } else if (before > 0 && item.durability === 0) {
+        this.addToast(`${item.name} er brudt!`);
+      }
+    }
+    if (!changed) return;
+    const stats = this.calcStats();
+    this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
+    this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
+    this.publishSnapshot();
   },
 
   applyDeathDurabilityLoss() {

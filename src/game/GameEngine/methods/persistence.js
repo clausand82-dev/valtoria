@@ -74,6 +74,14 @@ function normalizeTargetBonus(value) {
     : undefined;
 }
 
+function normalizeDurabilityLossOnEvents(value) {
+  if (!value || typeof value !== "object") return undefined;
+  const entries = Object.entries(value)
+    .map(([event, loss]) => [String(event ?? "").trim(), Math.max(0, Number(loss) || 0)])
+    .filter(([event, loss]) => event && loss > 0);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 function cleanupObsoleteQuestItems(player, questState) {
   if (!player || !Array.isArray(player.inventory) || !questState) return;
   const completed = new Set((Array.isArray(questState.completed) ? questState.completed : []).map(String));
@@ -207,6 +215,18 @@ export const persistenceMethods = {
       potionId: item.potionId ? normalizePotionId(item.potionId) : normalizePotionId(item.potionType),
       potionType: item.potionType ? String(item.potionType) : undefined,
       restorePct: Number(item.restorePct) || undefined,
+      restoreHealthPct: Number(item.restoreHealthPct) || undefined,
+      restoreManaPct: Number(item.restoreManaPct) || undefined,
+      armorBuffPct: Number(item.armorBuffPct) || undefined,
+      armorBuffDurationMs: Number(item.armorBuffDurationMs) || undefined,
+      durationMs: Number(item.durationMs) || undefined,
+      tickMs: Number(item.tickMs) || undefined,
+      healthRegenPct: Number(item.healthRegenPct) || undefined,
+      manaRegenPct: Number(item.manaRegenPct) || undefined,
+      description: item.description ? String(item.description) : undefined,
+      nonRepairable: Boolean(item.nonRepairable),
+      destroyWhenDurabilityDepleted: Boolean(item.destroyWhenDurabilityDepleted),
+      durabilityLossOnEvents: normalizeDurabilityLossOnEvents(item.durabilityLossOnEvents),
       resourceId: savedResourceId,
       questItemId: item.questItemId ? String(item.questItemId) : undefined,
       questInstanceId: item.questInstanceId ? String(item.questInstanceId) : undefined,
@@ -238,6 +258,7 @@ export const persistenceMethods = {
       normalized.rarityLabel = "Resource";
       normalized.rarityColor = RESOURCE_RARITY_COLOR;
       normalized.resourceColor = def?.color;
+      normalized.description = def?.description ? String(def.description) : normalized.description;
       normalized.iconIndex = def?.iconIndex ?? normalized.iconIndex;
       normalized.iconSheet = def?.sheet ?? normalized.iconSheet;
       normalized.stackMax = def?.stackMax ?? normalized.stackMax;
@@ -276,11 +297,23 @@ export const persistenceMethods = {
     if (isPotionItem(normalized)) {
       const def = potionDefById(normalized.potionId ?? normalized.potionType);
       if (def) {
+        const rarity = def.rarity ? String(def.rarity) : normalized.rarity;
         normalized.potionId = def.id;
         normalized.potionType = def.type;
         normalized.name = def.name;
         normalized.baseName = def.name;
+        normalized.rarity = rarity;
+        normalized.rarityLabel = rarity === "rare" ? "Good" : normalized.rarityLabel;
         normalized.restorePct = def.restorePct;
+        normalized.restoreHealthPct = Number(def.restoreHealthPct) || undefined;
+        normalized.restoreManaPct = Number(def.restoreManaPct) || undefined;
+        normalized.armorBuffPct = Number(def.armorBuffPct) || undefined;
+        normalized.armorBuffDurationMs = Number(def.armorBuffDurationMs) || undefined;
+        normalized.durationMs = Number(def.durationMs) || undefined;
+        normalized.tickMs = Number(def.tickMs) || undefined;
+        normalized.healthRegenPct = Number(def.healthRegenPct) || undefined;
+        normalized.manaRegenPct = Number(def.manaRegenPct) || undefined;
+        normalized.description = def.description ? String(def.description) : normalized.description;
         normalized.iconKey = def.iconKey;
         normalized.iconUrl = def.iconUrl;
         normalized.rarityColor = def.color;
@@ -291,6 +324,10 @@ export const persistenceMethods = {
       // Always re-derive from definition — never trust the saved iconUrl for unique items.
       normalized.iconUrl = def?.iconUrl || iconUrlFromKey(deriveIconKey({ uniqueId: normalized.uniqueId }));
       normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
+      normalized.description = def?.description ? String(def.description) : normalized.description;
+      normalized.nonRepairable = Boolean(def?.nonRepairable ?? normalized.nonRepairable);
+      normalized.destroyWhenDurabilityDepleted = Boolean(def?.destroyWhenDurabilityDepleted ?? normalized.destroyWhenDurabilityDepleted);
+      normalized.durabilityLossOnEvents = normalizeDurabilityLossOnEvents(def?.durabilityLossOnEvents ?? normalized.durabilityLossOnEvents);
       if (def?.tags !== undefined) normalized.tags = normalizeStringList(def.tags);
       if (def?.target !== undefined) normalized.target = normalizeStringList(def.target);
       if (def?.bonus !== undefined) normalized.bonus = normalizeTargetBonus(def.bonus);
@@ -299,6 +336,10 @@ export const persistenceMethods = {
       // Named items: use definition iconUrl if set, else fall through to baseName mapping.
       normalized.iconUrl = def?.iconUrl || undefined;
       normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
+      normalized.description = def?.description ? String(def.description) : normalized.description;
+      normalized.nonRepairable = Boolean(def?.nonRepairable ?? normalized.nonRepairable);
+      normalized.destroyWhenDurabilityDepleted = Boolean(def?.destroyWhenDurabilityDepleted ?? normalized.destroyWhenDurabilityDepleted);
+      normalized.durabilityLossOnEvents = normalizeDurabilityLossOnEvents(def?.durabilityLossOnEvents ?? normalized.durabilityLossOnEvents);
       if (def?.tags !== undefined) normalized.tags = normalizeStringList(def.tags);
       if (def?.target !== undefined) normalized.target = normalizeStringList(def.target);
       if (def?.bonus !== undefined) normalized.bonus = normalizeTargetBonus(def.bonus);
@@ -361,6 +402,14 @@ export const persistenceMethods = {
     this.worldEnergy = normalizeWorldEnergy(payload.worldEnergy);
     this.actionState = normalizeActionState(payload.actionState);
     this.currentExpedition = normalizeCurrentExpedition(payload.currentExpedition);
+    if ((this.currentExpedition?.subregionStack?.length ?? 0) > 0) {
+      console.warn("[subregions] Loaded save with nested subregion stack", {
+        currentMapInstanceId: this.currentExpedition.currentMapInstanceId,
+        rootMapInstanceId: this.currentExpedition.rootMapInstanceId,
+        stackDepth: this.currentExpedition.subregionStack.length,
+        instanceIds: Object.keys(this.currentExpedition.subregionInstances ?? {}),
+      });
+    }
     this.currentMapInstanceId = this.currentExpedition?.currentMapInstanceId ?? null;
     const currentMapSnapshot = this.currentExpedition?.mapSnapshots?.[this.currentMapInstanceId];
     if (currentMapSnapshot) {
@@ -520,7 +569,32 @@ export const persistenceMethods = {
       loots: [],
     };
 
+    let saveSizeKb = 0;
+    try {
+      saveSizeKb = Math.round((new Blob([JSON.stringify(payload)]).size / 1024) * 10) / 10;
+      if (saveSizeKb > 2500) {
+        console.warn(`[save] CRITICAL large save payload: ${saveSizeKb} KB`, {
+          storageKey: this.currentSaveStorageKey(),
+          activeQuests: payload.quests?.active?.length ?? 0,
+          currentExpedition: Boolean(payload.currentExpedition),
+        });
+      } else if (saveSizeKb > 1500) {
+        console.warn(`[save] Large save payload: ${saveSizeKb} KB`, {
+          storageKey: this.currentSaveStorageKey(),
+          activeQuests: payload.quests?.active?.length ?? 0,
+          currentExpedition: Boolean(payload.currentExpedition),
+        });
+      }
+    } catch (error) {
+      console.warn("[save] Failed to measure save payload size", error);
+    }
+
     const saved = saveRepository.saveGameSync(this.currentSaveStorageKey(), payload);
+    this.lastSaveInfo = {
+      savedAt: payload.savedAt,
+      sizeKb: saveSizeKb,
+      status: saved ? "OK" : "failed",
+    };
     if (saved && this.onSave) {
       this.onSave(payload);
     }

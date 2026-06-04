@@ -24,6 +24,8 @@ Fields used on each object in REGION_OBJECT_DEFS:
 - TODO:DELETE legacyWeightKey: Only used by legacyRegionObjectsFromWeights (old biodome weight system).
 - defaultDestructible: Default destructible flag if region override is not set.
 - destructible: Inline destructible data used by runtime object damage/loot.
+  destructible.itemLoot can drop gear by rarity or potions by id.
+  Examples: { rarity: "legendary", chance: 0.0035 }, { potion: "potion_orange_regen_health_mana", chance: 0.02 }
 - destroyRewards: Optional raw world energy rewards when this object is destroyed.
   Example: destroyRewards: { lydra: 1, netdra: 0.1 }
   Region overrides in map-region-config.js can also set destroyRewards per object spawn entry.

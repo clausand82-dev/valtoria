@@ -614,6 +614,15 @@ export const subregionMethods = {
       console.warn(`[subregions] Unsupported instanceScope '${scope}', falling back to sourceObject`);
     }
     const sourceId = target?.runtimeId ?? target?.id ?? `${target?.objectDefId ?? "object"}@${target?.x ?? 0},${target?.y ?? 0}`;
+    if (!target?.runtimeId && !target?.id) {
+      console.warn("[subregions] Source object is missing runtime id; using fallback instance id", {
+        actionId: action?.id ?? null,
+        targetSubregionId: subregionId,
+        objectDefId: target?.objectDefId ?? target?.type ?? null,
+        x: target?.x ?? null,
+        y: target?.y ?? null,
+      });
+    }
     return `${cleanInstanceId(expedition.rootMapInstanceId)}:${cleanInstanceId(sourceId)}:${cleanInstanceId(subregionId)}`;
   },
 
@@ -754,6 +763,13 @@ export const subregionMethods = {
       facingY: this.player.facingY,
     };
     const sourceObjectRuntimeId = target?.runtimeId ?? target?.id ?? null;
+    if (!sourceObjectRuntimeId) {
+      console.warn("[subregions] enterSubregion missing source object runtime id", {
+        actionId: action?.id ?? null,
+        targetSubregionId: subregionId,
+        targetId: target?.objectDefId ?? target?.type ?? null,
+      });
+    }
     const returnEntry = { mapInstanceId: previousMapInstanceId, sourceObjectRuntimeId, returnPlayerPosition };
     expedition.subregionStack.push(returnEntry);
 
@@ -835,6 +851,13 @@ export const subregionMethods = {
       this.addToast?.("Du er ikke i en subregion");
       return { ok: false, changed: false, reason: "not_in_subregion" };
     }
+    if (!expedition.subregionInstances?.[currentMapInstanceId]) {
+      console.warn("[subregions] Current subregion instance cannot be found", {
+        currentMapInstanceId,
+        rootMapInstanceId: expedition.rootMapInstanceId,
+        instanceIds: Object.keys(expedition.subregionInstances ?? {}),
+      });
+    }
     this.storeCurrentMapSnapshot(currentMapInstanceId);
     const clearChanged = applySubregionOnClear(this, currentMapInstanceId);
     let entry = expedition.subregionStack.pop();
@@ -852,6 +875,12 @@ export const subregionMethods = {
       });
       this.addToast?.("Subregion stack mangler returpunkt");
       return { ok: false, changed: false, reason: "missing_stack_entry" };
+    }
+    if (!entry.sourceObjectRuntimeId) {
+      console.warn("[subregions] Return stack entry is missing sourceObjectRuntimeId", {
+        currentMapInstanceId,
+        returnMapInstanceId: entry.mapInstanceId,
+      });
     }
     const previousSnapshot = expedition.mapSnapshots[entry.mapInstanceId]
       ?? (entry.mapInstanceId === expedition.rootMapInstanceId ? expedition.rootMapSnapshot : null);
@@ -904,5 +933,35 @@ export const subregionMethods = {
 
   isInSubregion() {
     return isSubregionMap(this);
+  },
+
+  debugSubregionState() {
+    const expedition = normalizeCurrentExpedition(this.currentExpedition);
+    const currentRegionId = this.region?.mapRegion?.id ?? this.region?.id ?? null;
+    const currentMapInstanceId = expedition?.currentMapInstanceId ?? this.currentMapInstanceId ?? null;
+    const instanceIds = Object.keys(expedition?.subregionInstances ?? {});
+    const snapshotKeys = Object.keys(expedition?.mapSnapshots ?? {});
+    const state = {
+      currentRegionId,
+      currentMapInstanceId,
+      loadedSubregionId: loadedSubregionId(this),
+      rootRegionId: expedition?.rootRegionId ?? null,
+      rootMapId: expedition?.rootMapId ?? null,
+      rootMapInstanceId: expedition?.rootMapInstanceId ?? null,
+      stackDepth: expedition?.subregionStack?.length ?? 0,
+      stack: (expedition?.subregionStack ?? []).map((entry) => ({
+        mapInstanceId: entry.mapInstanceId,
+        sourceObjectRuntimeId: entry.sourceObjectRuntimeId ?? null,
+        hasReturnPlayerPosition: Boolean(entry.returnPlayerPosition),
+      })),
+      instanceIds,
+      currentInstanceExists: Boolean(currentMapInstanceId && expedition?.subregionInstances?.[currentMapInstanceId]),
+      hasRootSnapshot: Boolean(expedition?.rootMapSnapshot),
+      subregionSnapshotCount: instanceIds.filter((id) => Boolean(expedition?.subregionInstances?.[id]?.mapSnapshot)).length,
+      mapSnapshotCount: snapshotKeys.length,
+      mapSnapshotIds: snapshotKeys,
+    };
+    console.info("[subregions] debug state", state);
+    return state;
   },
 };

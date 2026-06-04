@@ -91,7 +91,7 @@ export const CITY_BUILDINGS = [
         id: "forge",
         prebuilt: true,
         title: "Forge Addon",
-        help: "Destroys weapons and extracts resources from them.",
+        help: "Destroys gear and extracts resources from it.",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
       },

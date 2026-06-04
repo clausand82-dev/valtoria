@@ -41,6 +41,7 @@ export const DEFAULT_MONSTER_RESOURCE_DROPS = {
     { resource: "fruit", min: 1, max: 2, chance: 0.12 },
     { resource: "paper", min: 1, max: 2, chance: 0.12 },
     { resource: "scroll", min: 1, max: 2, chance: 0.12 },
+    { resource: "magicmushroom", min: 1, max: 2, chance: 0.007 },
     { resource: "red_rose", min: 1, max: 1, chance: 0.02 },
     { resource: "rare_pink_flower", min: 1, max: 1, chance: 0.001 },
   ],

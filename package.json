@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "check": "npm run build",
+    "validate": "node scripts/validate-config.js",
+    "check": "npm run validate && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

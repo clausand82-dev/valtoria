@@ -44,6 +44,7 @@ export const RESOURCE_DEFS = {
   // Plants / forageables
   red_rose: { name: "Rød rose", stackMax: 100, value: 1, sheet: "resources", iconIndex: 12, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },
   rare_pink_flower: { name: "Sjælden lilla blomst", stackMax: 100, value: 2, sheet: "resources", iconIndex: 13, color: "#c27bd9", iconUrl: "/assets/generated/item/item_plant_rarepinkflower.png" },
+  magicmushroom: { name: "Magisk Svamp", stackMax: 100, value: 2, sheet: "resources", iconIndex: 12, color: "#c99f7a", iconUrl: "/assets/generated/item/item_res_magicmushroom.png", description: "En svamp fra Valtorias fugtige skove. Bruges som ressource." },
   fruit_orange: { name: "Orange", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_orange.png" },
   fruit_banana: { name: "Banana", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_banana.png" },
 

@@ -27,11 +27,32 @@ export const regionStatsMethods = {
     for (const particle of this.particles ?? []) {
       increment(legacyParticlesByType, particle?.type ?? (particle?.configParticle ? "configured" : "legacy"));
     }
+    const timings = this.renderTimings ?? {};
+    const counts = this.renderDebugCounts ?? {};
+    const formatMs = (value) => Number.isFinite(Number(value)) ? Math.round(Number(value) * 10) / 10 : null;
     return {
       fps: this.lastFrameDt > 0 ? Math.round(1 / this.lastFrameDt) : 0,
       averageFps: Math.max(0, Math.round(Number(this.averageFps) || 0)),
+      frameMs: this.lastFrameDt > 0 ? Math.round(this.lastFrameDt * 10000) / 10 : 0,
       targetFps: Math.max(0, Math.round(Number(this.targetFps) || 0)),
       performanceMode: this.performanceMode ?? "balanced",
+      render: {
+        totalMs: formatMs(timings.totalMs),
+        tilesMs: formatMs(timings.tilesMs),
+        objectsMs: formatMs(timings.objectsMs),
+        particlesMs: formatMs(timings.particlesMs),
+        fogMs: formatMs(timings.fogMs),
+        minimapMs: formatMs(timings.minimapMs),
+      },
+      counts: {
+        drawables: counts.drawables ?? 0,
+        monsters: counts.monsters ?? this.monsters?.size ?? 0,
+        objects: counts.objects ?? 0,
+        particles: counts.particles ?? ((particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0)),
+        cachedTerrainLayers: counts.cachedTerrainLayers ?? this.countCachedTerrainLayers?.() ?? 0,
+        terrainLayersCleared: this.terrainLayersCleared ?? counts.terrainLayersCleared ?? 0,
+      },
+      save: this.lastSaveInfo ? { ...this.lastSaveInfo } : null,
       particles: {
         enabled: particleEngine?.enabled ?? false,
         quality: particleEngine?.quality ?? "unknown",

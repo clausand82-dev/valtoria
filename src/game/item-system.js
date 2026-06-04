@@ -124,6 +124,7 @@ const RESOURCE_ICON_KEYS = {
   gold_ingot: "gold",
   gold_bar: "res_goldbar",
   magic_essence: "res_magicessens",
+  resource_mushroom: "res_magicmushroom",
   paper: "res_paper",
   scroll: "res_scroll",
   red_gemstone: "res_redgemstone",

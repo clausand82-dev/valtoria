@@ -238,6 +238,7 @@ export const ACTION_CONFIG = {
   summon_wolf_boss: {
     id: "summon_wolf_boss",
     type: "summon",
+    allowStub: true,
     label: "Tilkald",
     spawn: [{ monsterId: "wolf_boss", count: 1 }],
     setFlags: ["summoned.wolf_boss"],
@@ -247,6 +248,7 @@ export const ACTION_CONFIG = {
   start_lost_note_quest: {
     id: "start_lost_note_quest",
     type: "questStart",
+    allowStub: true,
     label: "Tag imod opgave",
     questId: "lost_note",
     once: true,
@@ -255,6 +257,7 @@ export const ACTION_CONFIG = {
   deliver_ring_to_noble: {
     id: "deliver_ring_to_noble",
     type: "questAdvance",
+    allowStub: true,
     label: "Aflever ring",
     questId: "noble_ring",
     stepId: "deliver_ring",

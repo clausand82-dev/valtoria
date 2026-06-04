@@ -1,11 +1,19 @@
 Ting at få gjort
 
 NEW QUEST:
-Borgmester vil gerne have en til at rydde village området for vrede villager: næste part er at reperarer alle husene (kan object destrutable betingelser ændres undervejs, eller kræver det retur til borgmester først)? - svar: lav det som to quest - bemærk at del 2 skal være fiks X antal huse eller prefab - se CHATGPT chat
+- Flere quest fra blacksmith til smithy:
+find forsvundne metalplader / reparer smedjen / efterforsk et mord (undersøg lig --> følg blod spor --> igennen flere caves? --> kamp imod svære mobs)
+ny object - metalkister --> metal kister give god iron_piece
 
-
-
+- Flere quest fra borgmester til andre steder (et par quest mere i village)
 - 
+
+
+TODO senere:
+- Implementér summon action
+- Implementér questStart action
+- Implementér questAdvance action
+- Eller fjern dem fra aktiv content, hvis de kun var test/demo
 
 
 --- IGANG ---
@@ -22,10 +30,7 @@ Prøv at få gjort grass tile matchende
 
 - fix icebear, bear and lion animation
 - fix en af village - og nogle har stadig dårlig walk cycle
-- fjern den animerede kiste og dens brug
 
-- Kan E mon bruges til at fixe nogle af husene i village map?
-f.eks. 1 run, hvor man skal klare corrupted/sure villageer - derefter et 2. run, hvor bygninger skal reperares med E. Derefter kan man i tredje run samle et eller andet, der kun er tilgængelig i 3 run???
 
 
 - test popularity noget mere

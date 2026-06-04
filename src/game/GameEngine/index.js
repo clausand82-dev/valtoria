@@ -47,6 +47,10 @@ export class GameEngine {
     this.fpsWindowTime = 0;
     this.fpsWindowFrames = 0;
     this.averageFps = 0;
+    this.renderTimings = null;
+    this.renderDebugCounts = null;
+    this.terrainLayersCleared = 0;
+    this.lastSaveInfo = null;
     this.time = 0;
     this.frame = 0;
     this.raf = 0;

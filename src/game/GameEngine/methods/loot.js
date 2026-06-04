@@ -16,6 +16,7 @@ import {
   clamp,
   distance,
   READABLE_ITEM_DEFS,
+  POTION_DEFS,
   RESOURCE_DEFS,
   UNIQUE_DROP_CHANCES,
   RESTRICTED_DROPS,
@@ -41,6 +42,27 @@ import {
 import { worldEntryAllowed } from "../../world-state.js";
 
 const FOLIAGE_LOOT_INTERACT_RANGE = 0.78;
+
+function rollPotionIdByWeight(filter = null) {
+  const entries = Object.values(POTION_DEFS)
+    .filter((def) => def?.id && (!filter || filter(def)))
+    .map((def) => ({ id: def.id, weight: Math.max(0, Number(def.dropWeight) || 0) }))
+    .filter((entry) => entry.weight > 0);
+  if (!entries.length) return "";
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.id;
+  }
+  return entries[entries.length - 1]?.id ?? "";
+}
+
+function rollPotionIdForCategory(category) {
+  if (category === "health") return rollPotionIdByWeight((def) => def.type === "health" || Number(def.restoreHealthPct) > 0) || "small_health";
+  if (category === "mana") return rollPotionIdByWeight((def) => def.type === "mana" || Number(def.restoreManaPct) > 0) || "mana";
+  return rollPotionIdByWeight() || "small_health";
+}
 
 function normalizeItemLookupToken(value) {
   return String(value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -501,12 +523,12 @@ export const lootMethods = {
       const category = rollLootCategory(profile.weights);
       if (category && category !== "none" && !this.isDropCategoryBlocked(category)) {
         const item = category === "health" || category === "mana"
-          ? makePotion(category, lootLevel)
+          ? makePotion(rollPotionIdForCategory(category), lootLevel)
           : makeItem(lootLevel, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
         this.dropGroundItem(monster.x, monster.y, item);
 
         if (category === "all" && Math.random() < clamp(0.08 + monster.level * 0.01, 0.08, 0.24)) {
-          const potion = makePotion(Math.random() < 0.5 ? "health" : "mana", lootLevel);
+          const potion = makePotion(rollPotionIdForCategory("all"), lootLevel);
           this.dropGroundItem(monster.x, monster.y, potion, { spread: 0.85 });
         }
       }
@@ -561,6 +583,11 @@ export const lootMethods = {
   dropObjectItemLoot(x, y, entries = []) {
     for (const entry of entries) {
       if (!entry || Math.random() > (entry.chance ?? 0)) continue;
+      if (entry.potion || entry.potionId) {
+        const item = makePotion(entry.potionId ?? entry.potion, Math.max(1, Math.floor(Number(entry.level) || this.player?.level || 1)));
+        this.dropGroundItem(x, y, item);
+        continue;
+      }
       const rarity = String(entry.rarity ?? "legendary");
       const tries = Math.max(1, Math.floor(Number(entry.tries) || 60));
       const levelOffset = Math.floor(Number(entry.levelOffset) || 0);

@@ -29,6 +29,10 @@ function DebugStatsList({ title, values }) {
 }
 
 function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
+  const ms = (value) => Number.isFinite(Number(value)) ? `${value} ms` : "n/a";
+  const saveTime = liveStats?.save?.savedAt
+    ? new Date(liveStats.save.savedAt).toLocaleTimeString()
+    : "n/a";
   const totals = [
     ["Objekter", stats?.objects?.total ?? 0],
     ["Monsters", stats?.monsters?.total ?? 0],
@@ -38,6 +42,19 @@ function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
   ];
   const liveTotals = [
     ["FPS", `${liveStats?.averageFps ?? 0} / ${liveStats?.targetFps ?? "-"}`],
+    ["Frame", ms(liveStats?.frameMs)],
+    ["Render", ms(liveStats?.render?.totalMs)],
+    ["Tiles", ms(liveStats?.render?.tilesMs)],
+    ["Drawables", `${liveStats?.counts?.drawables ?? 0} (${ms(liveStats?.render?.objectsMs)})`],
+    ["Fog", ms(liveStats?.render?.fogMs)],
+    ["Particle ms", ms(liveStats?.render?.particlesMs)],
+    ["Minimap", ms(liveStats?.render?.minimapMs)],
+    ["Objects", liveStats?.counts?.objects ?? 0],
+    ["Monsters", liveStats?.counts?.monsters ?? 0],
+    ["Effects", liveStats?.counts?.particles ?? 0],
+    ["Terrain cache", liveStats?.counts?.cachedTerrainLayers ?? 0],
+    ["Terrain cleared", liveStats?.counts?.terrainLayersCleared ?? 0],
+    ["Save", `${liveStats?.save?.status ?? "n/a"} ${liveStats?.save?.sizeKb ?? "n/a"} KB ${saveTime}`],
     ["Particles", `${liveStats?.particles?.active ?? 0} / ${liveStats?.particles?.max ?? 0}`],
     ["Emitters", liveStats?.particles?.emitters ?? 0],
     ["Legacy particles", liveStats?.particles?.legacy ?? 0],
@@ -358,6 +375,10 @@ export function GameHud({
             <ImageIcon src="/assets/generated/item/item_chest.png" />
             
             <span>Storage</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={() => setHeroOpen(true)}>
+            <ImageIcon src="/assets/generated/ui_hero.png" />
+            <span>Hero</span>
           </button>
           <button type="button" className="city-menu-button" onClick={() => setQuestOverviewOpen(true)}>
             <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
