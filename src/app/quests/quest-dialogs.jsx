@@ -10,8 +10,6 @@ import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
 import { NAMED_ITEM_TEMPLATES } from "../../game/config/item-config.js";
 
-const ENABLE_RUNTIME_CHROMA_KEY = false;
-
 function normalizeQuestRegions(quest) {
   const target = quest?.target ?? {};
   if ((quest?.type === "clear_map" || quest?.type === "action_targets") && target.regionId) return [String(target.regionId)];
@@ -66,19 +64,6 @@ function QuestMonsterSprite({ monsterType }) {
       // Draw frame 0 to canvas
       ctx.drawImage(image, 0, 0, cellW, cellH, 0, 0, canvas.width, canvas.height);
       
-      if (ENABLE_RUNTIME_CHROMA_KEY) {
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          if (g > 145 && g > r * 1.55 && g > b * 1.55) {
-            data[i + 3] = 0;
-          }
-        }
-        ctx.putImageData(imageData, 0, 0);
-      }
     };
     image.src = monsterSpriteSheetFromType(monsterType);
   }, [monsterType]);
@@ -277,12 +262,35 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
   );
 }
 
-export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurnInQuest }) {
+export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurnInQuest, onAbandonQuest }) {
+  const [selectedQuest, setSelectedQuest] = useState(null);
+  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const npc = QUEST_NPCS[interaction.npcId];
   const offers = interaction.offers ?? [];
   const active = interaction.active ?? [];
   const completeActive = active.filter((quest) => quest.complete);
   const inProgress = active.filter((quest) => !quest.complete);
+  const closeSelectedQuest = () => setSelectedQuest(null);
+  const acceptSelectedQuest = () => {
+    if (!selectedQuest) return;
+    onAcceptQuest?.(selectedQuest);
+  };
+  const turnInSelectedQuest = () => {
+    if (!selectedQuest) return;
+    onTurnInQuest?.(selectedQuest);
+  };
+  const abandonSelectedQuest = () => {
+    if (!confirmAbandonQuest) return;
+    onAbandonQuest?.(confirmAbandonQuest);
+    setConfirmAbandonQuest(null);
+    setSelectedQuest(null);
+  };
+  const selectedQuestIsOffer = selectedQuest
+    ? offers.some((quest) => quest.id === selectedQuest.id)
+    : false;
+  const selectedQuestIsActive = selectedQuest
+    ? active.some((quest) => quest.id === selectedQuest.id)
+    : false;
   return (
     <div className="confirm-backdrop" role="presentation">
       <section className="confirm-dialog quest-offer-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-offer-title">
@@ -305,7 +313,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
                   </header>
                   <p>{quest.turnInText}</p>
                   <QuestObjectiveMeta quest={quest} />
-                  <button type="button" onClick={() => onTurnInQuest?.(quest)}>Indlever quest</button>
+                  <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
                 </article>
               ))}
             </div>
@@ -324,14 +332,29 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
                   <p>{quest.story}</p>
                   <p>{quest.acceptText}</p>
                   <QuestObjectiveMeta quest={quest} />
-                  <button type="button" onClick={() => onAcceptQuest?.(quest)}>Tag quest</button>
+                  <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
                 </article>
               ))}
             </div>
           </>
         )}
-        {offers.length === 0 && completeActive.length === 0 && inProgress.length > 0 && (
-          <p>Du har aktive quests herfra, og ingen nye quests er tilgaengelige lige nu.</p>
+        {inProgress.length > 0 && (
+          <>
+            <p>Aktive quests:</p>
+            <div className="quest-list">
+              {inProgress.map((quest) => (
+                <article className="quest-card" key={quest.id}>
+                  <header>
+                    <b>{quest.title}</b>
+                    <span>{quest.progressText}</span>
+                  </header>
+                  <p>{quest.story}</p>
+                  <QuestObjectiveMeta quest={quest} />
+                  <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
+                </article>
+              ))}
+            </div>
+          </>
         )}
         {offers.length === 0 && completeActive.length === 0 && inProgress.length === 0 && (
           <p>Ingen quests tilgaengelige lige nu.</p>
@@ -340,11 +363,48 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
           <button type="button" onClick={onDecline}>Luk</button>
         </div>
       </section>
+      {selectedQuest && (
+        <QuestDetailCard
+          quest={selectedQuest}
+          npc={npc}
+          onClose={closeSelectedQuest}
+          footer={(
+            <>
+              <button type="button" onClick={closeSelectedQuest}>Tilbage</button>
+              {selectedQuestIsActive && (
+                <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>Opgiv quest</button>
+              )}
+              {selectedQuest.complete ? (
+                <button type="button" onClick={turnInSelectedQuest}>Indlever quest</button>
+              ) : selectedQuestIsOffer ? (
+                <button type="button" onClick={acceptSelectedQuest}>
+                  Tag quest
+                </button>
+              ) : (
+                <button type="button" disabled>Indlever quest</button>
+              )}
+            </>
+          )}
+        />
+      )}
+      {confirmAbandonQuest && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
+            <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+            <div className="confirm-actions">
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+              <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
 
-export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, cityOpen }) {
+export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, onQuestAbandoned, cityOpen }) {
+  const [confirmAbandon, setConfirmAbandon] = useState(false);
   if (!quest) return null;
   const npc = QUEST_NPCS[quest.turnInNpcId ?? quest.npcId];
   const turnIn = async () => {
@@ -354,21 +414,42 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
       onClose?.();
     }
   };
+  const abandon = () => {
+    const abandoned = engineRef.current?.abandonQuest?.(quest.id);
+    if (!abandoned) return;
+    onQuestAbandoned?.(quest);
+    onClose?.();
+  };
 
   return (
-    <QuestDetailCard
-      quest={quest}
-      npc={npc}
-      onClose={onClose}
-      footer={(
-        <>
-          <button type="button" onClick={onClose}>Luk</button>
-          {cityOpen && (
-            <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
-          )}
-        </>
+    <>
+      <QuestDetailCard
+        quest={quest}
+        npc={npc}
+        onClose={onClose}
+        footer={(
+          <>
+            <button type="button" onClick={onClose}>Luk</button>
+            <button type="button" onClick={() => setConfirmAbandon(true)}>Opgiv quest</button>
+            {cityOpen && (
+              <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
+            )}
+          </>
+        )}
+      />
+      {confirmAbandon && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
+            <h3>Opgiv {quest.title}?</h3>
+            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+            <div className="confirm-actions">
+              <button type="button" onClick={() => setConfirmAbandon(false)}>Annuller</button>
+              <button type="button" onClick={abandon}>Opgiv quest</button>
+            </div>
+          </section>
+        </div>
       )}
-    />
+    </>
   );
 }
 
@@ -400,9 +481,10 @@ export function QuestDetailCard({ quest, npc, onClose, footer }) {
   );
 }
 
-export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onClose, onToggleTracked, onOpenQuest }) {
+export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onClose, onToggleTracked, onOpenQuest, onAbandonQuest }) {
   const [tab, setTab] = useState(activeQuests.length > 0 ? "active" : "completed");
   const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id ?? null);
+  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
 
   // Build completed quest objects from IDs
   const completedQuests = completedQuestIds
@@ -433,6 +515,11 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
 
   const selectedQuest = displayQuests.find((quest) => quest.id === selectedQuestId) ?? displayQuests[0] ?? null;
   const selectedNpc = selectedQuest ? QUEST_NPCS[selectedQuest.turnInNpcId ?? selectedQuest.npcId] : null;
+  const abandonSelectedQuest = () => {
+    if (!confirmAbandonQuest) return;
+    onAbandonQuest?.(confirmAbandonQuest);
+    setConfirmAbandonQuest(null);
+  };
 
   return (
     <div className="confirm-backdrop" role="presentation">
@@ -506,7 +593,12 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                       <b>{selectedQuest.title}</b>
                       <span>{selectedNpc?.name ?? "Questgiver"}{selectedNpc?.title ? ` | ${selectedNpc.title}` : ""}</span>
                     </div>
-                    <button type="button" onClick={() => onOpenQuest?.(selectedQuest)}>Aaben quest</button>
+                    <div>
+                      <button type="button" onClick={() => onOpenQuest?.(selectedQuest)}>Aaben quest</button>
+                      {tab === "active" && (
+                        <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>Opgiv quest</button>
+                      )}
+                    </div>
                   </header>
                   <p>{selectedQuest.complete ? selectedQuest.turnInText : selectedQuest.story}</p>
                   {selectedQuest.progressText && (
@@ -526,6 +618,16 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
           <button type="button" onClick={onClose}>Luk</button>
         </footer>
       </section>
+      {confirmAbandonQuest && (
+        <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
+          <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+          <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+          <div className="confirm-actions">
+            <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+            <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
+          </div>
+        </section>
+      )}
     </div>
   );
 }

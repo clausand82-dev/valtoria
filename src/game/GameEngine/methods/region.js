@@ -216,8 +216,7 @@ export const regionMethods = {
       ? currentWorldState
       : withRegionVisitWorldState(currentWorldState, areaMapId, regionConfig, { corrupted: options.corrupted });
     if (options.markVisit !== false) this.saveProgress({ force: true });
-    return {
-      ...resolveMapRegionConfig(regionConfig, this.worldState, {
+    const conditionContext = {
         areaMapId,
         regionId: regionConfig.id,
         regionConfig,
@@ -237,8 +236,11 @@ export const regionMethods = {
           player: this.player,
           worldState: this.worldState,
         },
-      }),
+      };
+    return {
+      ...resolveMapRegionConfig(regionConfig, this.worldState, conditionContext),
       __worldStateResolved: true,
+      __conditionContext: conditionContext,
     };
   },
 

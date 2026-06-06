@@ -1,7 +1,15 @@
 import { CITY_AREAS } from "./city-areas-config.js";
 import { CITY_BUILDINGS } from "./city-buildings-config.js";
 import { DURABILITY_DEFAULT } from "./durability-config.js";
-import { QUEST_DEFS } from "./quest-config.js";
+import { NAMED_ITEM_TEMPLATES, UNIQUE_ITEMS } from "./item-config.js";
+import { POTION_DEFS } from "./potion-config.js";
+import { QUEST_DEFS, QUEST_ITEM_DEFS } from "./quest-config.js";
+import { RARITIES } from "./rarity-config.js";
+import { READABLE_ITEM_DEFS } from "./readable-config.js";
+import { RESOURCE_DEFS } from "./resource-config.js";
+import { makeItem, makeNamedItem, makePotion, makeUniqueItem } from "../world.js";
+import { makeReadableItem, makeResourceItem, rollItemOfRarity } from "../GameEngine/helpers/items.js";
+import { makeQuestItem } from "../GameEngine/helpers/quests.js";
 import { normalizeWorldState } from "../world-state.js";
 
 // Toggle this to false before live builds, or remove the import from App.jsx.
@@ -40,6 +48,11 @@ function commandHelp() {
   return [
     "Valtoria cheats:",
     'valtoriaCheat("help")',
+    'valtoriaCheat("give <resource|potion|quest|readable|named|unique|gear> <id|rarity|random> [count] [level]")',
+    'valtoriaCheat("give resource wood_piece 50")',
+    'valtoriaCheat("give potion small_health 10")',
+    'valtoriaCheat("give gear rare 3 25")',
+    'valtoriaCheat("give gear random_weapon 1 25")',
     'valtoriaCheat("resetQuest <questId>")',
     'valtoriaCheat("resetQuest check_inn_infestation")',
     'valtoriaCheat("resetAllQuests")',
@@ -54,6 +67,191 @@ function commandHelp() {
     'valtoriaCheat("repairCityAreas")',
     'Alias: vc("help")',
   ].join("\n");
+}
+
+function normalizeGiveType(type) {
+  const value = String(type ?? "").trim().toLowerCase();
+  if (["resource", "resources", "res", "material", "materials"].includes(value)) return "resource";
+  if (["potion", "potions", "pot", "pots", "consumable", "consumables"].includes(value)) return "potion";
+  if (["quest", "questitem", "quest_item", "questitems", "quest_items"].includes(value)) return "quest";
+  if (["readable", "readables", "book", "books", "note", "notes"].includes(value)) return "readable";
+  if (["named", "nameditem", "named_item"].includes(value)) return "named";
+  if (["unique", "uniqueitem", "unique_item"].includes(value)) return "unique";
+  if (["gear", "item", "items", "equipment", "random"].includes(value)) return "gear";
+  return value;
+}
+
+function clampCheatCount(value, fallback = 1) {
+  const count = Math.floor(Number(value) || fallback);
+  return Math.max(1, Math.min(9999, count));
+}
+
+function clampCheatLevel(value, fallback = 1) {
+  const level = Math.floor(Number(value) || fallback);
+  return Math.max(1, Math.min(999, level));
+}
+
+function titleForDef(def, fallback) {
+  return String(def?.name ?? def?.title ?? def?.label ?? fallback ?? "").trim() || String(fallback ?? "");
+}
+
+function sortGiveOptions(options) {
+  return options.sort((a, b) => {
+    const group = String(a.group ?? "").localeCompare(String(b.group ?? ""), "da");
+    if (group) return group;
+    return String(a.label ?? "").localeCompare(String(b.label ?? ""), "da");
+  });
+}
+
+export function cheatGiveOptions() {
+  const options = [
+    { type: "gear", id: "random", group: "Gear", label: "Gear: Random (random)", countable: true, levelable: true },
+    { type: "gear", id: "random_weapon", group: "Gear", label: "Gear: Random weapon (random_weapon)", countable: true, levelable: true },
+    { type: "gear", id: "random_armor", group: "Gear", label: "Gear: Random armor (random_armor)", countable: true, levelable: true },
+    ...RARITIES.map((rarity) => ({
+      type: "gear",
+      id: rarity.id,
+      group: "Gear",
+      label: `Gear: ${rarity.label ?? rarity.id} (${rarity.id})`,
+      countable: true,
+      levelable: true,
+    })),
+    ...Object.entries(RESOURCE_DEFS ?? {}).map(([id, def]) => ({
+      type: "resource",
+      id,
+      group: "Resources",
+      label: `Resource: ${titleForDef(def, id)} (${id})`,
+      countable: true,
+      levelable: false,
+    })),
+    ...Object.entries(POTION_DEFS ?? {}).map(([id, def]) => ({
+      type: "potion",
+      id,
+      group: "Potions",
+      label: `Potion: ${titleForDef(def, id)} (${id})`,
+      countable: true,
+      levelable: true,
+    })),
+    ...Object.entries(QUEST_ITEM_DEFS ?? {}).map(([id, def]) => ({
+      type: "quest",
+      id,
+      group: "Quest items",
+      label: `Quest item: ${titleForDef(def, id)} (${id})`,
+      countable: true,
+      levelable: false,
+    })),
+    ...READABLE_ITEM_DEFS.map((def) => ({
+      type: "readable",
+      id: def.id,
+      group: "Readables",
+      label: `Readable: ${titleForDef(def, def.id)} (${def.id})`,
+      countable: true,
+      levelable: false,
+    })),
+    ...NAMED_ITEM_TEMPLATES.map((def) => ({
+      type: "named",
+      id: def.id,
+      group: "Named items",
+      label: `Named: ${titleForDef(def, def.id)} (${def.id})`,
+      countable: true,
+      levelable: true,
+    })),
+    ...UNIQUE_ITEMS.map((def) => ({
+      type: "unique",
+      id: def.id,
+      group: "Unique items",
+      label: `Unique: ${titleForDef(def, def.id)} (${def.id})`,
+      countable: true,
+      levelable: true,
+    })),
+  ].filter((entry) => entry.id);
+  return sortGiveOptions(options);
+}
+
+function giveItemFactory(type, id, level) {
+  if (type === "resource") {
+    if (!RESOURCE_DEFS[id]) return null;
+    return (count) => {
+      const item = makeResourceItem(id, 1);
+      return item ? { ...item, count } : null;
+    };
+  }
+  if (type === "potion") {
+    if (!POTION_DEFS[id]) return null;
+    return (count) => ({ ...makePotion(id, level), count });
+  }
+  if (type === "quest") {
+    if (!QUEST_ITEM_DEFS[id]) return null;
+    return () => makeQuestItem(id);
+  }
+  if (type === "readable") {
+    if (!READABLE_ITEM_DEFS.some((entry) => String(entry.id) === id)) return null;
+    return () => makeReadableItem(id);
+  }
+  if (type === "named") {
+    const def = NAMED_ITEM_TEMPLATES.find((entry) => String(entry.id) === id);
+    return def ? () => makeNamedItem(def, level) : null;
+  }
+  if (type === "unique") {
+    const def = UNIQUE_ITEMS.find((entry) => String(entry.id) === id);
+    return def ? () => makeUniqueItem(def, level) : null;
+  }
+  if (type === "gear") {
+    const rarity = RARITIES.find((entry) => String(entry.id) === id);
+    if (id === "random") return () => makeItem(level);
+    if (id === "random_weapon") return () => makeItem(level, 0);
+    if (id === "random_armor") return () => makeItem(level, 1);
+    return rarity ? () => rollItemOfRarity(level, rarity.id) : null;
+  }
+  return null;
+}
+
+function giveCheat(api, rawType, rawId, rawCount, rawLevel) {
+  const engine = api.getEngine?.();
+  if (!engine?.player?.inventory || typeof engine.addInventoryItem !== "function") return result(false, "No active game engine.");
+  const type = normalizeGiveType(rawType);
+  const id = String(rawId ?? "").trim();
+  if (!type || !id) {
+    return result(false, "Missing give type or id.", {
+      examples: ["give resource wood_piece 50", "give potion small_health 10", "give gear rare 3 25"],
+    });
+  }
+
+  const count = clampCheatCount(rawCount);
+  const level = clampCheatLevel(rawLevel, engine.player?.level ?? 1);
+  const factory = giveItemFactory(type, id, level);
+  if (!factory) {
+    return result(false, `Unknown give item: ${type} ${id}`, {
+      examples: cheatGiveOptions().slice(0, 12).map((option) => `give ${option.type} ${option.id}`),
+    });
+  }
+
+  let added = 0;
+  const stackable = type === "resource" || type === "potion";
+  if (stackable) {
+    const item = factory(count);
+    if (item && engine.addInventoryItem(item)) added = count;
+    else added = Math.max(0, count - Math.max(1, Math.floor(Number(item?.count) || count)));
+  } else {
+    for (let i = 0; i < count; i += 1) {
+      const item = factory(1);
+      if (!item || !engine.addInventoryItem(item)) break;
+      added += 1;
+    }
+  }
+
+  if (added <= 0) return result(false, `Inventory full; could not give ${type} ${id}.`, { type, id, requested: count });
+  engine.addToast?.(`Cheat: gav ${added}x ${id}`);
+  engine.publishSnapshot?.();
+  engine.saveProgress?.({ force: true });
+  return result(true, `Gave ${added}x ${type} ${id}.`, {
+    type,
+    id,
+    requested: count,
+    added,
+    level,
+    partial: added < count,
+  });
 }
 
 function result(ok, message, data = {}) {
@@ -434,6 +632,7 @@ export function installValtoriaCheats(api = {}) {
     const [rawCommand, ...parts] = normalizeCommand(input, args);
     const command = String(rawCommand ?? "help").trim().toLowerCase();
     if (!command || command === "help") return commandHelp();
+    if (command === "give" || command === "giveitem" || command === "item") return giveCheat(api, parts[0], parts[1], parts[2], parts[3]);
     if (command === "resetquest" || command === "questreset") return resetQuest(api, parts[0]);
     if (command === "resetallquests" || command === "questsreset" || command === "clearquests") return resetAllQuests(api);
     if (command === "clearbestiary" || command === "resetbestiary") return clearBestiary(api);

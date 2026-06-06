@@ -1259,7 +1259,8 @@ button {
 }
 
 .quickslot b,
-.quickslot-picker b {
+.quickslot-picker b,
+.skill-badge {
   position: absolute;
   z-index: 2;
   right: 4px;
@@ -1272,6 +1273,13 @@ button {
   background: rgba(0, 0, 0, 0.72);
   color: #f4efe3;
   font-size: 10px;
+}
+
+.skill-badge {
+  right: 3px;
+  bottom: 3px;
+  border: 1px solid rgba(255, 188, 188, 0.68);
+  background: #9a1f20;
 }
 
 .quickslot-picker {
@@ -1385,7 +1393,7 @@ button {
   left: 50%;
   bottom: 10px;
   display: grid;
-  grid-template-columns: repeat(6, minmax(148px, 1fr));
+  grid-template-columns: repeat(7, minmax(118px, 1fr));
   width: min(1350px, calc(100vw - 36px));
   gap: 8px;
   padding: 8px 10px;
@@ -3055,6 +3063,20 @@ button {
   z-index: 48;
 }
 
+.item-hover-stack.is-floating {
+  position: fixed;
+  z-index: 48;
+  display: grid;
+  gap: 6px;
+  width: 360px;
+  pointer-events: none;
+}
+
+.item-hover-stack.is-floating .item-hover-panel.is-floating {
+  position: static;
+  width: 100%;
+}
+
 .item-hover-panel.is-floating .comparison-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -3368,6 +3390,10 @@ button {
   align-items: end;
 }
 
+.city-settings-cheat-give {
+  grid-template-columns: minmax(220px, 1fr) 86px 86px 120px;
+}
+
 .city-settings-cheat-inline button,
 .city-settings-cheat-grid button {
   height: 34px;
@@ -3449,6 +3475,82 @@ button {
   font-size: 13px;
   text-align: center;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+.toast.quest {
+  border-color: rgba(226, 174, 79, 0.7);
+  background: rgba(30, 20, 11, 0.94);
+  color: #f4da96;
+}
+
+.toast-log-dialog {
+  width: min(900px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 72px));
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+}
+
+.toast-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-log-head h2 {
+  margin: 0;
+}
+
+.toast-log-list {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  overflow: auto;
+  padding: 4px 8px 4px 0;
+}
+
+.confirm-dialog > .toast-log-list {
+  display: grid;
+  justify-content: stretch;
+  gap: 2px;
+}
+
+.toast-log-row {
+  display: grid;
+  grid-template-columns: 70px 14px minmax(0, 1fr);
+  width: 100%;
+  align-items: start;
+  gap: 8px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #d5ccb9;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.toast-log-row.quest {
+  background: rgba(72, 44, 14, 0.25);
+}
+
+.toast-log-row time {
+  color: #f4da96;
+  font-variant-numeric: tabular-nums;
+}
+
+.toast-log-row span {
+  color: var(--muted);
+}
+
+.toast-log-row p,
+.quest-toast-dialog p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.quest-toast-dialog {
+  width: min(560px, calc(100vw - 32px));
 }
 
 .city-page {
@@ -3583,6 +3685,11 @@ button {
   overflow: auto;
 }
 
+.confirm-dialog.quest-parchment-dialog {
+  color: var(--quest-ink) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+}
+
 .quest-accepted-dialog {
   width: min(620px, calc(100vw - 28px));
   min-height: min(620px, calc(100vh - 36px));
@@ -3626,6 +3733,17 @@ button {
   text-align: left;
 }
 
+.confirm-dialog.quest-parchment-dialog p,
+.confirm-dialog.quest-parchment-dialog .quest-progress-line,
+.confirm-dialog.quest-parchment-dialog .quest-offer-header span {
+  color: var(--quest-ink-soft) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.55 !important;
+  opacity: 1 !important;
+}
+
 .confirm-dialog.quest-parchment-dialog > .quest-offer-header {
   display: grid;
   grid-template-columns: 74px 1fr;
@@ -3665,6 +3783,16 @@ button {
   text-shadow: none;
 }
 
+.confirm-dialog.quest-parchment-dialog .quest-chip,
+.confirm-dialog.quest-parchment-dialog .quest-monster-chip,
+.confirm-dialog.quest-parchment-dialog .comparison-list span {
+  color: var(--quest-ink) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
 .quest-parchment-dialog .quest-chip.kill-count,
 .quest-parchment-dialog .quest-chip.region-chip,
 .quest-parchment-panel .quest-chip.kill-count,
@@ -3672,6 +3800,11 @@ button {
   border: 0;
   background: transparent;
   color: var(--quest-red);
+}
+
+.confirm-dialog.quest-parchment-dialog .quest-chip.kill-count,
+.confirm-dialog.quest-parchment-dialog .quest-chip.region-chip {
+  color: var(--quest-red) !important;
 }
 
 .quest-parchment-dialog .quest-objective-meta,
@@ -3721,9 +3854,19 @@ button {
   font-weight: 700;
 }
 
-.quest-parchment-dialog button:hover,
-.quest-parchment-panel button:hover {
+.quest-parchment-dialog button:hover:not(:disabled),
+.quest-parchment-panel button:hover:not(:disabled) {
   background: rgba(70, 38, 16, 0.28);
+}
+
+.quest-parchment-dialog button:disabled,
+.quest-parchment-panel button:disabled {
+  border-color: rgba(84, 47, 19, 0.18);
+  background: rgba(70, 38, 16, 0.08);
+  color: rgba(75, 50, 31, 0.48);
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  opacity: 0.58;
 }
 
 .quest-overview-dialog {
@@ -6123,6 +6266,12 @@ button {
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.blacksmith-row.armory-item-row b,
+.blacksmith-row.armory-item-row i {
+  color: var(--item-quality, #f5f3ea);
+  font-style: normal;
 }
 
 .blacksmith-row button {

@@ -7,6 +7,7 @@ import {
   itemValue,
   clamp,
   distance,
+  makePotion,
   DESTROYED_ITEM_RESOURCE_DROPS,
   RESOURCE_DEFS,
   isPotionItem,
@@ -31,6 +32,11 @@ import {
   readableMergeRecipesFor,
   readableMergeOption,
   consumeReadableInputs,
+  potionMergeRecipeFor,
+  potionMergeRecipesFor,
+  potionMergeOption,
+  consumePotionInputs,
+  potionOutputCanFitAfterMerge,
   resourceMergeRecipeFor,
   resourceMergeRecipesFor,
   resourceMergeOption,
@@ -1003,6 +1009,23 @@ export const inventoryMethods = {
       }
       return this.mergeInventoryReadableWithRecipe(index, recipe.output);
     }
+    if (isPotionItem(item)) {
+      const recipes = potionMergeRecipesFor(item, this.player.inventory);
+      if (recipes.length > 1) {
+        return {
+          type: "potion-choice",
+          index,
+          itemId: item.id,
+          options: recipes.map((recipe) => potionMergeOption(recipe)),
+        };
+      }
+      const recipe = recipes[0] ?? potionMergeRecipeFor(item, this.player.inventory);
+      if (!recipe) {
+        this.addToast("Ikke nok potions til merge");
+        return null;
+      }
+      return this.mergeInventoryPotionWithRecipe(index, recipe.output);
+    }
     if (isResourceItem(item)) {
       const researchOnly = resourceMergeRecipesFor(item, this.player.inventory).filter((recipe) => recipeRequiresResearchLab(recipe));
       if (researchOnly.length > 0) {
@@ -1131,6 +1154,32 @@ export const inventoryMethods = {
       return false;
     }
     this.addToast(`Samlet: ${output.name}`);
+    this.publishSnapshot();
+    return true;
+  },
+
+  mergeInventoryPotionWithRecipe(index, outputPotionId) {
+    const item = this.player.inventory[index];
+    if (!item || !isPotionItem(item)) return false;
+    const recipe = potionMergeRecipesFor(item, this.player.inventory).find((entry) => entry.output === outputPotionId);
+    if (!recipe) {
+      this.addToast("Ikke nok potions til merge");
+      return false;
+    }
+    const outputCount = Math.max(1, Math.floor(Number(recipe.count) || 1));
+    const output = makePotion(recipe.output, item.level ?? this.player.level ?? 1);
+    if (!output) return false;
+    output.count = outputCount;
+    if (!potionOutputCanFitAfterMerge(this.player.inventory, recipe, output, this.inventorySlotCapacity())) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    consumePotionInputs(this.player.inventory, recipe.inputs ?? {});
+    if (!this.addPotionLoot(output)) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    this.addToast(`Merged: ${output.name}`);
     this.publishSnapshot();
     return true;
   },

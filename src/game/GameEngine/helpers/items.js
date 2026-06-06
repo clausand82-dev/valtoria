@@ -6,6 +6,7 @@ import {
   itemValue,
   makeItem,
   clamp,
+  POTION_MERGE_RECIPES,
   RESOURCE_DEFS,
   RESOURCE_MERGE_RECIPES,
   RESOURCE_RARITY_COLOR,
@@ -16,6 +17,8 @@ import {
   isQuestItem,
   isReadableItem,
   isResourceItem,
+  normalizePotionId,
+  potionDefById,
   withItemFlags,
   withItemIcon
 } from "../dependencies.js";
@@ -56,7 +59,7 @@ export function itemsCanMerge(a, b) {
 }
 
 export function itemIconIndex(item) {
-  if (isResourceItem(item)) return item.iconIndex ?? RESOURCE_DEFS[item.resourceId]?.iconIndex ?? 0;
+  if (isResourceItem(item)) return undefined;
   if (itemIconSheet(item) === "armor") {
     const armorMap = {
       Helm: 0,
@@ -106,7 +109,7 @@ export function itemIconIndex(item) {
 
 export function itemIconSheet(item) {
   if (isQuestItem(item)) return "items";
-  if (isResourceItem(item)) return RESOURCE_DEFS[item.resourceId]?.sheet ?? "resources";
+  if (isResourceItem(item)) return undefined;
   const armorBases = new Set(["Helm", "Gorget", "Chestplate", "Vambraces", "Greaves", "Bracelet", "Boots", "Gloves", "Pauldrons", "Cape", "Belt", "Relic"]);
   return armorBases.has(item?.baseName) ? "armor" : "items";
 }
@@ -128,8 +131,6 @@ export function makeResourceItem(resourceId, count = 1) {
     level: 1,
     count: clamp(Math.floor(Number(count) || 1), 1, def.stackMax),
     stackMax: def.stackMax,
-    iconIndex: def.iconIndex,
-    iconSheet: def.sheet ?? "resources",
     iconUrl: def.iconUrl ?? undefined,
     description: def.description,
     value: def.value,
@@ -313,11 +314,80 @@ export function resourceMergeOption(recipe) {
     output: recipe.output,
     name: output?.name ?? recipe.output,
     count: recipe.count ?? 1,
-    iconIndex: output?.iconIndex ?? 0,
-    iconSheet: output?.sheet ?? "resources",
     iconUrl: output?.iconUrl ?? previewItem.iconUrl,
     inputs: recipe.inputs,
   };
+}
+
+export function potionMergeRecipeFor(item, inventory) {
+  if (!isPotionItem(item)) return null;
+  return potionMergeRecipesFor(item, inventory)[0] ?? null;
+}
+
+export function potionMergeRecipesFor(item, inventory) {
+  const potionId = normalizePotionId(item?.potionId ?? item?.potionType);
+  if (!potionId) return [];
+  return POTION_MERGE_RECIPES.filter((recipe) => (
+    Object.hasOwn(recipe.inputs, potionId)
+    && hasPotionInputs(inventory, recipe.inputs)
+    && potionDefById(recipe.output)
+  ));
+}
+
+export function potionMergeOption(recipe) {
+  const output = potionDefById(recipe.output);
+  return {
+    output: recipe.output,
+    name: output?.name ?? recipe.output,
+    count: recipe.count ?? 1,
+    iconUrl: output?.iconUrl,
+    inputs: recipe.inputs,
+  };
+}
+
+export function hasPotionInputs(inventory, inputs) {
+  return Object.entries(inputs).every(([inputId, needed]) => {
+    const required = Math.max(1, Math.floor(Number(needed) || 1));
+    if (potionDefById(inputId)) return potionCount(inventory, inputId) >= required;
+    return resourceCount(inventory, inputId) >= required;
+  });
+}
+
+export function potionCount(inventory, potionId) {
+  const id = normalizePotionId(potionId);
+  if (!id) return 0;
+  return inventory.reduce((sum, item) => (
+    isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === id
+      ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+      : sum
+  ), 0);
+}
+
+export function consumePotionInputs(inventory, inputs) {
+  for (const [inputId, neededRaw] of Object.entries(inputs)) {
+    if (!potionDefById(inputId)) {
+      consumeResourceInputs(inventory, { [inputId]: neededRaw });
+      continue;
+    }
+    const potionId = normalizePotionId(inputId);
+    let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
+    for (let i = inventory.length - 1; i >= 0 && needed > 0; i -= 1) {
+      const item = inventory[i];
+      if (!isPotionItem(item) || normalizePotionId(item.potionId ?? item.potionType) !== potionId) continue;
+      const count = Math.max(1, Math.floor(Number(item.count) || 1));
+      const used = Math.min(count, needed);
+      const remaining = count - used;
+      needed -= used;
+      if (remaining > 0) item.count = remaining;
+      else inventory.splice(i, 1);
+    }
+  }
+}
+
+export function potionOutputCanFitAfterMerge(inventory, recipe, outputPotion, capacity) {
+  const simulated = inventory.map((item) => ({ ...item }));
+  consumePotionInputs(simulated, recipe.inputs ?? {});
+  return inventoryCanAccept(simulated, outputPotion, capacity);
 }
 
 export function hasResourceInputs(inventory, inputs) {
@@ -373,11 +443,18 @@ export function resourceStackMax(resourceId) {
   return RESOURCE_DEFS[resourceId]?.stackMax ?? 99;
 }
 
+const RESOURCE_ID_ALIASES = {
+  iron_ore: "iron_piece",
+  small_rock: "stone_brick",
+  magic_esense: "magic_essence",
+  magic_essens: "magic_essence",
+  magicessens: "magic_essence",
+  magicessence: "magic_essence",
+};
+
 export function normalizeResourceId(resourceId) {
   const id = resourceId ? String(resourceId) : undefined;
-  if (id === "iron_ore") return "iron_piece";
-  if (id === "small_rock") return "stone_brick";
-  return id;
+  return RESOURCE_ID_ALIASES[id] ?? id;
 }
 
 export function inventoryCanAccept(inventory, item, maxInventory = MAX_INVENTORY) {

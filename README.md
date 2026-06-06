@@ -14,6 +14,7 @@ Du styrer en helt i Valtoria efter de gamle fortællinger om Lord Kealand, Lady 
 - Vite
 - JavaScript modules
 - Custom Canvas-rendering
+- PNG-alpha assets uden runtime chroma-key cleanup
 - LocalStorage-baseret save/persistence
 - Config-drevet content-setup
 

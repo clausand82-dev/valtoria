@@ -83,6 +83,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "southern-fields",
       label: "Soendre marker",
       color: "#b4c46f",
+      cityStats: { population: 5 },
       unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       labelX: 70,
       labelY: 73,
@@ -111,10 +112,6 @@ export function createVillageOutskirtsMapRegions(region) {
         water: 20,
         provision: 5,
         supply: 5,
-        trade: 0,
-        knowledge: 0,
-        culture: 0,
-        faith: 0,
       },
       tileset: ["tileset/tileset_grass.png", "tileset/tileset_swamp.png"],
       spawnCounts: {objects: 50, foliage: 200, decals: 100, water: 25, monsters: { min: 32, max: 35 },},
@@ -126,7 +123,15 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       },
       layout: { pool: [ { id: "central_clearing", weight: 3 }, { id: "linear_path", weight: 1 },],},
-      prefabRules: {maxTotal: 2, minDistanceBetweenPrefabs: 8, anchors: ["clearing", "room"], pool: [{ id: "old_well_clearing", weight: 4, max: 2 },],},
+      prefabRules: {
+        maxTotal: 3,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "blacksmith_boar_cave_entrance", weight: 12, max: 1, questActive: "blacksmith_boar_hunt" },
+          { id: "old_well_clearing", weight: 4, max: 2, blockedBy: { questActive: "blacksmith_boar_hunt" }   },
+        ],
+      },
       water: [ { fileName: "tileset/tileset_water.png", x: 2, y: 2, weight: 5 },],
       ambient: {
         particles: [
@@ -164,6 +169,7 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: [
         { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
         { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
+        { fileName: "foilage/foilage_boneparts.png", scale: 0.75 },
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
@@ -182,8 +188,8 @@ export function createVillageOutskirtsMapRegions(region) {
       rareMobs: [
         {
           id: "rare_document_wolf",
-          type: "Demon",
-          chance: 1.04,
+          type: "WolfFenris",
+          chance: 0.04,
           maxPerRegion: 1,
           levelOffset: 10,
           displayName: "Den Sporsoegende Ulv",
@@ -244,6 +250,7 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Broenden",
       mapSize: "small",
       color: "#7fb6d6",
+      cityStats: { population: 5, water: 50 },
       unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
       labelX: 53,
       labelY: 52,
@@ -277,7 +284,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "inn-of-the-good-oak",
       label: "Kroen Den Gode Eg",
       corrupted: true,
-      cityStats: { population: 1 },
+      cityStats: { population: 5, supply: 20, trade: 10, culture: 5, },
       mapSize: "small",
       color: "#7fb172",
       //tileset: "tileset/tileset_bricktiles.png",
@@ -407,6 +414,7 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Laden",
       mapSize: "small",
       color: "#c4a86a",
+      cityStats: { population: 5, provision: 50, trade: 5, wealth: 5 },
       unlock: {
       any: [
         { questActive: "lost_anvil" },
@@ -481,21 +489,62 @@ export function createVillageOutskirtsMapRegions(region) {
     region({
       id: "smithy",
       label: "Smedjen",
+      mapSize: "small",
       color: "#c4a86a",
+      cityStats: { population: 10, trade: 10, health: 10, culture: 5 },
       unlock: { questCompleted: ["devils_judge"] },
       labelX: 44,
       labelY: 35,
+      spawnCounts:
+      {
+        objects: 24,
+        foliage: 50,
+        decals: 46,
+        monsters: { min: 20, max: 25 },
+      },
+      layout: {
+        pool: [
+          { id: "central_clearing", weight: 1 },
+        ],
+      },
+      prefabRules: {
+        maxTotal: 1,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room"],
+        pool: [
+          {
+            id: "smithy_repair_station",
+            weight: 10,
+            max: 1,
+            any: [
+              { questActive: "blacksmith_repair_smithy" },
+              { questActive: "blacksmith_find_wife" },
+            ],
+          },
+        ],
+      },
+      foliageSet: [
+        { fileName: "foilage/foilage_garbage_001.png", scale: 0.75, resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } },
+        { fileName: "foilage/foilage_metalparts.png", scale: 0.75, },
+        { fileName: "foilage/foilage_metalplates.png", scale: 0.75, resourceDrop: { iron_plates: 0.25, } },
+        { fileName: "foilage/foilage_metalchains.png", scale: 0.75, resourceDrop: { iron_chains: 0.20, }},
+        //{ fileName: "foilage/foilage_deadvillages.png", scale: 1.35, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
+      ,],
       tileset: [
-        { id: "tileset/tileset_bricktiles.png", weight: 8, x: 1, y: 1 },
-        { id: "tileset/tileset_debriswithblood.png", weight: 20, corruption: { min: 5 } },
+        { id: "tileset/tileset_woodplank.png", weight: 8, x: 4, y: 1 },
+        { id: "tileset/tileset_debris.png", weight: 2,},
+        //{ id: "tileset/tileset_debriswithblood.png", weight: 20, corruption: { min: 5 } },
+      ],
+      decay: [
+        { id: "decay_spiderweb", weight: 12 },
+        { id: "decay_cracks", weight: 8 },
+        { id: "decay_dust", weight: 10 },
+        { id: "decay_basement", weight: 20 },
+        { id: "decay_blood", weight: 20, questActive: "blacksmith_find_wife" },
       ],
       objects: [
-        { id: "object_house_mainland", weight: 4 },
-        { id: "object_stone_cluster", weight: 4 },
-        { id: "object_fireplace_mainland", weight: 3 },
-        { id: "object_tree_mainland", weight: 2 },
-        { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
+        { id: "object_metalchest", weight: 4, spawnDamage: "damaged" },
+
       ],
       points: "34.69,36.13 44.26,46.76 47.85,40.38 51.44,38.26 41.87,17.00 41.87,31.88",
     }),
@@ -503,6 +552,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "northern-fields",
       label: "Nordlige marker",
       color: "#b4c46f",
+      cityStats: { population: 25, provision: 15 },
       unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
@@ -536,6 +586,7 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Landsbyen",
       color: "#d7a85b",
       mapSize: "large",
+      cityStats: { population: 50 },
       spawnCounts: {
         value: { objects: 15, foliage: 28, decals: 24, monsters: { min: 8, max: 12 }, water: 0 },
         variants: [
@@ -635,6 +686,7 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "The Forest",
       color: "#7fb172",
       mapSize: "large",
+      cityStats: { population: 20 },
       tileset: { fileName: "tileset/tileset_grass.png" },
         spawnCounts: {                                            // Per chunk spawn counts.
             objects: 100,                                            // Regular objects.

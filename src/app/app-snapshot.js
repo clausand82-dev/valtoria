@@ -80,4 +80,5 @@ export const emptySnapshot = {
   },
   quests: { active: [], completed: [], cityFade: [], wildernessNpc: null, nearbyQuestgiver: null },
   toasts: [],
+  toastLog: [],
 };

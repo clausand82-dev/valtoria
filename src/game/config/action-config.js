@@ -122,6 +122,57 @@ export const ACTION_CONFIG = {
     once: true,
   },
 
+  repair_smithy_furnace: {
+    id: "repair_smithy_furnace",
+    type: "repair",
+    label: "Reparer furnace",
+    prompt: "Reparer furnace",
+    requires: { questActive: "blacksmith_repair_smithy" },
+    costs: {
+      resources: { iron_plates: 4, iron_chains: 2 },
+    },
+    replaceTargetWith: "object_furnace",
+    replaceTargetDestructible: false,
+    once: true,
+  },
+
+  repair_smithy_anvil: {
+    id: "repair_smithy_anvil",
+    type: "repair",
+    label: "Reparer anvil",
+    prompt: "Reparer anvil",
+    requires: { questActive: "blacksmith_repair_smithy" },
+    costs: {
+      resources: { iron_plates: 3, iron_chains: 1 },
+    },
+    replaceTargetWith: "object_anvil",
+    replaceTargetDestructible: false,
+    once: true,
+  },
+
+  repair_smithy_bellow: {
+    id: "repair_smithy_bellow",
+    type: "repair",
+    label: "Reparer bellow",
+    prompt: "Reparer bellow",
+    requires: { questActive: "blacksmith_repair_smithy" },
+    costs: {
+      resources: { iron_plates: 2, iron_chains: 2 },
+    },
+    replaceTargetWith: "object_bellow",
+    replaceTargetDestructible: false,
+    once: true,
+  },
+
+  inspect_blacksmith_wife: {
+    id: "inspect_blacksmith_wife",
+    type: "inspect",
+    label: "Undersoeg",
+    text: "Kvinden er doed. De dybe bidemaerker og oedelagte knogler peger ikke paa edderkopper eller ulve, men paa et enormt vildsvin.",
+    requires: { questActive: "blacksmith_find_wife" },
+    once: true,
+  },
+
   bury_village_dead: {
     id: "bury_village_dead",
     type: "cleanse",
@@ -155,6 +206,36 @@ export const ACTION_CONFIG = {
     targetSubregionId: "cave01_lvl1",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
+  },
+
+  enter_blacksmith_boar_cave_lvl1: {
+    id: "enter_blacksmith_boar_cave_lvl1",
+    type: "enterSubregion",
+    label: "Gaa ind i grotten",
+    targetSubregionId: "blacksmith_boar_cave_lvl1",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: { questActive: "blacksmith_boar_hunt" },
+  },
+
+  enter_blacksmith_boar_cave_lvl2: {
+    id: "enter_blacksmith_boar_cave_lvl2",
+    type: "enterSubregion",
+    label: "Gaa gennem revnen",
+    targetSubregionId: "blacksmith_boar_cave_lvl2",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: { questActive: "blacksmith_boar_hunt" },
+  },
+
+  enter_blacksmith_boar_cave_lvl3: {
+    id: "enter_blacksmith_boar_cave_lvl3",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "blacksmith_boar_cave_lvl3",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: { questActive: "blacksmith_boar_hunt" },
   },
 
   enter_cave01_lvl2: {

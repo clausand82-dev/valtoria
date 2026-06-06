@@ -81,7 +81,8 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
 
     const startIndex = Math.floor(rng(13000 + attempts * 29) * candidates.length);
     let placed = false;
-    for (let offset = 0; offset < Math.min(candidates.length, 16); offset += 1) {
+    const candidateLimit = pool.length <= 1 ? candidates.length : Math.min(candidates.length, 16);
+    for (let offset = 0; offset < candidateLimit; offset += 1) {
       const candidate = candidates[(startIndex + offset) % candidates.length];
       const x = Math.floor(candidate.x);
       const y = Math.floor(candidate.y);
@@ -217,7 +218,7 @@ function canPlacePrefab(region, prefab, x, y, options = {}) {
   for (let ty = y; ty < y + size.h; ty += 1) {
     for (let tx = x; tx < x + size.w; tx += 1) {
       if (isReservedTile(region, tx, ty)) return { ok: false, reason: "reserved" };
-      if (options.isPointPlayable && !options.isPointPlayable(region, tx + 0.5, ty + 0.5, 0.2)) {
+      if (!prefab.clearArea && options.isPointPlayable && !options.isPointPlayable(region, tx + 0.5, ty + 0.5, 0.2)) {
         return { ok: false, reason: "not_playable" };
       }
     }
@@ -227,10 +228,12 @@ function canPlacePrefab(region, prefab, x, y, options = {}) {
 
 function reservePrefabTiles(region, instance) {
   if (!region.reservedTiles) region.reservedTiles = new Set();
+  if (!region.mask) region.mask = new Set();
   const bounds = instance.bounds;
   for (let y = bounds.y; y < bounds.y + bounds.h; y += 1) {
     for (let x = bounds.x; x < bounds.x + bounds.w; x += 1) {
       region.reservedTiles.add(`${x},${y}`);
+      if (instance.clearArea) region.mask.add(`${x},${y}`);
     }
   }
 }
@@ -254,6 +257,7 @@ function buildPrefabInstance(prefab, x, y, rotation, mirrored, index) {
     rotation,
     mirrored,
     bounds: { x, y, w: size.w, h: size.h },
+    clearArea: Boolean(prefab.clearArea),
     objects: transformItems(content.objects),
     foliage: transformItems(content.foliage),
     decals: transformItems(content.decals),

@@ -21,6 +21,7 @@ import {
   itemIconSheet,
   normalizeReadableBonuses,
   readableMergeRecipesFor,
+  potionMergeRecipeFor,
   resourceMergeRecipeFor,
   questSnapshot,
   canNpcTurnInQuest
@@ -179,6 +180,9 @@ export const snapshotMethods = {
         const resourceMergeRecipe = isResourceItem(item)
           ? resourceMergeRecipeFor(item, this.player.inventory)
           : null;
+        const potionMergeRecipe = isPotionItem(item)
+          ? potionMergeRecipeFor(item, this.player.inventory)
+          : null;
         const readableCanMerge = isReadableItem(item)
           && item.readableStatus === "mergeable"
           && readableMergeRecipesFor(item, this.player.inventory).length > 0;
@@ -192,8 +196,10 @@ export const snapshotMethods = {
           mergeCount: 0,
           canMerge: isResourceItem(item)
             ? Boolean(resourceMergeRecipe && !recipeRequiresResearchLab(resourceMergeRecipe))
-            : readableCanMerge,
-          mergeType: isResourceItem(item) ? "resource" : readableCanMerge ? "readable" : "gear",
+            : isPotionItem(item)
+              ? Boolean(potionMergeRecipe)
+              : readableCanMerge,
+          mergeType: isResourceItem(item) ? "resource" : isPotionItem(item) ? "potion" : readableCanMerge ? "readable" : "gear",
           canRead: isReadableItem(item) && item.readableStatus === "readable" && Boolean(String(item.storyText ?? "").trim()),
           canConsume: isReadableItem(item) && item.readableStatus === "consumable",
           summary: this.itemSummary(item),
@@ -282,7 +288,14 @@ export const snapshotMethods = {
           };
         }),
       },
-      toasts: this.toasts.map((toast) => ({ id: toast.id, text: toast.text })),
+      toasts: this.toasts.map((toast) => ({ id: toast.id, text: toast.text, title: toast.title ?? "", kind: toast.kind ?? "info" })),
+      toastLog: (this.toastLog ?? []).map((toast) => ({
+        id: toast.id,
+        text: toast.text,
+        title: toast.title ?? "",
+        kind: toast.kind ?? "info",
+        createdAt: toast.createdAt ?? null,
+      })),
     });
   },
 

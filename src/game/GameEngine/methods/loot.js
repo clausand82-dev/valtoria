@@ -367,14 +367,19 @@ export const lootMethods = {
   },
 
   dropChestLoot(chest) {
+    const conditionContext = this.questConditionContext?.({ source: "chest", chest }) ?? {};
     let item = rollUniqueItem(Math.max(1, this.player.level), {
       source: "chest",
       biomeId: this.region.mapRegion?.id,
       chance: UNIQUE_DROP_CHANCES.chest,
+      worldState: this.worldState,
+      conditionContext,
     }) ?? rollNamedItem(Math.max(1, this.player.level), {
       source: "chest",
       biomeId: this.region.mapRegion?.id,
       chanceMult: 3,
+      worldState: this.worldState,
+      conditionContext,
     });
 
     for (let i = 0; i < 12; i += 1) {
@@ -441,7 +446,7 @@ export const lootMethods = {
     return baseLevel;
   },
 
-  dropConfiguredItemEntries(monster, entries = []) {
+  dropConfiguredItemEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
       if (!entry || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const item = makeConfiguredCommonItem(entry, this.configuredLootLevel(monster, entry));
@@ -450,21 +455,23 @@ export const lootMethods = {
     }
   },
 
-  dropConfiguredNamedEntries(monster, entries = []) {
+  dropConfiguredNamedEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
       if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const definition = NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(entry.itemId));
       if (!definition) continue;
+      if (!worldEntryAllowed(definition, this.worldState, conditionContext)) continue;
       const item = makeNamedItem(definition, this.configuredLootLevel(monster, entry));
       this.dropGroundItem(monster.x, monster.y, item);
     }
   },
 
-  dropConfiguredUniqueEntries(monster, entries = []) {
+  dropConfiguredUniqueEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
       if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const definition = UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(entry.itemId));
       if (!definition) continue;
+      if (!worldEntryAllowed(definition, this.worldState, conditionContext)) continue;
       const item = makeUniqueItem(definition, this.configuredLootLevel(monster, entry));
       this.dropGroundItem(monster.x, monster.y, item);
     }
@@ -478,9 +485,9 @@ export const lootMethods = {
       ? entries.filter((entry) => worldEntryAllowed(entry, this.worldState, context))
       : []);
     this.dropResourceLoot(monster.x, monster.y, allowedLines(rareLoot.resources));
-    this.dropConfiguredItemEntries(monster, allowedLines(rareLoot.items));
-    this.dropConfiguredNamedEntries(monster, allowedLines(rareLoot.named));
-    this.dropConfiguredUniqueEntries(monster, allowedLines(rareLoot.uniques));
+    this.dropConfiguredItemEntries(monster, allowedLines(rareLoot.items), context);
+    this.dropConfiguredNamedEntries(monster, allowedLines(rareLoot.named), context);
+    this.dropConfiguredUniqueEntries(monster, allowedLines(rareLoot.uniques), context);
   },
 
   dropLoot(monster) {
@@ -510,6 +517,8 @@ export const lootMethods = {
         source: gearDropSource,
         biomeId: this.region.mapRegion?.id,
         chance: UNIQUE_DROP_CHANCES.monster * (1 + stats.magicFind),
+        worldState: this.worldState,
+        conditionContext: this.questConditionContext?.({ monster, source: gearDropSource }) ?? {},
       });
       if (unique) this.dropGroundItem(monster.x, monster.y, unique);
 
@@ -517,6 +526,8 @@ export const lootMethods = {
         source: gearDropSource,
         biomeId: this.region.mapRegion?.id,
         chanceMult: namedItemChanceMultiplier(monster) * (1 + stats.magicFind),
+        worldState: this.worldState,
+        conditionContext: this.questConditionContext?.({ monster, source: gearDropSource }) ?? {},
       });
       if (named) this.dropGroundItem(monster.x, monster.y, named);
 

@@ -83,8 +83,6 @@ object_firebeacon_snow: {
       "firebeacon_snow_animated_008.png",
     ],
     animated: true,
-    keyEdgeBlack: true,
-    keyEdgeHalo: true,
     renderScale: 0.29,
   },
 }
@@ -130,6 +128,12 @@ export const REGION_OBJECT_LOOT_TABLES = {
     { resource: "fruit_orange", min: 1, max: 2, chance: 0.01 },
     { resource: "fruit_banana", min: 1, max: 2, chance: 0.01 },
     { resource: "fruit", min: 1, max: 2, chance: 0.10 },
+  ]),
+    METAL: Object.freeze([
+    { resource: "iron_piece", min: 1, max: 2, chance: 0.15 },
+    { resource: "iron_bar", min: 1, max: 2, chance: 0.01 },
+    { resource: "iron_plates", min: 1, max: 2, chance: 0.01 },
+    { resource: "iron_chains", min: 1, max: 2, chance: 0.01 },
   ]),
 
 };
@@ -659,7 +663,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_hay02.png",
@@ -679,7 +683,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphicsRef: "foilage/foilage_bones.png",
@@ -695,6 +699,16 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.7 },
     sheetRenderScale: 1.75,
   },
+  object_caves: {
+    spawnTypes: [{ type: "object_caves", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "cave"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_caves.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+    sheetRenderScale: 1.25,
+  },
     object_treestumps: {
     spawnTypes: [{ type: "object_treestumps", weight: 1 }],
     defaultDestructible: true,
@@ -708,7 +722,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_treestumps.png",
@@ -731,7 +745,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],  
+      ],
     },
     graphics: {
   mode: "sheet",
@@ -742,7 +756,6 @@ export const REGION_OBJECT_DEFS = {
       "object/trees/object_talltree_medium_4.png",
       "object/trees/object_talltree_medium_5.png",
   ],
-  
   rows: 2,
   cols: 2,
   renderScale: 0.5,
@@ -767,7 +780,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],  
+      ],
     },
     graphics: {
   mode: "sheet",
@@ -799,7 +812,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphics: {
@@ -827,7 +840,7 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_marketstalls.png",
@@ -847,10 +860,90 @@ export const REGION_OBJECT_DEFS = {
       ],
       rareLoot: [
         { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],  
+      ],
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_wagons.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_metalchest: {
+    spawnTypes: [{ type: "object_metalchest", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "metal"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.METAL,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_metalchest.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_furnace: {
+    spawnTypes: [{ type: "object_furnace", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "metal"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.METAL,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_furnace.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+    object_anvil: {
+    spawnTypes: [{ type: "object_anvil", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "metal"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.METAL,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_anvil.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+  object_bellow: {
+    spawnTypes: [{ type: "object_bellow", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "metal"],
+    destructible: {
+      hp: 52,
+      damageStages: 3,
+      particleColor: "#f2b017",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.METAL,
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_bellow.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },
@@ -899,9 +992,6 @@ function normalizeGraphicsConfig(def) {
     return {
       frameFiles,
       animated: graphics.animated !== false,
-      keyEdgeBlack: graphics.keyEdgeBlack,
-      keyEdgeHalo: graphics.keyEdgeHalo,
-      blackThreshold: graphics.blackThreshold,
       renderScale: Number.isFinite(Number(graphics.renderScale)) ? Number(graphics.renderScale) : 1,
       normalizeAnimation: graphics.normalizeAnimation,
     };

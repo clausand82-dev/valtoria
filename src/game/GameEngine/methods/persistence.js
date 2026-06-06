@@ -259,8 +259,8 @@ export const persistenceMethods = {
       normalized.rarityColor = RESOURCE_RARITY_COLOR;
       normalized.resourceColor = def?.color;
       normalized.description = def?.description ? String(def.description) : normalized.description;
-      normalized.iconIndex = def?.iconIndex ?? normalized.iconIndex;
-      normalized.iconSheet = def?.sheet ?? normalized.iconSheet;
+      delete normalized.iconIndex;
+      delete normalized.iconSheet;
       normalized.stackMax = def?.stackMax ?? normalized.stackMax;
       normalized.iconUrl = def?.iconUrl ?? iconUrlFromKey(deriveIconKey(normalized));
     }
@@ -322,6 +322,20 @@ export const persistenceMethods = {
     if (normalized.uniqueId) {
       const def = UNIQUE_ITEMS.find((entry) => entry.id === normalized.uniqueId);
       // Always re-derive from definition — never trust the saved iconUrl for unique items.
+      normalized.name = def?.name ? String(def.name) : normalized.name;
+      normalized.baseName = def?.baseName ? String(def.baseName) : normalized.baseName;
+      normalized.rarity = def?.rarity ? String(def.rarity) : normalized.rarity;
+      normalized.slot = def?.slot ? String(def.slot) : normalized.slot;
+      normalized.mode = def?.mode ? String(def.mode) : normalized.mode;
+      normalized.type = def?.type ? String(def.type) : normalized.type;
+      normalized.hands = Number.isFinite(Number(def?.hands))
+        ? Math.max(1, Math.min(2, Math.floor(Number(def.hands))))
+        : def?.slot === "weapon"
+          ? 1
+          : normalized.hands;
+      normalized.classReq = Array.isArray(def?.classReq) ? def.classReq.map(String) : normalized.classReq;
+      normalized.levelReq = Math.max(0, Math.floor(Number(def?.levelReq ?? normalized.levelReq) || 0)) || undefined;
+      normalized.requiresClassNode = def?.requiresClassNode ? String(def.requiresClassNode) : normalized.requiresClassNode;
       normalized.iconUrl = def?.iconUrl || iconUrlFromKey(deriveIconKey({ uniqueId: normalized.uniqueId }));
       normalized.effects = normalizeItemEffects(def?.effects ?? normalized.effects);
       normalized.description = def?.description ? String(def.description) : normalized.description;

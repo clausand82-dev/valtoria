@@ -55,6 +55,7 @@ import {
   calcCitySpawnChance,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
+import { CITY_EVENT_DEFS, CITY_EVENT_RULES } from "../game/config/city-config.js";
 import {
   deriveIconKey,
   iconUrlFromKey,
@@ -89,8 +90,6 @@ import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 import { saveRepository } from "../storage/saveRepository.js";
-
-const ENABLE_RUNTIME_CHROMA_KEY = false;
 
 const cityAssetCache = {
   promise: null,
@@ -550,7 +549,11 @@ function getCityBuildingState(progress, building) {
   const prebuiltAddons = (building.addons ?? [])
     .filter((addon) => addon.prebuilt)
     .map((addon) => addon.id);
-  const purchasedAddons = Array.isArray(saved.purchasedAddons) ? saved.purchasedAddons : [];
+  const legacyAddons = Array.isArray(saved.addons) ? saved.addons : [];
+  const purchasedAddons = [
+    ...(Array.isArray(saved.purchasedAddons) ? saved.purchasedAddons : []),
+    ...legacyAddons,
+  ];
   return {
     ...saved,
     level: building.prebuilt ? Math.max(1, saved.level ?? 0) : (saved.level ?? 0),
@@ -589,6 +592,7 @@ function cityAreaBuildingRefs(area) {
 function getCityMapQuestNpcs(cityNpcStates = [], showInactive = SHOW_INACTIVE_CITY_NPCS, seed = 0) {
   const stateByNpc = new Map((cityNpcStates ?? []).map((entry) => [entry.npcId, entry]));
   const candidates = Object.entries(QUEST_NPCS).flatMap(([npcId, npc]) => {
+    if (npc?.citySpawn === false) return [];
     const state = stateByNpc.get(npcId) ?? { active: [], offers: [], hasComplete: false };
     const hasOffer = (state.offers?.length ?? 0) > 0;
     const hasActive = (state.active?.length ?? 0) > 0;
@@ -1137,33 +1141,33 @@ function cityEventFlags(cityStats = {}) {
   const safety = Math.max(0, Math.min(100, Number(cityStats.safety) || 0));
   const famine = provision < population;
   const waterShortage = water < population;
-  const diseaseOutbreak = health < 50;
+  const diseaseOutbreak = health < CITY_EVENT_RULES.diseaseOutbreakHealthThreshold;
   const wealthRatio = wealth / Math.max(1, population);
-  const uprisingPoorness = wealthRatio < 0.5;
-  const fireRisk = Math.max(0, Math.min(100, (100 - safety) + (waterShortage ? 25 : 0)));
+  const uprisingPoorness = wealthRatio < CITY_EVENT_RULES.uprisingWealthRatioThreshold;
+  const fireRisk = Math.max(0, Math.min(100, (100 - safety) + (waterShortage ? CITY_EVENT_RULES.fireRiskWaterShortageBonus : 0)));
   return {
     famine: {
       active: famine,
-      unavailablePopulationPct: 25,
-      futureEffect: "hero_food_drops_half",
+      unavailablePopulationPct: CITY_EVENT_RULES.famineUnavailablePopulationPct,
+      futureEffect: CITY_EVENT_DEFS.famine.futureEffect,
     },
     water_shortage: {
       active: waterShortage,
-      unavailablePopulationPct: 45,
-      futureEffect: "no_health_or_mana_potion_drops",
+      unavailablePopulationPct: CITY_EVENT_RULES.waterShortageUnavailablePopulationPct,
+      futureEffect: CITY_EVENT_DEFS.water_shortage.futureEffect,
     },
     disease_outbreak: {
       active: diseaseOutbreak,
-      futureEffect: "hero_max_hp_minus_25_pct",
+      futureEffect: CITY_EVENT_DEFS.disease_outbreak.futureEffect,
     },
     uprising_poorness: {
       active: uprisingPoorness,
       risk: uprisingPoorness ? "high" : "low",
       wealthRatio,
-      futureEffect: "hero_gold_drops_half",
+      futureEffect: CITY_EVENT_DEFS.uprising_poorness.futureEffect,
     },
     fire: {
-      active: fireRisk >= 75,
+      active: fireRisk >= CITY_EVENT_RULES.fireRiskActiveThreshold,
       risk: fireRisk,
       waterShortage,
     },
@@ -1283,8 +1287,8 @@ function availablePopulationForRecruitment(cityStats = {}) {
   const population = Math.max(0, Math.floor(Number(cityStats.population) || 0));
   const events = cityStats.events ?? cityEventFlags(cityStats);
   const unavailablePct = Math.min(75, (
-    (events.famine?.active ? 25 : 0)
-    + (events.water_shortage?.active ? 45 : 0)
+    (events.famine?.active ? CITY_EVENT_RULES.famineUnavailablePopulationPct : 0)
+    + (events.water_shortage?.active ? CITY_EVENT_RULES.waterShortageUnavailablePopulationPct : 0)
   ));
   return Math.max(0, Math.floor(population * ((100 - unavailablePct) / 100)));
 }
@@ -1521,7 +1525,7 @@ function loadCityAssets() {
       loadCityHouseImages(),
       Promise.all(Object.entries(QUEST_NPCS).map(([npcId, npc]) => (
         loadImage(npc.imageUrl)
-          .then((image) => [npcId, removeGreenScreen(image)])
+          .then((image) => [npcId, imageToCanvas(image)])
           .catch(() => [npcId, null])
       ))),
     ]).then(([layerImageEntries, houseImages, npcImageEntries]) => {
@@ -1586,7 +1590,7 @@ function loadCityHouseImages() {
   }
   return Promise.all(entries.map(([key, src]) => (
       loadImage(src)
-      .then((image) => [key, removeGreenScreen(image)])
+      .then((image) => [key, imageToCanvas(image)])
       .catch(() => [key, null])
   ))).then((loaded) => Object.fromEntries(loaded));
 }
@@ -1710,8 +1714,10 @@ function normalizeCityProgress(progress = {}) {
     if (!value || typeof value !== "object" || Array.isArray(value)) continue;
     const nextValue = { ...value };
     if (buildingIds.has(key)) {
+      const legacyAddons = Array.isArray(value.addons) ? value.addons : [];
+      const purchasedAddons = Array.isArray(value.purchasedAddons) ? value.purchasedAddons : [];
       delete nextValue.addons;
-      nextValue.purchasedAddons = Array.isArray(value.purchasedAddons) ? [...new Set(value.purchasedAddons)] : [];
+      nextValue.purchasedAddons = [...new Set([...purchasedAddons, ...legacyAddons].map(String))];
     }
     normalized[key] = nextValue;
   }
@@ -1766,24 +1772,12 @@ function loadImage(src) {
   });
 }
 
-function removeGreenScreen(image) {
+function imageToCanvas(image) {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
   canvas.height = image.naturalHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   ctx.drawImage(image, 0, 0);
-  if (!ENABLE_RUNTIME_CHROMA_KEY) return canvas;
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = imageData;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    if (g > 145 && g > r * 1.5 && g > b * 1.5) {
-      data[i + 3] = 0;
-    }
-  }
-  ctx.putImageData(imageData, 0, 0);
   return canvas;
 }
 function resourceCountFromSnapshot(snapshot, resourceId) {
@@ -2020,7 +2014,6 @@ export {
   removeCityArmyUnits,
   resolveCityArmyBattle,
   loadImage,
-  removeGreenScreen,
   resourceCountFromSnapshot,
   cityStoredResourceCount,
   cityCostAvailable,

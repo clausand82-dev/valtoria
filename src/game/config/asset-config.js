@@ -81,8 +81,6 @@ export const OBJECT_SHEETS = {
   // animated: true betyder at draw-koden vælger frames over tid.
   // frameFiles: Bruges når animationen ligger som separate PNG-filer i stedet
   // for et samlet spritesheet.
-  // keyEdgeBlack/keyEdgeHalo: Ekstra baggrundsrensning for assets med mørke
-  // eller farvede kanter.
   // renderScale: Finjusterer hvor stort objectet tegnes uden at ændre spawn size.
   building: {
     mainland: { fileName: "building_normal_sheet.png", rows: 4, cols: 4 },
@@ -114,8 +112,6 @@ export const OBJECT_SHEETS = {
         "animated_object/firebeacon_snow_animated_008.png",
       ],
       animated: true,
-      keyEdgeBlack: true,
-      keyEdgeHalo: true,
       renderScale: 0.29,
     },
   },

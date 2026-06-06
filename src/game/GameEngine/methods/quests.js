@@ -986,6 +986,36 @@ export const questsMethods = {
     return true;
   },
 
+  abandonQuest(instanceId) {
+    const index = this.questState.active.findIndex((entry) => String(entry.id) === String(instanceId));
+    if (index < 0) return false;
+    const quest = this.questState.active[index];
+    const targetIds = new Set();
+    for (const target of questItemTargetsForQuest(quest)) {
+      if (target?.questItemId) targetIds.add(String(target.questItemId));
+    }
+    for (const step of quest.steps ?? []) {
+      for (const entry of step?.target?.questItems ?? []) {
+        if (entry?.questItemId) targetIds.add(String(entry.questItemId));
+      }
+      if (step?.target?.questItemId) targetIds.add(String(step.target.questItemId));
+      if (step?.id) this.worldState = setWorldFlag(this.worldState, questStepCompletedFlag(quest.questId, step.id), false);
+    }
+    this.questState.active.splice(index, 1);
+    if (targetIds.size > 0 && Array.isArray(this.player?.inventory)) {
+      this.player.inventory = this.player.inventory.filter((item) => {
+        if (item?.mode !== "quest") return true;
+        if (item.questInstanceId != null && String(item.questInstanceId) === String(quest.id)) return false;
+        if (item.questInstanceId == null && targetIds.has(String(item.questItemId))) return false;
+        return true;
+      });
+    }
+    this.addToast(`${quest.title} opgivet`);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
   acceptWildernessQuest(offer) {
     return this.acceptQuestOffer(offer?.quest ? { ...offer.quest, npcId: offer.npcId } : offer, "wilderness");
   },
@@ -1394,6 +1424,14 @@ export const questsMethods = {
     if (quest.rewards?.randomItem && simulated.length >= maxSlots) return false;
     const namedRewardCount = Array.isArray(quest.rewards?.namedItems) ? quest.rewards.namedItems.length : 0;
     if (namedRewardCount > 0 && simulated.length + namedRewardCount > maxSlots) return false;
+    for (const reward of quest.rewards?.questItems ?? []) {
+      const count = Math.max(1, Math.floor(Number(reward?.count) || 1));
+      for (let i = 0; i < count; i += 1) {
+        const item = makeQuestItem(reward.questItemId, null);
+        if (item && !inventoryCanAccept(simulated, item, maxSlots)) return false;
+        if (item) simulated.push(item);
+      }
+    }
     return true;
   },
 

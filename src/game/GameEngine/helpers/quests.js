@@ -371,7 +371,7 @@ export function isQuestComplete(quest, inventory = []) {
   if (quest.type === "action_targets") {
     const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
     const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
-    return quest.progress?.total !== null && quest.progress?.total !== undefined && done >= total;
+    return quest.progress?.total !== null && quest.progress?.total !== undefined && total > 0 && done >= total;
   }
   if (quest.type === "kill_monsters") {
     return Math.max(0, Math.floor(Number(quest.progress?.kills) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));

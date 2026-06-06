@@ -491,7 +491,7 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
         const foodBarrelCostValue = foodBarrelCost(popularity, option);
         return (
           <div className="blacksmith-row" key={`barrel-${option.id}`}>
-            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
+            <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
             <div>
               <b>{option.label}</b>
               <span>{foodBarrelCostValue} needed | Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
@@ -515,7 +515,7 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
         const def = RESOURCE_DEFS[option.resourceId];
         return (
           <div className="blacksmith-row" key={`provision-${option.resourceId}`}>
-            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.resourceId }))} />
+            <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.resourceId }))} />
             <div>
               <b>{option.label}</b>
               <span>{option.cost} {"->"} +{option.provision} provision | Available: {available}</span>
@@ -555,7 +555,7 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, onDonate }) {
         const def = RESOURCE_DEFS[resourceId];
         return (
           <div className="blacksmith-row" key={trade.id ?? `${resourceId}-${cityRuleEffectsText(trade.effects)}`}>
-            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
+            <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
             <div>
               <b>{trade.label ?? def?.name ?? resourceId}</b>
               <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
@@ -589,7 +589,7 @@ function CityFarmAlePanel({ inventory, cityStats, resourceCount, onBrewAle }) {
         <span>{inputText} {"->"} {outputCount} {outputDef?.name ?? outputResourceId}</span>
       </header>
       <div className="blacksmith-row">
-        <InventoryIcon iconSheet={outputDef?.sheet ?? "resources"} iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: outputResourceId }))} />
+        <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: outputResourceId }))} />
         <div>
           <b>{outputDef?.name ?? outputResourceId}</b>
           <span>Water: {Math.max(0, Math.floor(Number(cityStats?.water) || 0))} | Wheat: {countResource("wheat")} | Wood Plank: {countResource("wood_plank")}</span>
@@ -616,44 +616,12 @@ function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
         const def = RESOURCE_DEFS[resourceId];
         return (
           <div className="blacksmith-row" key={trade.id ?? resourceId}>
-            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
+            <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
             <div>
               <b>{trade.label ?? def?.name ?? resourceId}</b>
               <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
             </div>
             <button type="button" disabled={available < cost} onClick={() => onServeAle(trade)}>Sell</button>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-function CityTownHallPanel({ inventory, army, population, popularity, onContribute }) {
-  const bonus = popularityBonusStep(popularity);
-  const armyRoom = Math.max(0, Math.floor(Number(population) || 0) - Math.max(0, Math.floor(Number(army) || 0)));
-  const options = [
-    { id: "gold_bar", cost: 1, army: 10 + bonus, label: "Gold Bar" },
-    { id: "food", cost: 1, army: 8 + bonus, label: "Food Barrel" },
-    { id: "magic_essence", cost: 10, army: 1 + bonus, label: "Magic Essence" },
-  ];
-  return (
-    <section className="blacksmith-station">
-      <header>
-        <h4>Army Muster</h4>
-        <span>Army: {army} / Population {population} | Nethrendor target: 1000</span>
-      </header>
-      {options.map((option) => {
-        const available = cityResourceCount(inventory, option.id);
-        const def = RESOURCE_DEFS[option.id];
-        return (
-          <div className="blacksmith-row" key={option.id}>
-            <InventoryIcon iconSheet={def?.sheet ?? "resources"} iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
-            <div>
-              <b>{option.label}</b>
-              <span>{option.cost} {"->"} {Math.min(option.army, armyRoom)} army | Available: {available}</span>
-            </div>
-            <button type="button" disabled={available < option.cost || armyRoom <= 0} onClick={() => onContribute(option.id, option.cost, option.army)}>Contribute</button>
           </div>
         );
       })}
@@ -682,7 +650,7 @@ function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe
           .join(" + ");
         return (
           <div className="blacksmith-row" key={key}>
-            <InventoryIcon iconSheet={outputDef?.sheet ?? "resources"} iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: recipe.output }))} />
+            <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: recipe.output }))} />
             <div>
               <b>{outputDef?.name ?? recipe.output}</b>
               <span>{inputText} {"->"} {recipe.count ?? 1} {outputDef?.name ?? recipe.output}</span>
@@ -1102,7 +1070,6 @@ export {
   CityFarmPanel,
   CityInnAlePanel,
   CitySanctuaryDonationPanel,
-  CityTownHallPanel,
   CityResearchPanel,
   CitySocketPanel,
   CityMerchantPanel,

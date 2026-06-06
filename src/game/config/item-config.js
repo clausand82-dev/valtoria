@@ -63,6 +63,8 @@ export const PREFIXES = {
 // Procent-stats ovenfor skalerer ikke med level eller rarity.
 // Unique items kan bruge weight til relativ drop-vaegt blandt matchende uniques.
 // Eksempel: weight 3 er tre gange saa sandsynlig som weight 1, naar begge matcher.
+// UNIQUE_ITEMS og NAMED_ITEM_TEMPLATES kan bruge requires/conditions/blockedBy og shorthand conditions
+// som questCompleted, questActive, worldBalanceNetdra, playerStat, cityStat osv.
 //
 // Weapon effects:
 // effects er optional ekstra adfaerd paa et item. Lige nu understoettes:
@@ -90,7 +92,7 @@ export const PREFIXES = {
 // erstatter ikke det almindelige slag og koster ikke mana.
 export const UNIQUE_ITEMS = [
   {
-    id: "unique_old_walking_staff",
+    id: "old_walking_staff",
     name: "Gammel Vandrestok",
     baseName: "Rune Staff",
     rarity: "unique",
@@ -100,7 +102,7 @@ export const UNIQUE_ITEMS = [
     hands: 1,
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
-    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    //biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
     iconUrl: "/assets/generated/item/item_unique_wanderingstick.png",
     description: "En gammel vandrestok med dårlig slagkraft, men hvert slag har 60% chance for at udløse brutal magisk area damage.",
     scaleWithLevel: true,
@@ -377,8 +379,8 @@ export const NAMED_ITEM_TEMPLATES = [
     mode: "armor",
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
-    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
-    dropChance: 0.008,
+    //biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    dropChance: 0.001,
     rarityIds: ["epic"],
     iconUrl: "/assets/generated/item/item_named_wornsandal.png",
     description: "Næsten ingen beskyttelse, men de føles lettere end luft.",
@@ -394,7 +396,7 @@ export const NAMED_ITEM_TEMPLATES = [
     type: "relic",
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
-    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    //biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
     dropChance: 0.006,
     rarityIds: ["epic"],
     iconUrl: "/assets/generated/item/item_relic_cigar.png",
@@ -414,7 +416,7 @@ export const NAMED_ITEM_TEMPLATES = [
     type: "necklace",
     levelMin: 2,
     sources: ["chest", "boss", "monster"],
-    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
+    //biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
     dropChance: 0.003,
     rarityIds: ["legendary"],
     iconUrl: "/assets/generated/item/item_named_redneckless.png",
@@ -430,8 +432,8 @@ export const NAMED_ITEM_TEMPLATES = [
     mode: "armor",
     levelMin: 1,
     sources: ["chest", "boss", "monster"],
-    biomes: ["snow", "mainland", "jungle", "rock", "desert", "lava"],
-    dropChance: 0.008,
+    //biomes: ["northern-fields"], // biomes er old code, men kan bruges til at styre drop i regioner
+    dropChance: 0.002,
     rarityIds: ["epic"],
     iconUrl: "/assets/generated/item/item_named_poormansbelt.png",
     description: "Et slidt læderbælte, der på uforklarlig vis rummer en stor mængde mana. +50 mana.",

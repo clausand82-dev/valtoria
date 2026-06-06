@@ -134,4 +134,138 @@ export const SUBREGION_CONFIG = {
       },
     },
   },
+
+  blacksmith_boar_cave_lvl1: {
+    id: "blacksmith_boar_cave_lvl1",
+    label: "Blodsporet i grotten",
+    kind: "cave",
+    generator: "mapRegion",
+    mapSize: "small",
+    width: 52,
+    height: 52,
+    persistence: "whileRootRegionActive",
+    tileset: [
+      { fileName: "tileset/tileset_rock.png", weight: 1, lockedVariant: 2 },
+    ],
+    objects: [
+      { id: "object_caves", weight: 1, actionId: "exit_subregion", placementRole: "entryArea", blocking: false },
+      { id: "object_stone_cluster", weight: 4 },
+      { id: "object_bones", weight: 2, scale: 0.7 },
+    ],
+    foliageSets: [
+      { fileName: "foilage/foilage_plants_mainland.png", weight: 7, scale: 0.75 },
+      { fileName: "foilage/foilage_roots.png", weight: 4, scale: 0.7 },
+      { fileName: "foilage/foilage_boneparts.png", weight: 2, scale: 0.7 },
+    ],
+    decay: [
+      { id: "decay_blood", weight: 14 },
+      { id: "decay_spiderweb", weight: 18 },
+      { id: "decay_dust", weight: 8 },
+    ],
+    mobs: [
+      { type: "Spider", weight: 4 },
+      { type: "MediumSpider", weight: 3 },
+      { type: "LargeSpider", weight: 1 },
+    ],
+    foliage: [
+      { fileName: "object/object_cracks02.png", weight: 1, actionId: "enter_blacksmith_boar_cave_lvl2", placementRole: "farFromEntry", radius: 0.65, variant: 6, scale: 1.8, depthMode: "ground", sortAnchor: { x: 0.5, y: 1 } },
+    ],
+    monsters: [],
+    chests: [],
+    prefabRules: {},
+    spawnCounts: {
+      objects: 6,
+      foliage: 18,
+      decals: 18,
+      monsters: { min: 18, max: 23 },
+    },
+  },
+
+  blacksmith_boar_cave_lvl2: {
+    id: "blacksmith_boar_cave_lvl2",
+    label: "Den dybere revne",
+    kind: "cave",
+    generator: "mapRegion",
+    mapSize: "small",
+    width: 54,
+    height: 54,
+    persistence: "whileRootRegionActive",
+    tileset: [
+      { fileName: "tileset/tileset_rock.png", weight: 1, lockedVariant: 3 },
+    ],
+    objects: [
+      { id: "object_caves", weight: 1, actionId: "enter_blacksmith_boar_cave_lvl3", placementRole: "farFromEntry", blocking: false },
+      { id: "object_stone_cluster", weight: 10 },
+      { id: "object_pillar_stone", weight: 3 },
+      { id: "object_bones", weight: 1, scale: 0.65 },
+    ],
+    foliageSets: [
+      { fileName: "foilage/foilage_boneparts.png", weight: 2, scale: 0.7 },
+      { fileName: "foilage/foilage_plants_stone.png", weight: 1, scale: 0.55 },
+    ],
+    decay: [
+      { id: "decay_blood", weight: 12 },
+      { id: "decay_spiderweb", weight: 14 },
+      { id: "decay_dust", weight: 12 },
+    ],
+    mobs: [
+      { type: "MiniSpider", weight: 7 },
+      { type: "Spider", weight: 2 },
+      { type: "MediumSpider", weight: 1 },
+    ],
+    foliage: [
+      { fileName: "object/object_cracks02.png", weight: 1, actionId: "exit_subregion", placementRole: "entryArea", radius: 0.65, variant: 1, scale: 1.8, depthMode: "ground", sortAnchor: { x: 0.5, y: 1 } },
+    ],
+    monsters: [],
+    chests: [],
+    prefabRules: {},
+    spawnCounts: {
+      objects: 11,
+      foliage: 5,
+      decals: 20,
+      monsters: { min: 20, max: 26 },
+    },
+  },
+
+  blacksmith_boar_cave_lvl3: {
+    id: "blacksmith_boar_cave_lvl3",
+    label: "Vildsvinets hule",
+    kind: "cave",
+    generator: "mapRegion",
+    mapSize: "small",
+    width: 56,
+    height: 56,
+    persistence: "whileRootRegionActive",
+    tileset: [
+      { fileName: "tileset/tileset_rock.png", weight: 1, lockedVariant: 3 },
+      { fileName: "tileset/tileset_debriswithblood.png", weight: 1, lockedVariant: 1 },
+    ],
+    objects: [
+      { id: "object_caves", weight: 1, actionId: "exit_subregion", placementRole: "entryArea", blocking: false },
+      { id: "object_stone_cluster", weight: 2 },
+      { id: "object_bones", weight: 1, scale: 0.7 },
+    ],
+    foliageSets: [
+      { fileName: "foilage/foilage_boneparts.png", weight: 1, scale: 0.65 },
+      { fileName: "foilage/foilage_plants_stone.png", weight: 1, scale: 0.45 },
+    ],
+    decay: [
+      { id: "decay_blood", weight: 18 },
+      { id: "decay_dust", weight: 8 },
+    ],
+    mobs: [
+      { type: "Wild Boar", weight: 5 },
+      { type: "Blacksmiths Bane", weight: 0.5 },
+    ],
+    foliage: [],
+    monsters: [],
+    chests: [],
+    prefabRules: {},
+    spawnCounts: {
+      objects: 3,
+      foliage: 3,
+      decals: 18,
+      monsters: { min: 13, max: 17 },
+    },
+  },
 };

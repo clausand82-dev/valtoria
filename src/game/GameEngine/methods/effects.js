@@ -333,6 +333,15 @@ export const effectsMethods = {
     this.toastTimers?.delete(toastId);
   },
 
+  clearToastLog() {
+    for (const toast of this.toasts ?? []) {
+      if (toast?.id) this.clearToastTimer(toast.id);
+    }
+    this.toasts = [];
+    this.toastLog = [];
+    this.publishSnapshot();
+  },
+
   updateEffects(dt) {
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
@@ -773,11 +782,28 @@ export const effectsMethods = {
     this.floaters.push({ x, y, z: 68, text, color, life, maxLife: life });
   },
 
-  addToast(text) {
+  addToast(text, options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
     const id = createId();
     const life = 2.25;
-    const toast = { id, text, life, expiresAt: Date.now() + (life * 1000) };
+    const createdAt = Date.now();
+    const textValue = String(text ?? "");
+    const questTitles = new Set((this.questState?.active ?? []).map((quest) => String(quest?.title ?? "").trim()).filter(Boolean));
+    const requestedKind = String(opts.kind ?? "");
+    const isQuestToast = requestedKind.startsWith("quest")
+      || /\bquest\b/i.test(textValue)
+      || [...questTitles].some((title) => textValue.includes(title));
+    const toast = {
+      id,
+      text: textValue,
+      title: opts.title ? String(opts.title) : "",
+      kind: isQuestToast ? (requestedKind || "quest") : (requestedKind || "info"),
+      life,
+      createdAt,
+      expiresAt: createdAt + (life * 1000),
+    };
     this.toasts.push(toast);
+    this.toastLog = [toast, ...(this.toastLog ?? [])].slice(0, 80);
     if (this.toasts.length > 4) {
       const removedToast = this.toasts.shift();
       if (removedToast) this.clearToastTimer(removedToast.id);

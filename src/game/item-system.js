@@ -107,38 +107,9 @@ const COMMON_BASE_ICON_KEYS = {
 };
 
 const RESOURCE_ICON_KEYS = {
-  wood_piece: "res_woodpieces",
-  iron_piece: "res_ironore",
-  rock_piece: "res_stonepiece",
-  crystal_piece: "res_crystalpiece",
-  wood_plank: "res_woodplank",
-  iron_bar: "res_ironbar",
-  crystal: "res_crystal",
-  stone_brick: "res_stonebrick",
-  meat: "res_rawmeat",
-  fruit: "res_fruit",
-  wheat: "res_wheat",
-  food: "res_food",
-  coal: "res_coal",
-  junk: "res_junk",
   gold_ingot: "gold",
-  gold_bar: "res_goldbar",
-  magic_essence: "res_magicessens",
   resource_mushroom: "res_magicmushroom",
-  paper: "res_paper",
-  scroll: "res_scroll",
-  red_gemstone: "res_redgemstone",
-  yellow_gemstone: "res_yellowgemstone",
-  green_gemstone: "res_greengemstone",
-  blue_gemstone: "res_bluegemstone",
-  black_gemstone: "res_blackgemstone",
-  white_gemstone: "res_whitegemstone",
-  purple_gemstone: "res_purplegemstone",
-  pink_gemstone: "res_pinkgemstone",
-  orange_gemstone: "res_orangegemstone",
-  turquoise_gemstone: "res_turquoisegemstone",
-  diamond: "res_diamond",
-  };
+};
 
 export function makeItemFlags(mode, customFlags = {}) {
   const preset = MODE_FLAG_PRESETS[mode] ?? EMPTY_FLAGS;

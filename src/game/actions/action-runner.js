@@ -331,7 +331,21 @@ function showActionText(engine, action) {
   }
   const clean = String(text ?? "").trim();
   if (!clean) return false;
-  engine.addToast?.(clean.length > 90 ? `${clean.slice(0, 87)}...` : clean);
+  const isQuestAction = Boolean(
+    action.questId
+      || action.questStart
+      || action.questAdvance
+      || action.questTargetKey
+      || action.requires?.questActive
+      || action.requires?.questCompleted
+      || action.requires?.questStepActive
+      || action.requires?.questStepCompleted
+      || action.blockedBy?.questActive
+      || action.blockedBy?.questCompleted
+      || action.blockedBy?.questStepActive
+      || action.blockedBy?.questStepCompleted,
+  );
+  engine.addToast?.(clean, { kind: isQuestAction ? "quest_action" : "action", title });
   engine.addFloater?.(engine.player?.x ?? 0, engine.player?.y ?? 0, title ?? clean, "#f4da96", 1.05);
   return true;
 }

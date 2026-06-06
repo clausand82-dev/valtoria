@@ -7,7 +7,7 @@ import {
 } from "../../config/region-object-config.js";
 import { QUEST_NPCS } from "../../config/npc-config.js";
 import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
-import { normalizeRegionTileset } from "../../config/region-asset-config.js";
+import { normalizeRegionFoliageSets, normalizeRegionTileset } from "../../config/region-asset-config.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
 import {
   incrementWorldCounter,
@@ -218,11 +218,89 @@ function restoreChunk(snapshot, region) {
 }
 
 function regionConfigForSnapshot(region) {
-  return region?.sourceRegionConfig
+  const config = region?.sourceRegionConfig
     ? clonePlain(region.sourceRegionConfig)
     : region?.mapRegion
       ? clonePlain(region.mapRegion)
       : null;
+  if (config && typeof config === "object") {
+    delete config.__conditionContext;
+    delete config.__subregionContext;
+  }
+  return config;
+}
+
+function ensureRuntimeObjectAssets(region, chunks) {
+  const mapRegion = region?.mapRegion;
+  if (!mapRegion) return;
+  const objects = Array.isArray(mapRegion.objects) ? mapRegion.objects : [];
+  const known = new Set(objects.map((entry) => String(entry?.id ?? entry?.objectId ?? "").trim()).filter(Boolean));
+  const missing = [];
+  for (const chunk of chunks ?? []) {
+    for (const object of chunk?.objects ?? []) {
+      const objectDefId = String(object?.objectDefId ?? "").trim();
+      if (!objectDefId || known.has(objectDefId) || !REGION_OBJECT_DEFS[objectDefId]) continue;
+      known.add(objectDefId);
+      missing.push({ id: objectDefId, weight: 1 });
+    }
+  }
+  if (!missing.length) return;
+  mapRegion.objects = [...objects, ...missing];
+  region.sourceRegionConfig = clonePlain(mapRegion);
+}
+
+function foliageSetFromSheetId(sheetId) {
+  const match = /^foliage-custom:(.*):(\d+)x(\d+)$/i.exec(String(sheetId ?? ""));
+  if (!match) return null;
+  return {
+    fileName: match[1],
+    rows: Number(match[2]),
+    cols: Number(match[3]),
+    weight: 1,
+  };
+}
+
+function roleFoliageEntries(entries) {
+  return (entries ?? [])
+    .filter((entry) => entry?.placementRole && (entry.fileName || entry.foliageSet || entry.foilageSet))
+    .map((entry) => clonePlain(entry));
+}
+
+function mergeFoliageEntries(existing, additions) {
+  const merged = [...(Array.isArray(existing) ? existing : [])];
+  const sheetIdFor = (entry) => normalizeRegionFoliageSets({ foliageSet: entry })[0]?.sheetId ?? "";
+  const seen = new Set(merged.map(sheetIdFor).filter(Boolean));
+  for (const entry of additions ?? []) {
+    const sheetId = sheetIdFor(entry);
+    if (!sheetId || seen.has(sheetId)) continue;
+    seen.add(sheetId);
+    merged.push(clonePlain(entry));
+  }
+  return merged;
+}
+
+function ensureRuntimeFoliageAssets(region, chunks) {
+  const mapRegion = region?.mapRegion;
+  if (!mapRegion) return;
+  const additions = [];
+  const known = new Set((mapRegion.foliage ?? [])
+    .map((entry) => normalizeRegionFoliageSets({ foliageSet: entry })[0]?.sheetId ?? "")
+    .filter(Boolean));
+  for (const chunk of chunks ?? []) {
+    for (const object of chunk?.objects ?? []) {
+      if (object?.type !== "foliage") continue;
+      const sheetId = String(object.foliageSheet ?? "").trim();
+      if (!sheetId || known.has(sheetId)) continue;
+      const raw = foliageSetFromSheetId(sheetId);
+      const normalized = raw ? normalizeRegionFoliageSets({ foliageSet: raw })[0] : null;
+      if (!normalized) continue;
+      known.add(sheetId);
+      additions.push(raw);
+    }
+  }
+  if (!additions.length) return;
+  mapRegion.foliage = mergeFoliageEntries(mapRegion.foliage, additions);
+  region.sourceRegionConfig = clonePlain(mapRegion);
 }
 
 function subregionAsMapRegionConfig(config, context) {
@@ -255,12 +333,14 @@ function makeRuntimeObject(region, entry, x, y, salt) {
     type,
     x,
     y,
-    radius: tuning.radius,
-    size: tuning.sizeBase,
-    rotation: 0,
+    radius: Number(entry.radius) || tuning.radius,
+    size: Number(entry.size) || tuning.sizeBase,
+    rotation: Number(entry.rotation) || 0,
     colorShift: 0,
     flip: false,
-    treeVariant: Math.abs(salt) % resolveRegionObjectVariantCount(type),
+    treeVariant: Number.isFinite(Number(entry.variant))
+      ? Math.max(0, Math.floor(Number(entry.variant)))
+      : Math.abs(salt) % resolveRegionObjectVariantCount(type),
     animSeed: salt,
     visualScale: Number(entry.visualScale) || 1,
     blocking: entry.blocking ?? !entry.actionId,
@@ -269,15 +349,63 @@ function makeRuntimeObject(region, entry, x, y, salt) {
     graphicsRef: def.graphicsRef ?? null,
     particles: clonePlain(def.particles ?? []),
     effects: def.effects ? { ...def.effects } : null,
-    depthMode: def.depthMode ?? "dynamic",
-    sortAnchor: def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
-    depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
+    depthMode: entry.depthMode ?? def.depthMode ?? "dynamic",
+    sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : def.sortAnchor ? { ...def.sortAnchor } : { x: 0.5, y: 1 },
+    depthOffset: Number.isFinite(Number(entry.depthOffset))
+      ? Number(entry.depthOffset)
+      : Number.isFinite(Number(def.depthOffset))
+        ? Number(def.depthOffset)
+        : 0,
     tags: Array.isArray(entry.tags) ? [...entry.tags] : Array.isArray(def.tags) ? [...def.tags] : [],
     factionId: entry.factionId ?? def.factionId ?? null,
     onDestroyed: entry.onDestroyed ? { ...entry.onDestroyed } : def.onDestroyed ? { ...def.onDestroyed } : null,
     actionId: entry.actionId ?? null,
     actions: Array.isArray(entry.actions) ? entry.actions.map((item) => ({ ...item })) : null,
     defaultActionId: def.defaultActionId ?? null,
+  };
+}
+
+function makeRuntimeFoliage(region, entry, x, y, salt) {
+  const foliage = normalizeRegionFoliageSets({ foliageSet: entry })[0] ?? null;
+  if (!foliage?.sheetId) return null;
+  const fixedScale = Number(entry.scale ?? foliage.scale);
+  const hasFixedScale = Number.isFinite(fixedScale) && fixedScale > 0;
+  const variantCount = Math.max(1, Number(foliage.variantCount) || 16);
+  return {
+    id: createId(),
+    runtimeId: `${region.id}:subregion-role:${entry.placementRole ?? "foliage"}:${salt}:${foliage.sheetId}`,
+    type: "foliage",
+    x,
+    y,
+    radius: Number(entry.radius) || 0,
+    size: hasFixedScale ? fixedScale : Number(entry.size) || 0.72,
+    rotation: Number(entry.rotation) || 0,
+    colorShift: 0,
+    flip: false,
+    foliageVariant: Number.isFinite(Number(entry.cell))
+      ? Math.max(0, Math.floor(Number(entry.cell)) - 1)
+      : Number.isFinite(Number(entry.variant))
+        ? Math.max(0, Math.floor(Number(entry.variant)))
+        : Math.abs(salt) % variantCount,
+    foliageSheet: foliage.sheetId,
+    animSeed: salt,
+    visualScale: hasFixedScale ? 1 : Number(entry.visualScale) || 1,
+    wind: Number.isFinite(Number(entry.wind)) ? Number(entry.wind) : 0,
+    resourceDrops: foliage.resourceDrops ?? [],
+    particles: clonePlain(entry.particles ?? foliage.particles ?? []),
+    depthMode: entry.depthMode ?? foliage.depthMode ?? "ground",
+    sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : foliage.sortAnchor ? { ...foliage.sortAnchor } : { x: 0.5, y: 1 },
+    depthOffset: Number.isFinite(Number(entry.depthOffset))
+      ? Number(entry.depthOffset)
+      : Number.isFinite(Number(foliage.depthOffset))
+        ? Number(foliage.depthOffset)
+        : 0,
+    foliageLooted: false,
+    blocking: false,
+    actionId: entry.actionId ? String(entry.actionId) : foliage.actionId ?? null,
+    actions: Array.isArray(entry.actions) ? entry.actions.map((item) => ({ ...item })) : null,
+    questTargetKey: entry.questTargetKey ? String(entry.questTargetKey) : foliage.questTargetKey ?? null,
+    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
   };
 }
 
@@ -569,6 +697,8 @@ export const subregionMethods = {
         if (monster?.id) this.monsters.set(monster.id, monster);
       }
     }
+    ensureRuntimeObjectAssets(this.region, this.chunks.values());
+    ensureRuntimeFoliageAssets(this.region, this.chunks.values());
     this.loots = clonePlain(snapshot.loots ?? []);
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -603,6 +733,7 @@ export const subregionMethods = {
       ...resolveMapRegionConfig(subregionAsMapRegionConfig(raw, context), this.worldState, context),
       __subregionRaw: raw,
       __subregionContext: context,
+      __conditionContext: context,
     };
   },
 
@@ -627,15 +758,23 @@ export const subregionMethods = {
   },
 
   placeSubregionRoleObjects(config) {
-    const roleEntries = (config.objects ?? []).filter((entry) => entry?.placementRole && entry.id);
+    const objectRoleEntries = (config.objects ?? []).filter((entry) => entry?.placementRole && entry.id);
+    const foliageRoleEntries = roleFoliageEntries(config.foliage);
+    const roleEntries = [
+      ...objectRoleEntries.map((entry) => ({ ...entry, __roleKind: "object" })),
+      ...foliageRoleEntries.map((entry) => ({ ...entry, __roleKind: "foliage" })),
+    ];
     roleEntries.forEach((entry, index) => {
       const role = String(entry.placementRole);
       const origin = role === "farFromEntry" ? this.region.end : this.region.start;
       const minDistance = role === "farFromEntry" ? Math.max(8, Math.min(this.region.width, this.region.height) * 0.32) : 0;
       const point = findValidPointNear(this.region, origin, minDistance, Math.max(this.region.width, this.region.height));
-      const object = makeRuntimeObject(this.region, entry, point.x, point.y, index + stringHash(`${this.region.id}:${entry.id}:${role}`));
+      const salt = index + stringHash(`${this.region.id}:${entry.id ?? entry.fileName ?? "foliage"}:${role}`);
+      const object = entry.__roleKind === "object"
+        ? makeRuntimeObject(this.region, entry, point.x, point.y, salt)
+        : makeRuntimeFoliage(this.region, entry, point.x, point.y, salt);
       if (!object) {
-        console.warn(`[subregions] Could not place role object '${entry.id}' in ${config.id}`);
+        console.warn(`[subregions] Could not place role object '${entry.id ?? entry.fileName ?? "(unknown)"}' in ${config.id}`);
         return;
       }
       chunkForPoint(this, point).objects.push(object);
@@ -680,6 +819,17 @@ export const subregionMethods = {
     this.activeMapRegion = rootActiveMapRegion;
     this.resetRegionRuntime();
     this.ensureFullRegionGenerated();
+    const runtimeRegionConfig = clonePlain(this.region.mapRegion ?? generatorConfig);
+    runtimeRegionConfig.objects = [
+      ...(runtimeRegionConfig.objects ?? []),
+      ...(subregionConfig.objects ?? []).filter((entry) => entry?.placementRole).map((entry) => clonePlain(entry)),
+    ];
+    runtimeRegionConfig.foliage = mergeFoliageEntries(
+      runtimeRegionConfig.foliage,
+      roleFoliageEntries(subregionConfig.foliage),
+    );
+    this.region.mapRegion = runtimeRegionConfig;
+    this.region.sourceRegionConfig = clonePlain(runtimeRegionConfig);
     this.placeSubregionRoleObjects(subregionConfig);
     this.placeSubregionNpcs(subregionConfig);
     const snapshot = this.captureCurrentMapSnapshot();

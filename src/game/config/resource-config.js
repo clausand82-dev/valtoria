@@ -4,62 +4,54 @@
 // De kan stackes i inventory og kan senere bruges til crafting, bybygning eller
 // merge/forarbejdning.
 //
-// iconIndex peger på 4x3 resource sheets.
-// sheet: "resources" bruger res_sheet_001.png.
-// sheet: "gemstones" bruger res_sheet_002.png.
 // rarityColor er bevidst samme lyseblaa farve for alle resources, fordi UI'et
 // flere steder bruger rarityColor til tekst/glow. Det adskiller resources fra
 // mana-farven og fra almindeligt udstyr.
 export const RESOURCE_RARITY_COLOR = "#8be9ff";
 
 export const RESOURCE_DEFS = {
-  // res_sheet_001, row 1: wood piece, iron piece, rock piece, crystal piece
-  wood_piece: { name: "Wood Piece", stackMax: 100, value: 1, color: "#b88454" },
-  iron_piece: { name: "Iron Piece", stackMax: 100, value: 3, sheet: "resources", iconIndex: 1, color: "#a88f78" },
-  rock_piece: { name: "Rock Piece", stackMax: 100, value: 1, sheet: "resources", iconIndex: 2, color: "#9a9488" },
-  crystal_piece: { name: "Crystal Piece", stackMax: 100, value: 2, sheet: "resources", iconIndex: 3, color: "#7fdcff" },
-
-  // res_sheet_001, row 2: wood plank, iron bar, crystal, stone brick
-  wood_plank: { name: "Wood Plank", stackMax: 50, value: 8, color: "#c99b5d" },
-  iron_bar: { name: "Iron Bar", stackMax: 25, value: 12, sheet: "resources", iconIndex: 5, color: "#c2b3a2" },
-  crystal: { name: "Crystal", stackMax: 25, value: 18, sheet: "resources", iconIndex: 6, color: "#b6f1ff" },
-  stone_brick: { name: "Stone Brick", stackMax: 25, value: 6, sheet: "resources", iconIndex: 7, color: "#b8b0a2" },
-
-  // res_sheet_001, row 3: meat, fruit, coal, junk
-  meat: { name: "Meat", stackMax: 100, value: 2, sheet: "resources", iconIndex: 8, color: "#c8786c" },
-  fruit: { name: "Fruit", stackMax: 100, value: 2, sheet: "resources", iconIndex: 9, color: "#d5b84e" },
-  coal: { name: "Coal", stackMax: 100, value: 2, sheet: "resources", iconIndex: 10, color: "#4d4a48" },
-  wheat: { name: "Wheat", stackMax: 100, value: 2, sheet: "resources", iconIndex: 9, color: "#d6b85a", iconUrl: "/assets/generated/item/item_res_wheat.png" },
-  paper: { name: "Paper", stackMax: 100, value: 2, sheet: "resources", iconIndex: 8, color: "#f3f4aa" },
-  scroll: { name: "Scroll", stackMax: 100, value: 2, sheet: "resources", iconIndex: 9, color: "#ffbb00" },
-  junk: { name: "Junk", stackMax: 100, value: 1, sheet: "resources", iconIndex: 11, color: "#8f887d" },
-  //gold_ingot: { name: "Gold Ingot", stackMax: 100, value: 1000, sheet: "resources", iconIndex: 5, color: "#f1c657" },
-  gold_bar: { name: "Gold Bar", stackMax: 100, value: 1000, sheet: "resources", iconIndex: 5, color: "#f1c657", iconUrl: "/assets/generated/item/item_res_goldbar.png" },
-  magic_essence: { name: "Magic Essence", stackMax: 1000, value: 45, sheet: "resources", iconIndex: 6, color: "#9f7dff", iconUrl: "/assets/generated/item/item_res_magicessens.png" },
-  food: { name: "Food Barrel", stackMax: 1000, value: 120, sheet: "resources", iconIndex: 8, color: "#d49a58", iconUrl: "/assets/generated/item/item_res_food.png" },
-  ale: { name: "Ale", stackMax: 1000, value: 150, sheet: "resources", iconIndex: 8, color: "#dca64f", iconUrl: "/assets/generated/item/item_quest_barrel.png" },
-  hide: { name: "Skind", stackMax: 100, value: 4, sheet: "resources", iconIndex: 8, color: "#a87a50", iconUrl: "/assets/generated/item/item_res_hide.png" },
-  bonedust: { name: "Bone Dust", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_res_bonedust.png" },
+  wood_piece: { name: "Wood Piece", stackMax: 100, value: 1, color: "#b88454", iconUrl: "/assets/generated/item/item_res_woodpieces.png" },
+  iron_piece: { name: "Iron Piece", stackMax: 100, value: 3, color: "#a88f78", iconUrl: "/assets/generated/item/item_res_ironore.png" },
+  rock_piece: { name: "Rock Piece", stackMax: 100, value: 1, color: "#9a9488", iconUrl: "/assets/generated/item/item_res_stonepiece.png" },
+  crystal_piece: { name: "Crystal Piece", stackMax: 100, value: 2, color: "#7fdcff", iconUrl: "/assets/generated/item/item_res_crystalpiece.png" },
+  wood_plank: { name: "Wood Plank", stackMax: 50, value: 8, color: "#c99b5d", iconUrl: "/assets/generated/item/item_res_woodplank.png" },
+  iron_bar: { name: "Iron Bar", stackMax: 25, value: 12, color: "#c2b3a2", iconUrl: "/assets/generated/item/item_res_ironbar.png" },
+  crystal: { name: "Crystal", stackMax: 25, value: 18, color: "#b6f1ff", iconUrl: "/assets/generated/item/item_res_crystal.png" },
+  stone_brick: { name: "Stone Brick", stackMax: 25, value: 6, color: "#b8b0a2", iconUrl: "/assets/generated/item/item_res_stonebrick.png" },
+  iron_plates: { name: "Iron Plates", stackMax: 25, value: 12, color: "#00d9ff", iconUrl: "/assets/generated/item/item_res_ironplates.png" },
+  iron_chains: { name: "Iron Chains", stackMax: 25, value: 12, color: "#0051ff", iconUrl: "/assets/generated/item/item_res_ironchain.png" },
+  meat: { name: "Meat", stackMax: 100, value: 2, color: "#c8786c", iconUrl: "/assets/generated/item/item_res_rawmeat.png" },
+  fruit: { name: "Fruit", stackMax: 100, value: 2, color: "#d5b84e", iconUrl: "/assets/generated/item/item_res_fruit.png" },
+  coal: { name: "Coal", stackMax: 100, value: 2, color: "#4d4a48", iconUrl: "/assets/generated/item/item_res_coal.png" },
+  wheat: { name: "Wheat", stackMax: 100, value: 2, color: "#d6b85a", iconUrl: "/assets/generated/item/item_res_wheat.png" },
+  paper: { name: "Paper", stackMax: 100, value: 2, color: "#f3f4aa", iconUrl: "/assets/generated/item/item_res_paper.png" },
+  scroll: { name: "Scroll", stackMax: 100, value: 2, color: "#ffbb00", iconUrl: "/assets/generated/item/item_res_scroll.png" },
+  junk: { name: "Junk", stackMax: 100, value: 1, color: "#8f887d", iconUrl: "/assets/generated/item/item_res_junk.png" },
+  //gold_ingot: { name: "Gold Ingot", stackMax: 100, value: 1000, color: "#f1c657" },
+  gold_bar: { name: "Gold Bar", stackMax: 100, value: 1000, color: "#f1c657", iconUrl: "/assets/generated/item/item_res_goldbar.png" },
+  magic_essence: { name: "Magic Essence", stackMax: 1000, value: 45, color: "#9f7dff", iconUrl: "/assets/generated/item/item_res_magicessence.png" },
+  food: { name: "Food Barrel", stackMax: 1000, value: 120, color: "#d49a58", iconUrl: "/assets/generated/item/item_res_food.png" },
+  ale: { name: "Ale", stackMax: 1000, value: 150, color: "#dca64f", iconUrl: "/assets/generated/item/item_quest_barrel.png" },
+  hide: { name: "Skind", stackMax: 100, value: 4, color: "#a87a50", iconUrl: "/assets/generated/item/item_res_hide.png" },
+  bonedust: { name: "Bone Dust", stackMax: 100, value: 3, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_res_bonedust.png" },
   
   // Plants / forageables
-  red_rose: { name: "Rød rose", stackMax: 100, value: 1, sheet: "resources", iconIndex: 12, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },
-  rare_pink_flower: { name: "Sjælden lilla blomst", stackMax: 100, value: 2, sheet: "resources", iconIndex: 13, color: "#c27bd9", iconUrl: "/assets/generated/item/item_plant_rarepinkflower.png" },
-  magicmushroom: { name: "Magisk Svamp", stackMax: 100, value: 2, sheet: "resources", iconIndex: 12, color: "#c99f7a", iconUrl: "/assets/generated/item/item_res_magicmushroom.png", description: "En svamp fra Valtorias fugtige skove. Bruges som ressource." },
-  fruit_orange: { name: "Orange", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_orange.png" },
-  fruit_banana: { name: "Banana", stackMax: 100, value: 3, sheet: "resources", iconIndex: 7, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_banana.png" },
-
-  // res_sheet_002 gemstones
-  red_gemstone: { name: "Red Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 0, color: "#ff6b5f" },
-  yellow_gemstone: { name: "Yellow Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 1, color: "#ffd85d" },
-  green_gemstone: { name: "Green Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 2, color: "#58d96d" },
-  blue_gemstone: { name: "Blue Gemstone", stackMax: 100, value: 28, sheet: "gemstones", iconIndex: 3, color: "#58bfff" },
-  black_gemstone: { name: "Black Gemstone", stackMax: 100, value: 80, sheet: "gemstones", iconIndex: 4, color: "#303030" },
-  white_gemstone: { name: "White Gemstone", stackMax: 100, value: 80, sheet: "gemstones", iconIndex: 5, color: "#f2f4ef" },
-  purple_gemstone: { name: "Purple Gemstone", stackMax: 100, value: 70, sheet: "gemstones", iconIndex: 6, color: "#b579ff" },
-  pink_gemstone: { name: "Pink Gemstone", stackMax: 100, value: 70, sheet: "gemstones", iconIndex: 7, color: "#ff88c8" },
-  orange_gemstone: { name: "Orange Gemstone", stackMax: 100, value: 70, sheet: "gemstones", iconIndex: 8, color: "#ff9f1c" },
-  turquoise_gemstone: { name: "Turquoise Gemstone", stackMax: 100, value: 70, sheet: "gemstones", iconIndex: 9, color: "#36d7c9" },
-  diamond: { name: "Diamond", stackMax: 100, value: 140, sheet: "gemstones", iconIndex: 10, color: "#d9fbff" },
+  red_rose: { name: "Rød rose", stackMax: 100, value: 1, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },
+  rare_pink_flower: { name: "Sjælden lilla blomst", stackMax: 100, value: 2, color: "#c27bd9", iconUrl: "/assets/generated/item/item_plant_rarepinkflower.png" },
+  magicmushroom: { name: "Magisk Svamp", stackMax: 100, value: 2, color: "#c99f7a", iconUrl: "/assets/generated/item/item_res_magicmushroom.png", description: "En svamp fra Valtorias fugtige skove. Bruges som ressource." },
+  fruit_orange: { name: "Orange", stackMax: 100, value: 3, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_orange.png" },
+  fruit_banana: { name: "Banana", stackMax: 100, value: 3, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_quest_banana.png" },
+  red_gemstone: { name: "Red Gemstone", stackMax: 100, value: 28, color: "#ff6b5f", iconUrl: "/assets/generated/item/item_res_redgemstone.png" },
+  yellow_gemstone: { name: "Yellow Gemstone", stackMax: 100, value: 28, color: "#ffd85d", iconUrl: "/assets/generated/item/item_res_yellowgemstone.png" },
+  green_gemstone: { name: "Green Gemstone", stackMax: 100, value: 28, color: "#58d96d", iconUrl: "/assets/generated/item/item_res_greengemstone.png" },
+  blue_gemstone: { name: "Blue Gemstone", stackMax: 100, value: 28, color: "#58bfff", iconUrl: "/assets/generated/item/item_res_bluegemstone.png" },
+  black_gemstone: { name: "Black Gemstone", stackMax: 100, value: 80, color: "#303030", iconUrl: "/assets/generated/item/item_res_blackgemstone.png" },
+  white_gemstone: { name: "White Gemstone", stackMax: 100, value: 80, color: "#f2f4ef", iconUrl: "/assets/generated/item/item_res_whitegemstone.png" },
+  purple_gemstone: { name: "Purple Gemstone", stackMax: 100, value: 70, color: "#b579ff", iconUrl: "/assets/generated/item/item_res_purplegemstone.png" },
+  pink_gemstone: { name: "Pink Gemstone", stackMax: 100, value: 70, color: "#ff88c8", iconUrl: "/assets/generated/item/item_res_pinkgemstone.png" },
+  orange_gemstone: { name: "Orange Gemstone", stackMax: 100, value: 70, color: "#ff9f1c", iconUrl: "/assets/generated/item/item_res_orangegemstone.png" },
+  turquoise_gemstone: { name: "Turquoise Gemstone", stackMax: 100, value: 70, color: "#36d7c9", iconUrl: "/assets/generated/item/item_res_turquoisegemstone.png" },
+  diamond: { name: "Diamond", stackMax: 100, value: 140, color: "#d9fbff", iconUrl: "/assets/generated/item/item_res_diamond.png" },
 };
 
 export const GEMSTONE_RESOURCE_IDS = [

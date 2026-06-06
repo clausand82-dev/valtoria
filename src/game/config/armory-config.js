@@ -9,6 +9,25 @@ export const ARMORY_POINTS_BY_RARITY = {
 };
 
 export const ARMORY_POINT_IDS = ["weaponPoints", "armorPoints"];
+const ARMORY_ARMOR_SLOTS = new Set([
+  "head",
+  "neck",
+  "amulet",
+  "shoulder",
+  "cape",
+  "chest",
+  "arms",
+  "hands",
+  "bracelet",
+  "ring",
+  "ring1",
+  "ring2",
+  "belt",
+  "legs",
+  "feet",
+  "offhand",
+  "relic",
+]);
 
 export function normalizeArmoryPoints(value = {}) {
   const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
@@ -25,7 +44,7 @@ export function isArmoryPointId(resourceId) {
 export function getArmoryPointTarget(item) {
   if (!item || typeof item !== "object") return null;
   if (item.type === "weapon" || item.slot === "weapon") return "weaponPoints";
-  if (item.type === "armor" || item.mode === "armor") return "armorPoints";
+  if (item.type === "armor" || item.mode === "armor" || ARMORY_ARMOR_SLOTS.has(String(item.slot ?? ""))) return "armorPoints";
   return null;
 }
 

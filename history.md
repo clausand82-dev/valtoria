@@ -1,13 +1,21 @@
 History over changes
 
 TO DO:
-måske få alle bygnings funktioner ned som "addons" med værdier, der kan ændres. Så alle tabs bliver en slags addon eller lignende
-Hover på bygninger skal vise informationer om den bygning (formål, byggede addons, sslots x/y, osv)
 kun en farm, resten er bare areas der hedder farm!
 
 *V. 0.81
 - Blacksmith Forge Addon can now destroy gear and not only items now
 - fixed a bug where chunk generation not was so random after all (tileset, object, deacy, foliage, mobs and world generation)
+- change building system: all features are now "addons"
+- item hover is now stacked vertical instead of horizental
+- items-config can now take conditions (and shorthanded too) at parent level
+- added metalchest object (normal, damage and destroyed)
+- added more foilage and objects
+- now there are small, medium and big health and mana
+- fixed crack02.png
+- potion mege system integrated
+- new toast log system
+
 
 *V. 0.80
 - added two quest for village area (kill villager and repair houses)

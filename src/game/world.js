@@ -5,6 +5,7 @@ import { MONSTER_STATS } from "./config/monster-config.js";
 import { QUEST_NPCS } from "./config/npc-config.js";
 import { RARITIES, UNIQUE_RARITY } from "./config/rarity-config.js";
 import { OBJECT_SPAWN_TUNING, SPAWN_CONFIG } from "./config/spawn-config.js";
+import { worldEntryAllowed } from "./world-state.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
 import {
   getRegionObjectFamily,
@@ -378,10 +379,13 @@ export function rollUniqueItem(level, context = {}) {
 
   const source = context.source ?? "monster";
   const biomeId = context.biomeId ?? "mainland";
+  const conditionContext = context.conditionContext ?? context;
+  const worldState = context.worldState ?? conditionContext.worldState;
   const candidates = UNIQUE_ITEMS.filter((item) => (
     level >= (item.levelMin ?? 1)
     && (!item.sources || item.sources.includes(source))
     && (!item.biomes || item.biomes.includes(biomeId))
+    && worldEntryAllowed(item, worldState, conditionContext)
   ));
   if (!candidates.length) return null;
 
@@ -442,11 +446,14 @@ export function rollNamedItem(level, context = {}) {
 
   const source = context.source ?? "monster";
   const biomeId = context.biomeId ?? "mainland";
+  const conditionContext = context.conditionContext ?? context;
+  const worldState = context.worldState ?? conditionContext.worldState;
   const candidates = NAMED_ITEM_TEMPLATES.filter((item) => (
     level >= (item.levelMin ?? 1)
     && Math.random() < (item.dropChance ?? 0) * chanceMult
     && (!item.sources || item.sources.includes(source))
     && (!item.biomes || item.biomes.includes(biomeId))
+    && worldEntryAllowed(item, worldState, conditionContext)
   ));
   if (!candidates.length) return null;
 
@@ -845,6 +852,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         }))
         : [],
       mapSize: regionConfig.mapSize ?? "medium",
+      __conditionContext: regionConfig.__conditionContext ?? null,
     } : null,
     width: regionW,
     height: regionH,
@@ -901,6 +909,7 @@ function pickWaterVariant(set, tileX, tileY, salt) {
 function regionWaterTile(region, tileX, tileY) {
   const patchCount = Math.max(0, Number(region?.mapRegion?.spawnCounts?.water) || 0);
   if (!region || patchCount <= 0 || !(region.mapRegion?.waterSets?.length)) return null;
+  if (isReservedTile(region, tileX, tileY)) return null;
   for (let i = 0; i < patchCount; i += 1) {
     const centerX = seededRegionCoord(region.seed, i, 7100, region.width);
     const centerY = seededRegionCoord(region.seed, i, 7200, region.height);
@@ -1250,9 +1259,24 @@ function applySpawnAvoidance(chunk) {
   chunk.objects = chunk.objects.filter((object) => !producers.some((producer) => objectAvoidsSpawnZone(object, producer)));
 }
 
+function prefabConditionContext(chunk) {
+  const mapRegion = chunk?.region?.mapRegion ?? {};
+  return {
+    ...(mapRegion.__conditionContext ?? {}),
+    region: chunk?.region,
+    regionConfig: mapRegion,
+    regionId: mapRegion.id ?? chunk?.region?.id,
+  };
+}
+
+function prefabItemAllowed(item, chunk) {
+  return worldEntryAllowed(item, chunk?.region?.mapRegion?.__conditionContext?.worldState, prefabConditionContext(chunk));
+}
+
 function addPrefabObjects(chunk, instance) {
   for (let i = 0; i < (instance.objects ?? []).length; i += 1) {
     const item = instance.objects[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const def = REGION_OBJECT_DEFS[item.id];
     if (!def) {
       console.warn(`[map-prefabs] Unknown object id: ${item.id}`);
@@ -1365,6 +1389,7 @@ function resolvePrefabFoliage(item, chunk, index) {
 function addPrefabFoliage(chunk, instance) {
   for (let i = 0; i < (instance.foliage ?? []).length; i += 1) {
     const item = instance.foliage[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const { x, y } = prefabWorldPoint(instance, item);
     if (!pointInChunk(chunk, x, y)) continue;
     if (!isRegionPointPlayable(chunk.region, x, y, 0.2) || isWaterAt(chunk, x, y)) continue;
@@ -1397,6 +1422,9 @@ function addPrefabFoliage(chunk, instance) {
       depthOffset: foliage.depthOffset,
       foliageLooted: false,
       blocking: false,
+      actionId: item.actionId ? String(item.actionId) : null,
+      actions: Array.isArray(item.actions) ? item.actions.map((action) => ({ ...action })) : undefined,
+      questTargetKey: item.questTargetKey ? String(item.questTargetKey) : null,
       prefabId: instance.id,
       prefabInstanceId: instance.instanceId,
     });
@@ -1406,6 +1434,7 @@ function addPrefabFoliage(chunk, instance) {
 function addPrefabChests(chunk, instance) {
   for (let i = 0; i < (instance.chests ?? []).length; i += 1) {
     const item = instance.chests[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const { x, y } = prefabWorldPoint(instance, item);
     if (!pointInChunk(chunk, x, y)) continue;
     if (!isRegionPointPlayable(chunk.region, x, y, 0.42) || isWaterAt(chunk, x, y)) continue;
@@ -1485,6 +1514,7 @@ function resolvePrefabDecay(item, chunk, index) {
 function addPrefabDecals(chunk, instance) {
   for (let i = 0; i < (instance.decals ?? []).length; i += 1) {
     const item = instance.decals[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const { x, y } = prefabWorldPoint(instance, item);
     if (!pointInChunk(chunk, x, y)) continue;
     if (!isRegionPointPlayable(chunk.region, x, y, 0.15) || isWaterAt(chunk, x, y)) continue;
@@ -1527,6 +1557,7 @@ function addPrefabDecals(chunk, instance) {
 function addPrefabMonsters(chunk, instance) {
   for (let i = 0; i < (instance.monsters ?? []).length; i += 1) {
     const item = instance.monsters[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const monsterType = item.type ?? item.typeName;
     const base = MONSTER_STATS[monsterType];
     if (!base) {
@@ -1618,6 +1649,7 @@ function addPrefabMonsters(chunk, instance) {
 function addPrefabNpcs(chunk, instance) {
   for (let i = 0; i < (instance.npcs ?? []).length; i += 1) {
     const item = instance.npcs[i];
+    if (!prefabItemAllowed(item, chunk)) continue;
     const npcId = String(item.npcId ?? item.id ?? "").trim();
     const def = QUEST_NPCS[npcId];
     if (!def) {

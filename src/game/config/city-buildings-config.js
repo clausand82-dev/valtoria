@@ -1,13 +1,38 @@
 export const CITY_BUILDING_GOLD_COST = 1000;
 
-// Set prebuilt: true on a building/addon to make it owned from the start.
+// City building model:
+// - Building = the house/frame on the city map. It owns construction cost, durability, image, levels, and broad statEffects.
+// - Addon/feature = every tab, station, storage section, action, and sub-function inside the building.
+// - Use addons for compatibility, but treat each addon as a generic building feature.
+//
+// Addons can define:
+//   id, title, help/functionText/description, prebuilt, cost, unlock, statRequirements, statEffects,
+//   inventoryType, panel, and addon-specific config.
+//
 // inventoryType supports:
-//   { type: "none" | "all" | "gemstone" | "potion" | "resource" | "weapon" | "armor" | "quest" | "readable", slots: number }
+//   { type: "none" | "all" | "gemstone" | "potion" | "resource" | "weapon" | "armor" | "quest" | "readable" | "fixed_lorebook" | "fixed_spellbook", slots: number }
 // Use type tags to restrict accepted items; "all" accepts every backpack item.
+//
+// Example simple building:
+// {
+//   id: "workshop",
+//   title: "Workshop",
+//   addons: [
+//     { id: "overview", title: "Overview", prebuilt: true, panel: "custom/noop" },
+//     { id: "workbench", title: "Workbench", cost: { gold: 500 }, panel: "blacksmith", config: { station: "repair" } },
+//   ],
+// }
+//
+// Example storage addon:
+//   { id: "main_vault", title: "Main Vault", prebuilt: true, panel: "storage", inventoryType: { type: "all", slots: 100 } }
+//
+// Example functional panel addon:
+//   { id: "trade_counter", title: "Trade Counter", prebuilt: true, panel: "merchant", config: { stockSize: 22 } }
+//
 // statEffects can be placed on buildings, addons, areas, and building levels.
 // Supported city stats: city_defence, population, housing, provision, water, army, happiness, citizens_health.
 // Effects are additive: final stat = base city stat + sum of statEffects from unlocked areas + owned buildings + bought addons + reached building levels.
-// Use statRequirements on buildings/areas, or unlock.statRequirements, with the same stat ids:
+// Use statRequirements on buildings/areas/addons, or unlock.statRequirements, with the same stat ids:
 //   statRequirements: { city_defence: 100, provision: 50 }
 // A requirement means "current calculated city stat must be at least this value".
 // Building levels start at level 1 after first construction. Extra entries in levels define upgrades to higher levels.
@@ -21,6 +46,25 @@ export const CITY_BUILDINGS = [
     functionText: "Resident management will live here: population, housing needs, assignments, and settlement-wide effects.",
     imageUrl: "/assets/generated/house/house_townhall.png",
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 50, red_gemstone: 1 },
+    addons: [
+      {
+        id: "civic_ledger",
+        title: "Civic Ledger",
+        prebuilt: true,
+        help: "Shows city overview, faction reputation, and civic status.",
+        panel: "townHallCivic",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
+        id: "town_hall_quest_board",
+        title: "Quest Board",
+        prebuilt: true,
+        help: "Lists settlement quests and requests.",
+        panel: "townHallQuests",
+        inventoryType: { type: "none", slots: 0 },
+        config: { boardId: "townHall" },
+      },
+    ],
   },
   {
     id: "barracks",
@@ -37,6 +81,8 @@ export const CITY_BUILDINGS = [
         title: "Melee Training",
         prebuilt: false,
         help: "Trains sword and spear soldiers.",
+        panel: "armyTraining",
+        config: { group: "melee" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
       },
@@ -45,6 +91,8 @@ export const CITY_BUILDINGS = [
         title: "Ranged Training",
         prebuilt: false,
         help: "Trains archer and crossbow soldiers.",
+        panel: "armyTraining",
+        config: { group: "ranged" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1800 },
       },
@@ -59,6 +107,17 @@ export const CITY_BUILDINGS = [
     imageUrl: "/assets/generated/house/house_blacksmith.png",
     inventoryType: { type: "none", slots: 0 },
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 75, iron_bar: 20 },
+    addons: [
+      {
+        id: "armory_donation_station",
+        title: "Donation Station",
+        prebuilt: true,
+        help: "Converts weapon and armor loot into armory points.",
+        panel: "armory",
+        inventoryType: { type: "none", slots: 0 },
+        config: { pointTypes: ["weaponPoints", "armorPoints"] },
+      },
+    ],
   },
   {
     id: "blacksmith",
@@ -75,6 +134,8 @@ export const CITY_BUILDINGS = [
         title: "Weapon Anvil",
         prebuilt: true,
         help: "Unlocks weapon merging at the blacksmith.",
+        panel: "blacksmith",
+        config: { station: "weapon" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1000 },
         unlock: { completedQuests: ["lost_anvil"], text: "Requires Den forsvundne anvil." },
@@ -84,14 +145,27 @@ export const CITY_BUILDINGS = [
         title: "Armor Anvil",
         prebuilt: true,
         help: "Unlocks armor merging at the blacksmith.",
+        panel: "blacksmith",
+        config: { station: "armor" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1000 },
+      },
+      {
+        id: "repair_station",
+        prebuilt: true,
+        title: "Repair Station",
+        help: "Repairs equipped and carried gear with available resources.",
+        panel: "blacksmith",
+        config: { station: "repair" },
+        inventoryType: { type: "none", slots: 0 },
       },
       {
         id: "forge",
         prebuilt: true,
         title: "Forge Addon",
         help: "Destroys gear and extracts resources from it.",
+        panel: "blacksmith",
+        config: { station: "forge" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
       },
@@ -100,6 +174,8 @@ export const CITY_BUILDINGS = [
         prebuilt: true,
         title: "Minting Furnace",
         help: "Smelts gold into gold bars. Popularity affects the price.",
+        panel: "goldBar",
+        config: { goldBar: true, ironBar: true },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 2500 },
       },
@@ -115,10 +191,19 @@ export const CITY_BUILDINGS = [
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 100, iron_bar: 10, purple_gemstone: 1 },
     addons: [
       {
+        id: "research_projects",
+        title: "Research Projects",
+        prebuilt: true,
+        help: "Researches gemstone recipes and merges researched resources.",
+        panel: "research",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
         id: "socket_workbench",
         title: "Socket Workbench",
         prebuilt: true,
         help: "Adds sockets to gear and inserts gemstones.",
+        panel: "socket",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
       },
@@ -131,14 +216,23 @@ export const CITY_BUILDINGS = [
     help: "Stores items and resources in a 100-slot bank box.",
     functionText: "A 100-slot shared storage interface will live here.",
     imageUrl: "/assets/generated/house/house_bank.png",
-    inventoryType: { type: "all", slots: 100 },
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 200, stone_brick: 150, iron_bar: 50 },
     addons: [
+      {
+        id: "main_vault",
+        title: "Main Vault",
+        prebuilt: true,
+        help: "Stores items and resources in a 100-slot bank box.",
+        panel: "storage",
+        inventoryType: { type: "all", slots: 100 },
+        config: { legacyBase: true },
+      },
       {
         id: "extra_vault",
         title: "Extra Vault",
         prebuilt: true,
         help: "Adds 25 more bank slots.",
+        panel: "storage",
         inventoryType: { type: "all", slots: 25 },
         cost: { gold: 5000 },
       },
@@ -147,6 +241,7 @@ export const CITY_BUILDINGS = [
         title: "Gemstone Vault",
         prebuilt: true,
         help: "Adds 25 gemstone-only bank slots.",
+        panel: "storage",
         inventoryType: { type: "gemstone", slots: 25 },
         cost: { gold: 10000 },
       },
@@ -160,6 +255,17 @@ export const CITY_BUILDINGS = [
     functionText: "Sell non-quest, non-unique items for gold, or buy overpriced emergency goods.",
     imageUrl: "/assets/generated/house/house_merchant.png",
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 75 },
+    addons: [
+      {
+        id: "trade_counter",
+        title: "Trade Counter",
+        prebuilt: true,
+        help: "Buys and sells normal goods. Prices follow popularity.",
+        panel: "merchant",
+        inventoryType: { type: "none", slots: 0 },
+        config: { stockSize: 22, soldItemStockSize: 10 },
+      },
+    ],
   },
   {
     id: "library",
@@ -168,7 +274,6 @@ export const CITY_BUILDINGS = [
     help: "Contains lore and information about places, monsters, and discoveries.",
     functionText: "Bestiary, locations, lore entries, and discovered knowledge will live here.",
     imageUrl: "/assets/generated/house/house_library.png",
-    inventoryType: { type: "fixed_lorebook", slots: 0 },
     cost: {
       gold: CITY_BUILDING_GOLD_COST,
       wood_plank: 200,
@@ -178,6 +283,34 @@ export const CITY_BUILDINGS = [
       blue_gemstone: 1,
       green_gemstone: 1,
     },
+    addons: [
+      {
+        id: "lore_archive",
+        title: "Lore Archive",
+        prebuilt: true,
+        help: "Stores complete lorebooks in fixed archive slots.",
+        panel: "storage",
+        inventoryType: { type: "fixed_lorebook", slots: 0 },
+        config: { legacyBase: true },
+      },
+      {
+        id: "lore_assembly",
+        title: "Lore Assembly",
+        prebuilt: true,
+        help: "Merges lore note fragments.",
+        panel: "readableMerge",
+        inventoryType: { type: "none", slots: 0 },
+        config: { kind: "lorenote" },
+      },
+      {
+        id: "bestiary",
+        title: "Bestiary",
+        prebuilt: true,
+        help: "Shows discovered monster knowledge.",
+        panel: "bestiary",
+        inventoryType: { type: "none", slots: 0 },
+      },
+    ],
   },
   {
     id: "inn",
@@ -186,16 +319,42 @@ export const CITY_BUILDINGS = [
     help: "Controls sleeping places and rest capacity.",
     functionText: "Beds, rest bonuses, visitor capacity, and recovery systems will live here.",
     imageUrl: "/assets/generated/house/house_inn.png",
-    inventoryType: { type: "all", slots: 10 },
     cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 50 },
     addons: [
+      {
+        id: "inn_quest_board",
+        title: "Rumor Board",
+        prebuilt: true,
+        help: "Lists inn rumors and local jobs.",
+        panel: "innQuests",
+        inventoryType: { type: "none", slots: 0 },
+        config: { boardId: "inn" },
+      },
+      {
+        id: "main_chest",
+        title: "Main Chest",
+        prebuilt: true,
+        help: "Adds 10 all-purpose inn storage slots.",
+        panel: "storage",
+        inventoryType: { type: "all", slots: 10 },
+        config: { legacyBase: true },
+      },
       {
         id: "chest",
         title: "Chest",
         prebuilt: true,
         help: "Adds 10 more all-purpose storage slots.",
+        panel: "storage",
         inventoryType: { type: "all", slots: 50 },
         cost: { gold: 750 },
+      },
+      {
+        id: "ale_sales",
+        title: "Ale Sales",
+        prebuilt: true,
+        help: "Serve ale to gain popularity and water service.",
+        panel: "innAle",
+        inventoryType: { type: "none", slots: 0 },
       },
     ],
   },
@@ -213,6 +372,7 @@ export const CITY_BUILDINGS = [
         title: "Arcane Extractor",
         prebuilt: true,
         help: "Extracts magic from upgraded or better non-unique gear and creates magic essence.",
+        panel: "arcaneExtractor",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1800 },
       },
@@ -221,8 +381,10 @@ export const CITY_BUILDINGS = [
         title: "Arcane Archive",
         prebuilt: true,
         help: "Merges spellbook fragments and stores complete spellbooks in fixed slots.",
+        panel: "readableMerge",
         inventoryType: { type: "fixed_spellbook", slots: 0 },
         cost: { gold: 2200 },
+        config: { kind: "spellbook" },
       },
     ],
   },
@@ -234,6 +396,32 @@ export const CITY_BUILDINGS = [
     functionText: "Choose a class, unlock class nodes, and develop the hero through combat, magic, survival, and discipline upgrades.",
     imageUrl: "/assets/generated/house/house_sanctury.png",
     cost: { gold: CITY_BUILDING_GOLD_COST },
+    addons: [
+      {
+        id: "class_training",
+        title: "Class Training",
+        prebuilt: true,
+        help: "Choose and develop a hero class.",
+        panel: "classTraining",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
+        id: "skill_tree_training",
+        title: "Skill Tree",
+        prebuilt: true,
+        help: "Spend hero skill points.",
+        panel: "skillTree",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
+        id: "donation_trail",
+        title: "Donation Trail",
+        prebuilt: true,
+        help: "Donate gold bars or food barrels for one chosen city benefit.",
+        panel: "sanctuaryDonation",
+        inventoryType: { type: "none", slots: 0 },
+      },
+    ],
   },
   {
     id: "farm",
@@ -244,6 +432,24 @@ export const CITY_BUILDINGS = [
     imageUrl: "/assets/generated/house/house_farm.png",
     statEffects: { provision: 100 },
     cost: { gold: CITY_BUILDING_GOLD_COST },
+    addons: [
+      {
+        id: "food_provision",
+        title: "Food Provision",
+        prebuilt: true,
+        help: "Turns bulk food resources into provision for the settlement.",
+        panel: "farm",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
+        id: "ale_brewing",
+        title: "Ale Brewing",
+        prebuilt: true,
+        help: "Brew ale from wheat, planks, and city water.",
+        panel: "farmAle",
+        inventoryType: { type: "none", slots: 0 },
+      },
+    ],
   },
   {
     id: "farm2",

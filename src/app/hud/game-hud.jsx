@@ -222,6 +222,7 @@ export function GameHud({
   setInventoryOpen,
   setMapOpen,
   setQuestOverviewOpen,
+  setToastLogOpen,
   setViewedQuest,
   snapshot,
   trackedQuests,
@@ -232,6 +233,7 @@ export function GameHud({
   const [regionDebugStats, setRegionDebugStats] = useState(null);
   const [regionDebugLiveStats, setRegionDebugLiveStats] = useState(null);
   const questBadgeCount = Math.max(0, (snapshot.quests?.active ?? []).filter((quest) => quest.complete).length);
+  const toastLogCount = Math.max(0, snapshot.toastLog?.length ?? 0);
   const handleOpenPicker = (slotId) => setOpenPicker(slotId);
   const handleClosePicker = (slotId) => setOpenPicker((current) => (current === slotId ? null : current));
   const refreshRegionDebug = () => {
@@ -385,6 +387,11 @@ export function GameHud({
             <span>Questlog</span>
             {questBadgeCount > 0 && <b className="city-menu-badge">{questBadgeCount}</b>}
           </button>
+          <button type="button" className="city-menu-button" onClick={() => setToastLogOpen(true)}>
+            <ImageIcon src="/assets/generated/item/item_book_lore.png" />
+            <span>Beskeder</span>
+            {toastLogCount > 0 && <b className="city-menu-badge">{Math.min(99, toastLogCount)}</b>}
+          </button>
           <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
             <ImageIcon src="/assets/generated/item/item_book_lore.png" />
             <span>Setting</span>
@@ -424,6 +431,10 @@ export function GameHud({
         </button>
         <button type="button" className="skill" title="Questoversigt" onClick={() => setQuestOverviewOpen(true)}>
           <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
+        </button>
+        <button type="button" className="skill" title="Beskedlog" onClick={() => setToastLogOpen(true)}>
+          <ImageIcon src="/assets/generated/item/item_book_lore.png" />
+          {toastLogCount > 0 && <b className="skill-badge">{Math.min(99, toastLogCount)}</b>}
         </button>
         <button
           type="button"

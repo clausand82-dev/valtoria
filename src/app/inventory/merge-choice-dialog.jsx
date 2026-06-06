@@ -1,4 +1,5 @@
 import React from "react";
+import { potionDefById } from "../../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID } from "../../game/config/readable-config.js";
 import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { InventoryIcon } from "../ui/icons.jsx";
@@ -36,6 +37,7 @@ function formatMergeInputs(inputs, type = "resource-choice") {
   return Object.entries(inputs)
     .map(([resourceId, count]) => {
       if (type === "readable-choice") return `${count} ${READABLE_DEF_BY_ID[resourceId]?.title ?? resourceId}`;
+      if (type === "potion-choice") return `${count} ${potionDefById(resourceId)?.name ?? RESOURCE_DEFS[resourceId]?.name ?? resourceId}`;
       return `${count} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`;
     })
     .join(" + ");

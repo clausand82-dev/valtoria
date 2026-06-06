@@ -6,7 +6,7 @@ import { CITY_AREAS } from "./game/config/city-areas-config.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
 import { WORLD_MAP } from "./game/config/map-region-config.js";
-import { CHEAT_SETTINGS, installValtoriaCheats } from "./game/config/cheat-config.js";
+import { CHEAT_SETTINGS, cheatGiveOptions, installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
 import { QUEST_DEFS } from "./game/config/quest-config.js";
@@ -187,6 +187,8 @@ export default function App() {
   const [questRewardModal, setQuestRewardModal] = useState(null);
   const [viewedQuest, setViewedQuest] = useState(null);
   const [questOverviewOpen, setQuestOverviewOpen] = useState(false);
+  const [toastLogOpen, setToastLogOpen] = useState(false);
+  const [questToastModal, setQuestToastModal] = useState(null);
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
   const [cityStorageOpen, setCityStorageOpen] = useState(false);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
@@ -194,6 +196,12 @@ export default function App() {
   const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
   const [cheatResetQuestId, setCheatResetQuestId] = useState(() => Object.keys(QUEST_DEFS ?? {})[0] ?? "");
   const [cheatClearCityTarget, setCheatClearCityTarget] = useState("all");
+  const [cheatGiveSelection, setCheatGiveSelection] = useState(() => {
+    const first = cheatGiveOptions()[0];
+    return first ? `${first.type}:${first.id}` : "";
+  });
+  const [cheatGiveCount, setCheatGiveCount] = useState(1);
+  const [cheatGiveLevel, setCheatGiveLevel] = useState(1);
   const [cityMinimapHero, setCityMinimapHero] = useState(null);
   const [cityProgressHud, setCityProgressHud] = useState(() => loadCityProgress());
   const [cityProgressRefreshToken, setCityProgressRefreshToken] = useState(0);
@@ -202,6 +210,7 @@ export default function App() {
   const gameSessionRef = useRef(null);
   const lastMapReturnIdRef = useRef(null);
   const lastDeathIdRef = useRef(null);
+  const lastQuestToastModalIdRef = useRef(null);
   const lastCityOpenRef = useRef(false);
   const lastCityRollSessionRef = useRef(null);
   const preloadedGameAssetsRef = useRef({ atlas: null, animationSheets: null });
@@ -472,6 +481,7 @@ export default function App() {
       setRegionCorruption(nextRegionCorruption);
       setRegionMapInitialId(mapReturn.areaMapId ?? WORLD_MAP.id);
     }
+    clearToastLogForModeSwitch();
     setRegionMapOpen(false);
     setMapOpen(false);
     setInventoryOpen(false);
@@ -576,6 +586,18 @@ export default function App() {
     }
   }, [inventoryOpen]);
 
+  useEffect(() => {
+    const newestQuestToast = (snapshot.toastLog ?? []).find((toast) => String(toast?.kind ?? "").startsWith("quest"));
+    if (cityOpen) {
+      if (newestQuestToast?.id) lastQuestToastModalIdRef.current = newestQuestToast.id;
+      return;
+    }
+    if (questToastModal) return;
+    if (!newestQuestToast?.id || lastQuestToastModalIdRef.current === newestQuestToast.id) return;
+    lastQuestToastModalIdRef.current = newestQuestToast.id;
+    setQuestToastModal(newestQuestToast);
+  }, [cityOpen, questToastModal, snapshot.toastLog]);
+
   const player = snapshot.player;
   const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
   const manaPct = Math.max(0, Math.min(100, (player.mana / player.maxMana) * 100));
@@ -652,6 +674,11 @@ export default function App() {
       })
       .sort((a, b) => a.label.localeCompare(b.label, "da"))
   ), []);
+  const giveOptions = useMemo(() => cheatGiveOptions(), []);
+  const selectedGiveOption = useMemo(
+    () => giveOptions.find((option) => `${option.type}:${option.id}` === cheatGiveSelection) ?? giveOptions[0] ?? null,
+    [cheatGiveSelection, giveOptions],
+  );
 
   const applyPerformanceSettings = (nextSettings) => {
     const normalized = normalizePerformanceSettings(nextSettings);
@@ -701,6 +728,12 @@ export default function App() {
 
   const resolvedDraft = resolveRuntimePerformanceSettings(settingsDraft);
 
+  const clearToastLogForModeSwitch = () => {
+    engineRef.current?.clearToastLog?.();
+    setToastLogOpen(false);
+    setQuestToastModal(null);
+  };
+
   const startPlayableMapRegion = async (areaMapId, region) => {
     if (!areaMapId || !region?.id) return;
     const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
@@ -709,6 +742,7 @@ export default function App() {
     if (!ready) return;
     const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return;
+    clearToastLogForModeSwitch();
     setRegionMapOpen(false);
     setMapOpen(false);
     setCityOpen(false);
@@ -727,6 +761,7 @@ export default function App() {
       engineRef.current.activeMapRegion.cityMobType = cityMobType;
       engineRef.current.activeMapRegion.cityMobLevel = cityMobLevel;
     }
+    clearToastLogForModeSwitch();
     setRegionMapOpen(false);
     setMapOpen(false);
     setInventoryOpen(false);
@@ -790,6 +825,7 @@ export default function App() {
   };
 
   const openWorldMapFromCity = () => {
+    clearToastLogForModeSwitch();
     setRegionMapOpen(true);
     setMapOpen(false);
     setInventoryOpen(false);
@@ -798,6 +834,7 @@ export default function App() {
   };
 
   const handleOpenCityFromMap = () => {
+    clearToastLogForModeSwitch();
     setRegionMapOpen(false);
     setMapOpen(false);
     setCityOpen(true);
@@ -846,6 +883,7 @@ export default function App() {
         setInventoryOpen={setInventoryOpen}
         setMapOpen={setMapOpen}
         setQuestOverviewOpen={setQuestOverviewOpen}
+        setToastLogOpen={setToastLogOpen}
         setViewedQuest={setViewedQuest}
         snapshot={snapshot}
         trackedQuests={trackedQuests}
@@ -1066,6 +1104,51 @@ export default function App() {
                   </label>
                   <button type="button" onClick={() => runCheatCommand("clearCity", cheatClearCityTarget)}>Koer clearCity</button>
                 </div>
+
+                <div className="city-settings-cheat-inline city-settings-cheat-give">
+                  <label>
+                    give
+                    <select value={cheatGiveSelection} onChange={(event) => setCheatGiveSelection(event.target.value)}>
+                      {giveOptions.map((option) => (
+                        <option key={`${option.type}:${option.id}`} value={`${option.type}:${option.id}`}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    antal
+                    <input
+                      type="number"
+                      min="1"
+                      max="9999"
+                      step="1"
+                      value={cheatGiveCount}
+                      onChange={(event) => setCheatGiveCount(Math.max(1, Math.min(9999, Math.floor(Number(event.target.value) || 1))))}
+                    />
+                  </label>
+                  <label>
+                    level
+                    <input
+                      type="number"
+                      min="1"
+                      max="999"
+                      step="1"
+                      disabled={!selectedGiveOption?.levelable}
+                      value={cheatGiveLevel}
+                      onChange={(event) => setCheatGiveLevel(Math.max(1, Math.min(999, Math.floor(Number(event.target.value) || 1))))}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedGiveOption) return;
+                      runCheatCommand("give", selectedGiveOption.type, selectedGiveOption.id, cheatGiveCount, cheatGiveLevel);
+                    }}
+                  >
+                    Koer give
+                  </button>
+                </div>
               </div>
             )}
             <div className="city-settings-actions">
@@ -1090,11 +1173,38 @@ export default function App() {
           completedQuestIds={snapshot.quests?.completed ?? []}
           onClose={() => setQuestOverviewOpen(false)}
           onToggleTracked={(questId, tracked) => engineRef.current?.setQuestTracked?.(questId, tracked)}
+          onAbandonQuest={(quest) => engineRef.current?.abandonQuest?.(quest.id)}
           onOpenQuest={(quest) => {
             setViewedQuest(quest);
             setQuestOverviewOpen(false);
           }}
         />
+      )}
+
+      {toastLogOpen && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-dialog toast-log-dialog" role="dialog" aria-modal="true" aria-labelledby="toast-log-title">
+            <header className="toast-log-head">
+              <h2 id="toast-log-title">Beskedlog</h2>
+              <button type="button" onClick={() => setToastLogOpen(false)}>Luk</button>
+            </header>
+            <div className="toast-log-list">
+              {(snapshot.toastLog ?? []).length <= 0 ? (
+                <p>Ingen beskeder endnu.</p>
+              ) : (snapshot.toastLog ?? []).map((toast) => (
+                <div className={`toast-log-row ${String(toast.kind ?? "").startsWith("quest") ? "quest" : ""}`} key={toast.id}>
+                  <time>
+                    {toast.createdAt
+                      ? new Date(toast.createdAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                      : "--.--.--"}
+                  </time>
+                  <span>-</span>
+                  <p>{toast.text}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
       )}
 
       {inventoryOpen && (
@@ -1115,11 +1225,32 @@ export default function App() {
 
       <div className="toast-stack">
         {snapshot.toasts.map((toast) => (
-          <div className="toast" key={toast.id}>
+          <div className={`toast ${String(toast.kind ?? "").startsWith("quest") ? "quest" : ""}`} key={toast.id}>
             {toast.text}
           </div>
         ))}
       </div>
+
+      {questToastModal && !cityOpen && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-dialog quest-toast-dialog quest-parchment-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-toast-title">
+            <h2 id="quest-toast-title">{questToastModal.title || "Quest besked"}</h2>
+            <p>{questToastModal.text}</p>
+            <div>
+              <button type="button" onClick={() => setQuestToastModal(null)}>OK</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuestToastModal(null);
+                  setToastLogOpen(true);
+                }}
+              >
+                Aaben log
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
 
       {mergeChoice && (
         <MergeChoiceDialog
@@ -1130,6 +1261,8 @@ export default function App() {
             if (current) {
               if (mergeChoice.type === "readable-choice") {
                 engineRef.current?.mergeInventoryReadableWithRecipe?.(current.index, output);
+              } else if (mergeChoice.type === "potion-choice") {
+                engineRef.current?.mergeInventoryPotionWithRecipe?.(current.index, output);
               } else {
                 engineRef.current?.mergeInventoryResourceWithRecipe(current.index, output);
               }
@@ -1194,6 +1327,10 @@ export default function App() {
               engineRef.current?.publishSnapshot?.();
             }
           }}
+          onAbandonQuest={(quest) => {
+            const abandoned = engineRef.current?.abandonQuest?.(quest.id);
+            if (abandoned) setQuestOffer(null);
+          }}
         />
       )}
 
@@ -1203,6 +1340,7 @@ export default function App() {
           engineRef={engineRef}
           onClose={() => setViewedQuest(null)}
           onQuestCompleted={(result) => setQuestRewardModal(result)}
+          onQuestAbandoned={() => setViewedQuest(null)}
           cityOpen={cityOpen}
         />
       )}

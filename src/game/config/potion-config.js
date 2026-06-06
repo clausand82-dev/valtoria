@@ -9,25 +9,55 @@ export const POTION_DEFS = {
     iconKey: "potion_health",
     iconUrl: "/assets/generated/item/item_potion_smallhealth.png",
   },
+  medium_health: {
+    id: "medium_health",
+    type: "health",
+    name: "Medium Health Potion",
+    restorePct: 0.50,
+    dropWeight: 44,
+    color: "#c52c38",
+    iconKey: "potion_health",
+    iconUrl: "/assets/generated/item/item_potion_mediumhealth.png",
+  },
   big_health: {
     id: "big_health",
     type: "health",
     name: "Big Health Potion",
-    restorePct: 0.55,
-    dropWeight: 12,
+    restorePct: 1,
+    dropWeight: 5,
     color: "#e34b56",
     iconKey: "potion_health",
-    iconUrl: "/assets/generated/item/item_potion_health.png",
+    iconUrl: "/assets/generated/item/item_potion_bighealth.png",
   },
-  mana: {
-    id: "mana",
+  small_mana: {
+    id: "small_mana",
     type: "mana",
-    name: "Mana Potion",
+    name: "Small Mana Potion",
     restorePct: 0.25,
     dropWeight: 44,
     color: "#2d8ed8",
     iconKey: "potion_mana",
     iconUrl: "/assets/generated/item/item_potion_smallmana.png",
+  },
+  medium_mana: {
+    id: "medium_mana",
+    type: "mana",
+    name: "Medium Mana Potion",
+    restorePct: 0.50,
+    dropWeight: 30,
+    color: "#2d8ed8",
+    iconKey: "potion_mana",
+    iconUrl: "/assets/generated/item/item_potion_mediummana.png",
+  },
+  big_mana: {
+    id: "big_mana",
+    type: "mana",
+    name: "Big Mana Potion",
+    restorePct: 1,
+    dropWeight: 5,
+    color: "#2d8ed8",
+    iconKey: "potion_mana",
+    iconUrl: "/assets/generated/item/item_potion_bigmana.png",
   },
   potion_purple_health_mana_50: {
     id: "potion_purple_health_mana_50",
@@ -61,11 +91,30 @@ export const POTION_DEFS = {
 
 export const POTION_IDS = Object.keys(POTION_DEFS);
 
+export const POTION_MERGE_RECIPES = [
+  { inputs: { small_health: 2 }, output: "medium_health", count: 1 },
+  { inputs: { medium_health: 2 }, output: "big_health", count: 1 },
+  { inputs: { small_mana: 2 }, output: "medium_mana", count: 1 },
+  { inputs: { medium_mana: 2 }, output: "big_mana", count: 1 },
+  { inputs: { medium_health: 1, medium_mana:1 }, output: "potion_purple_health_mana_50", count: 1 },
+  { inputs: { big_health: 1, big_mana:1, magic_essence: 1}, output: "potion_orange_regen_health_mana", count: 1 },
+];
+
+const POTION_ID_ALIASES = {
+  health: "small_health",
+  mana: "small_mana",
+  potion_health: "small_health",
+  potion_mana: "small_mana",
+  mediumhealth: "medium_health",
+  mediummana: "medium_mana",
+  bighealth: "big_health",
+  bigmana: "big_mana",
+};
+
 export function normalizePotionId(value) {
   const id = String(value ?? "").trim();
-  if (POTION_DEFS[id]) return id;
-  if (id === "health") return "small_health";
-  if (id === "mana") return "mana";
+  const mapped = POTION_ID_ALIASES[id] ?? id;
+  if (POTION_DEFS[mapped]) return mapped;
   return "";
 }
 

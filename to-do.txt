@@ -1,9 +1,10 @@
 Ting at få gjort
 
 NEW QUEST:
-- Flere quest fra blacksmith til smithy:
-find forsvundne metalplader / reparer smedjen / efterforsk et mord (undersøg lig --> følg blod spor --> igennen flere caves? --> kamp imod svære mobs)
-ny object - metalkister --> metal kister give god iron_piece
+
+
+
+- random loot i wild (breve - et til annelise fra lost lover, en til borgmester fra forsvunden datter, en til Marla (cook) fra succes fuld søn)
 
 - Flere quest fra borgmester til andre steder (et par quest mere i village)
 - 
@@ -15,15 +16,20 @@ TODO senere:
 - Implementér questAdvance action
 - Eller fjern dem fra aktiv content, hvis de kun var test/demo
 
+- repair og andre city funktioner ink. quest (i CITY kun) skal kunne trække fra både city invnetory og player inventory (måske skal der et lock systme på city storage, så locked storage ikke kan trækkes fra)
+
+
+- justerer bygningspriser
+
+- få city konsekvenser til at have betydning (konsekvenserne skal måske være gated bag nogle lvl krav, så man ikke starter total dårlig - og dog)
+
 
 --- IGANG ---
 Prøv at få gjort grass tile matchende
 
 --- GRAFISK ---
-- Hvis test viser at alle gamle green-screen assets er fikset i Photoshop: fjern runtime chroma-key cleanup helt. Fjern ENABLE_RUNTIME_CHROMA_KEY og green-key pixel loops i src/game/assets.js, src/app/ui/icons.jsx, src/app/quests/quest-dialogs.jsx og src/app/city-systems.jsx. Fjern/ryd keyEdgeBlack/keyEdgeHalo config hvis de kun var til gamle gronne/morke kanter, og opdater README-linjen om runtime chroma-key.
 - Få grafik på alle bygninger og addons, samt få bygningerne i flere variationer (hel, damage og ruin)
 - Få tilføjet flere objekter (objekter skal også have tre stadies hel, damaged, ruin)
-- begge ovenstående kodes, så findes variation ikke, så bruges normal billede bare
 - blizzard skal komme mere oppe fra, ikke fra spilleren (kun meget lidt orienteret fra spiller retning)
 
 
@@ -177,5 +183,4 @@ Hvis fractioner nu er de grundlæggende (som også findes på samlekort), så ka
 
 
 MAGIC GØRE SKADE PÅ OBJECT UDFRA MATERIAL
-
 

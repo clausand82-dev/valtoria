@@ -110,8 +110,7 @@ const AUTO_LOOT_RARITY_OPTIONS = [
 
 const HOVER_PANEL_WIDTH = 360;
 const HOVER_PANEL_HEIGHT_ESTIMATE = 260;
-const HOVER_PANEL_GAP = 16;
-const HOVER_STACK_VERTICAL_GAP = 10;
+const HOVER_PANEL_GAP = 28;
 
 function autoLootEnabled(settings, group, id) {
   return settings?.[group]?.[id] !== false;
@@ -275,7 +274,7 @@ export function InventoryPanel({
       ? preferredLeft
       : Math.max(8, hoverPointer.x - HOVER_PANEL_WIDTH - HOVER_PANEL_GAP);
     const maxTop = Math.max(8, viewportHeight - HOVER_PANEL_HEIGHT_ESTIMATE - 8);
-    const top = Math.min(Math.max(8, hoverPointer.y - 24), maxTop);
+    const top = Math.min(Math.max(8, hoverPointer.y - 120), maxTop);
     return { left, top, viewportWidth, viewportHeight };
   }, [hoverPointer]);
 
@@ -299,39 +298,6 @@ export function InventoryPanel({
       bottom: "auto",
     };
   }, [hoverPanelLayout]);
-
-  const equippedHoverPanelStyle = React.useMemo(() => {
-    if (!hoverPanelLayout || !showEquippedHover) return null;
-    const { left, top, viewportWidth, viewportHeight } = hoverPanelLayout;
-    const rightCandidate = left + HOVER_PANEL_WIDTH + HOVER_PANEL_GAP;
-    if (rightCandidate + HOVER_PANEL_WIDTH <= viewportWidth - 8) {
-      return {
-        left: `${rightCandidate}px`,
-        top: `${top}px`,
-        right: "auto",
-        bottom: "auto",
-      };
-    }
-    const leftCandidate = left - HOVER_PANEL_WIDTH - HOVER_PANEL_GAP;
-    if (leftCandidate >= 8) {
-      return {
-        left: `${leftCandidate}px`,
-        top: `${top}px`,
-        right: "auto",
-        bottom: "auto",
-      };
-    }
-    const belowTop = top + HOVER_PANEL_HEIGHT_ESTIMATE + HOVER_STACK_VERTICAL_GAP;
-    const stackedTop = belowTop + HOVER_PANEL_HEIGHT_ESTIMATE <= viewportHeight - 8
-      ? belowTop
-      : Math.max(8, top - HOVER_PANEL_HEIGHT_ESTIMATE - HOVER_STACK_VERTICAL_GAP);
-    return {
-      left: `${left}px`,
-      top: `${stackedTop}px`,
-      right: "auto",
-      bottom: "auto",
-    };
-  }, [hoverPanelLayout, showEquippedHover]);
 
   React.useEffect(() => {
     if (!draggingItem) return undefined;
@@ -546,7 +512,7 @@ export function InventoryPanel({
                         onClick={(event) => {
                           event.stopPropagation();
                           const result = engineRef.current?.mergeInventoryItem(item.index);
-                          if (result?.type === "resource-choice" || result?.type === "readable-choice") setMergeChoice(result);
+                          if (result?.type === "resource-choice" || result?.type === "readable-choice" || result?.type === "potion-choice") setMergeChoice(result);
                         }}
                       >
                         M
@@ -641,15 +607,17 @@ export function InventoryPanel({
         </aside>
       </aside>
       {hoveredItem && hoverPanelStyle && (
-        <aside className="item-hover-panel is-floating" style={hoverPanelStyle} aria-hidden="true">
-          <span className="item-hover-panel-title">Valgt item</span>
-          <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
-        </aside>
-      )}
-      {showEquippedHover && hoveredEquippedItem && equippedHoverPanelStyle && (
-        <aside className="item-hover-panel is-floating equipped" style={equippedHoverPanelStyle} aria-hidden="true">
-          <span className="item-hover-panel-title">Udstyret item</span>
-          <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
+        <aside className="item-hover-stack is-floating" style={hoverPanelStyle} aria-hidden="true">
+          <section className="item-hover-panel is-floating">
+            <span className="item-hover-panel-title">Valgt item</span>
+            <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
+          </section>
+          {showEquippedHover && hoveredEquippedItem && (
+            <section className="item-hover-panel is-floating equipped">
+              <span className="item-hover-panel-title">Udstyret item</span>
+              <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
+            </section>
+          )}
         </aside>
       )}
     </>

@@ -209,6 +209,73 @@ export const MAP_PREFABS = {
     ],
   },
 
+  smithy_repair_station: {
+    id: "smithy_repair_station",
+    label: "Smithy Repair Station",
+    w: 7,
+    h: 6,
+    tags: ["smithy", "quest", "repair"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 8,
+    avoidExit: 8,
+    objects: [
+      { id: "object_furnace", x: 3, y: 2, blocking: true, actionId: "repair_smithy_furnace", questTargetKey: "smithy_furnace", spawnDamage: "damaged", questActive: "blacksmith_repair_smithy" },
+      { id: "object_anvil", x: 5, y: 3, blocking: true, actionId: "repair_smithy_anvil", questTargetKey: "smithy_anvil", spawnDamage: "damaged", questActive: "blacksmith_repair_smithy" },
+      { id: "object_bellow", x: 2, y: 4, blocking: true, actionId: "repair_smithy_bellow", questTargetKey: "smithy_bellow", spawnDamage: "damaged", questActive: "blacksmith_repair_smithy" },
+      { id: "object_furnace", x: 3, y: 2, blocking: true, questActive: "blacksmith_find_wife" },
+      { id: "object_anvil", x: 5, y: 3, blocking: true, questActive: "blacksmith_find_wife" },
+      { id: "object_bellow", x: 2, y: 4, blocking: true, questActive: "blacksmith_find_wife" },
+      { id: "object_metalchest", x: 6, y: 5, blocking: true, spawnDamage: "damaged" },
+    ],
+    foliage: [
+      { fileName: "foilage/foilage_metalparts.png", x: 1, y: 3, size: 0.72 },
+      { fileName: "foilage/foilage_metalplates.png", x: 4, y: 5, size: 0.75 },
+      { fileName: "foilage/foilage_metalchains.png", x: 6, y: 2, size: 0.75 },
+      { fileName: "foilage/foilage_deadvillages.png", x: 4, y: 4, size: 1.35, cell: 10, actionId: "inspect_blacksmith_wife", questTargetKey: "blacksmith_wife_body", questActive: "blacksmith_find_wife" },
+    ],
+    decals: [
+      { decayId: "decay_dust", x: 3, y: 3, cell: 4, size: 1.15 },
+      { decayId: "decay_cracks", x: 5, y: 4, cell: 8, size: 0.9 },
+      { decayId: "decay_blood", x: 4, y: 4, cell: 2, size: 1.55, alpha: 0.88, questActive: "blacksmith_find_wife" },
+      { decayId: "decay_blood", x: 5, y: 4, cell: 5, size: 1.05, alpha: 0.72, questActive: "blacksmith_find_wife" },
+      { decayId: "decay_blood", x: 3, y: 5, cell: 8, size: 0.9, alpha: 0.68, questActive: "blacksmith_find_wife" },
+    ],
+  },
+
+  blacksmith_boar_cave_entrance: {
+    id: "blacksmith_boar_cave_entrance",
+    label: "Bloodied Cave Entrance",
+    w: 6,
+    h: 5,
+    tags: ["cave", "quest", "boar"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 4,
+    avoidExit: 4,
+    objects: [
+      { id: "object_caves", x: 3, y: 2, blocking: false, actionId: "enter_blacksmith_boar_cave_lvl1" },
+      { id: "object_stone_cluster", x: 1, y: 4, blocking: true },
+      { id: "object_stone_cluster", x: 5, y: 4, blocking: true },
+    ],
+    foliage: [
+      { fileName: "foilage/foilage_plants_mainland.png", x: 2, y: 4, size: 0.75 },
+      { fileName: "foilage/foilage_roots.png", x: 4, y: 4, size: 0.7 },
+    ],
+    decals: [
+      { decayId: "decay_blood", x: 3, y: 3, cell: 7, size: 0.9, alpha: 0.74 },
+      { decayId: "decay_cracks", x: 3, y: 2, cell: 8, size: 1.2, alpha: 0.62 },
+    ],
+    monsters: [
+      { type: "Spider", x: 1, y: 2 },
+      { type: "MiniSpider", x: 5, y: 3 },
+    ],
+  },
+
     labyrint: {
     id: "labyrint",
     label: "Labyrint",

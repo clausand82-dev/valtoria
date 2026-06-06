@@ -55,8 +55,7 @@ let generatedAtlasPromise = null;
 let generatedAtlasCache = null;
 let animationSheetsPromise = null;
 let animationSheetsCache = null;
-const chromaImageCache = new Map();
-const ENABLE_RUNTIME_CHROMA_KEY = false;
+const imageCanvasCache = new Map();
 
 const atlasPartCache = {
   canvas: null,
@@ -236,6 +235,15 @@ function buildRegionAssetManifest(input) {
   }));
 
   const foliageSets = normalizeRegionFoliageSets(regionConfig);
+  const directFoliageSpecs = (regionConfig.foliage ?? [])
+    .map((entry) => normalizeRegionFoliageSets({ foliageSet: entry })[0] ?? null)
+    .filter(Boolean)
+    .map((entry) => ({
+      id: entry.sheetId,
+      fileName: entry.fileName,
+      rows: entry.rows,
+      cols: entry.cols,
+    }));
   const prefabDefs = prefabsForRegionConfig(regionConfig);
   const prefabFoliageIds = new Set();
   const prefabFoliageSpecs = new Map();
@@ -263,6 +271,7 @@ function buildRegionAssetManifest(input) {
       cols: entry.cols,
     }))
     .concat([...prefabFoliageSpecs.values()])
+    .concat(directFoliageSpecs)
     .concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)));
 
   const objectTypes = new Set(["object_chests_ground"]);
@@ -344,7 +353,7 @@ function prefabsForRegionConfig(regionConfig) {
 function loadHeroAnimationSheet() {
   if (animationPartCache.hero) return Promise.resolve(animationPartCache.hero);
   if (!animationPartCache.heroPromise) {
-    animationPartCache.heroPromise = loadChromaImage(HERO_SHEET.url)
+    animationPartCache.heroPromise = loadImageCanvas(HERO_SHEET.url)
       .then((canvas) => {
         animationPartCache.hero = makeAnimationSheet(canvas, HERO_SHEET.rows, HERO_SHEET.cols, "hero");
         return animationPartCache.hero;
@@ -360,7 +369,7 @@ function loadHeroAnimationSheet() {
 function loadHeroCastAnimationSheet() {
   if (animationPartCache.heroCast) return Promise.resolve(animationPartCache.heroCast);
   if (!animationPartCache.heroCastPromise) {
-    animationPartCache.heroCastPromise = loadChromaImage("/assets/generated/hero_cast_sheet.png")
+    animationPartCache.heroCastPromise = loadImageCanvas("/assets/generated/hero_cast_sheet.png")
       .then((canvas) => {
         animationPartCache.heroCast = makeAnimationSheet(canvas, 1, 8, "hero");
         return animationPartCache.heroCast;
@@ -378,7 +387,7 @@ function loadMonsterAnimationSheets(manifest) {
   return Promise.all(configs.map((cfg) => {
     if (animationPartCache.monsters[cfg.id]) return Promise.resolve([cfg.id, animationPartCache.monsters[cfg.id]]);
     if (!animationPartCache.monsterPromises.has(cfg.id)) {
-      animationPartCache.monsterPromises.set(cfg.id, loadChromaImage(cfg.url)
+      animationPartCache.monsterPromises.set(cfg.id, loadImageCanvas(cfg.url)
         .then((canvas) => [cfg.id, {
           sheet: makeAnimationSheet(canvas, cfg.rows, cfg.cols, "monsters"),
           cfg,
@@ -421,148 +430,14 @@ function customGroundSpec(biomeId, fileName) {
   };
 }
 
-function loadChromaImage(src, options = {}) {
-  const cacheKey = ENABLE_RUNTIME_CHROMA_KEY
-    ? `${src}|${options.keyEdgeBlack ? 1 : 0}|${options.keyEdgeHalo ? 1 : 0}|${options.blackThreshold ?? ""}`
-    : `${src}|raw`;
-  if (chromaImageCache.has(cacheKey)) return chromaImageCache.get(cacheKey);
-  if (!ENABLE_RUNTIME_CHROMA_KEY) {
-    const rawPromise = loadRawImage(src).catch((error) => {
-      chromaImageCache.delete(cacheKey);
-      throw error;
-    });
-    chromaImageCache.set(cacheKey, rawPromise);
-    return rawPromise;
-  }
-  const promise = new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(image, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const keyGreen = g > 145 && g > r * 1.55 && g > b * 1.55;
-        if (keyGreen) {
-          const strength = Math.min(1, (g - Math.max(r, b) - 45) / 95);
-          data[i + 3] = Math.max(0, Math.floor(data[i + 3] * (1 - strength)));
-          data[i + 1] = Math.min(data[i + 1], Math.max(r, b) + 30);
-        }
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-      if (options.keyEdgeBlack) {
-        removeEdgeBlackBackground(canvas, options.blackThreshold ?? 24);
-      }
-      if (options.keyEdgeHalo) {
-        removeEdgeHalo(canvas);
-      }
-      resolve(canvas);
-    };
-    image.onerror = () => reject(new Error(`Image load failed: ${src}`));
-    image.src = src;
-  }).catch((error) => {
-    chromaImageCache.delete(cacheKey);
+function loadImageCanvas(src) {
+  if (imageCanvasCache.has(src)) return imageCanvasCache.get(src);
+  const promise = loadRawImage(src).catch((error) => {
+    imageCanvasCache.delete(src);
     throw error;
   });
-  chromaImageCache.set(cacheKey, promise);
+  imageCanvasCache.set(src, promise);
   return promise;
-}
-
-function removeEdgeBlackBackground(canvas, threshold = 24) {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = imageData;
-  const { width, height } = canvas;
-  const visited = new Uint8Array(width * height);
-  const queue = [];
-
-  const enqueue = (x, y) => {
-    if (x < 0 || y < 0 || x >= width || y >= height) return;
-    const index = y * width + x;
-    if (visited[index]) return;
-    const dataIndex = index * 4;
-    const isBlack = data[dataIndex + 3] > 0
-      && data[dataIndex] <= threshold
-      && data[dataIndex + 1] <= threshold
-      && data[dataIndex + 2] <= threshold;
-    if (!isBlack) return;
-    visited[index] = 1;
-    queue.push(index);
-  };
-
-  for (let x = 0; x < width; x += 1) {
-    enqueue(x, 0);
-    enqueue(x, height - 1);
-  }
-  for (let y = 1; y < height - 1; y += 1) {
-    enqueue(0, y);
-    enqueue(width - 1, y);
-  }
-
-  for (let i = 0; i < queue.length; i += 1) {
-    const index = queue[i];
-    const x = index % width;
-    const y = Math.floor(index / width);
-    data[index * 4 + 3] = 0;
-    enqueue(x + 1, y);
-    enqueue(x - 1, y);
-    enqueue(x, y + 1);
-    enqueue(x, y - 1);
-  }
-
-  ctx.putImageData(imageData, 0, 0);
-}
-
-function removeEdgeHalo(canvas) {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true });
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const { data } = imageData;
-  const { width, height } = canvas;
-  const remove = [];
-
-  const isTransparent = (x, y) => {
-    if (x < 0 || y < 0 || x >= width || y >= height) return true;
-    return data[(y * width + x) * 4 + 3] < 16;
-  };
-
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const index = (y * width + x) * 4;
-      const alpha = data[index + 3];
-      if (alpha < 16) continue;
-      const r = data[index];
-      const g = data[index + 1];
-      const b = data[index + 2];
-      const greenCyanHalo = r < 125 && g > 95 && b > 65 && g > r * 1.18 && b > r * 1.04;
-      if (!greenCyanHalo) continue;
-      if (
-        isTransparent(x + 1, y)
-        || isTransparent(x - 1, y)
-        || isTransparent(x, y + 1)
-        || isTransparent(x, y - 1)
-        || isTransparent(x + 1, y + 1)
-        || isTransparent(x - 1, y - 1)
-        || isTransparent(x + 1, y - 1)
-        || isTransparent(x - 1, y + 1)
-      ) {
-        remove.push(index);
-      }
-    }
-  }
-
-  for (const index of remove) {
-    data[index + 3] = 0;
-  }
-
-  ctx.putImageData(imageData, 0, 0);
 }
 
 function loadRawImage(src) {
@@ -584,7 +459,7 @@ function loadRawImage(src) {
 function loadAtlasCanvas() {
   if (atlasPartCache.canvas) return Promise.resolve(atlasPartCache.canvas);
   if (!atlasPartCache.canvasPromise) {
-    atlasPartCache.canvasPromise = loadChromaImage("/assets/generated/runebound-atlas-source.png")
+    atlasPartCache.canvasPromise = loadImageCanvas("/assets/generated/runebound-atlas-source.png")
       .then((canvas) => {
         atlasPartCache.canvas = canvas;
         return canvas;
@@ -604,7 +479,7 @@ function loadGroundSheets(manifest = buildFullRegionAssetManifest()) {
         return Promise.resolve([spec.biomeId, atlasPartCache.groundSheets[spec.biomeId]]);
       }
       if (!atlasPartCache.groundPromises.has(spec.biomeId)) {
-        atlasPartCache.groundPromises.set(spec.biomeId, loadGroundImage(`/assets/generated/${spec.fileName}`).then((canvas) => [spec.biomeId, makeGroundSheet(canvas, {
+        atlasPartCache.groundPromises.set(spec.biomeId, loadImageCanvas(`/assets/generated/${spec.fileName}`).then((canvas) => [spec.biomeId, makeGroundSheet(canvas, {
         sourceInset: spec.sourceInset,
         edgeFeather: spec.edgeFeather,
         textureAlpha: spec.textureAlpha,
@@ -671,7 +546,7 @@ function loadTreeSheets(manifest = buildFullRegionAssetManifest()) {
         return Promise.resolve([biomeId, atlasPartCache.treeSheets[biomeId]]);
       }
       if (!atlasPartCache.treePromises.has(biomeId)) {
-        atlasPartCache.treePromises.set(biomeId, loadChromaImage(`/assets/generated/${fileName}`).then(makeTreeSheet)
+        atlasPartCache.treePromises.set(biomeId, loadImageCanvas(`/assets/generated/${fileName}`).then(makeTreeSheet)
         .then((sheet) => [biomeId, sheet])
         .catch((error) => {
           console.warn(`Tree sheet load failed for ${biomeId}: ${fileName}`, error);
@@ -716,8 +591,8 @@ function loadFoliageSheet(manifest = buildFullRegionAssetManifest()) {
         return Promise.resolve([spec.id, atlasPartCache.foliageSheets[spec.id]]);
       }
       if (!atlasPartCache.foliagePromises.has(spec.id)) {
-        atlasPartCache.foliagePromises.set(spec.id, loadChromaImage(`/assets/generated/${spec.fileName}`)
-        .then((canvas) => makeFoliageSheet(canvas, { rows: spec.rows, cols: spec.cols }))
+        atlasPartCache.foliagePromises.set(spec.id, loadImageCanvas(`/assets/generated/${spec.fileName}`)
+        .then((canvas) => makeFoliageSheet(canvas, { rows: spec.rows, cols: spec.cols, fileName: spec.fileName }))
         .then((sheet) => [spec.id, sheet])
         .catch((error) => {
           console.warn(`Foliage sheet load failed for ${spec.id}: ${spec.fileName}`, error);
@@ -766,7 +641,7 @@ function loadDecaySheets(manifest = buildFullRegionAssetManifest()) {
     const rows = Math.max(1, Math.floor(Number(def?.rows) || 4));
     const cols = Math.max(1, Math.floor(Number(def?.cols) || 4));
     const renderConfig = normalizeDecayRenderConfig(def);
-    const promise = loadChromaImage(`/assets/generated/${def.fileName}`)
+    const promise = loadImageCanvas(`/assets/generated/${def.fileName}`)
       .then((canvas) => [sheetId, {
         ...makeTileSheet(canvas, rows, cols),
         ...renderConfig,
@@ -837,11 +712,7 @@ function getObjectSheetConfigKey(config) {
 
 function loadObjectSheetConfig(config) {
   if (config.frameFiles) {
-    return Promise.all(config.frameFiles.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`, {
-      keyEdgeBlack: config.keyEdgeBlack ?? false,
-      keyEdgeHalo: config.keyEdgeHalo ?? false,
-      blackThreshold: config.blackThreshold,
-    })))
+    return Promise.all(config.frameFiles.map((fileName) => loadImageCanvas(`/assets/generated/${fileName}`)))
       .then((frames) => makeObjectFrameSheet(frames, {
         animated: config.animated ?? false,
         normalizeAnimation: config.normalizeAnimation ?? true,
@@ -885,7 +756,7 @@ function objectSheetFileNames(config) {
 }
 
 function loadObjectSheetFiles(fileNames, makeSheet) {
-  return Promise.all(fileNames.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`).then(makeSheet)))
+  return Promise.all(fileNames.map((fileName) => loadImageCanvas(`/assets/generated/${fileName}`).then(makeSheet)))
     .then(mergeObjectSheets);
 }
 
@@ -894,7 +765,7 @@ function loadOptionalObjectDamageSheet(baseFileNames, suffix, makeSheet) {
     .map((fileName) => objectDamageFileName(fileName, suffix))
     .filter(Boolean);
   if (!fileNames.length) return Promise.resolve(null);
-  return Promise.all(fileNames.map((fileName) => loadChromaImage(`/assets/generated/${fileName}`)
+  return Promise.all(fileNames.map((fileName) => loadImageCanvas(`/assets/generated/${fileName}`)
     .then(makeSheet)
     .catch(() => null)))
     .then((sheets) => mergeObjectSheets(sheets.filter(Boolean)))
@@ -915,35 +786,6 @@ function mergeObjectSheets(sheets) {
     ...validSheets[0],
     cells: validSheets.flatMap((sheet) => sheet.cells),
   };
-}
-
-function loadGroundImage(src) {
-  if (!ENABLE_RUNTIME_CHROMA_KEY) return loadRawImage(src);
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(image, 0, 0);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const data = imageData.data;
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const neonKey = g > 185 && r < 80 && b < 90 && g > r * 2.5 && g > b * 2.2;
-        if (neonKey) data[i + 3] = 0;
-      }
-
-      ctx.putImageData(imageData, 0, 0);
-      resolve(canvas);
-    };
-    image.onerror = () => reject(new Error(`Image load failed: ${src}`));
-    image.src = src;
-  });
 }
 
 function makeGroundSheet(canvas, options = {}) {
@@ -1033,6 +875,12 @@ function makeFoliageSheet(canvas, options = {}) {
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const rows = Math.max(1, Math.floor(Number(options.rows) || 8));
   const cols = Math.max(1, Math.floor(Number(options.cols) || 8));
+  const fileName = String(options.fileName ?? "").toLowerCase();
+  const objectLikeSheet = fileName.startsWith("object/");
+  // Object sheets used as foliage (e.g. cracks) should keep only one component
+  // so detached parts in a cell do not render as duplicate visuals.
+  const keepNearby = objectLikeSheet ? false : true;
+  const samplePad = objectLikeSheet ? 8 : 0;
   const gridScale = Math.min(rows, cols) / 8;
   const renderScale = Number.isFinite(Number(options.renderScale))
     ? Number(options.renderScale)
@@ -1053,12 +901,25 @@ function makeFoliageSheet(canvas, options = {}) {
       };
       const bounds = alphaBoundsFromImageData(imageData.data, canvas.width, rect);
       if (!isUsableFoliageCell(bounds, rect)) continue;
+      const sampleX = Math.max(0, x - samplePad);
+      const sampleY = Math.max(0, y - samplePad);
+      const sampleW = Math.min(canvas.width - sampleX, rect.w + samplePad * 2);
+      const sampleH = Math.min(canvas.height - sampleY, rect.h + samplePad * 2);
       cells.push({
-        sprite: isolateSprite(canvas, rect, {
+        sprite: isolateSprite(canvas, {
+          x: sampleX,
+          y: sampleY,
+          w: sampleW,
+          h: sampleH,
+        }, {
           minArea: 24,
-          keepNearby: true,
+          keepNearby,
           nearbyRadiusMult: 1.25,
           nearbyRatio: 0.012,
+          focusX: x + rect.w * 0.5 - sampleX,
+          focusY: y + rect.h * 0.55 - sampleY,
+          focus2X: x + rect.w * 0.5 - sampleX,
+          focus2Y: y + rect.h * 0.82 - sampleY,
         }),
         index: row * cols + col,
       });

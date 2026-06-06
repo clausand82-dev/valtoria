@@ -37,6 +37,7 @@ import {
   normalizeSkillTree,
 } from "../game/config/skill-tree-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
+import { cityEventEntries } from "../game/config/city-config.js";
 import { QUEST_BOARD_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
 import { MAX_POTION_STACK, SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
@@ -101,7 +102,6 @@ import {
   CityResearchPanel,
   CitySkillTreePanel,
   CitySocketPanel,
-  CityTownHallPanel,
 } from "./city-panels.jsx";
 
 import {
@@ -171,7 +171,6 @@ import {
   normalizeCityMobs,
   payCityCostEntries,
   pickCityBattleRegion,
-  removeGreenScreen,
   removeCityArmyUnits,
   resolveCityArmyBattle,
   saveCityProgress,
@@ -237,6 +236,7 @@ function CityPage({
   const [selectedBuildingId, setSelectedBuildingId] = useState(null);
   const [selectedQuestNpcId, setSelectedQuestNpcId] = useState(null);
   const [hoveredAreaId, setHoveredAreaId] = useState(null);
+  const [hoveredBuildingId, setHoveredBuildingId] = useState(null);
   const [clickedAreaId, setClickedAreaId] = useState(null);
   const [selectedCityMobId, setSelectedCityMobId] = useState(null);
   const [armyBattleResult, setArmyBattleResult] = useState(null);
@@ -256,6 +256,10 @@ function CityPage({
     [clickedAreaId, interactiveAreas],
   );
   const activeAreaPanel = clickedArea ?? hoveredArea;
+  const hoveredBuilding = useMemo(
+    () => CITY_BUILDINGS.find((building) => building.id === hoveredBuildingId) ?? null,
+    [hoveredBuildingId],
+  );
   const unlockedLayerUrls = useMemo(() => (
     interactiveAreas
       .filter((area) => isCityAreaUnlocked(cityProgress, area))
@@ -325,6 +329,7 @@ function CityPage({
     cityStorageKeyRef.current = cityStorageKey;
     setCityProgress(loadCityProgress(cityStorageKey));
     setHoveredAreaId(null);
+    setHoveredBuildingId(null);
     setClickedAreaId(null);
   }, [cityStorageKey]);
 
@@ -371,13 +376,15 @@ function CityPage({
   }, [engineRef, cityStats, cityProgress]);
 
   useEffect(() => {
-    const station = selectedBuildingId === "library"
-      ? "library"
-      : selectedBuildingId === "mage_tower"
-        ? "mage_tower"
+    const selectedBuilding = CITY_BUILDINGS.find((building) => building.id === selectedBuildingId);
+    const readableFeature = cityBuildingOwnedAddons(cityProgress, selectedBuilding).find((addon) => addon.panel === "readableMerge");
+    const station = readableFeature?.config?.kind === "spellbook"
+      ? "mage_tower"
+      : readableFeature?.config?.kind === "lorenote"
+        ? "library"
         : "backpack";
     engineRef.current?.setReadableMergeStation?.(station);
-  }, [selectedBuildingId, engineRef]);
+  }, [selectedBuildingId, cityProgress, engineRef]);
 
   useEffect(() => {
     if (cityStorageKeyRef.current !== cityStorageKey) return;
@@ -884,6 +891,7 @@ function CityPage({
               buildingImageUrls={cityBuildingImageUrls}
               quests={snapshot.quests}
               onOpenBuilding={openBuilding}
+              onHoverBuilding={setHoveredBuildingId}
               onOpenNpc={openNpc}
               key={area.id}
             />
@@ -897,6 +905,7 @@ function CityPage({
               buildingImageUrls={cityBuildingImageUrls}
               quests={snapshot.quests}
               onOpenBuilding={openBuilding}
+              onHoverBuilding={setHoveredBuildingId}
               onOpenNpc={openNpc}
             />
           )}
@@ -906,6 +915,7 @@ function CityPage({
             npcRefs={cityMapNpcs}
             npcImageUrls={cityNpcImageUrls}
             onOpenBuilding={openBuilding}
+            onHoverBuilding={setHoveredBuildingId}
             onOpenNpc={openNpc}
           />
           <CityMapMobIcons
@@ -924,8 +934,15 @@ function CityPage({
             />
           )}
         </div>
-        <div className={`city-area-panel-slot ${activeAreaPanel ? "has-content" : ""}`}>
-        {activeAreaPanel ? (
+        <div className={`city-area-panel-slot ${hoveredBuilding || activeAreaPanel ? "has-content" : ""}`}>
+        {hoveredBuilding ? (
+          <CityBuildingHoverPopover
+            building={hoveredBuilding}
+            snapshot={snapshot}
+            progress={cityProgress}
+            cityStats={cityStats}
+          />
+        ) : activeAreaPanel ? (
           <CityAreaPopover
             area={activeAreaPanel}
             snapshot={snapshot}
@@ -1151,6 +1168,74 @@ function CityPanelSection({ title, children }) {
   );
 }
 
+function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
+  const summary = cityBuildingHoverSummary(building, progress, snapshot, cityStats);
+  const costEntries = Object.entries(building.cost ?? {});
+  const statRequirementEntries = cityStatRequirementEntries(building.statRequirements ?? building.unlock?.statRequirements ?? building.unlock?.stats, cityStats);
+  const durabilityValue = Math.max(0, Math.min(100, Number(summary.state.durability ?? DURABILITY_DEFAULT) || 0));
+  return (
+    <aside className={`city-area-popover city-building-hover-popover ${summary.owned ? "unlocked" : "locked"}`}>
+      <header style={{ "--city-area-panel-image": `url("${building.imageUrl ?? CITY_MAP_IMAGE.src}")` }}>
+        <div className="city-area-panel-heading">
+          <div className="city-area-panel-titleline">
+            <b>{building.title}</b>
+            <span>{summary.owned ? `${building.prebuilt ? "Prebuilt" : "Built"} | Level ${summary.state.level}` : "Locked"}</span>
+          </div>
+          <p>{building.help ?? building.functionText ?? "No building description configured yet."}</p>
+          {building.functionText && <p>{building.functionText}</p>}
+        </div>
+      </header>
+      <div className="city-area-popover-body">
+        <CityPanelSection title="Status">
+          <div className="city-area-work-card no-top-border">
+            <div className="city-area-work-head">
+              <span>{summary.owned ? `Durability ${durabilityValue.toFixed(2)}%` : "Not owned"}</span>
+              <span>{building.prebuilt ? "Prebuilt building" : "Buildable building"}</span>
+            </div>
+            {!summary.owned && <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />}
+            {!summary.owned && statRequirementEntries.length > 0 && <CityRequirementGrid entries={statRequirementEntries} />}
+          </div>
+        </CityPanelSection>
+        <CityPanelSection title="Inventory">
+          <div className="city-area-costs city-chip-grid">
+            <span>Total slots: {summary.inventory.totalSlots}</span>
+            {Object.entries(summary.inventory.byType).map(([type, slots]) => (
+              <span key={type}>{cityInventoryTypeLabel(type)}: {slots}</span>
+            ))}
+          </div>
+        </CityPanelSection>
+        <CityPanelSection title="Stats">
+          <CityStatEffectsSummary effects={summary.activeEffects} />
+        </CityPanelSection>
+        <CityPanelSection title="Features">
+          <div className="city-area-building-icons city-building-feature-list">
+            {[...summary.ownedAddons, ...summary.lockedAddons].map(({ addon, owned, unlocked }) => {
+              const inventory = normalizeInventoryType(addon.inventoryType);
+              const fixedSlots = fixedReadableDefsForInventoryType(inventory.type).length;
+              const slots = fixedSlots || inventory.slots;
+              const cost = cityBuildingAddonCostEntries(addon);
+              const reqs = cityStatRequirementEntries(addon.statRequirements ?? addon.unlock?.statRequirements ?? addon.unlock?.stats, cityStats);
+              return (
+                <article className={`city-area-building-chip ${owned ? "owned" : "locked"}`} title={addon.help ?? addon.title} key={addon.id}>
+                  <b>{addon.title}</b>
+                  <span>{owned ? "Owned" : unlocked ? "Can buy" : "Locked"} | {cityBuildingFeatureLabel(addon.panel)}</span>
+                  {addon.help && <span>{addon.help}</span>}
+                  {slots > 0 && <span>{cityInventoryTypeLabel(inventory.type)}: {slots} slots</span>}
+                  {cost.length > 0 && <span>{cost.map(([id, amount]) => `${amount} ${cityCostLabel(id)}`).join(", ")}</span>}
+                  {reqs.length > 0 && <span>{reqs.map((entry) => entry.label).join(", ")}</span>}
+                  {Object.keys(addon.statEffects ?? {}).length > 0 && (
+                    <span>{Object.entries(addon.statEffects).map(([id, amount]) => `${cityStatLabel(id)} ${amount}`).join(", ")}</span>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </CityPanelSection>
+      </div>
+    </aside>
+  );
+}
+
 function CityBuildingIconList({ buildingRefs, buildingImageUrls = {}, progress }) {
   if (!buildingRefs?.length) return null;
   return (
@@ -1360,7 +1445,7 @@ function cityEffectUnit(value) {
   return (hash >>> 0) / 4294967295;
 }
 
-function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, quests = null, onOpenBuilding, onOpenNpc }) {
+function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, quests = null, onOpenBuilding, onHoverBuilding, onOpenNpc }) {
   return (
     <div className="city-map-hover-icons" aria-label={`${area.title} actions`}>
       {buildingRefs.map(({ building, x, y }) => {
@@ -1373,6 +1458,10 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
             style={cityMapPositionStyle(x, y)}
             title={building.title}
             aria-label={building.title}
+            onMouseEnter={() => onHoverBuilding?.(building.id)}
+            onFocus={() => onHoverBuilding?.(building.id)}
+            onMouseLeave={() => onHoverBuilding?.(null)}
+            onBlur={() => onHoverBuilding?.(null)}
             onClick={(event) => {
               event.stopPropagation();
               onOpenBuilding(building.id);
@@ -1420,9 +1509,9 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
 }
 
 function questBoardIdForBuilding(buildingId) {
-  if (buildingId === "town_hall") return "townHall";
-  if (buildingId === "inn") return "inn";
-  return null;
+  const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
+  const addon = normalizeCityBuildingAddons(building).find((entry) => ["townHallQuests", "innQuests"].includes(entry.panel));
+  return addon?.config?.boardId ?? null;
 }
 
 function cityBuildingQuestStatus(buildingId, quests = null) {
@@ -1674,7 +1763,7 @@ function getActiveCityQuestBuildings(layout, quests = null) {
 }
 
 function getActiveCityQuestNpcs(layout, cityNpcStates = [], showInactive = SHOW_INACTIVE_CITY_NPCS) {
-  const allNpcIds = Object.keys(QUEST_NPCS);
+  const allNpcIds = Object.keys(QUEST_NPCS).filter((npcId) => QUEST_NPCS[npcId]?.citySpawn !== false);
   const stateByNpc = new Map((cityNpcStates ?? []).map((entry) => [entry.npcId, entry]));
   const occupiedSpots = [];
   return allNpcIds.flatMap((npcId, index) => {
@@ -1955,6 +2044,8 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
       : "";
   const lastPointerActionRef = useRef(0);
   const [actionMessage, setActionMessage] = useState("");
+  const [selectedQuest, setSelectedQuest] = useState(null);
+  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const [questCompletionResult, setQuestCompletionResult] = useState(null);
   if (!npc) return null;
 
@@ -1963,6 +2054,7 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
     const result = engine?.completeQuest?.(quest.id ?? quest.questId, npcId);
     if (result?.ok) {
       setActionMessage("");
+      setSelectedQuest(null);
       setQuestCompletionResult(result);
       engine?.publishSnapshot?.();
     } else {
@@ -1995,6 +2087,27 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
     action();
   };
 
+  const abandonQuest = () => {
+    const quest = confirmAbandonQuest;
+    if (!quest) return;
+    const abandoned = engineRef.current?.abandonQuest?.(quest.id);
+    if (!abandoned) return;
+    setConfirmAbandonQuest(null);
+    setSelectedQuest(null);
+    onClose?.();
+  };
+  const selectedTurnInNpcIds = selectedQuest?.quest
+    ? [
+      ...(Array.isArray(selectedQuest.quest.turnInNpcIds) ? selectedQuest.quest.turnInNpcIds : []),
+      ...(Array.isArray(selectedQuest.quest.completeNpcIds) ? selectedQuest.quest.completeNpcIds : []),
+      ...(selectedQuest.quest.turnInNpcId ? [selectedQuest.quest.turnInNpcId] : []),
+      ...(Array.isArray(selectedQuest.quest.npcIds) ? selectedQuest.quest.npcIds : []),
+      ...(selectedQuest.quest.npcId ? [selectedQuest.quest.npcId] : []),
+    ].map(String).filter(Boolean)
+    : [];
+  const selectedQuestCanTurnIn = Boolean(selectedQuest?.quest?.complete)
+    && (selectedTurnInNpcIds.length <= 0 || selectedTurnInNpcIds.includes(String(npcId)));
+
   return (
     <div className="city-popup-backdrop" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
       <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
@@ -2021,10 +2134,10 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
               <QuestObjectiveMeta quest={quest} />
               <button
                 type="button"
-                onPointerUp={(event) => runButtonAction(event, () => acceptQuest(quest), true)}
-                onClick={(event) => runButtonAction(event, () => acceptQuest(quest))}
+                onPointerUp={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "offer", quest }), true)}
+                onClick={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "offer", quest }))}
               >
-                Tag quest
+                Aaben quest
               </button>
             </article>
           ))}
@@ -2038,17 +2151,48 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
               <QuestObjectiveMeta quest={quest} compact />
               <button
                 type="button"
-                disabled={!quest.complete}
-                onPointerUp={(event) => runButtonAction(event, () => turnIn(quest), true)}
-                onClick={(event) => runButtonAction(event, () => turnIn(quest))}
+                onPointerUp={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "active", quest }), true)}
+                onClick={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "active", quest }))}
               >
-                Indlever quest
+                Aaben quest
               </button>
             </article>
           ))}
           {!npcOffers.length && !npcQuests.length && <p>{npcDialogue || "Ingen quests tilgaengelige lige nu."}</p>}
         </main>
       </section>
+      {selectedQuest && (
+        <QuestDetailCard
+          quest={selectedQuest.quest}
+          npc={npc}
+          onClose={() => setSelectedQuest(null)}
+          footer={(
+            <>
+              <button type="button" onClick={() => setSelectedQuest(null)}>Tilbage</button>
+              {selectedQuest.mode === "offer" ? (
+                <button type="button" onClick={() => acceptQuest(selectedQuest.quest)}>Tag quest</button>
+              ) : (
+                <>
+                  <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest.quest)}>Opgiv quest</button>
+                  <button type="button" disabled={!selectedQuestCanTurnIn} onClick={() => turnIn(selectedQuest.quest)}>Indlever quest</button>
+                </>
+              )}
+            </>
+          )}
+        />
+      )}
+      {confirmAbandonQuest && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
+            <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+            <div className="confirm-actions">
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+              <button type="button" onClick={abandonQuest}>Opgiv quest</button>
+            </div>
+          </section>
+        </div>
+      )}
       {questCompletionResult && (
         <QuestDetailCard
           quest={{
@@ -2072,11 +2216,30 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   );
 }
 
-function CityQuestBoardPanel({ board, fallbackConfig, onAcceptQuest }) {
+function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAcceptQuest, onAbandonQuest }) {
+  const [selectedQuest, setSelectedQuest] = useState(null);
+  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const offers = board?.offers ?? [];
   const title = board?.title ?? fallbackConfig?.title ?? "Quest Board";
   const subtitle = board?.subtitle ?? fallbackConfig?.subtitle ?? "";
   const emptyText = board?.emptyText ?? fallbackConfig?.emptyText ?? "Ingen quests tilgaengelige lige nu.";
+  const acceptSelectedQuest = () => {
+    if (!selectedQuest) return;
+    const accepted = onAcceptQuest?.(selectedQuest);
+    if (accepted !== false) setSelectedQuest(null);
+  };
+  const selectedNpcId = Array.isArray(selectedQuest?.npcIds)
+    ? selectedQuest.npcIds[0]
+    : selectedQuest?.turnInNpcId ?? selectedQuest?.npcId;
+  const selectedQuestIsActive = selectedQuest
+    ? activeQuests.some((quest) => quest.id === selectedQuest.id)
+    : false;
+  const abandonSelectedQuest = () => {
+    if (!confirmAbandonQuest) return;
+    onAbandonQuest?.(confirmAbandonQuest);
+    setConfirmAbandonQuest(null);
+    setSelectedQuest(null);
+  };
   return (
     <section className="blacksmith-station quest-board-panel">
       <header>
@@ -2093,32 +2256,237 @@ function CityQuestBoardPanel({ board, fallbackConfig, onAcceptQuest }) {
             <p>{quest.story}</p>
             {quest.acceptText && <p>{quest.acceptText}</p>}
             <QuestObjectiveMeta quest={quest} />
-            <button type="button" onClick={() => onAcceptQuest?.(quest)}>Tag quest</button>
+            <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
           </article>
         ))}
-        {offers.length === 0 && <p>{emptyText}</p>}
+        {activeQuests.length > 0 && (
+          <>
+            <p>Aktive quests:</p>
+            {activeQuests.map((quest) => (
+              <article className={`quest-card ${quest.complete ? "complete" : ""}`} key={`board-active-${quest.id}`}>
+                <header>
+                  <b>{quest.title}</b>
+                  <span>{quest.progressText}</span>
+                </header>
+                <p>{quest.complete ? quest.turnInText : quest.story}</p>
+                <QuestObjectiveMeta quest={quest} />
+                <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
+              </article>
+            ))}
+          </>
+        )}
+        {offers.length === 0 && activeQuests.length === 0 && <p>{emptyText}</p>}
       </div>
+      {selectedQuest && (
+        <QuestDetailCard
+          quest={selectedQuest}
+          npc={QUEST_NPCS[selectedNpcId]}
+          onClose={() => setSelectedQuest(null)}
+          footer={(
+            <>
+              <button type="button" onClick={() => setSelectedQuest(null)}>Tilbage</button>
+              {selectedQuestIsActive ? (
+                <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>Opgiv quest</button>
+              ) : (
+                <button type="button" onClick={acceptSelectedQuest}>Tag quest</button>
+              )}
+            </>
+          )}
+        />
+      )}
+      {confirmAbandonQuest && (
+        <div className="confirm-backdrop" role="presentation">
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
+            <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+            <div className="confirm-actions">
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+              <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }
 
-const QUEST_BOARD_TAB_ID = "__quest_board";
-const QUEST_BOARD_ICON_URL = "/assets/generated/item/item_quest_scroll.png";
 const BUILDING_BASE_TAB_ID = "__base";
-const BUILDING_STORAGE_FUNCTION_ID = "__storage";
-const BLACKSMITH_BASE_FUNCTION_ID = "__blacksmith_base";
-const SANCTUARY_DONATION_TAB_ID = "__sanctuary_donations";
-const FARM_ALE_TAB_ID = "__farm_ale";
-const INN_ALE_TAB_ID = "__inn_ale";
-const CITY_BUILDING_BASE_FUNCTIONS = {
-  town_hall: { label: "Civic", detail: "Settlement overview", title: "Town Hall" },
-  armory: { label: "Armory", detail: "Donate gear", title: "Armory" },
-  research_lab: { label: "Research", detail: "Projects and recipes", title: "Research" },
-  merchant: { label: "Trade", detail: "Buy and sell", title: "Merchant" },
-  library: { label: "Knowledge", detail: "Lore and Bestiary", title: "Library" },
-  sanctuary: { label: "Hero", detail: "Class and skills", title: "Sanctuary" },
-  farm: { label: "Provision", detail: "Food production", title: "Farm" },
+
+const CITY_BUILDING_PANEL_COMPONENTS = {
+  merchant: CityMerchantPanel,
+  storage: CityStoragePanel,
+  townHallQuests: CityQuestBoardPanel,
+  innQuests: CityQuestBoardPanel,
+  armyTraining: CityBarracksTrainingPanel,
+  armory: CityArmoryPanel,
+  blacksmith: CityBlacksmithPanel,
+  goldBar: CityGoldBarPanel,
+  research: CityResearchPanel,
+  socket: CitySocketPanel,
+  skillTree: CitySkillTreePanel,
+  readableMerge: CityReadableMergePanel,
+  arcaneExtractor: CityArcaneExtractorPanel,
+  farm: CityFarmPanel,
+  bestiary: BestiaryViewer,
+  classTraining: CityClassPanel,
+  sanctuaryDonation: CitySanctuaryDonationPanel,
+  farmAle: CityFarmAlePanel,
+  innAle: CityInnAlePanel,
 };
+
+function normalizeCityBuildingAddons(building) {
+  const addons = Array.isArray(building?.addons) ? building.addons : [];
+  const normalized = addons.map((addon) => ({
+    panel: "custom/noop",
+    inventoryType: { type: "none", slots: 0 },
+    ...addon,
+    id: String(addon.id),
+    title: addon.title ?? addon.label ?? String(addon.id),
+    help: addon.help ?? addon.description ?? addon.functionText ?? "",
+    config: addon.config ?? {},
+  }));
+  const baseInventory = normalizeInventoryType(building?.inventoryType);
+  if (baseInventory.type !== "none" && cityInventorySlotCount(baseInventory) > 0) {
+    const hasSameLegacyBase = normalized.some((addon) => cityInventorySectionKey(addon) === "base");
+    if (!hasSameLegacyBase) {
+      normalized.unshift({
+        id: "base_storage",
+        title: `${building.title} Storage`,
+        help: building.functionText ?? building.help ?? "Building storage.",
+        prebuilt: true,
+        panel: "storage",
+        inventoryType: building.inventoryType,
+        config: { legacyBase: true },
+      });
+    }
+  }
+  return normalized;
+}
+
+function cityBuildingAddonOwned(progress, building, addon) {
+  if (!addon?.id) return false;
+  if (addon.prebuilt) return true;
+  const state = getCityBuildingState(progress, building);
+  return new Set(state.addons ?? []).has(addon.id);
+}
+
+function cityBuildingOwnedAddons(progress, building) {
+  return normalizeCityBuildingAddons(building).filter((addon) => cityBuildingAddonOwned(progress, building, addon));
+}
+
+function cityBuildingAvailableAddons(progress, building, snapshot, cityStats = {}) {
+  return normalizeCityBuildingAddons(building).filter((addon) => (
+    cityAddonIsUnlocked(addon, snapshot, cityStats)
+    && cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats).canBuy
+  ));
+}
+
+function cityBuildingLockedAddons(progress, building, snapshot, cityStats = {}) {
+  return normalizeCityBuildingAddons(building).filter((addon) => !cityBuildingAddonOwned(progress, building, addon) && !cityAddonIsUnlocked(addon, snapshot, cityStats));
+}
+
+function cityBuildingFeaturePanels(building, progress, snapshot, cityStats = {}) {
+  const owned = isCityBuildingOwned(progress, building);
+  return normalizeCityBuildingAddons(building).map((addon) => ({
+    addon,
+    owned: owned && cityBuildingAddonOwned(progress, building, addon),
+    unlocked: cityAddonIsUnlocked(addon, snapshot, cityStats),
+    panel: addon.panel ?? "custom/noop",
+  }));
+}
+
+function cityBuildingInventorySummary(building, progress) {
+  const state = getCityBuildingState(progress, building);
+  const sections = cityInventorySections(building, state, state.level > 0);
+  const byType = {};
+  for (const section of sections) byType[section.type] = (byType[section.type] ?? 0) + section.slots;
+  return {
+    totalSlots: sections.reduce((sum, section) => sum + section.slots, 0),
+    sections,
+    byType,
+  };
+}
+
+function cityBuildingAddonCostEntries(addon) {
+  return Object.entries(addon?.cost ?? {}).filter(([, amount]) => Math.max(0, Math.floor(Number(amount) || 0)) > 0);
+}
+
+function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats = {}) {
+  if (!addon?.id) return { canBuy: false, reasons: ["Missing addon id"] };
+  if (!isCityBuildingOwned(progress, building)) return { canBuy: false, reasons: ["Build the building first."] };
+  if (cityBuildingAddonOwned(progress, building, addon)) return { canBuy: false, reasons: ["Already owned."] };
+  if (!cityAddonIsUnlocked(addon, snapshot, cityStats)) return { canBuy: false, reasons: [cityAddonLockText(addon, snapshot, cityStats)] };
+  const requirementEntries = cityStatRequirementEntries(addon.statRequirements ?? addon.unlock?.statRequirements ?? addon.unlock?.stats, cityStats);
+  const costEntries = cityBuildingAddonCostEntries(addon);
+  const reasons = [
+    ...requirementEntries.filter((entry) => !entry.met).map((entry) => entry.label),
+    ...costEntries
+      .filter(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) < amount)
+      .map(([resourceId, amount]) => `${cityCostLabel(resourceId)} ${cityCostAvailable(snapshot, resourceId, progress)}/${amount}`),
+  ];
+  return { canBuy: reasons.length === 0, reasons };
+}
+
+function buyCityBuildingAddon({ progress, building, addon, snapshot, cityStats = {}, engineRef, onChangeProgress }) {
+  const check = cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats);
+  if (!check.canBuy) return false;
+  const entries = cityBuildingAddonCostEntries(addon);
+  if (!payCityCostEntries(entries, engineRef.current, snapshot, progress, onChangeProgress)) return false;
+  onChangeProgress((current) => ({
+    ...current,
+    [building.id]: {
+      ...(current[building.id] ?? {}),
+      purchasedAddons: [...new Set([
+        ...(Array.isArray(current[building.id]?.purchasedAddons) ? current[building.id].purchasedAddons : []),
+        ...(Array.isArray(current[building.id]?.addons) ? current[building.id].addons : []),
+        addon.id,
+      ].map(String))],
+    },
+  }));
+  return true;
+}
+
+function cityBuildingFeatureLabel(panelKey) {
+  const labels = {
+    merchant: "Trade",
+    storage: "Storage",
+    townHallQuests: "Quests",
+    innQuests: "Rumors",
+    armyTraining: "Training",
+    armory: "Armory",
+    blacksmith: "Blacksmith",
+    goldBar: "Minting",
+    research: "Research",
+    socket: "Sockets",
+    skillTree: "Skills",
+    readableMerge: "Archive",
+    arcaneExtractor: "Extractor",
+    farm: "Provision",
+    townHallCivic: "Civic",
+    bestiary: "Bestiary",
+    classTraining: "Class",
+    sanctuaryDonation: "Donations",
+    farmAle: "Ale",
+    innAle: "Ale",
+  };
+  return labels[panelKey] ?? String(panelKey ?? "Feature");
+}
+
+function cityBuildingHoverSummary(building, progress, snapshot, cityStats = {}) {
+  const state = getCityBuildingState(progress, building);
+  const owned = state.level > 0;
+  const addons = cityBuildingFeaturePanels(building, progress, snapshot, cityStats);
+  const ownedAddonEffects = addons.filter((entry) => entry.owned).map((entry) => entry.addon.statEffects);
+  return {
+    building,
+    state,
+    owned,
+    inventory: cityBuildingInventorySummary(building, progress),
+    activeEffects: owned ? mergeCityStatEffects([cityBuildingActiveStatEffects(building, state.level), ...ownedAddonEffects]) : {},
+    ownedAddons: addons.filter((entry) => entry.owned),
+    lockedAddons: addons.filter((entry) => !entry.owned),
+  };
+}
 
 function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
@@ -2134,11 +2502,6 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
-  const questBoardId = building.id === "town_hall" ? "townHall" : building.id === "inn" ? "inn" : null;
-  const activeQuestBoard = activeAddonId === QUEST_BOARD_TAB_ID;
-  const activeSanctuaryDonationTab = functionModalId === SANCTUARY_DONATION_TAB_ID;
-  const activeFarmAleTab = functionModalId === FARM_ALE_TAB_ID;
-  const activeInnAleTab = functionModalId === INN_ALE_TAB_ID;
   const prebuilt = Boolean(building.prebuilt);
   const payBuildingEntries = (entries, progressOverride = progress) => (
     payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
@@ -2165,63 +2528,39 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   )) && statRequirementsMet;
   const sprite = cityImageForBuilding(houseImages, building, progress);
   const buildingImageSrc = cityImageElementSrc(sprite, building.imageUrl);
-  const purchasedAddons = new Set(buildingState.addons ?? []);
+  const featureAddons = normalizeCityBuildingAddons(building);
+  const purchasedAddons = new Set([
+    ...(buildingState.addons ?? []),
+    ...featureAddons.filter((addon) => addon.prebuilt).map((addon) => addon.id),
+  ]);
   const savedPurchasedAddons = new Set(buildingState.purchasedAddons ?? []);
-  const activeAddon = (building.addons ?? []).find((addon) => addon.id === activeAddonId) ?? null;
+  const activeAddon = featureAddons.find((addon) => addon.id === activeAddonId) ?? null;
   const activeAddonOwned = Boolean(activeAddon && purchasedAddons.has(activeAddon.id));
-  const baseInventory = normalizeInventoryType(building.inventoryType);
-  const baseFunction = CITY_BUILDING_BASE_FUNCTIONS[building.id]
-    ?? (baseInventory.slots > 0 ? { label: building.title, detail: `${cityInventorySlotCount(building.inventoryType)} slots`, title: `${building.title} Storage` } : null);
+  const activePanel = activeAddon?.panel ?? null;
+  const activeQuestBoard = activeAddon && ["townHallQuests", "innQuests"].includes(activePanel);
+  const questBoardId = activeQuestBoard ? activeAddon.config?.boardId : null;
   const activeBaseTab = functionModalId === BUILDING_BASE_TAB_ID;
   const functionModalTitle = activeBaseTab
     ? building.title
-    : functionModalId === QUEST_BOARD_TAB_ID
-    ? QUEST_BOARD_CONFIG[questBoardId]?.title ?? "Quests"
-    : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
-      ? "Repair"
-      : functionModalId === SANCTUARY_DONATION_TAB_ID
-        ? "Donation Trail"
-      : functionModalId === FARM_ALE_TAB_ID
-        ? "Ale Brewing"
-      : functionModalId === INN_ALE_TAB_ID
-        ? "Ale Sales"
-      : functionModalId === BUILDING_STORAGE_FUNCTION_ID
-        ? baseFunction?.title ?? `${building.title} Storage`
-        : activeAddon?.title ?? "Building function";
+    : activeQuestBoard
+      ? QUEST_BOARD_CONFIG[questBoardId]?.title ?? activeAddon?.title ?? "Quests"
+      : activeAddon?.title ?? "Building function";
   const functionModalHelp = activeBaseTab
     ? ""
-    : functionModalId === QUEST_BOARD_TAB_ID
-      ? QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? "Available local quests and rumors."
-      : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
-        ? "Repair equipped and carried gear with available resources."
-        : functionModalId === SANCTUARY_DONATION_TAB_ID
-          ? "Donate gold bars or food barrels for one chosen city benefit."
-        : functionModalId === FARM_ALE_TAB_ID
-          ? "Brew ale from wheat, planks, and city water."
-        : functionModalId === INN_ALE_TAB_ID
-          ? "Serve ale to gain popularity and water service."
-        : functionModalId === BUILDING_STORAGE_FUNCTION_ID
-          ? baseFunction?.detail ?? building.functionText ?? ""
-          : activeAddon?.help ?? "";
+    : activeQuestBoard
+      ? QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? activeAddon?.help ?? "Available local quests and rumors."
+      : activeAddon?.help ?? activeAddon?.functionText ?? "";
   const headerStatus = activeAddon
     ? `${activeAddon.prebuilt ? "Prebuilt addon" : savedPurchasedAddons.has(activeAddon.id) ? "Built addon" : "Available addon"} | ${building.title}`
-    : functionModalId === QUEST_BOARD_TAB_ID
-      ? `Function | ${building.title}`
-      : functionModalId === BLACKSMITH_BASE_FUNCTION_ID
-        || functionModalId === SANCTUARY_DONATION_TAB_ID
-        || functionModalId === FARM_ALE_TAB_ID
-        || functionModalId === INN_ALE_TAB_ID
-        || functionModalId === BUILDING_STORAGE_FUNCTION_ID
-        ? `Function | ${building.title}`
-        : owned
+    : owned
           ? `${prebuilt ? "Prebuilt | " : ""}Lvl ${buildingState.level}`
           : "Not owned";
   const storageSections = cityInventorySections(building, buildingState, owned);
   const activeStorageSection = activeQuestBoard
     ? null
-    : activeAddon
+    : activeAddon?.panel === "storage"
       ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
-      : storageSections.find((section) => section.key === "base") ?? storageSections[0] ?? null;
+      : null;
 
   useEffect(() => {
     if (!owned || !questBoardId) {
@@ -2242,26 +2581,17 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     setQuestBoard(engineRef.current?.questBoardSnapshot?.(questBoardId, context) ?? null);
   };
 
-  const openQuestBoardTab = () => {
-    if (!questBoardId) return;
-    const context = { cityStats, cityProgress: progress };
-    const board = engineRef.current?.rollQuestBoard?.(questBoardId, context)
-      ?? engineRef.current?.questBoardSnapshot?.(questBoardId, context)
-      ?? null;
-    setQuestBoard(board);
-    setActiveAddonId(QUEST_BOARD_TAB_ID);
-    setFunctionModalId(QUEST_BOARD_TAB_ID);
-  };
-
   const openBaseTab = () => {
     setActiveAddonId(null);
     setFunctionModalId(BUILDING_BASE_TAB_ID);
   };
 
   const acceptBoardQuest = (quest) => {
-    if (!questBoardId) return;
+    if (!questBoardId) return false;
     const accepted = engineRef.current?.acceptBoardQuest?.(questBoardId, quest, { cityStats, cityProgress: progress });
     if (accepted) refreshQuestBoard();
+    else engineRef.current?.addToast?.("Quest kunne ikke tages");
+    return Boolean(accepted);
   };
 
   const applyBuildResource = (resourceId, amount) => {
@@ -2320,19 +2650,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const buyAddon = (addon) => {
-    if (!owned || purchasedAddons.has(addon.id)) return;
-    if (!cityAddonIsUnlocked(addon, snapshot)) return;
-    const goldCost = addon.cost?.gold ?? 0;
-    if (goldCost > 0 && (snapshot?.player?.gold ?? 0) < goldCost) return;
-    const paidGold = goldCost > 0 ? engineRef.current?.consumeGold?.(goldCost) ?? 0 : 0;
-    if (paidGold < goldCost) return;
-    onChangeProgress((current) => ({
-      ...current,
-      [building.id]: {
-        ...(current[building.id] ?? {}),
-        purchasedAddons: [...new Set([...(Array.isArray(current[building.id]?.purchasedAddons) ? current[building.id].purchasedAddons : []), addon.id])],
-      },
-    }));
+    buyCityBuildingAddon({ progress, building, addon, snapshot: snapshotRef?.current ?? snapshot, cityStats, engineRef, onChangeProgress });
   };
 
   const depositInventoryItem = (inventoryIndex, sectionKey, slotIndex, confirmed = false) => {
@@ -2662,14 +2980,6 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     }
   };
 
-  const contributeTownHallResource = (resourceId, cost, armyGain) => {
-    const population = Math.max(0, Math.floor(Number(cityStats.population) || 0));
-    const army = Math.max(0, Math.floor(Number(snapshot.player?.stats?.army) || 0));
-    if (army >= population) return;
-    const consumed = engineRef.current?.consumeResource?.(resourceId, cost) ?? 0;
-    if (consumed >= cost) engineRef.current?.addArmy?.(Math.min(armyGain, population - army), RESOURCE_DEFS[resourceId]?.name ?? resourceId);
-  };
-
   const trainArmyUnit = (recipe) => {
     if (!recipe?.unitId || !cityArmyCanTrainUnit(progress, cityStats, recipe.unitId, recipe.count ?? 1)) return;
     const entries = Object.entries(recipe.cost ?? {});
@@ -2798,6 +3108,184 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     }));
   };
 
+  const renderActiveFeaturePanel = () => {
+    if (!owned || !activeAddon || !activeAddonOwned || activeStorageSection) return null;
+    switch (activeAddon.panel) {
+      case "townHallQuests":
+      case "innQuests":
+        return (
+          <CityQuestBoardPanel
+            board={questBoard}
+            fallbackConfig={QUEST_BOARD_CONFIG[activeAddon.config?.boardId]}
+            activeQuests={(snapshot.quests?.active ?? []).filter((quest) => String(quest.source ?? "") === String(questBoard?.source ?? QUEST_BOARD_CONFIG[activeAddon.config?.boardId]?.source ?? ""))}
+            onAcceptQuest={acceptBoardQuest}
+            onAbandonQuest={(quest) => engineRef.current?.abandonQuest?.(quest.id)}
+          />
+        );
+      case "arcaneExtractor":
+        return (
+          <CityArcaneExtractorPanel
+            inventory={snapshot.inventory}
+            onExtract={(index) => engineRef.current?.extractArcaneEssence?.(index)}
+          />
+        );
+      case "readableMerge":
+        return (
+          <CityReadableMergePanel
+            inventory={snapshot.inventory}
+            kind={activeAddon.config?.kind ?? "lorenote"}
+            onMerge={(index) => engineRef.current?.mergeInventoryItem?.(index)}
+          />
+        );
+      case "bestiary":
+        return <BestiaryViewer worldState={snapshot.worldState} />;
+      case "goldBar":
+        return (
+          <CityGoldBarPanel
+            gold={snapshot.player?.gold ?? 0}
+            inventory={snapshot.inventory}
+            popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
+            resourceCount={buildingResourceAvailable}
+            onSmelt={() => engineRef.current?.smeltGoldToBar?.(1)}
+            onSmeltIron={() => onConvertResourceToResource?.("iron_piece", 3, "iron_bar", 1)}
+          />
+        );
+      case "farm":
+        return (
+          <CityFarmPanel
+            inventory={snapshot.inventory}
+            popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
+            resourceCount={buildingResourceAvailable}
+            onProduceFoodBarrel={produceFoodBarrel}
+            onProduceProvision={addFarmProvision}
+          />
+        );
+      case "farmAle":
+        return (
+          <CityFarmAlePanel
+            inventory={snapshot.inventory}
+            cityStats={cityStats}
+            resourceCount={buildingResourceAvailable}
+            onBrewAle={brewFarmAle}
+          />
+        );
+      case "innAle":
+        return (
+          <CityInnAlePanel
+            inventory={snapshot.inventory}
+            resourceCount={buildingResourceAvailable}
+            onServeAle={serveInnAle}
+          />
+        );
+      case "townHallCivic":
+        return (
+          <section className="blacksmith-station">
+            <header>
+              <h4>Civic Ledger</h4>
+              <span>Faction reputation</span>
+            </header>
+            <CityFactionPanel factionRep={snapshot.player?.factionRep} />
+          </section>
+        );
+      case "armyTraining":
+        return (
+          <CityBarracksTrainingPanel
+            addon={activeAddon}
+            progress={progress}
+            cityStats={cityStats}
+            snapshot={snapshot}
+            onTrain={trainArmyUnit}
+          />
+        );
+      case "armory":
+        return (
+          <CityArmoryPanel
+            inventory={snapshot.inventory}
+            progress={progress}
+            onConvert={convertInventoryItemToArmory}
+          />
+        );
+      case "research":
+        return (
+          <CityResearchPanel
+            buildingState={buildingState}
+            snapshot={snapshot}
+            resourceCount={buildingResourceAvailable}
+            onBuyRecipe={(recipeKey) => buyResearchRecipe(recipeKey)}
+            onMerge={(recipe) => mergeResearchRecipe(recipe)}
+          />
+        );
+      case "socket":
+        return (
+          <CitySocketPanel
+            inventory={snapshot.inventory}
+            gold={snapshot.player?.gold ?? 0}
+            onAddSocket={(index) => engineRef.current?.addSocketToInventoryItem?.(index)}
+            onSocketGem={(itemIndex, gemIndex) => engineRef.current?.socketGemIntoInventoryItem?.(itemIndex, gemIndex)}
+          />
+        );
+      case "merchant":
+        return (
+          <CityMerchantPanel
+            inventory={snapshot.inventory}
+            stock={buildingState.merchant?.stock ?? []}
+            gold={snapshot.player?.gold ?? 0}
+            popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
+            onSell={sellMerchantItem}
+            onBuy={buyMerchantItem}
+          />
+        );
+      case "classTraining":
+        return (
+          <CityClassPanel
+            player={snapshot.player}
+            progress={progress}
+            onChooseClass={(classId) => engineRef.current?.chooseClass?.(classId, progress)}
+            onResetClass={() => engineRef.current?.resetClassChoice?.()}
+            onUnlockNode={(nodeId) => engineRef.current?.unlockClassNode?.(nodeId, progress)}
+          />
+        );
+      case "skillTree":
+        return (
+          <CitySkillTreePanel
+            player={snapshot.player}
+            onBuyRank={(nodeId) => engineRef.current?.buySkillTreeRank?.(nodeId)}
+          />
+        );
+      case "sanctuaryDonation":
+        return (
+          <CitySanctuaryDonationPanel
+            inventory={snapshot.inventory}
+            resourceCount={buildingResourceAvailable}
+            onDonate={applySanctuaryDonation}
+          />
+        );
+      case "blacksmith":
+        return (
+          <CityBlacksmithPanel
+            engineRef={engineRef}
+            snapshot={snapshot}
+            snapshotRef={snapshotRef}
+            activeAddonId={activeAddon.config?.station === "repair" ? null : activeAddon.id}
+            purchasedAddons={purchasedAddons}
+            resourceCount={buildingResourceAvailable}
+            onRepairEquippedItem={repairEquippedItem}
+            onRepairInventoryItem={repairInventoryItem}
+          />
+        );
+      case "custom/noop":
+      default:
+        return (
+          <section className="blacksmith-station">
+            <header>
+              <h4>{activeAddon.title}</h4>
+              <span>{activeAddon.help ?? "No separate station content configured yet."}</span>
+            </header>
+          </section>
+        );
+    }
+  };
+
   return (
     <div className="city-popup-backdrop">
       <div className="city-building-shell">
@@ -2806,99 +3294,23 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
             <span>{building.title}</span>
           </button>
-          {owned && baseFunction && (
-            <button
-              type="button"
-              className={`city-building-rail-tab ${functionModalId === BUILDING_STORAGE_FUNCTION_ID ? "active" : ""}`}
-              onClick={() => {
-                setActiveAddonId(null);
-                setFunctionModalId(BUILDING_STORAGE_FUNCTION_ID);
-              }}
-              title={baseFunction.title}
-            >
-              {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
-              <span>{baseFunction.label}</span>
-            </button>
-          )}
-          {owned && questBoardId && (
-            <button type="button" className={`city-building-rail-tab ${activeQuestBoard ? "active" : ""}`} onClick={openQuestBoardTab} title={QUEST_BOARD_CONFIG[questBoardId]?.title ?? "Quest board"}>
-              <img src={QUEST_BOARD_ICON_URL} alt="" draggable="false" />
-              <span>{questBoardId === "inn" ? "Rygter" : "Quests"}</span>
-            </button>
-          )}
-          {owned && building.id === "blacksmith" && (
-            <button
-              type="button"
-              className={`city-building-rail-tab ${functionModalId === BLACKSMITH_BASE_FUNCTION_ID ? "active" : ""}`}
-              onClick={() => {
-                setActiveAddonId(null);
-                setFunctionModalId(BLACKSMITH_BASE_FUNCTION_ID);
-              }}
-              title="Repair equipped gear"
-            >
-              {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
-              <span>Repair</span>
-            </button>
-          )}
-          {owned && building.id === "sanctuary" && (
-            <button
-              type="button"
-              className={`city-building-rail-tab ${activeSanctuaryDonationTab ? "active" : ""}`}
-              onClick={() => {
-                setActiveAddonId(null);
-                setFunctionModalId(SANCTUARY_DONATION_TAB_ID);
-              }}
-              title="Donation Trail"
-            >
-              <img src="/assets/generated/item/item_res_goldbar.png" alt="" draggable="false" />
-              <span>Donations</span>
-            </button>
-          )}
-          {owned && building.id === "farm" && (
-            <button
-              type="button"
-              className={`city-building-rail-tab ${activeFarmAleTab ? "active" : ""}`}
-              onClick={() => {
-                setActiveAddonId(null);
-                setFunctionModalId(FARM_ALE_TAB_ID);
-              }}
-              title="Ale Brewing"
-            >
-              <img src="/assets/generated/item/item_quest_barrel.png" alt="" draggable="false" />
-              <span>Ale</span>
-            </button>
-          )}
-          {owned && building.id === "inn" && (
-            <button
-              type="button"
-              className={`city-building-rail-tab ${activeInnAleTab ? "active" : ""}`}
-              onClick={() => {
-                setActiveAddonId(null);
-                setFunctionModalId(INN_ALE_TAB_ID);
-              }}
-              title="Ale Sales"
-            >
-              <img src="/assets/generated/item/item_quest_barrel.png" alt="" draggable="false" />
-              <span>Ale</span>
-            </button>
-          )}
-          {(building.addons ?? []).map((addon) => {
+          {featureAddons.map((addon) => {
             const bought = purchasedAddons.has(addon.id);
-            const unlocked = cityAddonIsUnlocked(addon, snapshot);
-            const affordable = (snapshot?.player?.gold ?? 0) >= (addon.cost?.gold ?? 0);
+            const unlocked = cityAddonIsUnlocked(addon, snapshot, cityStats);
+            const buyCheck = cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats);
             const iconSprite = cityImageForAddon(houseImages, building, addon, progress);
             const addonIconUrl = cityImageElementSrc(iconSprite, addon.imageUrl ?? buildingImageSrc);
             return (
               <button
                 type="button"
-                className={`city-building-rail-tab ${bought ? "bought" : "unowned"} ${!bought && !addon.prebuilt ? "not-built" : ""} ${!bought && !affordable ? "unaffordable" : ""} ${activeAddonId === addon.id ? "active" : ""} ${!unlocked ? "locked" : ""}`}
+                className={`city-building-rail-tab ${bought ? "bought" : "unowned"} ${!bought && !addon.prebuilt ? "not-built" : ""} ${!bought && !buyCheck.canBuy ? "unaffordable" : ""} ${activeAddonId === addon.id ? "active" : ""} ${!unlocked ? "locked" : ""}`}
                 key={addon.id}
                 disabled={!owned || !unlocked}
                 onClick={() => {
                   setActiveAddonId(addon.id);
                   setFunctionModalId(addon.id);
                 }}
-                title={!unlocked ? cityAddonLockText(addon, snapshot) : bought ? addon.title : affordable ? `Buy ${addon.title}` : `${addon.title} requires ${addon.cost?.gold ?? 0} gold`}
+                title={!unlocked ? cityAddonLockText(addon, snapshot, cityStats) : bought ? addon.title : buyCheck.canBuy ? `Buy ${addon.title}` : buyCheck.reasons.join(", ")}
               >
                 {addonIconUrl && <img src={addonIconUrl} alt="" draggable="false" />}
                 <span>{addon.title}</span>
@@ -2990,12 +3402,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           </div>
         </div>}
 
-        <main className={`city-popup-main ${activeStorageSection && (functionModalId === BUILDING_STORAGE_FUNCTION_ID || functionModalId === activeAddon?.id) ? "storage-tab" : ""}`}>
+        <main className={`city-popup-main ${activeStorageSection ? "storage-tab" : ""}`}>
           {activeBaseTab && (
             <section className="city-building-base-note">
               <h4>{building.title}</h4>
               <p>{building.functionText ?? building.help}</p>
-              {building.addons?.length > 0 && <span>{purchasedAddons.size} / {building.addons.length} addons active</span>}
+              {featureAddons.length > 0 && <span>{featureAddons.filter((addon) => purchasedAddons.has(addon.id)).length} / {featureAddons.length} addons active</span>}
             </section>
           )}
           {!activeBaseTab && (
@@ -3008,13 +3420,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       </header>
                       <div className="city-addon-purchase-row">
                         <b>Cost</b>
-                        <span>{activeAddon.cost?.gold ?? 0} Gold</span>
-                        <span className={(snapshot?.player?.gold ?? 0) >= (activeAddon.cost?.gold ?? 0) ? "met" : "missing"}>
-                          You have {snapshot?.player?.gold ?? 0}
-                        </span>
+                        <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText="Free" />
                         <button
                           type="button"
-                          disabled={(snapshot?.player?.gold ?? 0) < (activeAddon.cost?.gold ?? 0)}
+                          disabled={!cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).canBuy}
                           onClick={() => buyAddon(activeAddon)}
                         >
                           Buy addon
@@ -3024,14 +3433,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   )}
                   {(!activeAddon || activeAddonOwned) && (
                     <>
-                  {owned && questBoardId && activeQuestBoard && (
-                    <CityQuestBoardPanel
-                      board={questBoard}
-                      fallbackConfig={QUEST_BOARD_CONFIG[questBoardId]}
-                      onAcceptQuest={acceptBoardQuest}
-                    />
-                  )}
-                  {owned && activeStorageSection && (functionModalId === BUILDING_STORAGE_FUNCTION_ID || functionModalId === activeAddon?.id) && (
+                  {owned && activeStorageSection && (
                     <CityStoragePanel
                       building={building}
                       buildingState={buildingState}
@@ -3051,170 +3453,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       onSortStoredItems={sortStoredItems}
                     />
                   )}
-                  {building.id === "mage_tower" && owned && activeAddonId === "arcane_extractor" && purchasedAddons.has("arcane_extractor") && (
-                    <CityArcaneExtractorPanel
-                      inventory={snapshot.inventory}
-                      onExtract={(index) => engineRef.current?.extractArcaneEssence?.(index)}
-                    />
-                  )}
-                  {owned && activeAddonId === "arcane_archive" && building.id === "mage_tower" && purchasedAddons.has("arcane_archive") && (
-                    <CityReadableMergePanel
-                      inventory={snapshot.inventory}
-                      kind="spellbook"
-                      onMerge={(index) => engineRef.current?.mergeInventoryItem?.(index)}
-                    />
-                  )}
-                  {owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && building.id === "library" && (
-                    <CityReadableMergePanel
-                      inventory={snapshot.inventory}
-                      kind="lorenote"
-                      onMerge={(index) => engineRef.current?.mergeInventoryItem?.(index)}
-                    />
-                  )}
-                  {functionModalId === BUILDING_STORAGE_FUNCTION_ID && building.id === "library" && owned && (
-                    <BestiaryViewer worldState={snapshot.worldState} />
-                  )}
-                  {building.id === "blacksmith" && owned && activeAddonId === "minting_furnace" && purchasedAddons.has("minting_furnace") && (
-                    <CityGoldBarPanel
-                      gold={snapshot.player?.gold ?? 0}
-                      inventory={snapshot.inventory}
-                      popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
-                      resourceCount={buildingResourceAvailable}
-                      onSmelt={() => engineRef.current?.smeltGoldToBar?.(1)}
-                      onSmeltIron={() => onConvertResourceToResource?.("iron_piece", 3, "iron_bar", 1)}
-                    />
-                  )}
-                  {building.id === "farm" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <CityFarmPanel
-                      inventory={snapshot.inventory}
-                      popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
-                      resourceCount={buildingResourceAvailable}
-                      onProduceFoodBarrel={produceFoodBarrel}
-                      onProduceProvision={addFarmProvision}
-                    />
-                  )}
-                  {building.id === "farm" && owned && activeFarmAleTab && (
-                    <CityFarmAlePanel
-                      inventory={snapshot.inventory}
-                      cityStats={cityStats}
-                      resourceCount={buildingResourceAvailable}
-                      onBrewAle={brewFarmAle}
-                    />
-                  )}
-                  {building.id === "inn" && owned && activeInnAleTab && (
-                    <CityInnAlePanel
-                      inventory={snapshot.inventory}
-                      resourceCount={buildingResourceAvailable}
-                      onServeAle={serveInnAle}
-                    />
-                  )}
-                  {building.id === "town_hall" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <section className="blacksmith-station">
-                      <header>
-                        <h4>Civic Ledger</h4>
-                        <span>Faction reputation</span>
-                      </header>
-                      <CityFactionPanel factionRep={snapshot.player?.factionRep} />
-                    </section>
-                  )}
-                  {building.id === "barracks" && owned && activeAddon && (
-                    <CityBarracksTrainingPanel
-                      addon={activeAddon}
-                      progress={progress}
-                      cityStats={cityStats}
-                      snapshot={snapshot}
-                      onTrain={trainArmyUnit}
-                    />
-                  )}
-                  {building.id === "armory" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <CityArmoryPanel
-                      inventory={snapshot.inventory}
-                      progress={progress}
-                      onConvert={convertInventoryItemToArmory}
-                    />
-                  )}
-                  {building.id === "research_lab" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <CityResearchPanel
-                      buildingState={buildingState}
-                      snapshot={snapshot}
-                      resourceCount={buildingResourceAvailable}
-                      onBuyRecipe={(recipeKey) => buyResearchRecipe(recipeKey)}
-                      onMerge={(recipe) => mergeResearchRecipe(recipe)}
-                    />
-                  )}
-                  {building.id === "research_lab" && owned && activeAddonId === "socket_workbench" && purchasedAddons.has("socket_workbench") && (
-                    <CitySocketPanel
-                      inventory={snapshot.inventory}
-                      gold={snapshot.player?.gold ?? 0}
-                      onAddSocket={(index) => engineRef.current?.addSocketToInventoryItem?.(index)}
-                      onSocketGem={(itemIndex, gemIndex) => engineRef.current?.socketGemIntoInventoryItem?.(itemIndex, gemIndex)}
-                    />
-                  )}
-                  {building.id === "merchant" && owned && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <CityMerchantPanel
-                      inventory={snapshot.inventory}
-                      stock={buildingState.merchant?.stock ?? []}
-                      gold={snapshot.player?.gold ?? 0}
-                      popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
-                      onSell={sellMerchantItem}
-                      onBuy={buyMerchantItem}
-                    />
-                  )}
-                  {building.id === "sanctuary" && functionModalId === BUILDING_STORAGE_FUNCTION_ID && (
-                    <>
-                      <CityClassPanel
-                        player={snapshot.player}
-                        progress={progress}
-                        onChooseClass={(classId) => engineRef.current?.chooseClass?.(classId, progress)}
-                        onResetClass={() => engineRef.current?.resetClassChoice?.()}
-                        onUnlockNode={(nodeId) => engineRef.current?.unlockClassNode?.(nodeId, progress)}
-                      />
-                      {owned && (
-                        <CitySkillTreePanel
-                          player={snapshot.player}
-                          onBuyRank={(nodeId) => engineRef.current?.buySkillTreeRank?.(nodeId)}
-                        />
-                      )}
-                    </>
-                  )}
-                  {building.id === "sanctuary" && owned && activeSanctuaryDonationTab && (
-                    <CitySanctuaryDonationPanel
-                      inventory={snapshot.inventory}
-                      resourceCount={buildingResourceAvailable}
-                      onDonate={applySanctuaryDonation}
-                    />
-                  )}
-                  {building.id === "blacksmith" && owned && (
-                    functionModalId === BLACKSMITH_BASE_FUNCTION_ID
-                  || (activeAddonOwned && ["weapon_anvil", "armor_anvil", "forge"].includes(String(activeAddonId)))
-                  ) && (
-                    <CityBlacksmithPanel
-                      engineRef={engineRef}
-                      snapshot={snapshot}
-                      snapshotRef={snapshotRef}
-                      activeAddonId={functionModalId === BLACKSMITH_BASE_FUNCTION_ID ? null : activeAddonId}
-                      purchasedAddons={purchasedAddons}
-                      resourceCount={buildingResourceAvailable}
-                      onRepairEquippedItem={repairEquippedItem}
-                      onRepairInventoryItem={repairInventoryItem}
-                    />
-                  )}
-                  {activeAddon && !activeStorageSection && ![
-                    "arcane_extractor",
-                    "arcane_archive",
-                    "minting_furnace",
-                    "socket_workbench",
-                    "weapon_anvil",
-                    "armor_anvil",
-                    "forge",
-                  ].includes(String(activeAddon.id)) && (
-                    <section className="blacksmith-station">
-                      <header>
-                        <h4>{activeAddon.title}</h4>
-                        <span>{activeAddon.help ?? "No separate station content configured yet."}</span>
-                      </header>
-                    </section>
-                  )}
+                  {renderActiveFeaturePanel()}
                     </>
                   )}
             </>
@@ -3267,17 +3506,22 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   );
 }
 
-function cityAddonIsUnlocked(addon, snapshot) {
+function cityAddonIsUnlocked(addon, snapshot, cityStats = {}) {
   if (addon?.prebuilt) return true;
   const required = addon?.unlock?.completedQuests ?? [];
+  const statRequirements = addon?.statRequirements ?? addon?.unlock?.statRequirements ?? addon?.unlock?.stats;
+  if (!cityStatsMeetRequirements(statRequirements, cityStats)) return false;
   if (!required.length) return true;
   const completed = new Set((snapshot?.quests?.completed ?? []).map(String));
   return required.every((questId) => completed.has(String(questId)));
 }
 
-function cityAddonLockText(addon, snapshot) {
-  if (cityAddonIsUnlocked(addon, snapshot)) return "";
+function cityAddonLockText(addon, snapshot, cityStats = {}) {
+  if (cityAddonIsUnlocked(addon, snapshot, cityStats)) return "";
   if (addon?.unlock?.text) return addon.unlock.text;
+  const statRequirementEntries = cityStatRequirementEntries(addon?.statRequirements ?? addon?.unlock?.statRequirements ?? addon?.unlock?.stats, cityStats);
+  const missingStats = statRequirementEntries.filter((entry) => !entry.met).map((entry) => entry.label);
+  if (missingStats.length) return `Requires ${missingStats.join(", ")}`;
   const required = addon?.unlock?.completedQuests ?? [];
   const completed = new Set((snapshot?.quests?.completed ?? []).map(String));
   const missing = required.filter((questId) => !completed.has(String(questId)));
@@ -3296,6 +3540,7 @@ function normalizeInventoryType(value) {
 }
 
 function cityInventorySectionKey(source) {
+  if (source?.config?.legacyBase) return "base";
   return source?.id ? `addon:${source.id}` : "base";
 }
 
@@ -3316,8 +3561,9 @@ function cityInventorySections(building, state, owned) {
     });
   }
   const bought = new Set(state.addons ?? []);
-  for (const addon of building.addons ?? []) {
+  for (const addon of normalizeCityBuildingAddons(building)) {
     if (!bought.has(addon.id)) continue;
+    if (addon.config?.legacyBase && baseInventory.type !== "none" && baseSlots > 0) continue;
     const addonInventory = normalizeInventoryType(addon.inventoryType);
     const fixedDefs = fixedReadableDefsForInventoryType(addonInventory.type);
     const slots = fixedDefs.length || addonInventory.slots;
@@ -3583,13 +3829,13 @@ function applyCityInventoryDepositPlan(items, item, plan) {
 
 function itemMatchesCityInventoryType(item, type) {
   if (!item || !type || type === "none") return false;
+  if (isQuestItem(item)) return false;
   if (type === "all") return true;
-  if (type === "gemstone") return item.mode === "resource" && (RESOURCE_DEFS[item.resourceId]?.sheet === "gemstones" || String(item.resourceId ?? "").includes("gemstone") || item.resourceId === "diamond");
+  if (type === "gemstone") return item.mode === "resource" && (String(item.resourceId ?? "").includes("gemstone") || item.resourceId === "diamond");
   if (type === "potion") return isPotionItem(item);
   if (type === "resource") return isResourceItem(item);
   if (type === "weapon") return item.slot === "weapon";
   if (type === "armor") return item.mode === "armor";
-  if (type === "quest") return isQuestItem(item);
   if (type === "readable") return isReadableItem(item);
   if (type === "fixed_lorebook") return isReadableItem(item) && item.readableKind === "lorebook" && item.readableStatus !== "mergeable";
   if (type === "fixed_spellbook") return isReadableItem(item) && item.readableKind === "spellbook" && item.readableStatus !== "mergeable";
@@ -3716,12 +3962,14 @@ function CityArmoryPanel({ inventory, progress, onConvert }) {
         const quantity = getArmoryItemQuantity(item);
         const pointsPerItem = getArmoryPointValue(item);
         const iconUrl = iconUrlFromKey(deriveIconKey(item));
+        const rarityColor = item.rarityColor ?? RARITIES.find((rarity) => rarity.id === item.rarity)?.color ?? "#f5f3ea";
+        const rarityLabel = item.rarityLabel ?? RARITIES.find((rarity) => rarity.id === item.rarity)?.label ?? item.rarity ?? "normal";
         return (
-          <div className="blacksmith-row" key={item.id ?? index}>
+          <div className="blacksmith-row armory-item-row" style={{ "--item-quality": rarityColor }} key={item.id ?? index}>
             <InventoryIcon iconSheet="items" iconUrl={item.iconUrl ?? iconUrl} />
             <div>
               <b>{item.name ?? "Unnamed item"}</b>
-              <span>{item.rarity ?? "normal"} | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? ` each, ${quantity} available` : ""}</span>
+              <span><i>{rarityLabel}</i> | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? ` each, ${quantity} available` : ""}</span>
             </div>
             <button type="button" onClick={() => onConvert(index, 1)}>Convert</button>
             {quantity > 1 && <button type="button" onClick={() => onConvert(index, quantity)}>Convert all</button>}
@@ -3752,19 +4000,13 @@ function CityStatEffectsSummary({ title, effects }) {
 
 function CityCampStats({ cityStats }) {
   const events = cityStats.events ?? {};
-  const activeEntries = [
-    ["famine", "Famine"],
-    ["water_shortage", "Water shortage"],
-    ["disease_outbreak", "Disease outbreak"],
-    ["uprising_poorness", "Uprising risk"],
-    ["fire", "Fire risk"],
-  ].filter(([id]) => events[id]?.active || Number(events[id]?.risk) > 0);
+  const activeEntries = cityEventEntries(events, { includeRisk: true });
   return (
     <div className="city-stat-effects">
       <b>City events</b>
       <div>
-        {activeEntries.length ? activeEntries.map(([id, label]) => (
-          <span title={label} key={id}><b>{label}</b></span>
+        {activeEntries.length ? activeEntries.map((event) => (
+          <span title={event.label} key={event.id}><b>{event.label}</b></span>
         )) : <span><b>Stable</b></span>}
       </div>
       <p>Events are derived from current city stats and can be used by later combat, loot, and quest logic.</p>
@@ -3859,11 +4101,7 @@ function CityCostIcon({ resourceId }) {
   if (!def) return <i className="city-cost-missing-icon" aria-hidden="true" />;
   const iconUrl = iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }));
   return (
-    <InventoryIcon
-      iconIndex={def.iconIndex}
-      iconSheet={def.sheet ?? "resources"}
-      iconUrl={def.iconUrl ?? iconUrl}
-    />
+    <InventoryIcon iconUrl={def.iconUrl ?? iconUrl} />
   );
 }
 
