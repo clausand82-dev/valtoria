@@ -9,7 +9,8 @@ import {
   worldToScreen,
   POPULARITY_CONFIG,
   DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
-  SPELL_DEFS
+  SPELL_DEFS,
+  cityRuntimeModifiers
 } from "../dependencies.js";
 import {
   monsterPopularityDelta,
@@ -1769,7 +1770,7 @@ export const combatMethods = {
         this.applyStatBonuses(stats, effect.bonuses);
       }
     }
-    stats.maxHp = Math.floor(stats.maxHp);
+    stats.maxHp = Math.floor(stats.maxHp * (cityRuntimeModifiers(this.cityStats).heroMaxHpMultiplier ?? 1));
     stats.maxMana = Math.floor(stats.maxMana);
     stats.damageMin = Math.max(1, Math.floor(stats.damageMin));
     stats.damageMax = Math.max(stats.damageMin + 1, Math.floor(stats.damageMax));

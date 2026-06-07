@@ -41,6 +41,7 @@ import {
   calcThreatRiseOnDeath,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
+import { cityRuntimeModifiers } from "../game/config/city-consequence-resolver.js";
 import {
   deriveIconKey,
   iconUrlFromKey,
@@ -299,16 +300,16 @@ function merchantTradeQuantity(item, quantity) {
   return Math.max(1, Math.min(merchantTradeMax(item), Math.floor(Number(quantity) || 1)));
 }
 
-function merchantSellPrice(item, popularity) {
+function merchantSellPrice(item, popularity, modifiers = {}) {
   const value = Math.max(1, Math.floor(Number(item?.value) || itemValue(item)));
   const pop = Math.max(0, Math.min(100, Number(popularity) || 0));
-  return Math.max(1, Math.floor(value * (0.35 + pop * 0.004)));
+  return Math.max(1, Math.floor(value * (0.35 + pop * 0.004) * (modifiers.merchantSellPriceMultiplier ?? 1)));
 }
 
-function merchantBuyPrice(item, popularity) {
+function merchantBuyPrice(item, popularity, modifiers = {}) {
   const value = Math.max(1, Math.floor(Number(item?.value) || itemValue(item)));
   const pop = Math.max(0, Math.min(100, Number(popularity) || 0));
-  return Math.max(1, Math.ceil(value * (1.25 - pop * 0.004)));
+  return Math.max(1, Math.ceil(value * (1.25 - pop * 0.004) * (modifiers.merchantBuyPriceMultiplier ?? 1)));
 }
 
 function merchantCloneItem(item) {
@@ -318,7 +319,7 @@ function merchantCloneItem(item) {
   };
 }
 
-function generateMerchantStock(level, soldItems = []) {
+function generateMerchantStock(level, soldItems = [], cityStats = {}) {
   const stock = [...(soldItems ?? []).slice(0, 10).map(merchantCloneItem)];
   const resourceIds = Object.keys(RESOURCE_DEFS).filter((id) => id !== "diamond");
   for (let i = 0; i < Math.min(10, resourceIds.length); i += 1) {
@@ -328,10 +329,11 @@ function generateMerchantStock(level, soldItems = []) {
   stock.push(makeItem({ level: Math.max(1, level), rarity: "normal" }));
   if (level >= 3) stock.push(makeItem({ level, rarity: "upgraded" }));
   if (level >= 6) stock.push(makeItem({ level, rarity: "rare" }));
-  return stock.slice(0, 22);
+  const stockLimit = Math.max(1, Math.floor(22 * (cityRuntimeModifiers(cityStats).merchantStockMultiplier ?? 1)));
+  return stock.slice(0, stockLimit);
 }
 
-function rerollMerchantStockForCityVisit(progress, level) {
+function rerollMerchantStockForCityVisit(progress, level, cityStats = {}) {
   const merchantBuilding = CITY_BUILDINGS.find((building) => building.id === "merchant");
   if (!merchantBuilding) return progress;
   const state = progress?.merchant ?? {};
@@ -342,19 +344,21 @@ function rerollMerchantStockForCityVisit(progress, level) {
       ...state,
       merchant: {
         ...merchant,
-        stock: generateMerchantStock(level, merchant.soldItems ?? []),
+        stock: generateMerchantStock(level, merchant.soldItems ?? [], cityStats),
       },
     },
   };
 }
 
-function applyDurabilityDegradationForVisit(progress) {
+function applyDurabilityDegradationForVisit(progress, cityStats = {}) {
   if (!progress) return progress;
   const next = { ...progress };
+  const modifiers = cityRuntimeModifiers(cityStats);
   const degradeState = (state) => {
     const current = Math.max(0, Math.min(100, Number(state?.durability ?? DURABILITY_DEFAULT)));
-    if (Math.random() > DURABILITY_DEGRADE_CHANCE) return state;
-    const pct = DURABILITY_DEGRADE_MIN_PCT + Math.random() * (DURABILITY_DEGRADE_MAX_PCT - DURABILITY_DEGRADE_MIN_PCT);
+    if (Math.random() > Math.min(1, DURABILITY_DEGRADE_CHANCE * (modifiers.cityDurabilityDegradeChanceMultiplier ?? 1))) return state;
+    const pct = (DURABILITY_DEGRADE_MIN_PCT + Math.random() * (DURABILITY_DEGRADE_MAX_PCT - DURABILITY_DEGRADE_MIN_PCT))
+      * (modifiers.cityDurabilityDamageMultiplier ?? 1);
     return {
       ...state,
       durability: Math.max(0, current - pct),

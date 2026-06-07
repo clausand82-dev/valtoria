@@ -3,6 +3,10 @@ History over changes
 TO DO:
 kun en farm, resten er bare areas der hedder farm!
 
+*V. 0.82
+- adding more city stats and consequences
+- added icons for buffs (also consequences)
+
 *V. 0.81
 - Blacksmith Forge Addon can now destroy gear and not only items now
 - fixed a bug where chunk generation not was so random after all (tileset, object, deacy, foliage, mobs and world generation)

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { CHEAT_SETTINGS } from "../../game/config/cheat-config.js";
+import { CITY_STATUS_EFFECT_ICON_URLS, cityEventEntries } from "../../game/config/city-config.js";
 import {
   AtlasIcon,
   CityStatsTopBar,
@@ -200,6 +201,148 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
   );
 }
 
+function HeroModifierList({ events = {}, statusEffects = [] }) {
+  const activeOrderRef = useRef(new Map());
+  const nextOrderRef = useRef(0);
+  const [hoveredTooltip, setHoveredTooltip] = useState(null);
+  const eventEntries = cityEventEntries(events)
+    .map((event) => ({
+      ...event,
+      effectText: cityEventModifierText(event.modifiers),
+      kind: event.positive ? "positive" : "negative",
+      iconText: heroModifierIconText(event.id),
+      iconUrl: event.iconUrl,
+    }))
+    .filter((event) => event.effectText);
+  const statusEntries = (statusEffects ?? []).map((effect, index) => ({
+    id: `status-${effect.id ?? effect.label}-${index}`,
+    label: effect.label,
+    effectText: effect.effect,
+    metaText: Number(effect.remainingSeconds) > 0 ? `${Math.ceil(Number(effect.remainingSeconds))}s` : "",
+    solution: effect.solution,
+    kind: effect.type === "buff" ? "positive" : "negative",
+    detail: effect.detail ?? "",
+    color: effect.color,
+    iconText: heroStatusIconText(effect.type),
+    iconUrl: effect.sourceId ? CITY_STATUS_EFFECT_ICON_URLS[effect.sourceId] ?? null : null,
+  }));
+  const entries = [...eventEntries, ...statusEntries];
+  const activeIds = new Set(entries.map((entry) => entry.id));
+  for (const key of activeOrderRef.current.keys()) {
+    if (!activeIds.has(key)) activeOrderRef.current.delete(key);
+  }
+  for (const entry of entries) {
+    if (!activeOrderRef.current.has(entry.id)) {
+      activeOrderRef.current.set(entry.id, nextOrderRef.current);
+      nextOrderRef.current += 1;
+    }
+  }
+  entries.sort((a, b) => (
+    (activeOrderRef.current.get(a.id) ?? 0) - (activeOrderRef.current.get(b.id) ?? 0)
+  ));
+  if (!entries.length) return null;
+  const showTooltip = (event, element) => {
+    const rect = element.getBoundingClientRect();
+    const width = 250;
+    const estimatedHeight = 150;
+    const margin = 8;
+    const left = Math.max(margin, Math.min(window.innerWidth - width - margin, rect.left));
+    const below = rect.bottom + 7;
+    const top = below + estimatedHeight <= window.innerHeight - margin
+      ? below
+      : Math.max(margin, rect.top - estimatedHeight - 7);
+    setHoveredTooltip({ event, style: { left: `${left}px`, top: `${top}px`, width: `${width}px` } });
+  };
+  const hideTooltip = () => setHoveredTooltip(null);
+  return (
+    <>
+      <div className="hero-modifier-list" aria-label="Active hero and loot modifiers">
+        {entries.map((event) => (
+          <div
+            className={`hero-modifier ${event.kind}`}
+            key={event.id}
+            onBlur={hideTooltip}
+            onFocus={(focusEvent) => showTooltip(event, focusEvent.currentTarget)}
+            onMouseEnter={(mouseEvent) => showTooltip(event, mouseEvent.currentTarget)}
+            onMouseLeave={hideTooltip}
+            style={event.color ? { "--hero-modifier-color": event.color } : undefined}
+            tabIndex={0}
+          >
+            <i aria-hidden="true">
+              {event.iconUrl ? <img src={event.iconUrl} alt="" draggable="false" onError={(error) => { error.currentTarget.hidden = true; }} /> : null}
+              <em>{event.iconText}</em>
+            </i>
+            {event.metaText ? <span>{event.metaText}</span> : null}
+          </div>
+        ))}
+      </div>
+      {hoveredTooltip && (
+        <div className="hero-modifier-tooltip" role="tooltip" style={hoveredTooltip.style}>
+          <b>{hoveredTooltip.event.label}</b>
+          {hoveredTooltip.event.effectText ? <section><strong>Effect</strong><p>{hoveredTooltip.event.effectText}</p></section> : null}
+          {hoveredTooltip.event.detail ? <section><strong>Info</strong><p>{hoveredTooltip.event.detail}</p></section> : null}
+          {hoveredTooltip.event.solution ? <section><strong>Solution</strong><p>{hoveredTooltip.event.solution}</p></section> : null}
+        </div>
+      )}
+    </>
+  );
+}
+
+function heroModifierTitle(event) {
+  return [
+    event.label,
+    event.effectText ? `Effect: ${event.effectText}` : "",
+    event.detail ? `Info: ${event.detail}` : "",
+    event.solution ? `Solution: ${event.solution}` : "",
+  ].filter(Boolean).join("\n");
+}
+
+function heroModifierIconText(eventId) {
+  const icons = {
+    famine: "FO",
+    water_shortage: "WA",
+    disease_outbreak: "HP",
+    uprising_poorness: "GD",
+    fire: "FI",
+    lawlessness: "MB",
+    supply_crisis: "RP",
+    trade_collapse: "TR",
+    faith_crisis: "PT",
+    prosperity: "RW",
+  };
+  return icons[eventId] ?? "EV";
+}
+
+function heroStatusIconText(type) {
+  if (type === "buff") return "BF";
+  if (type === "debuff") return "DB";
+  return "FX";
+}
+
+function cityEventModifierText(modifiers = {}) {
+  const parts = [];
+  const pct = (value) => `${Math.round((Number(value) || 1) * 100)}%`;
+  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(`Max HP ${pct(modifiers.heroMaxHpMultiplier)}`);
+  if (modifiers.goldDropMultiplier !== undefined) parts.push(`Gold drops ${pct(modifiers.goldDropMultiplier)}`);
+  if (modifiers.potionDropMultiplier !== undefined) parts.push(`Potion drops ${pct(modifiers.potionDropMultiplier)}`);
+  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(`Health potions ${pct(modifiers.healthPotionHealMultiplier)}`);
+  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(`City mob spawn ${pct(modifiers.cityMobSpawnChanceMultiplier)}`);
+  if (modifiers.repairCostMultiplier !== undefined) parts.push(`Repair cost ${pct(modifiers.repairCostMultiplier)}`);
+  if (modifiers.craftingCostMultiplier !== undefined) parts.push(`Crafting cost ${pct(modifiers.craftingCostMultiplier)}`);
+  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(`Buy prices ${pct(modifiers.merchantBuyPriceMultiplier)}`);
+  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(`Sell prices ${pct(modifiers.merchantSellPriceMultiplier)}`);
+  if (modifiers.merchantStockMultiplier !== undefined) parts.push(`Merchant stock ${pct(modifiers.merchantStockMultiplier)}`);
+  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(`Quest gold ${pct(modifiers.questGoldRewardMultiplier)}`);
+  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(`City decay chance ${pct(modifiers.cityDurabilityDegradeChanceMultiplier)}`);
+  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(`City damage ${pct(modifiers.cityDurabilityDamageMultiplier)}`);
+  const resourceMultipliers = Object.entries(modifiers.resourceDropMultiplierById ?? {});
+  if (resourceMultipliers.length) {
+    const values = [...new Set(resourceMultipliers.map(([, value]) => pct(value)))];
+    parts.push(`Food resources ${values.join("/")}`);
+  }
+  return parts.join(" | ");
+}
+
 export function GameHud({
   cityHudStats,
   cityOpen,
@@ -282,8 +425,11 @@ export function GameHud({
           </>
         ) : (
           <>
-            <div className="portrait">
-              <b>{player.level}</b>
+            <div className="hero-hud-column">
+              <div className="portrait">
+                <b>{player.level}</b>
+              </div>
+              <HeroModifierList events={derivedCityStats?.events} statusEffects={player.statusEffects} />
             </div>
             <div className="resource-stack">
               <ResourceBar type="health" value={hpPct} label={`HP ${player.hp} / ${player.maxHp}`} />

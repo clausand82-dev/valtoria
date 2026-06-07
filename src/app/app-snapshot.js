@@ -33,6 +33,7 @@ export const emptySnapshot = {
     goldFind: 0,
     resourceFind: 0,
     xpGain: 0,
+    statusEffects: [],
   },
   zone: { name: "Stonewake Wilds", level: 1, seed: 7341, weather: { id: "none", label: "No weather" } },
   region: { name: "Stonewake Wilds", index: 1, seed: 7341, weather: { id: "none", label: "No weather" } },

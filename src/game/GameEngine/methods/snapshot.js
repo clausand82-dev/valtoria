@@ -47,6 +47,88 @@ function snapshotIconUrl(item) {
   return item.iconUrl;
 }
 
+function statusEffectSnapshot(effect = {}) {
+  const seconds = Math.max(0, Number(effect.duration) || 0);
+  const sourceDef = effect.sourceId ? POTION_DEFS[normalizePotionId(effect.sourceId)] ?? SPELL_DEFS[effect.sourceId] : null;
+  const pct = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
+  if (effect.type === "statBuff") {
+    const bonuses = Object.entries(effect.bonuses ?? {})
+      .map(([key, value]) => `${key} ${Number(value) > 0 ? "+" : ""}${Math.round(Number(value) || 0)}`)
+      .join(", ");
+    return {
+      id: effect.sourceId ?? effect.type ?? "statBuff",
+      sourceId: effect.sourceId ?? null,
+      type: "buff",
+      label: sourceDef?.name ?? sourceDef?.title ?? "Stat buff",
+      effect: bonuses || "Temporary stat bonus",
+      remainingSeconds: seconds,
+      solution: "Wait for the buff to expire.",
+      color: effect.color ?? sourceDef?.color ?? "#f4da96",
+    };
+  }
+  if (effect.type === "regen") {
+    const parts = [];
+    if (effect.healthPct) parts.push(`Health regen ${pct(effect.healthPct)}/s`);
+    if (effect.manaPct) parts.push(`Mana regen ${pct(effect.manaPct)}/s`);
+    return {
+      id: effect.sourceId ?? effect.type ?? "regen",
+      sourceId: effect.sourceId ?? null,
+      type: "buff",
+      label: sourceDef?.name ?? "Regeneration",
+      effect: parts.join(" | ") || "Regeneration",
+      remainingSeconds: seconds,
+      solution: "Wait for the buff to expire.",
+      color: effect.color ?? sourceDef?.color ?? "#ff9f1c",
+    };
+  }
+  if (effect.type === "dot") {
+    return {
+      id: effect.sourceId ?? effect.type ?? "dot",
+      sourceId: effect.sourceId ?? null,
+      type: "debuff",
+      label: sourceDef?.title ?? sourceDef?.name ?? "Damage over time",
+      effect: `${Math.max(1, Math.floor(Number(effect.damage ?? effect.baseDamage) || 1))} damage per tick`,
+      remainingSeconds: seconds,
+      solution: "Survive until it expires.",
+      color: effect.color ?? "#d15757",
+    };
+  }
+  if (effect.type === "slow") {
+    return {
+      id: effect.sourceId ?? effect.type ?? "slow",
+      sourceId: effect.sourceId ?? null,
+      type: "debuff",
+      label: "Slow",
+      effect: `Move speed -${pct(effect.pct)}`,
+      remainingSeconds: seconds,
+      solution: "Wait for it to expire.",
+      color: effect.color ?? "#58bfff",
+    };
+  }
+  if (effect.type === "root") {
+    return {
+      id: effect.sourceId ?? effect.type ?? "root",
+      sourceId: effect.sourceId ?? null,
+      type: "debuff",
+      label: "Root",
+      effect: "Movement disabled",
+      remainingSeconds: seconds,
+      solution: "Wait for it to expire.",
+      color: effect.color ?? "#d7d4c7",
+    };
+  }
+  return {
+    id: effect.sourceId ?? effect.type ?? "effect",
+    sourceId: effect.sourceId ?? null,
+    type: "effect",
+    label: String(effect.type ?? "Effect"),
+    effect: "Temporary effect",
+    remainingSeconds: seconds,
+    solution: "Wait for it to expire.",
+    color: effect.color ?? "#f4da96",
+  };
+}
+
 export const snapshotMethods = {
   publishSnapshot() {
     const stats = this.calcStats();
@@ -89,6 +171,9 @@ export const snapshotMethods = {
         goldFind: stats.goldFind,
         resourceFind: stats.resourceFind,
         xpGain: stats.xpGain,
+        statusEffects: (this.player.statusEffects ?? [])
+          .filter((effect) => Number(effect?.duration) > 0)
+          .map(statusEffectSnapshot),
         physicalResist: stats.physicalResist,
         fireResist: stats.fireResist,
         iceResist: stats.iceResist,

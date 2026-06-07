@@ -55,7 +55,8 @@ import {
   calcCitySpawnChance,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
-import { CITY_EVENT_DEFS, CITY_EVENT_RULES } from "../game/config/city-config.js";
+import { CITY_EVENT_RULES } from "../game/config/city-config.js";
+import { cityDurabilityConsequenceFor, cityEventFlags, cityRuntimeModifiers } from "../game/config/city-consequence-resolver.js";
 import {
   deriveIconKey,
   iconUrlFromKey,
@@ -317,7 +318,7 @@ function regionHasMobType(region, mobType) {
   });
 }
 
-function applyCityMobProgressForVisit(progress = {}) {
+function applyCityMobProgressForVisit(progress = {}, cityStats = {}) {
   let next = {
     ...progress,
     threatLevel: Math.max(0, Math.min(100, Number(progress.threatLevel) || 0)),
@@ -325,8 +326,8 @@ function applyCityMobProgressForVisit(progress = {}) {
   };
 
   next = applyCityMobLevelAndSpread(next);
-  next = applyCityMobNewSpawns(next);
-  next = applyCityMobBuildingDamage(next);
+  next = applyCityMobNewSpawns(next, cityStats);
+  next = applyCityMobBuildingDamage(next, cityStats);
   return next;
 }
 
@@ -358,8 +359,8 @@ function applyCityMobLevelAndSpread(progress = {}) {
   return { ...progress, cityMobs: nextMobs };
 }
 
-function applyCityMobNewSpawns(progress = {}) {
-  const spawnChance = calcCitySpawnChance(Number(progress.threatLevel) || 0);
+function applyCityMobNewSpawns(progress = {}, cityStats = {}) {
+  const spawnChance = Math.min(1, calcCitySpawnChance(Number(progress.threatLevel) || 0) * (cityRuntimeModifiers(cityStats).cityMobSpawnChanceMultiplier ?? 1));
   if (spawnChance <= 0) return progress;
   const currentMobs = normalizeCityMobs(progress.cityMobs);
   const nextMobs = [...currentMobs];
@@ -375,9 +376,10 @@ function applyCityMobNewSpawns(progress = {}) {
   return { ...progress, cityMobs: nextMobs };
 }
 
-function applyCityMobBuildingDamage(progress = {}) {
+function applyCityMobBuildingDamage(progress = {}, cityStats = {}) {
   const mobs = normalizeCityMobs(progress.cityMobs);
   if (!mobs.length) return progress;
+  const damageMultiplier = cityRuntimeModifiers(cityStats).cityDurabilityDamageMultiplier ?? 1;
   let next = progress;
   for (const mob of mobs) {
     const targetAreaId = CITY_SPAWN_AREA_BUILDING_TARGETS[mob.areaId];
@@ -388,7 +390,7 @@ function applyCityMobBuildingDamage(progress = {}) {
     if (!state.unlocked) continue;
     const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
     const currentDurability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
-    const damage = CITY_MOB_DAMAGE_PER_LEVEL_PCT * mob.level * Math.max(1, mob.count);
+    const damage = CITY_MOB_DAMAGE_PER_LEVEL_PCT * mob.level * Math.max(1, mob.count) * damageMultiplier;
     const nextDurability = Math.max(0, parseFloat((currentDurability - damage).toFixed(2)));
     if (nextDurability === currentDurability) continue;
     next = {
@@ -1033,16 +1035,29 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
-    applyNonPopularityEffects(stats, cityAreaActiveStatEffects(area, state.level));
+    const consequence = cityDurabilityConsequenceFor(state.durability);
+    if (consequence?.disabled) continue;
+    applyNonPopularityEffects(stats, scaleCityStatEffects(
+      cityAreaActiveStatEffects(area, state.level),
+      consequence?.buildingEfficiencyMultiplier ?? 1,
+    ));
   }
   for (const building of CITY_BUILDINGS) {
     const state = getCityBuildingState(progress, building);
     if ((state.level ?? 0) <= 0) continue;
-    applyNonPopularityEffects(stats, cityBuildingActiveStatEffects(building, state.level));
+    const consequence = cityDurabilityConsequenceFor(state.durability);
+    if (consequence?.disabled) continue;
+    applyNonPopularityEffects(stats, scaleCityStatEffects(
+      cityBuildingActiveStatEffects(building, state.level),
+      consequence?.buildingEfficiencyMultiplier ?? 1,
+    ));
     const purchasedAddons = new Set(state.addons ?? []);
     for (const addon of building.addons ?? []) {
       if (!purchasedAddons.has(addon.id)) continue;
-      applyNonPopularityEffects(stats, addon.statEffects ?? addon.effects?.cityStats);
+      applyNonPopularityEffects(stats, scaleCityStatEffects(
+        addon.statEffects ?? addon.effects?.cityStats,
+        consequence?.addonEfficiencyMultiplier ?? 1,
+      ));
     }
   }
   applyRegionCityStats(stats, regionCorruption, snapshot);
@@ -1130,48 +1145,6 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   if (cityPopularityModifier !== 0) addEntry("popularity", "City modifier", cityPopularityModifier, "Effective = base + city modifier");
   addEntry("maintenance", "Average durability", finalStats.maintenance, "Unlocked city areas and buildings");
   return breakdown;
-}
-
-function cityEventFlags(cityStats = {}) {
-  const population = Math.max(0, Math.floor(Number(cityStats.population) || 0));
-  const provision = Math.max(0, Math.floor(Number(cityStats.provision) || 0));
-  const water = Math.max(0, Math.floor(Number(cityStats.water) || 0));
-  const health = Math.max(0, Math.min(100, Number(cityStats.health) || 0));
-  const wealth = Math.max(0, Math.floor(Number(cityStats.wealth) || 0));
-  const safety = Math.max(0, Math.min(100, Number(cityStats.safety) || 0));
-  const famine = provision < population;
-  const waterShortage = water < population;
-  const diseaseOutbreak = health < CITY_EVENT_RULES.diseaseOutbreakHealthThreshold;
-  const wealthRatio = wealth / Math.max(1, population);
-  const uprisingPoorness = wealthRatio < CITY_EVENT_RULES.uprisingWealthRatioThreshold;
-  const fireRisk = Math.max(0, Math.min(100, (100 - safety) + (waterShortage ? CITY_EVENT_RULES.fireRiskWaterShortageBonus : 0)));
-  return {
-    famine: {
-      active: famine,
-      unavailablePopulationPct: CITY_EVENT_RULES.famineUnavailablePopulationPct,
-      futureEffect: CITY_EVENT_DEFS.famine.futureEffect,
-    },
-    water_shortage: {
-      active: waterShortage,
-      unavailablePopulationPct: CITY_EVENT_RULES.waterShortageUnavailablePopulationPct,
-      futureEffect: CITY_EVENT_DEFS.water_shortage.futureEffect,
-    },
-    disease_outbreak: {
-      active: diseaseOutbreak,
-      futureEffect: CITY_EVENT_DEFS.disease_outbreak.futureEffect,
-    },
-    uprising_poorness: {
-      active: uprisingPoorness,
-      risk: uprisingPoorness ? "high" : "low",
-      wealthRatio,
-      futureEffect: CITY_EVENT_DEFS.uprising_poorness.futureEffect,
-    },
-    fire: {
-      active: fireRisk >= CITY_EVENT_RULES.fireRiskActiveThreshold,
-      risk: fireRisk,
-      waterShortage,
-    },
-  };
 }
 
 function clampCorruptionLevel(value) {
@@ -1454,6 +1427,15 @@ function mergeCityStatEffects(effectList = []) {
     }
   }
   return merged;
+}
+
+function scaleCityStatEffects(effects = {}, multiplier = 1) {
+  const scale = Number(multiplier);
+  if (!Number.isFinite(scale) || scale === 1) return effects ?? {};
+  return Object.fromEntries(Object.entries(effects ?? {}).map(([statId, amount]) => [
+    statId,
+    Math.floor((Number(amount) || 0) * scale),
+  ]));
 }
 
 function cityReachedLevels(config, currentLevel = 1) {

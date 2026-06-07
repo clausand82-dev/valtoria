@@ -114,7 +114,7 @@ import {
   socketText,
 } from "./city-panel-helpers.jsx";
 
-function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
+function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
@@ -130,6 +130,8 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
           snapshot={snapshot}
           snapshotRef={snapshotRef}
           resourceCount={resourceCount}
+          cityEventModifiers={cityEventModifiers}
+          blacksmithModifiers={blacksmithModifiers}
           onRepairEquippedItem={onRepairEquippedItem}
           onRepairInventoryItem={onRepairInventoryItem}
         />
@@ -158,6 +160,7 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
         <BlacksmithForgeStation
           enabled={hasForge}
           gear={forgeGear}
+          blacksmithModifiers={blacksmithModifiers}
           onDestroy={(index) => engineRef.current?.forgeDestroyInventoryWeapon?.(index)}
         />
       )}
@@ -174,7 +177,7 @@ function durabilityColor(dur) {
   return "#ff6b5f";
 }
 
-function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
+function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
   const equipment = snapshot.equipment ?? [];
   const equippedItems = equipment
     .filter((slot) => slot.item != null)
@@ -222,6 +225,8 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
             engineRef={engineRef}
             snapshotRef={snapshotRef}
             resourceCount={resourceCount}
+            cityEventModifiers={cityEventModifiers}
+            blacksmithModifiers={blacksmithModifiers}
             onRepairEquippedItem={onRepairEquippedItem}
             onRepairInventoryItem={onRepairInventoryItem}
           />
@@ -231,7 +236,7 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
   );
 }
 
-function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, onRepairEquippedItem, onRepairInventoryItem }) {
+function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
   const item = slot.item;
   const dur = Number(item.durability ?? 100);
   const missing = Math.ceil(100 - dur);
@@ -240,8 +245,9 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
   const color = durabilityColor(dur);
 
   // Calculate repair costs
-  const goldCost = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
-  const junkCost = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
+  const repairCostMultiplier = (cityEventModifiers.repairCostMultiplier ?? 1) * (blacksmithModifiers.repairCostMultiplier ?? 1);
+  const goldCost = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing * repairCostMultiplier));
+  const junkCost = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing * repairCostMultiplier));
 
   // Check if player has enough resources
   const goldHave = Math.max(0, Math.floor(Number(snapshot.player?.gold) || 0));
@@ -411,12 +417,13 @@ function isForgeGear(item) {
     || item.mode === "magic";
 }
 
-function BlacksmithForgeStation({ enabled, gear, onDestroy }) {
+function BlacksmithForgeStation({ enabled, gear, blacksmithModifiers = {}, onDestroy }) {
+  const junkYieldMultiplier = blacksmithModifiers.forgeJunkYieldMultiplier ?? 1;
   return (
     <section className={`blacksmith-station ${enabled ? "" : "locked"}`}>
       <header>
         <h4>Forge Addon</h4>
-        <span>{enabled ? "Destroy gear for resources" : "Build Forge Addon to extract gear resources."}</span>
+        <span>{enabled ? `Destroy gear for resources${junkYieldMultiplier !== 1 ? ` | Junk yield ${Math.round(junkYieldMultiplier * 100)}%` : ""}` : "Build Forge Addon to extract gear resources."}</span>
       </header>
       {!enabled && <p>Build Forge Addon to destroy gear here.</p>}
       {enabled && gear.length === 0 && <p>No gear in backpack.</p>}
@@ -436,9 +443,9 @@ function BlacksmithForgeStation({ enabled, gear, onDestroy }) {
   );
 }
 
-function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, onSmelt, onSmeltIron }) {
-  const unitCost = goldBarUnitCost(popularity);
-  const ironPieceCost = 3;
+function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, blacksmithModifiers = {}, onSmelt, onSmeltIron }) {
+  const unitCost = Math.max(1, Math.ceil(goldBarUnitCost(popularity) * (blacksmithModifiers.goldBarCostMultiplier ?? 1)));
+  const ironPieceCost = 3 + Math.max(0, Math.floor(Number(blacksmithModifiers.metalBarInputCostBonus) || 0));
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const ironPieces = countResource("iron_piece");
   return (
@@ -451,7 +458,7 @@ function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, onSmelt,
         <InventoryIcon iconSheet="items" iconUrl="/assets/generated/item/item_res_goldbar.png" />
         <div>
           <b>Gold Bar</b>
-          <span>Popularity {Math.round(popularity ?? 0)}% | Available gold: {gold}</span>
+          <span>{unitCost} Gold {"->"} 1 Gold Bar | Popularity {Math.round(popularity ?? 0)}% | Available: {gold}</span>
         </div>
         <button type="button" disabled={gold < unitCost} onClick={onSmelt}>Smelt</button>
       </div>
@@ -461,7 +468,7 @@ function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, onSmelt,
           <b>Iron Bar</b>
           <span>{ironPieceCost} Iron Piece {"->"} 1 Iron Bar | Available: {ironPieces}</span>
         </div>
-        <button type="button" disabled={ironPieces < ironPieceCost} onClick={onSmeltIron}>Smelt</button>
+        <button type="button" disabled={ironPieces < ironPieceCost} onClick={() => onSmeltIron?.(ironPieceCost)}>Smelt</button>
       </div>
     </section>
   );
@@ -733,14 +740,14 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
   );
 }
 
-function CityMerchantPanel({ inventory, stock, gold, popularity, onSell, onBuy }) {
+function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifiers = {}, onSell, onBuy }) {
   const [tradeDraft, setTradeDraft] = useState(null);
   const sellable = (inventory ?? []).filter(merchantItemCanTrade);
   const openTrade = (mode, item, index) => {
     const max = mode === "buy"
       ? merchantTradeMax(item)
       : merchantTradeMax(item);
-    const unitPrice = mode === "buy" ? merchantBuyPrice(item, popularity) : merchantSellPrice(item, popularity);
+    const unitPrice = mode === "buy" ? merchantBuyPrice(item, popularity, cityEventModifiers) : merchantSellPrice(item, popularity, cityEventModifiers);
     setTradeDraft({ mode, item, index, quantity: 1, max, unitPrice });
   };
   const confirmTrade = () => {
@@ -764,7 +771,7 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, onSell, onBuy }
               <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
               <div>
                 <CityItemName item={item} />
-                <span>{merchantSellPrice(item, popularity)} G each | have {merchantTradeMax(item)} | value {item.value ?? itemValue(item)}</span>
+                <span>{merchantSellPrice(item, popularity, cityEventModifiers)} G each | have {merchantTradeMax(item)} | value {item.value ?? itemValue(item)}</span>
               </div>
               <button type="button" onClick={() => openTrade("sell", item, item.index)}>Sell</button>
             </div>
@@ -774,7 +781,7 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, onSell, onBuy }
           <h4>Buy <span>sold items stay here</span></h4>
           {(stock ?? []).length === 0 && <p>No stock this visit.</p>}
           {(stock ?? []).map((item, index) => {
-            const price = merchantBuyPrice(item, popularity);
+            const price = merchantBuyPrice(item, popularity, cityEventModifiers);
             return (
               <div className="blacksmith-row" key={`${item.id}-${index}`}>
                 <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />

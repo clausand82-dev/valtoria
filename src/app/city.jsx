@@ -38,6 +38,7 @@ import {
 } from "../game/config/skill-tree-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
 import { cityEventEntries } from "../game/config/city-config.js";
+import { blacksmithDurabilityModifiers, cityRuntimeModifiers } from "../game/config/city-consequence-resolver.js";
 import { QUEST_BOARD_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
 import { MAX_POTION_STACK, SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NPCS } from "../game/config/game-engine-config.js";
@@ -299,6 +300,7 @@ function CityPage({
     getCityMapQuestNpcs(snapshot.quests?.cityNpcStates ?? [], SHOW_INACTIVE_CITY_NPCS, npcPlacementSeedRef.current)
   ), [snapshot.quests?.cityNpcStates]);
   const cityStats = useMemo(() => calculateCityStats(cityProgress, snapshot, regionCorruption), [cityProgress, snapshot, regionCorruption]);
+  const cityEventModifiers = useMemo(() => cityRuntimeModifiers(cityStats), [cityStats]);
   const cityMobs = useMemo(() => normalizeCityMobs(cityProgress?.cityMobs), [cityProgress?.cityMobs]);
   const attackableCityMobIds = useMemo(() => cityAttackableMobIds(cityMobs), [cityMobs]);
   const cityMobRefs = useMemo(() => cityMapMobRefs(cityMobs), [cityMobs]);
@@ -338,12 +340,19 @@ function CityPage({
   }, [cityProgressRefreshToken, cityStorageKey]);
 
   useEffect(() => {
-    setCityProgress((current) => rerollMerchantStockForCityVisit(current, snapshotRef.current.player?.level ?? 1));
+    setCityProgress((current) => rerollMerchantStockForCityVisit(
+      current,
+      snapshotRef.current.player?.level ?? 1,
+      calculateCityStats(current, snapshotRef.current, regionCorruption),
+    ));
   }, [cityStorageKey]);
 
   // Apply durability degradation on each city visit
   useEffect(() => {
-    setCityProgress((current) => applyDurabilityDegradationForVisit(current));
+    setCityProgress((current) => applyDurabilityDegradationForVisit(
+      current,
+      calculateCityStats(current, snapshotRef.current, regionCorruption),
+    ));
   }, [cityStorageKey]);
 
   // Spawn and progress city mobs on each city visit.
@@ -355,7 +364,10 @@ function CityPage({
     if (skippedMobProgressForVisitRef.current) {
       return;
     }
-    setCityProgress((current) => applyCityMobProgressForVisit(current));
+    setCityProgress((current) => applyCityMobProgressForVisit(
+      current,
+      calculateCityStats(current, snapshotRef.current, regionCorruption),
+    ));
   }, [cityStorageKey]);
 
   useEffect(() => {
@@ -2497,6 +2509,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const [storedReadable, setStoredReadable] = useState(null);
   const [confirmStoreItem, setConfirmStoreItem] = useState(null);
   const [questBoard, setQuestBoard] = useState(null);
+  const cityEventModifiers = useMemo(() => cityRuntimeModifiers(cityStats), [cityStats]);
+  const blacksmithModifiers = useMemo(() => blacksmithDurabilityModifiers(progress), [progress]);
   if (!building) return null;
   const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
 
@@ -3073,7 +3087,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       if (!sold) return;
       sold = merchantCloneItem(sold);
     }
-    const gold = merchantSellPrice(sold, cityStats?.popularity ?? snapshot.player?.popularity ?? 0) * qty;
+    const gold = merchantSellPrice(sold, cityStats?.popularity ?? snapshot.player?.popularity ?? 0, cityEventModifiers) * qty;
     engineRef.current?.addGold?.(gold, "Merchant");
     setMerchantState((merchant) => {
       const soldItems = [sold, ...(merchant.soldItems ?? [])].slice(0, 10);
@@ -3091,7 +3105,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const item = stock[stockIndex];
     if (!item) return;
     const qty = merchantTradeQuantity(item, quantity);
-    const price = merchantBuyPrice(item, cityStats?.popularity ?? snapshot.player?.popularity ?? 0) * qty;
+    const price = merchantBuyPrice(item, cityStats?.popularity ?? snapshot.player?.popularity ?? 0, cityEventModifiers) * qty;
     if ((snapshot.player?.gold ?? 0) < price) return;
     const bought = merchantCloneItem({ ...item, count: isResourceItem(item) ? qty : item.count });
     if (!engineRef.current?.addInventoryItem?.(bought)) return;
@@ -3146,8 +3160,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             inventory={snapshot.inventory}
             popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
             resourceCount={buildingResourceAvailable}
+            blacksmithModifiers={blacksmithModifiers}
             onSmelt={() => engineRef.current?.smeltGoldToBar?.(1)}
-            onSmeltIron={() => onConvertResourceToResource?.("iron_piece", 3, "iron_bar", 1)}
+            onSmeltIron={(ironPieceCost) => onConvertResourceToResource?.("iron_piece", ironPieceCost, "iron_bar", 1)}
           />
         );
       case "farm":
@@ -3231,6 +3246,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             stock={buildingState.merchant?.stock ?? []}
             gold={snapshot.player?.gold ?? 0}
             popularity={cityStats?.popularity ?? snapshot.player?.popularity ?? 0}
+            cityEventModifiers={cityEventModifiers}
             onSell={sellMerchantItem}
             onBuy={buyMerchantItem}
           />
@@ -3269,6 +3285,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             activeAddonId={activeAddon.config?.station === "repair" ? null : activeAddon.id}
             purchasedAddons={purchasedAddons}
             resourceCount={buildingResourceAvailable}
+            cityEventModifiers={cityEventModifiers}
+            blacksmithModifiers={blacksmithModifiers}
             onRepairEquippedItem={repairEquippedItem}
             onRepairInventoryItem={repairInventoryItem}
           />
@@ -4006,10 +4024,18 @@ function CityCampStats({ cityStats }) {
       <b>City events</b>
       <div>
         {activeEntries.length ? activeEntries.map((event) => (
-          <span title={event.label} key={event.id}><b>{event.label}</b></span>
+          <span
+            className={event.positive ? "positive" : "negative"}
+            title={event.detail ?? event.label}
+            key={event.id}
+          >
+            <b>{event.label}</b>
+            {event.positive ? <em>Positive</em> : Number(event.risk) > 0 ? <em>Risk {Math.round(Number(event.risk))}%</em> : null}
+            {event.detail ? <small>{event.detail}</small> : null}
+          </span>
         )) : <span><b>Stable</b></span>}
       </div>
-      <p>Events are derived from current city stats and can be used by later combat, loot, and quest logic.</p>
+      <p>Events are derived from current city stats and apply runtime modifiers without changing base values.</p>
     </div>
   );
 }

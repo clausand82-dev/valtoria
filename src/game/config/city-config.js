@@ -5,43 +5,216 @@ export const CITY_EVENT_RULES = {
   waterShortageUnavailablePopulationPct: 45,
   diseaseOutbreakHealthThreshold: 50,
   uprisingWealthRatioThreshold: 0.5,
+  lawlessnessSafetyThreshold: 35,
+  supplyCrisisSupplyThreshold: 35,
+  tradeCollapseTradeThreshold: 35,
+  faithCrisisFaithThreshold: 35,
+  prosperityWealthThreshold: 100,
+  prosperityTradeThreshold: 100,
   fireRiskWaterShortageBonus: 25,
   fireRiskActiveThreshold: 75,
 };
 
+// CITY_EVENT_DEFS reference
+//
+// Supported condition keys:
+// - statBelowPopulation: "provision"
+//   Active when cityStats[stat] is lower than cityStats.population.
+// - statBelow: { safety: 35, health: 50 }
+//   Active when all listed city stats are below their threshold.
+// - statsAtLeast: { wealth: 100, trade: 100 }
+//   Active when all listed city stats are at least their threshold.
+// - statPopulationRatioBelow: { stat: "wealth", threshold: 0.5 }
+//   Active when cityStats[stat] / max(1, population) is below threshold.
+// - fireRiskAtLeast: 75
+//   Active when computed fire risk is at least this value.
+//
+// Supported modifier keys currently hooked into gameplay:
+// - resourceDropMultiplierById: { meat: 0.5, wheat: 0.5 }
+// - goldDropMultiplier
+// - potionDropMultiplier
+// - heroMaxHpMultiplier
+// - cityMobSpawnChanceMultiplier
+// - cityDurabilityDegradeChanceMultiplier
+// - cityDurabilityDamageMultiplier
+// - repairCostMultiplier
+// - craftingCostMultiplier
+//   Config-ready. Resource crafting has a TODO hook because current recipes use fixed inputs.
+// - merchantBuyPriceMultiplier
+// - merchantSellPriceMultiplier
+// - merchantStockMultiplier
+// - healthPotionHealMultiplier
+// - questGoldRewardMultiplier
+//
+// Event fields used by UI:
+// - id, label, iconUrl, detail, solution, positive, conditions, modifiers
+//
 export const CITY_EVENT_DEFS = {
   famine: {
     id: "famine",
     label: "Famine",
-    detail: "Provision is below population. Recruitment capacity and later food drops are affected.",
-    futureEffect: "hero_food_drops_half",
+    iconUrl: "/assets/generated/icon/buff_famine.png",
+    detail: "Provision is below population. Food resource drops are reduced by 50%.",
+    solution: "Increase provision or reduce population pressure.",
+    conditions: { statBelowPopulation: "provision" },
+    modifiers: {
+      resourceDropMultiplierById: {
+        meat: 0.5,
+        fruit: 0.5,
+        wheat: 0.5,
+        food: 0.5,
+        fruit_orange: 0.5,
+        fruit_banana: 0.5,
+      },
+    },
   },
   water_shortage: {
     id: "water_shortage",
     label: "Water shortage",
-    detail: "Water is below population. Recruitment capacity and later potion drops are affected.",
-    futureEffect: "no_health_or_mana_potion_drops",
+    iconUrl: "/assets/generated/icon/buff_water_shortage.png",
+    detail: "Water is below population. Potion drops stop until water recovers.",
+    solution: "Increase water production before returning to the wilds.",
+    conditions: { statBelowPopulation: "water" },
+    modifiers: {
+      potionDropMultiplier: 0,
+    },
   },
   disease_outbreak: {
     id: "disease_outbreak",
     label: "Disease outbreak",
-    detail: "Health is below 50%. Later hero max HP effects can use this.",
-    futureEffect: "hero_max_hp_minus_25_pct",
+    iconUrl: "/assets/generated/icon/buff_disease_outbreak.png",
+    detail: "Health is too low. Hero max HP is reduced by 25%.",
+    solution: "Raise city health above the disease threshold.",
+    conditions: { statBelow: { health: CITY_EVENT_RULES.diseaseOutbreakHealthThreshold } },
+    modifiers: {
+      heroMaxHpMultiplier: 0.75,
+    },
   },
   uprising_poorness: {
     id: "uprising_poorness",
     label: "Uprising risk",
-    detail: "Wealth is low compared to population. Later gold drops can be affected.",
-    futureEffect: "hero_gold_drops_half",
+    iconUrl: "/assets/generated/icon/buff_uprising_poorness.png",
+    detail: "Wealth is low compared to population. Gold drops are reduced by 50%.",
+    solution: "Increase wealth relative to population.",
+    conditions: { statPopulationRatioBelow: { stat: "wealth", threshold: CITY_EVENT_RULES.uprisingWealthRatioThreshold } },
+    modifiers: {
+      goldDropMultiplier: 0.5,
+    },
   },
   fire: {
     id: "fire",
     label: "Fire risk",
-    detail: "Low safety, especially with water shortage, raises fire risk.",
+    iconUrl: "/assets/generated/icon/buff_fire.png",
+    detail: "Low safety, especially with water shortage, accelerates city durability damage.",
+    solution: "Raise safety and solve water shortage.",
+    conditions: { fireRiskAtLeast: CITY_EVENT_RULES.fireRiskActiveThreshold },
+    modifiers: {
+      cityDurabilityDegradeChanceMultiplier: 2,
+      cityDurabilityDamageMultiplier: 1.5,
+    },
+  },
+  lawlessness: {
+    id: "lawlessness",
+    label: "Lawlessness",
+    iconUrl: "/assets/generated/icon/buff_lawlessness.png",
+    detail: "Safety is low. City mob spawn chance is increased by 10%.",
+    solution: "Raise safety or clear city mobs.",
+    conditions: { statBelow: { safety: CITY_EVENT_RULES.lawlessnessSafetyThreshold } },
+    modifiers: {
+      cityMobSpawnChanceMultiplier: 1.1,
+    },
+  },
+  supply_crisis: {
+    id: "supply_crisis",
+    label: "Supply crisis",
+    iconUrl: "/assets/generated/icon/buff_supply_crisis.png",
+    detail: "Supply is low. Repair and crafting costs are increased.",
+    solution: "Increase supply through city buildings, addons, or regions.",
+    conditions: { statBelow: { supply: CITY_EVENT_RULES.supplyCrisisSupplyThreshold } },
+    modifiers: {
+      repairCostMultiplier: 1.25,
+      craftingCostMultiplier: 1.25,
+    },
+  },
+  trade_collapse: {
+    id: "trade_collapse",
+    label: "Trade collapse",
+    iconUrl: "/assets/generated/icon/buff_trade_collapse.png",
+    detail: "Trade is low. Merchant stock and prices are worse.",
+    solution: "Increase trade before shopping.",
+    conditions: { statBelow: { trade: CITY_EVENT_RULES.tradeCollapseTradeThreshold } },
+    modifiers: {
+      merchantBuyPriceMultiplier: 1.25,
+      merchantSellPriceMultiplier: 0.75,
+      merchantStockMultiplier: 0.75,
+    },
+  },
+  faith_crisis: {
+    id: "faith_crisis",
+    label: "Faith crisis",
+    iconUrl: "/assets/generated/icon/buff_faith_crisis.png",
+    detail: "Faith is low. Health potions restore 50% less health.",
+    solution: "Increase faith. Mana potions are not affected.",
+    conditions: { statBelow: { faith: CITY_EVENT_RULES.faithCrisisFaithThreshold } },
+    modifiers: {
+      healthPotionHealMultiplier: 0.5,
+    },
+  },
+  prosperity: {
+    id: "prosperity",
+    label: "Prosperity",
+    iconUrl: "/assets/generated/icon/buff_prosperity.png",
+    detail: "Wealth and trade are high. Merchant prices and quest gold rewards improve.",
+    solution: "Keep wealth and trade high to preserve this bonus.",
+    positive: true,
+    conditions: { statsAtLeast: { wealth: CITY_EVENT_RULES.prosperityWealthThreshold, trade: CITY_EVENT_RULES.prosperityTradeThreshold } },
+    modifiers: {
+      merchantBuyPriceMultiplier: 0.9,
+      merchantSellPriceMultiplier: 1.1,
+      questGoldRewardMultiplier: 1.1,
+    },
   },
 };
 
 export const CITY_EVENT_IDS = Object.keys(CITY_EVENT_DEFS);
+
+export const CITY_STATUS_EFFECT_ICON_URLS = {
+  potion_orange_regen_health_mana: "/assets/generated/icon/buff_potion_orange_regen_health_mana.png",
+};
+
+// Durability consequence fields:
+// - buildingEfficiencyMultiplier/addonEfficiencyMultiplier scale city stat output.
+// - blacksmithRepairCostMultiplier scales Blacksmith item repair gold/junk costs.
+// - blacksmithMetalBarInputCostBonus adds extra ore/pieces to metal bar smelting recipes.
+// - blacksmithGoldBarCostMultiplier scales the gold price for minting gold bars.
+// - blacksmithForgeJunkYieldMultiplier scales junk returned by the Forge Addon.
+// - failureChance is reserved for building action failure checks.
+// - disabled removes building/addon city stat output.
+export const CITY_DURABILITY_CONSEQUENCE_RULES = [
+  {
+    belowPct: 50,
+    buildingEfficiencyMultiplier: 0.75,
+    addonEfficiencyMultiplier: 0.75,
+    blacksmithRepairCostMultiplier: 1.25,
+    blacksmithMetalBarInputCostBonus: 1,
+    blacksmithGoldBarCostMultiplier: 1.25,
+    blacksmithForgeJunkYieldMultiplier: 0.75,
+  },
+  {
+    belowPct: 25,
+    buildingEfficiencyMultiplier: 0.5,
+    addonEfficiencyMultiplier: 0.5,
+    blacksmithRepairCostMultiplier: 1.5,
+    blacksmithMetalBarInputCostBonus: 2,
+    blacksmithGoldBarCostMultiplier: 1.5,
+    blacksmithForgeJunkYieldMultiplier: 0.5,
+    failureChance: 0.15,
+  },
+  {
+    belowPct: 1,
+    disabled: true,
+  },
+];
 
 export const CITY_STAT_ALIASES = {
   defence: "defense",
@@ -120,7 +293,7 @@ export const CITY_STAT_RULE_TEXT = {
   supply: ["General supply can be improved by regions, buildings, and addons."],
   wealth: ["If wealth/population is below 0.5, uprising risk becomes active."],
   trade: ["Trade can feed later wealth and supply logic."],
-  safety: ["Starts at 100. Each city mob level currently present reduces safety by 2 points.", "Low safety raises fire risk."],
+  safety: ["Base safety is 10 and can be raised by city sources up to 100.", "Each city mob level currently present reduces safety by 2 points.", "Low safety raises fire risk and can trigger lawlessness."],
   health: ["Health is a 0-100 public-health score.", "If health is below 50, disease outbreak becomes active."],
   defense: ["Uses the old army unit power as defense.", "If knowledge is at least population, defense gains +5%."],
   knowledge: ["If knowledge is at least population, defense gains +5%."],

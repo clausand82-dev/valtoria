@@ -20,8 +20,10 @@ import {
   MAX_POTION_STACK,
   GROUND_LOOT_DESPAWN_SECONDS,
   POTION_DEFS,
+  blacksmithDurabilityModifiers,
   normalizePotionId,
   potionDefById,
+  cityRuntimeModifiers,
   normalizeQuickSlots
 } from "../dependencies.js";
 import {
@@ -563,7 +565,9 @@ export const inventoryMethods = {
     const item = inventory[index];
 
     const stats = this.calcStats();
-    const restoreHealthPct = Number(item.restoreHealthPct ?? def.restoreHealthPct) || (def.type === "health" ? Number(item.restorePct ?? def.restorePct) || 0.25 : 0);
+    const cityModifiers = cityRuntimeModifiers(this.cityStats);
+    const healthPotionMultiplier = def.type === "health" ? (cityModifiers.healthPotionHealMultiplier ?? 1) : 1;
+    const restoreHealthPct = (Number(item.restoreHealthPct ?? def.restoreHealthPct) || (def.type === "health" ? Number(item.restorePct ?? def.restorePct) || 0.25 : 0)) * healthPotionMultiplier;
     const restoreManaPct = Number(item.restoreManaPct ?? def.restoreManaPct) || (def.type === "mana" ? Number(item.restorePct ?? def.restorePct) || 0.25 : 0);
     if (restoreHealthPct > 0) {
       this.player.hp = clamp(this.player.hp + stats.maxHp * restoreHealthPct, 0, stats.maxHp);
@@ -760,7 +764,7 @@ export const inventoryMethods = {
     return used;
   },
 
-  destroyInventoryItem(index, force = false) {
+  destroyInventoryItem(index, force = false, options = {}) {
     const item = this.player.inventory[index];
     if (!item) return;
     if (item.rarity === "legendary" && !force) {
@@ -772,7 +776,7 @@ export const inventoryMethods = {
       this.player.stats.itemsDestroyed += 1;
       incrementStatMap(this.player.stats.itemsDestroyedByRarity, itemRarityBucket(item));
     }
-    this.dropDestroyedItemResources(item);
+    this.dropDestroyedItemResources(item, options);
     this.addToast(`Destrueret: ${item.name}`);
     this.publishSnapshot();
   },
@@ -784,7 +788,7 @@ export const inventoryMethods = {
       this.addToast("Forge kan kun destruere gear");
       return false;
     }
-    this.destroyInventoryItem(index, true);
+    this.destroyInventoryItem(index, true, { forge: true });
     this.saveProgress({ force: true });
     return true;
   },
@@ -823,7 +827,7 @@ export const inventoryMethods = {
     const batches = Math.max(1, Math.floor(Number(count) || 1));
     const popularity = clamp(Number(this.player.popularity) || 0, 0, 100);
     const priceMult = clamp(1.25 - (popularity / 100) * 0.5, 0.75, 1.25);
-    const unitCost = Math.max(1, Math.round(1000 * priceMult));
+    const unitCost = Math.max(1, Math.ceil(Math.round(1000 * priceMult) * (blacksmithDurabilityModifiers(this.cityProgress).goldBarCostMultiplier ?? 1)));
     const cost = batches * unitCost;
     if (Math.max(0, Math.floor(Number(this.player.gold) || 0)) < cost) {
       this.addToast(`Kraever ${unitCost} gold pr. gold bar`);
@@ -949,15 +953,20 @@ export const inventoryMethods = {
     return true;
   },
 
-  dropDestroyedItemResources(item) {
+  dropDestroyedItemResources(item, options = {}) {
     const profile = DESTROYED_ITEM_RESOURCE_DROPS[item.unique ? "unique" : item.rarity] ?? DESTROYED_ITEM_RESOURCE_DROPS.normal;
+    const forgeJunkYieldMultiplier = options.forge ? (blacksmithDurabilityModifiers(this.cityProgress).forgeJunkYieldMultiplier ?? 1) : 1;
     const entries = [
       ...(profile.guaranteed ?? []).map((entry) => ({ ...entry, chance: 1 })),
       ...(profile.rare ?? []),
     ];
     for (const entry of entries) {
       if (Math.random() > (entry.chance ?? 1)) continue;
-      const resource = makeResourceItem(entry.resource, randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1));
+      const rolledAmount = randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1);
+      const amount = entry.resource === "junk"
+        ? Math.max(1, Math.floor(rolledAmount * forgeJunkYieldMultiplier))
+        : rolledAmount;
+      const resource = makeResourceItem(entry.resource, amount);
       if (!resource) continue;
       if (this.addInventoryItem(resource)) continue;
       this.loots.push({
@@ -1187,6 +1196,7 @@ export const inventoryMethods = {
   mergeInventoryResourceWithRecipe(index, outputResourceId) {
     const item = this.player.inventory[index];
     if (!item || !isResourceItem(item)) return false;
+    // TODO: If resource crafting gains variable costs, apply cityRuntimeModifiers(this.cityStats).craftingCostMultiplier here.
     const recipe = resourceMergeRecipesFor(item, this.player.inventory).find((entry) => entry.output === outputResourceId);
     if (!recipe) {
       this.addToast("Ikke nok resources til merge");
@@ -1439,8 +1449,10 @@ export const inventoryMethods = {
     if (missing <= 0) { this.addToast(`${item.name} er allerede fuldt repareret.`); return false; }
 
     // Calculate costs: gold and junk only
-    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
-    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
+    const repairCostMultiplier = (cityRuntimeModifiers(this.cityStats).repairCostMultiplier ?? 1)
+      * (blacksmithDurabilityModifiers(this.cityProgress).repairCostMultiplier ?? 1);
+    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing * repairCostMultiplier));
+    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing * repairCostMultiplier));
 
     if (!options?.prepaid) {
       const goldHave = Math.max(0, Math.floor(Number(this.player.gold) || 0));
@@ -1481,8 +1493,10 @@ export const inventoryMethods = {
       return false;
     }
 
-    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing));
-    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing));
+    const repairCostMultiplier = (cityRuntimeModifiers(this.cityStats).repairCostMultiplier ?? 1)
+      * (blacksmithDurabilityModifiers(this.cityProgress).repairCostMultiplier ?? 1);
+    const goldNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing * repairCostMultiplier));
+    const junkNeeded = Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing * repairCostMultiplier));
 
     if (!options?.prepaid) {
       const goldHave = Math.max(0, Math.floor(Number(this.player.gold) || 0));
@@ -1511,8 +1525,8 @@ export const inventoryMethods = {
     const missing = Math.max(0, Math.ceil(100 - dur));
     if (missing <= 0) return { gold: 0, junk: 0 };
     return {
-      gold: Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing)),
-      junk: Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing)),
+      gold: Math.max(1, Math.ceil(ITEM_REPAIR_GOLD_PER_PCT * missing * (cityRuntimeModifiers(this.cityStats).repairCostMultiplier ?? 1) * (blacksmithDurabilityModifiers(this.cityProgress).repairCostMultiplier ?? 1))),
+      junk: Math.max(1, Math.ceil(ITEM_REPAIR_JUNK_PER_PCT * missing * (cityRuntimeModifiers(this.cityStats).repairCostMultiplier ?? 1) * (blacksmithDurabilityModifiers(this.cityProgress).repairCostMultiplier ?? 1))),
     };
   },
 };

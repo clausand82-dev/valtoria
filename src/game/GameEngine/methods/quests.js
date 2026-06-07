@@ -16,7 +16,8 @@ import {
   isPotionItem,
   isResourceItem,
   QUEST_INTERACT_RADIUS,
-  GROUND_LOOT_DESPAWN_SECONDS
+  GROUND_LOOT_DESPAWN_SECONDS,
+  cityRuntimeModifiers
 } from "../dependencies.js";
 import {
   hashToIndex,
@@ -1314,7 +1315,8 @@ export const questsMethods = {
     const rewards = quest.rewards ?? {};
     const baseXp = Math.max(0, Math.floor(Number(rewards.xp) || ((rewards.xpPerKill ?? 0) * (quest.target?.count ?? 0))));
     const xp = this.modifiedXp?.(baseXp) ?? baseXp;
-    const gold = Math.max(0, Math.floor(Number(rewards.gold) || ((rewards.goldPerKill ?? 0) * (quest.target?.count ?? 0))));
+    const baseGold = Math.max(0, Math.floor(Number(rewards.gold) || ((rewards.goldPerKill ?? 0) * (quest.target?.count ?? 0))));
+    const gold = Math.max(0, Math.floor(baseGold * (cityRuntimeModifiers(this.cityStats).questGoldRewardMultiplier ?? 1)));
     const summary = {
       xp,
       gold,

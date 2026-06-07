@@ -27,7 +27,8 @@ import {
   isQuestItem,
   isReadableItem,
   isResourceItem,
-  GROUND_LOOT_DESPAWN_SECONDS
+  GROUND_LOOT_DESPAWN_SECONDS,
+  cityRuntimeModifiers
 } from "../dependencies.js";
 import {
   rollItemOfRarity,
@@ -321,9 +322,18 @@ export const lootMethods = {
       return false;
     }
 
+    const modifiers = cityRuntimeModifiers(this.cityStats);
     const items = drops
+      .filter((entry) => Math.random() < (modifiers.resourceDropMultiplierById?.[entry.resource] ?? 1))
       .map((entry) => makeResourceItem(entry.resource, entry.count))
       .filter(Boolean);
+    if (!items.length) {
+      object.foliageLooted = true;
+      object.resourceDrops = [];
+      this.nearbyFoliageLoot = null;
+      this.publishSnapshot();
+      return false;
+    }
     const simulatedInventory = this.player.inventory.map((item) => ({ ...item }));
     const maxSlots = this.inventorySlotCapacity?.() ?? simulatedInventory.length;
     for (const item of items) {
@@ -501,16 +511,19 @@ export const lootMethods = {
       this.dropReadableLoot(monster);
       const gearDropSource = monster.isBoss ? "boss" : "monster";
       if (Math.random() < profile.goldChance) {
-        const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult * (1 + stats.goldFind));
-        this.loots.push({
-          id: createId(),
-          type: "gold",
-          amount: gold,
-          x: monster.x + (Math.random() - 0.5) * 0.5,
-          y: monster.y + (Math.random() - 0.5) * 0.5,
-          bob: Math.random() * Math.PI * 2,
-          despawn: GROUND_LOOT_DESPAWN_SECONDS,
-        });
+        const cityModifiers = cityRuntimeModifiers(this.cityStats);
+        const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult * (1 + stats.goldFind) * (cityModifiers.goldDropMultiplier ?? 1));
+        if (gold > 0) {
+          this.loots.push({
+            id: createId(),
+            type: "gold",
+            amount: gold,
+            x: monster.x + (Math.random() - 0.5) * 0.5,
+            y: monster.y + (Math.random() - 0.5) * 0.5,
+            bob: Math.random() * Math.PI * 2,
+            despawn: GROUND_LOOT_DESPAWN_SECONDS,
+          });
+        }
       }
 
       const unique = rollUniqueItem(lootLevel, {
@@ -533,14 +546,20 @@ export const lootMethods = {
 
       const category = rollLootCategory(profile.weights);
       if (category && category !== "none" && !this.isDropCategoryBlocked(category)) {
+        const cityModifiers = cityRuntimeModifiers(this.cityStats);
+        const potionAllowed = category !== "health" && category !== "mana"
+          ? true
+          : Math.random() < (cityModifiers.potionDropMultiplier ?? 1);
         const item = category === "health" || category === "mana"
-          ? makePotion(rollPotionIdForCategory(category), lootLevel)
+          ? potionAllowed ? makePotion(rollPotionIdForCategory(category), lootLevel) : null
           : makeItem(lootLevel, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
-        this.dropGroundItem(monster.x, monster.y, item);
+        if (item) this.dropGroundItem(monster.x, monster.y, item);
 
         if (category === "all" && Math.random() < clamp(0.08 + monster.level * 0.01, 0.08, 0.24)) {
           const potion = makePotion(rollPotionIdForCategory("all"), lootLevel);
-          this.dropGroundItem(monster.x, monster.y, potion, { spread: 0.85 });
+          if (Math.random() < (cityModifiers.potionDropMultiplier ?? 1)) {
+            this.dropGroundItem(monster.x, monster.y, potion, { spread: 0.85 });
+          }
         }
       }
     }
@@ -571,8 +590,10 @@ export const lootMethods = {
 
   dropResourceLoot(x, y, entries = []) {
     const stats = this.calcStats();
+    const cityModifiers = cityRuntimeModifiers(this.cityStats);
     for (const entry of entries) {
-      if (!entry?.resource || Math.random() > Math.min(1, (entry.chance ?? 1) * (1 + stats.resourceFind))) continue;
+      const resourceMultiplier = cityModifiers.resourceDropMultiplierById?.[entry?.resource] ?? 1;
+      if (!entry?.resource || Math.random() > Math.min(1, (entry.chance ?? 1) * (1 + stats.resourceFind) * resourceMultiplier)) continue;
       const amount = Math.max(1, Math.floor(randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1) * (1 + stats.resourceFind)));
       const item = makeResourceItem(entry.resource, amount);
       if (!item || this.isDropBlocked(item)) continue;
@@ -592,9 +613,11 @@ export const lootMethods = {
   },
 
   dropObjectItemLoot(x, y, entries = []) {
+    const cityModifiers = cityRuntimeModifiers(this.cityStats);
     for (const entry of entries) {
       if (!entry || Math.random() > (entry.chance ?? 0)) continue;
       if (entry.potion || entry.potionId) {
+        if (Math.random() >= (cityModifiers.potionDropMultiplier ?? 1)) continue;
         const item = makePotion(entry.potionId ?? entry.potion, Math.max(1, Math.floor(Number(entry.level) || this.player?.level || 1)));
         this.dropGroundItem(x, y, item);
         continue;
