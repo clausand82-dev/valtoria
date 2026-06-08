@@ -61,7 +61,16 @@ export { BOSS_TINT } from "../config/monster-config.js";
 export { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../config/readable-config.js";
 export { SPELL_DEFS } from "../config/spell-config.js";
 export { ACTION_BAR_CONFIG, normalizeQuickSlots } from "../config/action-bar-config.js";
-export { POTION_DEFS, POTION_IDS, POTION_MERGE_RECIPES, normalizePotionId, potionDefById } from "../config/potion-config.js";
+export {
+  POTION_DEFS,
+  POTION_IDS,
+  POTION_MERGE_RECIPES,
+  POTION_RECIPE_ACCESS,
+  normalizePotionId,
+  potionDefById,
+  potionRecipeAvailableAt,
+  potionRecipesForStation,
+} from "../config/potion-config.js";
 export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG, QUEST_GLOBAL_RULES } from "../config/quest-config.js";
 export { QUEST_NPCS } from "../config/npc-config.js";
 export { getRegionObjectFamily, resolveRegionObjectDefBySpawnType, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";

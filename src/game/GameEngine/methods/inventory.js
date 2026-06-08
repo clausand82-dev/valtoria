@@ -20,9 +20,11 @@ import {
   MAX_POTION_STACK,
   GROUND_LOOT_DESPAWN_SECONDS,
   POTION_DEFS,
+  POTION_RECIPE_ACCESS,
   blacksmithDurabilityModifiers,
   normalizePotionId,
   potionDefById,
+  potionRecipesForStation,
   cityRuntimeModifiers,
   normalizeQuickSlots
 } from "../dependencies.js";
@@ -37,6 +39,7 @@ import {
   potionMergeRecipeFor,
   potionMergeRecipesFor,
   potionMergeOption,
+  hasPotionInputs,
   consumePotionInputs,
   potionOutputCanFitAfterMerge,
   resourceMergeRecipeFor,
@@ -50,7 +53,10 @@ import {
   incrementStatMap,
   decrementStatMap,
   itemRarityBucket,
-  inventoryCanAccept
+  inventoryCanAccept,
+  questItemCanStack,
+  questItemsCanStack,
+  questItemStackMax,
 } from "../helpers.js";
 import {
   SKILL_TREE_NODE_BY_ID,
@@ -592,6 +598,18 @@ export const inventoryMethods = {
       this.addFloater(this.player.x, this.player.y, `+${armorBonus} armor`, def.color ?? "#b579ff", 0.95);
     }
     const durationMs = Number(item.durationMs ?? def.durationMs) || 0;
+    const speedBuffPct = Number(item.speedBuffPct ?? def.speedBuffPct) || 0;
+    if (durationMs > 0 && speedBuffPct > 0) {
+      this.player.statusEffects = Array.isArray(this.player.statusEffects) ? this.player.statusEffects : [];
+      this.player.statusEffects.push({
+        type: "statBuff",
+        sourceId: id,
+        duration: durationMs / 1000,
+        bonuses: { speedPct: speedBuffPct },
+        color: def.color ?? "#1c9fff",
+      });
+      this.addFloater(this.player.x, this.player.y, `+${Math.round(speedBuffPct * 100)}% fart`, def.color ?? "#1c9fff", 0.95);
+    }
     const healthRegenPct = Number(item.healthRegenPct ?? def.healthRegenPct) || 0;
     const manaRegenPct = Number(item.manaRegenPct ?? def.manaRegenPct) || 0;
     if (durationMs > 0 && (healthRegenPct > 0 || manaRegenPct > 0)) {
@@ -653,6 +671,9 @@ export const inventoryMethods = {
 
   consumeInventoryItem(index) {
     const item = this.player.inventory[index];
+    if (isPotionItem(item)) {
+      return this.usePotion(item.potionId ?? item.potionType, index);
+    }
     if (!item || !isReadableItem(item) || item.readableStatus !== "consumable") return false;
     const effect = item.consumableEffect ?? {};
     const bonuses = normalizeReadableBonuses(this.player.readableBonuses);
@@ -718,7 +739,7 @@ export const inventoryMethods = {
     const item = this.player.inventory[index];
     if (!item) return null;
     const requested = Math.max(1, Math.floor(Number(count) || 1));
-    if (!isStackableItem(item)) {
+    if (!isStackableItem(item) && !(isQuestItem(item) && questItemCanStack(item.questItemId))) {
       this.player.inventory.splice(index, 1);
       this.publishSnapshot();
       return item;
@@ -749,6 +770,19 @@ export const inventoryMethods = {
     if (used <= 0) return 0;
     consumeResourceInputs(this.player.inventory, { [resourceId]: used });
     this.addToast(`Used ${used}x ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`);
+    this.publishSnapshot();
+    return used;
+  },
+
+  consumePotion(potionId, amount) {
+    const id = normalizePotionId(potionId);
+    const count = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!id || count <= 0) return 0;
+    const available = this.potionInventoryCount(id);
+    const used = Math.min(available, count);
+    if (used <= 0) return 0;
+    consumePotionInputs(this.player.inventory, { [id]: used });
+    this.addToast(`Used ${used}x ${potionDefById(id)?.name ?? id}`);
     this.publishSnapshot();
     return used;
   },
@@ -1193,6 +1227,36 @@ export const inventoryMethods = {
     return true;
   },
 
+  mergePotionRecipeAtStation(outputPotionId, station = POTION_RECIPE_ACCESS.ALCHEMY_BENCH) {
+    const stationId = String(station ?? POTION_RECIPE_ACCESS.BACKPACK);
+    const recipe = potionRecipesForStation(stationId).find((entry) => String(entry.output) === String(outputPotionId));
+    if (!recipe || !potionDefById(recipe.output)) {
+      this.addToast("Potion recipe not available here");
+      return false;
+    }
+    if (!hasPotionInputs(this.player.inventory, recipe.inputs ?? {})) {
+      this.addToast("Ikke nok potion ingredients");
+      return false;
+    }
+    const outputCount = Math.max(1, Math.floor(Number(recipe.count) || 1));
+    const output = makePotion(recipe.output, this.player.level ?? 1);
+    if (!output) return false;
+    output.count = outputCount;
+    if (!potionOutputCanFitAfterMerge(this.player.inventory, recipe, output, this.inventorySlotCapacity())) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    consumePotionInputs(this.player.inventory, recipe.inputs ?? {});
+    if (!this.addPotionLoot(output)) {
+      this.addToast("Rygsaekken er fuld");
+      return false;
+    }
+    this.addToast(`Brewed: ${output.name}`);
+    this.publishSnapshot();
+    this.saveProgress({ force: true });
+    return true;
+  },
+
   mergeInventoryResourceWithRecipe(index, outputResourceId) {
     const item = this.player.inventory[index];
     if (!item || !isResourceItem(item)) return false;
@@ -1336,6 +1400,29 @@ export const inventoryMethods = {
     }
     if (isPotionItem(item)) {
       return this.addPotionLoot(item);
+    }
+    if (isQuestItem(item) && questItemCanStack(item.questItemId)) {
+      let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
+      const stackMax = questItemStackMax(item.questItemId);
+      for (const stack of this.player.inventory) {
+        if (!questItemsCanStack(item, stack)) continue;
+        const current = Math.max(1, Math.floor(Number(stack.count) || 1));
+        const moved = Math.min(stackMax - current, remaining);
+        if (moved <= 0) continue;
+        stack.count = current + moved;
+        remaining -= moved;
+        if (remaining <= 0) return true;
+      }
+      while (remaining > 0) {
+        if (this.player.inventory.length >= maxSlots) {
+          item.count = remaining;
+          return false;
+        }
+        const count = Math.min(stackMax, remaining);
+        this.player.inventory.push({ ...item, id: createId(), count, stackMax });
+        remaining -= count;
+      }
+      return true;
     }
     if (this.player.inventory.length >= maxSlots) return false;
     this.player.inventory.push(item);

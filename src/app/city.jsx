@@ -9,11 +9,12 @@ import {
 } from "../game/data.js";
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
-import { makeItem, itemValue } from "../game/world.js";
-import { makeResourceItem, resourceStackMax } from "../game/GameEngine/helpers.js";
+import { makeItem, itemValue, makePotion } from "../game/world.js";
+import { consumePotionInputs, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
+import { normalizePotionId, potionDefById } from "../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
@@ -97,6 +98,7 @@ import {
   CityGoldBarPanel,
   CityInnAlePanel,
   CityMerchantPanel,
+  CityPotionLabPanel,
   CitySanctuaryDonationPanel,
   CityClassPanel,
   CityReadableMergePanel,
@@ -995,7 +997,10 @@ function CityPage({
         <CityQuestPopup
           npcId={selectedQuestNpcId}
           engineRef={engineRef}
+          snapshotRef={snapshotRef}
+          progress={cityProgress}
           npcStates={snapshot.quests?.cityNpcStates ?? []}
+          onChangeProgress={setCityProgress}
           onQuestCompleted={onQuestCompleted}
           onClose={() => setSelectedQuestNpcId(null)}
         />
@@ -2042,7 +2047,7 @@ function drawCityQuestStatusMarker(ctx, marker, camera, time) {
   ctx.restore();
 }
 
-function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted }) {
+function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, onChangeProgress, onClose, onQuestCompleted }) {
   const npc = QUEST_NPCS[npcId];
   const state = (npcStates ?? []).find((entry) => entry.npcId === npcId) ?? { active: [], offers: [] };
   const npcQuests = state.active ?? [];
@@ -2061,9 +2066,54 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
   const [questCompletionResult, setQuestCompletionResult] = useState(null);
   if (!npc) return null;
 
+  const questResourceEntries = (quest) => (
+    Array.isArray(quest?.target?.resources)
+      ? quest.target.resources
+        .map((entry) => [String(entry.resource ?? entry.resourceId ?? ""), Math.max(1, Math.floor(Number(entry.count) || 1))])
+        .filter(([resourceId]) => resourceId)
+      : []
+  );
+
+  const cityQuestCompletionInventory = (quest) => {
+    const snapshot = snapshotRef?.current ?? {};
+    const inventory = (snapshot.inventory ?? engineRef.current?.player?.inventory ?? []).map((item) => (
+      item && typeof item === "object" ? { ...item } : item
+    ));
+    for (const [resourceId] of questResourceEntries(quest)) {
+      const backpackCount = cityResourceCount(inventory, resourceId);
+      const available = cityCostAvailable(snapshot, resourceId, progress);
+      const cityOnlyCount = Math.max(0, available - backpackCount);
+      if (cityOnlyCount <= 0) continue;
+      const item = makeResourceItem(resourceId, cityOnlyCount);
+      if (item) inventory.push(item);
+    }
+    return inventory;
+  };
+
   const turnIn = (quest) => {
     const engine = engineRef.current;
-    const result = engine?.completeQuest?.(quest.id ?? quest.questId, npcId);
+    const completionInventory = cityQuestCompletionInventory(quest);
+    const backpackComplete = isQuestComplete(quest, engine?.player?.inventory ?? []);
+    const cityComplete = isQuestComplete(quest, completionInventory);
+    if (!backpackComplete && cityComplete) {
+      if (!engine?.questRewardsCanFit?.(quest)) {
+        setActionMessage("Rygsaekken er fuld. Lav plads foer questen indleveres.");
+        engine?.addToast?.("Rygsaekken er fuld");
+        engine?.publishSnapshot?.();
+        return;
+      }
+      const resourceEntries = questResourceEntries(quest);
+      if (resourceEntries.length > 0 && !payCityCostEntries(resourceEntries, engine, snapshotRef?.current, progress, onChangeProgress)) {
+        setActionMessage("Questen kunne ikke indleveres. Tjek city storage eller locked storage.");
+        engine?.addToast?.("Quest resources mangler");
+        engine?.publishSnapshot?.();
+        return;
+      }
+    }
+    const result = engine?.completeQuest?.(quest.id ?? quest.questId, npcId, {
+      inventoryOverride: completionInventory,
+      resourcesPrepaid: !backpackComplete && cityComplete,
+    });
     if (result?.ok) {
       setActionMessage("");
       setSelectedQuest(null);
@@ -2118,6 +2168,8 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
     ].map(String).filter(Boolean)
     : [];
   const selectedQuestCanTurnIn = Boolean(selectedQuest?.quest?.complete)
+    || Boolean(selectedQuest?.quest && isQuestComplete(selectedQuest.quest, cityQuestCompletionInventory(selectedQuest.quest)));
+  const selectedQuestCanTurnInAtNpc = selectedQuestCanTurnIn
     && (selectedTurnInNpcIds.length <= 0 || selectedTurnInNpcIds.includes(String(npcId)));
 
   return (
@@ -2186,7 +2238,7 @@ function CityQuestPopup({ npcId, engineRef, npcStates, onClose, onQuestCompleted
               ) : (
                 <>
                   <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest.quest)}>Opgiv quest</button>
-                  <button type="button" disabled={!selectedQuestCanTurnIn} onClick={() => turnIn(selectedQuest.quest)}>Indlever quest</button>
+                  <button type="button" disabled={!selectedQuestCanTurnInAtNpc} onClick={() => turnIn(selectedQuest.quest)}>Indlever quest</button>
                 </>
               )}
             </>
@@ -2469,6 +2521,7 @@ function cityBuildingFeatureLabel(panelKey) {
     blacksmith: "Blacksmith",
     goldBar: "Minting",
     research: "Research",
+    potionLab: "Alchemy",
     socket: "Sockets",
     skillTree: "Skills",
     readableMerge: "Archive",
@@ -2523,6 +2576,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const buildingResourceAvailable = (resourceId, progressOverride = progress) => (
     cityCostAvailable(snapshotRef?.current ?? snapshot, resourceId, progressOverride)
   );
+  const potionIngredientAvailable = (ingredientId, progressOverride = progress) => {
+    const potionId = normalizePotionId(ingredientId);
+    if (potionId && potionDefById(potionId)) {
+      return backpackPotionCount(snapshotRef?.current ?? snapshot, potionId) + cityStoredPotionCount(progressOverride, potionId);
+    }
+    return buildingResourceAvailable(ingredientId, progressOverride);
+  };
   const nextBuildingLevel = owned ? cityBuildingNextLevel(building, buildingState.level) : null;
   const nextBuildingLevelCostEntries = cityLevelCostEntries(nextBuildingLevel);
   const nextBuildingLevelRequirementEntries = cityStatRequirementEntries(nextBuildingLevel?.statRequirements ?? nextBuildingLevel?.unlock?.statRequirements, cityStats);
@@ -2822,7 +2882,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const repairBuilding = (percent = null) => {
     if (!building) return;
-    const state = progress?.[building.id] ?? {};
+    const progressState = progress ?? {};
+    const state = getCityBuildingState(progressState, building);
     const currentDur = Math.max(0, Math.min(100, Number(state.durability ?? DURABILITY_DEFAULT)));
     const missing = Math.max(0, Math.ceil((percent !== null && typeof percent === "number" ? percent : (100 - currentDur))));
     if (missing <= 0) return;
@@ -2831,7 +2892,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     // Check availability and show informative toast if missing
     const deficits = repairEntries
       .map(([resourceId, amount]) => {
-        const available = buildingResourceAvailable(resourceId, progress);
+        const available = buildingResourceAvailable(resourceId, progressState);
         return { resourceId, amount, available };
       })
       .filter((entry) => entry.available < entry.amount);
@@ -2841,7 +2902,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       return;
     }
 
-    const paid = payBuildingEntries(repairEntries, progress);
+    const paid = payBuildingEntries(repairEntries, progressState);
     if (!paid) {
       engineRef.current?.addToast?.("Betaling mislykkedes ved reparation.");
       return;
@@ -3059,6 +3120,64 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     engineRef.current?.saveProgress?.({ force: true });
   };
 
+  const mixPotionRecipe = (recipe) => {
+    if (!recipe || !potionDefById(recipe.output)) return;
+    const inputs = Object.entries(recipe.inputs ?? {});
+    if (!inputs.every(([inputId, amount]) => potionIngredientAvailable(inputId) >= Math.max(1, Math.floor(Number(amount) || 1)))) {
+      engineRef.current?.addToast?.("Ikke nok potion ingredients");
+      return;
+    }
+    const output = makePotion(recipe.output, snapshotRef.current?.player?.level ?? 1);
+    if (!output) return;
+    output.count = Math.max(1, Math.floor(Number(recipe.count) || 1));
+    const simulatedInventory = (snapshotRef.current?.inventory ?? []).map((item) => ({ ...item }));
+    consumePotionInputs(simulatedInventory, recipe.inputs ?? {});
+    const outputPotionId = normalizePotionId(output.potionId ?? output.potionType);
+    const canStackOutput = simulatedInventory.some((item) => (
+      isPotionItem(item)
+      && normalizePotionId(item.potionId ?? item.potionType) === outputPotionId
+      && Math.max(1, Math.floor(Number(item.count) || 1)) < MAX_POTION_STACK
+    ));
+    if (!canStackOutput && simulatedInventory.length >= backpackCapacity) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+
+    const resourceInputs = inputs.filter(([inputId]) => !potionDefById(inputId));
+    if (resourceInputs.length > 0 && !payBuildingEntries(resourceInputs)) return;
+
+    for (const [inputId, amountRaw] of inputs) {
+      const potionId = normalizePotionId(inputId);
+      if (!potionId || !potionDefById(potionId)) continue;
+      const amount = Math.max(1, Math.floor(Number(amountRaw) || 1));
+      const fromBackpack = Math.min(backpackPotionCount(snapshotRef.current, potionId), amount);
+      let consumed = 0;
+      if (fromBackpack > 0) consumed += engineRef.current?.consumePotion?.(potionId, fromBackpack) ?? 0;
+      const remaining = amount - consumed;
+      if (remaining > 0) {
+        let storageConsumed = 0;
+        onChangeProgress((current) => {
+          const result = consumeCityStoredPotions(current, potionId, remaining);
+          storageConsumed = result.consumed;
+          return result.progress;
+        });
+        if (storageConsumed < remaining) {
+          engineRef.current?.addToast?.("Ikke nok potion ingredients");
+          return;
+        }
+        engineRef.current?.addToast?.(`Used ${storageConsumed}x ${potionDefById(potionId)?.name ?? potionId} from city storage`);
+      }
+    }
+
+    if (!engineRef.current?.addPotionLoot?.(output)) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+    engineRef.current?.addToast?.(`Brewed: ${output.name}`);
+    engineRef.current?.publishSnapshot?.();
+    engineRef.current?.saveProgress?.({ force: true });
+  };
+
   const setMerchantState = (updater) => {
     onChangeProgress((current) => {
       const state = current[building.id] ?? {};
@@ -3228,6 +3347,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             resourceCount={buildingResourceAvailable}
             onBuyRecipe={(recipeKey) => buyResearchRecipe(recipeKey)}
             onMerge={(recipe) => mergeResearchRecipe(recipe)}
+          />
+        );
+      case "potionLab":
+        return (
+          <CityPotionLabPanel
+            countIngredient={(ingredientId) => potionIngredientAvailable(ingredientId)}
+            onMix={(recipe) => mixPotionRecipe(recipe)}
           />
         );
       case "socket":
@@ -3548,18 +3674,27 @@ function cityAddonLockText(addon, snapshot, cityStats = {}) {
 }
 
 function normalizeInventoryType(value) {
-  if (!value || value === "none") return { type: "none", slots: 0 };
-  if (typeof value === "number") return { type: "all", slots: Math.max(0, Math.floor(value)) };
-  if (typeof value === "string") return { type: value, slots: 0 };
+  if (!value || value === "none") return { type: "none", slots: 0, cityCostAccess: true };
+  if (typeof value === "number") return { type: "all", slots: Math.max(0, Math.floor(value)), cityCostAccess: true };
+  if (typeof value === "string") return { type: value, slots: 0, cityCostAccess: true };
   return {
     type: String(value.type ?? value.accepts ?? "none"),
     slots: Math.max(0, Math.floor(Number(value.slots ?? value.size ?? 0) || 0)),
+    cityCostAccess: value.cityCostAccess !== false,
   };
 }
 
 function cityInventorySectionKey(source) {
   if (source?.config?.legacyBase) return "base";
   return source?.id ? `addon:${source.id}` : "base";
+}
+
+function cityStorageCanSupplyCityCosts(source, inventoryType = normalizeInventoryType(source?.inventoryType)) {
+  return source?.cityCostAccess !== false
+    && source?.lockedForCityUse !== true
+    && source?.config?.cityCostAccess !== false
+    && source?.config?.lockedForCityUse !== true
+    && inventoryType.cityCostAccess !== false;
 }
 
 function cityInventorySections(building, state, owned) {
@@ -3576,6 +3711,7 @@ function cityInventorySections(building, state, owned) {
       typeLabel: cityInventoryTypeLabel(baseInventory.type),
       slots: baseSlots,
       fixedDefs: baseFixedDefs,
+      cityCostAccess: cityStorageCanSupplyCityCosts(building, baseInventory),
     });
   }
   const bought = new Set(state.addons ?? []);
@@ -3593,6 +3729,7 @@ function cityInventorySections(building, state, owned) {
       typeLabel: cityInventoryTypeLabel(addonInventory.type),
       slots,
       fixedDefs,
+      cityCostAccess: cityStorageCanSupplyCityCosts(addon, addonInventory),
     });
   }
   return sections;
@@ -3628,6 +3765,78 @@ function normalizeCityInventories(state, building) {
   return next;
 }
 
+function backpackPotionCount(snapshot, potionId) {
+  const id = normalizePotionId(potionId);
+  if (!id) return 0;
+  return (snapshot?.inventory ?? []).reduce((sum, item) => (
+    isPotionItem(item) && normalizePotionId(item.potionId ?? item.potionType) === id
+      ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
+      : sum
+  ), 0);
+}
+
+function cityStoredPotionCount(progress = {}, potionId) {
+  const id = normalizePotionId(potionId);
+  if (!id) return 0;
+  let total = 0;
+  for (const building of CITY_BUILDINGS) {
+    if (!isCityBuildingOwned(progress, building)) continue;
+    const state = getCityBuildingState(progress, building);
+    const inventories = normalizeCityInventories(state, building);
+    for (const section of cityInventorySections(building, state, true)) {
+      if (section.cityCostAccess === false) continue;
+      for (const item of inventories[section.key] ?? []) {
+        if (!isPotionItem(item) || normalizePotionId(item.potionId ?? item.potionType) !== id) continue;
+        total += Math.max(1, Math.floor(Number(item.count) || 1));
+      }
+    }
+  }
+  return total;
+}
+
+function consumeCityStoredPotions(progress = {}, potionId, amount = 0) {
+  const id = normalizePotionId(potionId);
+  let remaining = Math.max(0, Math.floor(Number(amount) || 0));
+  if (!id || remaining <= 0) return { progress, consumed: 0 };
+  let nextProgress = progress;
+  let consumed = 0;
+  for (const building of CITY_BUILDINGS) {
+    if (remaining <= 0 || !isCityBuildingOwned(nextProgress, building)) continue;
+    const state = getCityBuildingState(nextProgress, building);
+    const sections = cityInventorySections(building, state, true);
+    const inventories = normalizeCityInventories(state, building);
+    let changed = false;
+    const nextInventories = { ...inventories };
+    for (const section of sections) {
+      if (remaining <= 0) break;
+      if (section.cityCostAccess === false) continue;
+      const items = [...(nextInventories[section.key] ?? [])];
+      for (let index = items.length - 1; index >= 0 && remaining > 0; index -= 1) {
+        const item = items[index];
+        if (!isPotionItem(item) || normalizePotionId(item.potionId ?? item.potionType) !== id) continue;
+        const count = Math.max(1, Math.floor(Number(item.count) || 1));
+        const used = Math.min(count, remaining);
+        remaining -= used;
+        consumed += used;
+        const left = count - used;
+        items[index] = left > 0 ? { ...item, count: left } : null;
+        changed = true;
+      }
+      nextInventories[section.key] = items;
+    }
+    if (changed) {
+      nextProgress = {
+        ...nextProgress,
+        [building.id]: {
+          ...(nextProgress[building.id] ?? {}),
+          inventories: nextInventories,
+        },
+      };
+    }
+  }
+  return { progress: nextProgress, consumed };
+}
+
 function sortCityStorageSection(progress, buildingId, sectionKey, sortId) {
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
   if (!building || !isCityBuildingOwned(progress, building)) return progress;
@@ -3660,7 +3869,10 @@ function normalizeCityStoredItem(item) {
   if (!next.iconUrl && (next.iconIndex === undefined || next.iconIndex === null)) {
     next.iconUrl = iconUrlFromKey(next.iconKey);
   }
-  if (!isResourceItem(next) && !isPotionItem(next) && next.count !== undefined) {
+  if (isQuestItem(next) && questItemCanStack(next.questItemId)) {
+    next.stackMax = questItemStackMax(next.questItemId);
+    next.count = Math.max(1, Math.min(next.stackMax, Math.floor(Number(next.count) || 1)));
+  } else if (!isResourceItem(next) && !isPotionItem(next) && next.count !== undefined) {
     delete next.count;
   }
   return next;
@@ -3742,6 +3954,9 @@ function cityInventoryStackMax(item) {
   if (isPotionItem(item)) {
     return Math.max(1, Math.floor(Number(item.stackMax ?? MAX_POTION_STACK) || 1));
   }
+  if (isQuestItem(item)) {
+    return Math.max(1, Math.floor(Number(item.stackMax ?? questItemStackMax(item.questItemId)) || 1));
+  }
   return 1;
 }
 
@@ -3756,13 +3971,16 @@ function cityInventoryItemsCanStack(incoming, target) {
     if (incomingPotionId !== targetPotionId) return false;
     return Math.max(1, Math.floor(Number(target.count) || 1)) < cityInventoryStackMax(target);
   }
+  if (isQuestItem(incoming) && isQuestItem(target)) {
+    return questItemsCanStack(incoming, target);
+  }
   return false;
 }
 
 function planCityInventoryDeposit(item, section, slotIndex, storedItems = []) {
   if (!item || !section) return null;
   const target = storedItems[slotIndex] ?? null;
-  if (!isResourceItem(item) && !isPotionItem(item)) {
+  if (!isResourceItem(item) && !isPotionItem(item) && !isQuestItem(item)) {
     if (target || !itemMatchesCityInventorySlot(item, section, slotIndex)) return null;
     return { movedCount: 1, steps: [{ type: "place", slotIndex, count: 1 }] };
   }
@@ -3834,7 +4052,7 @@ function applyCityInventoryDepositPlan(items, item, plan) {
       items[step.slotIndex] = { ...target, count: current + moved };
     } else {
       const placed = { ...item };
-      if (isResourceItem(placed) || isPotionItem(placed)) {
+      if (isResourceItem(placed) || isPotionItem(placed) || isQuestItem(placed)) {
         placed.count = moved;
       } else {
         delete placed.count;
@@ -3847,8 +4065,9 @@ function applyCityInventoryDepositPlan(items, item, plan) {
 
 function itemMatchesCityInventoryType(item, type) {
   if (!item || !type || type === "none") return false;
-  if (isQuestItem(item)) return false;
   if (type === "all") return true;
+  if (type === "quest") return isQuestItem(item);
+  if (isQuestItem(item)) return false;
   if (type === "gemstone") return item.mode === "resource" && (String(item.resourceId ?? "").includes("gemstone") || item.resourceId === "diamond");
   if (type === "potion") return isPotionItem(item);
   if (type === "resource") return isResourceItem(item);

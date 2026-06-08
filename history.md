@@ -6,6 +6,11 @@ kun en farm, resten er bare areas der hedder farm!
 *V. 0.82
 - adding more city stats and consequences
 - added icons for buffs (also consequences)
+- added alchemy_bench addon in research lab
+- added function where pay to something in city can draw from own inventory and city inventory
+- added support for stacking quiestitems
+- enabled drinking potion direct from backpack
+- fixed a durability bug
 
 *V. 0.81
 - Blacksmith Forge Addon can now destroy gear and not only items now

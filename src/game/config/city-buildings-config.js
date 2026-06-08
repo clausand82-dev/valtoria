@@ -8,6 +8,8 @@ export const CITY_BUILDING_GOLD_COST = 1000;
 // Addons can define:
 //   id, title, help/functionText/description, prebuilt, cost, unlock, statRequirements, statEffects,
 //   inventoryType, panel, and addon-specific config.
+//   cityCostAccess: false, config.cityCostAccess: false, or inventoryType.cityCostAccess: false
+//   locks that storage section from automatic city payments/crafting/repair consumption.
 //
 // inventoryType supports:
 //   { type: "none" | "all" | "gemstone" | "potion" | "resource" | "weapon" | "armor" | "quest" | "readable" | "fixed_lorebook" | "fixed_spellbook", slots: number }
@@ -45,7 +47,7 @@ export const CITY_BUILDINGS = [
     help: "Controls everything related to inhabitants and civic growth.",
     functionText: "Resident management will live here: population, housing needs, assignments, and settlement-wide effects.",
     imageUrl: "/assets/generated/house/house_townhall.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 50, red_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 25, stone_brick: 20, red_gemstone: 1 },
     addons: [
       {
         id: "civic_ledger",
@@ -188,7 +190,7 @@ export const CITY_BUILDINGS = [
     help: "Controls research connected to skills and long-term unlocks.",
     functionText: "Research projects, skill links, and unlock chains will live here.",
     imageUrl: "/assets/generated/house/house_researchlab.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 100, iron_bar: 10, purple_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 25, stone_brick: 100, iron_bar: 10, purple_gemstone: 1 },
     addons: [
       {
         id: "research_projects",
@@ -206,6 +208,15 @@ export const CITY_BUILDINGS = [
         panel: "socket",
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1500 },
+      },
+      {
+        id: "alchemy_bench",
+        title: "Alchemy Bench",
+        prebuilt: true,
+        help: "Mixes potions into stronger and rarer brews.",
+        panel: "potionLab",
+        inventoryType: { type: "potion", slots: 25 },
+        cost: { gold: 2000, wood_plank: 25, stone_brick: 25, magic_essence: 2 },
       },
     ],
   },

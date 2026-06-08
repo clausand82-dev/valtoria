@@ -32,6 +32,8 @@ export const QUEST_ITEM_DEFS = {
     name: "Forsvundet øl",
     iconUrl: "/assets/generated/item/item_quest_barrel.png",
     placeholderColor: "#f2c94c",
+    stackable: true,
+    stackMax: 20,
   }, 
   lost_anvil: {
     name: "Forsvunden anvil",
@@ -57,6 +59,8 @@ export const QUEST_ITEM_DEFS = {
     name: "Sejl til Tornvalhed",
     iconUrl: "/assets/generated/item/item_quest_sail.png",
     placeholderColor: "#f3f4aa",
+    stackable: true,
+    stackMax: 10,
   },
   king_crown: {
     name: "Kongekrone",
@@ -77,6 +81,8 @@ export const QUEST_ITEM_DEFS = {
     name: "Lion Gold Idol",
     iconUrl: "/assets/generated/item/item_goldidol.png",
     placeholderColor: "#d7bd67",
+    stackable: true,
+    stackMax: 50,
   },
 };
 
@@ -139,6 +145,9 @@ Target shapes for collect_quest_item:
 
 Quest item drop fields:
 - questItemId: Key from QUEST_ITEM_DEFS.
+- QUEST_ITEM_DEFS can opt into stacking with stackable: true and stackMax: number.
+  Omit these fields for unique/non-stackable quest items.
+  Stackable quest items stack across quest instances by default; set stackByQuestInstance: true to keep instance-bound stacks separate.
 - count: Number required.
 - source: Drop source category, not monster type.
   Supported values:

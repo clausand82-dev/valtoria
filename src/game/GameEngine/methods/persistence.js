@@ -37,6 +37,8 @@ import {
   normalizeHeroStats,
   normalizeQuestBoards,
   normalizeSavedQuestState,
+  questItemCanStack,
+  questItemStackMax,
   questSavePayload,
   questItemTargetsForQuest
 } from "../helpers.js";
@@ -219,6 +221,7 @@ export const persistenceMethods = {
       restoreManaPct: Number(item.restoreManaPct) || undefined,
       armorBuffPct: Number(item.armorBuffPct) || undefined,
       armorBuffDurationMs: Number(item.armorBuffDurationMs) || undefined,
+      speedBuffPct: Number(item.speedBuffPct) || undefined,
       durationMs: Number(item.durationMs) || undefined,
       tickMs: Number(item.tickMs) || undefined,
       healthRegenPct: Number(item.healthRegenPct) || undefined,
@@ -244,11 +247,17 @@ export const persistenceMethods = {
       target: normalizeStringList(item.target),
       bonus: normalizeTargetBonus(item.bonus),
       iconIndex: Number.isFinite(Number(item.iconIndex)) ? Math.floor(Number(item.iconIndex)) : undefined,
-      stackMax: isResourceItem(item) ? resourceStackMax(savedResourceId) : undefined,
+      stackMax: isResourceItem(item)
+        ? resourceStackMax(savedResourceId)
+        : isQuestItem(item) && questItemCanStack(item.questItemId)
+          ? questItemStackMax(item.questItemId)
+          : undefined,
       count: isPotionItem(item)
         ? clamp(Math.floor(Number(item.count) || 1), 1, MAX_POTION_STACK)
         : isResourceItem(item)
           ? clamp(Math.floor(Number(item.count) || 1), 1, resourceStackMax(savedResourceId))
+          : isQuestItem(item) && questItemCanStack(item.questItemId)
+            ? clamp(Math.floor(Number(item.count) || 1), 1, questItemStackMax(item.questItemId))
           : undefined,
     };
     if (isResourceItem(normalized)) {
@@ -273,6 +282,10 @@ export const persistenceMethods = {
       normalized.rarityColor = "#ffcf5a";
       normalized.slot = "quest";
       normalized.iconUrl = def?.iconUrl ?? normalized.iconUrl;
+      normalized.stackMax = questItemCanStack(normalized.questItemId) ? questItemStackMax(normalized.questItemId) : undefined;
+      normalized.count = questItemCanStack(normalized.questItemId)
+        ? clamp(Math.floor(Number(normalized.count) || 1), 1, questItemStackMax(normalized.questItemId))
+        : undefined;
     }
     if (isReadableItem(normalized)) {
       const def = READABLE_DEF_BY_ID[normalized.readableId];
@@ -309,6 +322,7 @@ export const persistenceMethods = {
         normalized.restoreManaPct = Number(def.restoreManaPct) || undefined;
         normalized.armorBuffPct = Number(def.armorBuffPct) || undefined;
         normalized.armorBuffDurationMs = Number(def.armorBuffDurationMs) || undefined;
+        normalized.speedBuffPct = Number(def.speedBuffPct) || undefined;
         normalized.durationMs = Number(def.durationMs) || undefined;
         normalized.tickMs = Number(def.tickMs) || undefined;
         normalized.healthRegenPct = Number(def.healthRegenPct) || undefined;

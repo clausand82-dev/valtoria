@@ -129,6 +129,7 @@ function CityItemName({ item, equipment = [] }) {
 
 function CityItemSlot({ item, equipment = [], placeholder, locked, lockLabel = "LOCK", draggable, accepted, muted, onClick, onDoubleClick, onDragStart, onDrop }) {
   const [hoverPointer, setHoverPointer] = useState(null);
+  const slotRef = useRef(null);
   const rarityClass = cityItemRarityClass(item);
   const qualityColor = cityItemQualityColor(item);
   const fallbackIconUrl = item ? iconUrlFromKey(item.iconKey ?? deriveIconKey(item)) : null;
@@ -140,10 +141,15 @@ function CityItemSlot({ item, equipment = [], placeholder, locked, lockLabel = "
         type="button"
         className={`city-item-slot ${locked ? "locked" : ""} ${item ? "filled" : ""} ${rarityClass} ${accepted ? "accepted" : ""} ${muted ? "muted" : ""}`}
         style={qualityColor ? { "--city-item-quality": qualityColor } : undefined}
+        ref={slotRef}
         draggable={draggable}
         onClick={onClick}
         onDoubleClick={onDoubleClick}
-        onDragStart={onDragStart}
+        onDragStart={(event) => {
+          const iconElement = slotRef.current?.querySelector(".inventory-icon, .city-slot-placeholder");
+          if (iconElement) event.dataTransfer.setDragImage(iconElement, 18, 18);
+          onDragStart?.(event);
+        }}
         onDragOver={(event) => {
           if (onDrop) event.preventDefault();
         }}
@@ -366,8 +372,24 @@ function applyDurabilityDegradationForVisit(progress, cityStats = {}) {
   };
 
   for (const area of CITY_AREAS) {
-    if (!area?.id || !next[area.id]) continue;
-    next[area.id] = degradeState(next[area.id]);
+    if (!area?.id) continue;
+    const saved = next.areas?.[area.id];
+    const state = typeof saved === "object"
+      ? saved
+      : area.prebuilt
+        ? { unlocked: true, level: 1, durability: DURABILITY_DEFAULT }
+        : null;
+    if (!state || !state.unlocked) continue;
+    const degraded = degradeState(state);
+    if (degraded === state) continue;
+    next.areas = {
+      ...(next.areas ?? {}),
+      [area.id]: {
+        ...degraded,
+        unlocked: true,
+        level: Math.max(1, Number(degraded.level) || 1),
+      },
+    };
   }
   for (const building of CITY_BUILDINGS) {
     if (!building?.id || !next[building.id]) continue;

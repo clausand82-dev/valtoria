@@ -1,13 +1,23 @@
 Ting at få gjort
 
+IMPORTENT:
+- speedbuff potion skal have egne buff ikon og eget item ikon
+- tilføj nye quest og få færdiggjort nuværende åbne regions
+- få åbnet og tilføjet nye regioner
+- juster bygningspriser og lvl priser
+
+
+
 NEW QUEST:
 
+Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
 
+Frugterne kan kun findes i marketplace ved corruption der maks må være 1. FGrugterne er orange og banana, som allerede er defineret og gjort klar.
 
 - random loot i wild (breve - et til annelise fra lost lover, en til borgmester fra forsvunden datter, en til Marla (cook) fra succes fuld søn)
 
 - Flere quest fra borgmester til andre steder (et par quest mere i village)
-- 
+
 
 
 TODO senere:
@@ -16,28 +26,13 @@ TODO senere:
 - Implementér questAdvance action
 - Eller fjern dem fra aktiv content, hvis de kun var test/demo
 
-- repair og andre city funktioner ink. quest (i CITY kun) skal kunne trække fra både city invnetory og player inventory (måske skal der et lock systme på city storage, så locked storage ikke kan trækkes fra)
-
-
-- justerer bygningspriser
-
-- få city konsekvenser til at have betydning (konsekvenserne skal måske være gated bag nogle lvl krav, så man ikke starter total dårlig - og dog)
-
-
---- IGANG ---
-Prøv at få gjort grass tile matchende
-
 --- GRAFISK ---
 - Få grafik på alle bygninger og addons, samt få bygningerne i flere variationer (hel, damage og ruin)
 - Få tilføjet flere objekter (objekter skal også have tre stadies hel, damaged, ruin)
 - blizzard skal komme mere oppe fra, ikke fra spilleren (kun meget lidt orienteret fra spiller retning)
 
-
-
 - fix icebear, bear and lion animation
 - fix en af village - og nogle har stadig dårlig walk cycle
-
-
 
 - test popularity noget mere
 - teste om population matcher
@@ -52,8 +47,6 @@ Prøv at få gjort grass tile matchende
 - bedre mobs IQ (pathfinding)
 - grafik til start og stop
 
-- Have map-region-config splittet op i mindre regioner! - Noget skal ændres til area maps. Måske kommentar hjælp skal være seperat fil
-
 - marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
 - man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
 
@@ -62,12 +55,6 @@ Prøv at få gjort grass tile matchende
 
 
 - magi i equimt magi felt skal vise magi info i info panel
-
-- durability har pt ingen konsekvens
-
-- fra AI
-En ekstra ting jeg lagde mærke til: almindelig visit-degradation for areas ser muligvis forkert ud, fordi applyDurabilityDegradationForVisit() leder efter next[area.id], mens areas normalt ligger under progress.areas[area.id]. Bygninger ligger top-level og degraderes, men areas gør sandsynligvis ikke via den funktion.
-
 
 
 - skal junk kunne veksles til forskellige ting som ironbar, wood plank, stone brick mm - måske et sandsynligheds tjek og chance for ingen drop
@@ -94,14 +81,6 @@ et eller andet med flygtninge fra området (jo flere corrupted zoner, jo flere f
 
 
 
--- START QUEST --
-
-Udfylde main quest for lidt flere regioner og så have en masse fyld quest også.
-
-QUEST TO ADD:
-Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
-
-Frugterne kan kun findes i marketplace ved corruption der maks må være 1. FGrugterne er orange og banana, som allerede er defineret og gjort klar.
 
 
 -- MAGI --
@@ -111,9 +90,12 @@ nye potion: fuld liv, magisk save (1 x rød rose, 2 x sjælden lilla blomst, 10 
 
 
 -- NYT udstyr --
-- sten og jern kan blandes for at lave slibesten - 1 x slibesten kan bruges i vildmarken til at fikse våben 5-15% durability.
-- skind og træ kan blandes for at lave repairkit - 1 x repairkit kan bruges i vildmarken til at fikse våben eller armor med 10%-25% durability
-begge disse er backpack merges - måske en ny stats kan påvirke hvor meget disse to fikser durability
+
+REPAIRKIT (item_tools_repairkit.png, maxstack: 3)
+special item, der kan reparerer et våben eller armor med 15-25% durability
+er der en eksisterende stats, der kan påvirke dette specil item?
+
+
 
 
 
@@ -134,16 +116,6 @@ MOBS ATTACK:
 
 
 
--- FRACTIONER --
-Village People (start zone)
-Eldirias Light Elfs (Elvindale skoven)
-Elvindale People
-
-Mountain Trolls
-Nethrendors Dark Elfs
-
-Fractions system: alle mobs tilhører en fraction (brug en variable til fractions navne så jeg nemmere kan ændre dem). Nogle mobs giver plus til andre fractioner (global regel sæt), andre giver minus. Som regel minus til den fraction man dræber af.
-Fractions systemet skal have konsekvens ind i handel og ind i chance for overfald af en bestemt slags (måske er der altid en chance for at fractioner man er meget dårlig stillet ved, kan angribe en i alle zoner).
 
 
 -- ANGREB PÅ byen (NETHRENDIOR) --
@@ -158,8 +130,6 @@ Fractions systemet skal have konsekvens ind i handel og ind i chance for overfal
 - Måske Nethrendor starter med en vis styrke, og mobs, der er under hans kommando reducere i den styrke (måske fraction systemet skal bruges her). Quest kan tilføje elelr fjerne nethrendor army_styrke. Når army styrke er over en vis del af ens egen army styrke, kan der måske ske de her angreb på ens by - corruption skal have noget at sige her.
 
 
-QUEST DER KOMMER FRA TOWN HALL
-Flytte repeat quest over til Town Hall by tavle noget
 
 MAP QUEST
 Quest der er tilknyttet maps og starter første gang man er på map! Lidt mere kompleks system.
@@ -170,9 +140,6 @@ Skal quest så i prefab i stedet, ligesom events kan komme det?
 --- RANDOM EVENTS ---
 Hver region kan få et random event tag, der beskriver hvilke random event's der kan ske, og weight på det.
 Event skal komme fra en event-config, hvor det defineres om event er onetime, id, text, obejct det er relateret til, hvad event gør/giver/kræver osv.
-
-WORLDSTATES 
-Tracke meget mere end i dag - også mere end jeg måske behøver - det er billig data til statistik.
 
 STATISTIK SIDE
 Skal vises pænere og mere. Hænger sammen med worldstate.

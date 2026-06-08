@@ -6,7 +6,6 @@ import {
   itemValue,
   makeItem,
   clamp,
-  POTION_MERGE_RECIPES,
   RESOURCE_DEFS,
   RESOURCE_MERGE_RECIPES,
   RESOURCE_RARITY_COLOR,
@@ -19,6 +18,7 @@ import {
   isResourceItem,
   normalizePotionId,
   potionDefById,
+  potionRecipesForStation,
   withItemFlags,
   withItemIcon
 } from "../dependencies.js";
@@ -327,7 +327,7 @@ export function potionMergeRecipeFor(item, inventory) {
 export function potionMergeRecipesFor(item, inventory) {
   const potionId = normalizePotionId(item?.potionId ?? item?.potionType);
   if (!potionId) return [];
-  return POTION_MERGE_RECIPES.filter((recipe) => (
+  return potionRecipesForStation("backpack").filter((recipe) => (
     Object.hasOwn(recipe.inputs, potionId)
     && hasPotionInputs(inventory, recipe.inputs)
     && potionDefById(recipe.output)

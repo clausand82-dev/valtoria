@@ -51,9 +51,26 @@ function statusEffectSnapshot(effect = {}) {
   const seconds = Math.max(0, Number(effect.duration) || 0);
   const sourceDef = effect.sourceId ? POTION_DEFS[normalizePotionId(effect.sourceId)] ?? SPELL_DEFS[effect.sourceId] : null;
   const pct = (value) => `${Math.round((Number(value) || 0) * 100)}%`;
+  const pctBonusKeys = new Set([
+    "armorPct",
+    "damagePct",
+    "speedPct",
+    "attackSpeed",
+    "critChance",
+    "dodgeChance",
+    "lifeSteal",
+    "magicFind",
+    "goldFind",
+    "resourceFind",
+    "xpGain",
+  ]);
   if (effect.type === "statBuff") {
     const bonuses = Object.entries(effect.bonuses ?? {})
-      .map(([key, value]) => `${key} ${Number(value) > 0 ? "+" : ""}${Math.round(Number(value) || 0)}`)
+      .map(([key, value]) => {
+        const numericValue = Number(value) || 0;
+        const label = pctBonusKeys.has(key) ? pct(numericValue) : String(Math.round(numericValue));
+        return `${key} ${numericValue > 0 ? "+" : ""}${label}`;
+      })
       .join(", ");
     return {
       id: effect.sourceId ?? effect.type ?? "statBuff",
@@ -286,7 +303,7 @@ export const snapshotMethods = {
               : readableCanMerge,
           mergeType: isResourceItem(item) ? "resource" : isPotionItem(item) ? "potion" : readableCanMerge ? "readable" : "gear",
           canRead: isReadableItem(item) && item.readableStatus === "readable" && Boolean(String(item.storyText ?? "").trim()),
-          canConsume: isReadableItem(item) && item.readableStatus === "consumable",
+          canConsume: isPotionItem(item) || (isReadableItem(item) && item.readableStatus === "consumable"),
           summary: this.itemSummary(item),
         };
       }),

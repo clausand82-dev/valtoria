@@ -7,6 +7,7 @@ import { makeResourceItem } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
+import { potionDefById, potionRecipesForStation } from "../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
@@ -676,6 +677,45 @@ function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe
   );
 }
 
+function CityPotionLabPanel({ countIngredient, onMix }) {
+  const recipes = potionRecipesForStation("alchemy_bench");
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Alchemy Bench</h4>
+        <span>Mix backpack recipes and rarer bench-only brews.</span>
+      </header>
+      {recipes.map((recipe) => {
+        const outputDef = potionDefById(recipe.output);
+        const outputName = outputDef?.name ?? recipe.output;
+        const inputEntries = Object.entries(recipe.inputs ?? {});
+        const hasInputs = inputEntries.every(([inputId, count]) => (
+          (countIngredient?.(inputId) ?? 0) >= Math.max(1, Math.floor(Number(count) || 1))
+        ));
+        const inputText = inputEntries
+          .map(([inputId, count]) => {
+            const name = potionDefById(inputId)?.name ?? RESOURCE_DEFS[inputId]?.name ?? inputId;
+            const available = countIngredient?.(inputId) ?? 0;
+            return `${count} ${name} (${available})`;
+          })
+          .join(" + ");
+        return (
+          <div className="blacksmith-row" key={`${recipe.output}-${inputText}`}>
+            <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "potion", potionId: recipe.output }))} />
+            <div>
+              <b>{outputName}</b>
+              <span>{inputText} {"->"} {recipe.count ?? 1} {outputName} | {hasInputs ? "Ready" : "Missing inputs"}</span>
+            </div>
+            <button type="button" disabled={!hasInputs} onClick={() => onMix?.(recipe)}>
+              Mix
+            </button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
   const [selectedItemIndex, setSelectedItemIndex] = useState(null);
   const socketItems = (inventory ?? []).filter((item) => itemCanHaveSockets(item));
@@ -1084,4 +1124,5 @@ export {
   CitySkillTreePanel,
   CityArcaneExtractorPanel,
   CityReadableMergePanel,
+  CityPotionLabPanel,
 };

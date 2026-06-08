@@ -33,6 +33,10 @@ import {
   questItemTargetsForQuest,
   questItemCount,
   questConsumesQuestItem,
+  questItemCanStack,
+  questItemsCanStack,
+  questItemStackMax,
+  questItemStacksByQuestInstance,
   inventoryCanAccept,
   makeQuestInstance,
   isQuestComplete,
@@ -1206,7 +1210,7 @@ export const questsMethods = {
     if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
   },
 
-  completeQuest(instanceId, npcId = null) {
+  completeQuest(instanceId, npcId = null, options = {}) {
     let index = this.questState.active.findIndex((quest) => quest.id === instanceId);
     if (index < 0) {
       index = this.questState.active.findIndex((quest) => String(quest.questId) === String(instanceId));
@@ -1222,8 +1226,12 @@ export const questsMethods = {
       this.publishSnapshot();
       return false;
     }
+    const completionInventory = Array.isArray(options.inventoryOverride)
+      ? options.inventoryOverride
+      : this.player.inventory;
+    const resourcesPrepaid = Boolean(options.resourcesPrepaid);
     if (questHasSteps(quest)) {
-      if (!isQuestComplete(quest, this.player.inventory)) {
+      if (!isQuestComplete(quest, completionInventory)) {
         this.addToast(`${currentQuestStep(quest)?.title ?? quest.title} er ikke faerdig endnu`);
         this.publishSnapshot();
         return false;
@@ -1234,9 +1242,9 @@ export const questsMethods = {
         return false;
       }
       const step = currentQuestStep(quest);
-      const turnInInventorySnapshot = (this.player.inventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
+      const turnInInventorySnapshot = (completionInventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
       const rewardSummary = this.grantQuestRewards(quest);
-      if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
+      if (quest.type === "collect_quest_item") this.consumeQuestItems(quest, { skipResources: resourcesPrepaid });
       const completed = this.completeQuestStepById(quest.questId, step?.id, { grantRewards: false, consumeItems: false });
       this.publishSnapshot();
       this.saveProgress();
@@ -1247,7 +1255,7 @@ export const questsMethods = {
         questInfo: questSnapshot(quest, turnInInventorySnapshot),
       } : false;
     }
-    if (!isQuestComplete(quest, this.player.inventory)) {
+    if (!isQuestComplete(quest, completionInventory)) {
       this.addToast(`${quest.title} er ikke faerdig endnu`);
       this.publishSnapshot();
       return false;
@@ -1258,9 +1266,9 @@ export const questsMethods = {
       return false;
     }
 
-  const turnInInventorySnapshot = (this.player.inventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
+  const turnInInventorySnapshot = (completionInventory ?? []).map((item) => (item && typeof item === "object" ? { ...item } : item));
     const rewardSummary = this.grantQuestRewards(quest);
-    if (quest.type === "collect_quest_item") this.consumeQuestItems(quest);
+    if (quest.type === "collect_quest_item") this.consumeQuestItems(quest, { skipResources: resourcesPrepaid });
     this.questState.active.splice(index, 1);
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
@@ -1430,8 +1438,27 @@ export const questsMethods = {
       const count = Math.max(1, Math.floor(Number(reward?.count) || 1));
       for (let i = 0; i < count; i += 1) {
         const item = makeQuestItem(reward.questItemId, null);
-        if (item && !inventoryCanAccept(simulated, item, maxSlots)) return false;
-        if (item) simulated.push(item);
+        if (!item) continue;
+        if (questItemCanStack(item.questItemId)) {
+          let remaining = 1;
+          const stackMax = questItemStackMax(item.questItemId);
+          for (const stack of simulated) {
+            if (!questItemsCanStack(item, stack)) continue;
+            const current = Math.max(1, Math.floor(Number(stack.count) || 1));
+            const moved = Math.min(stackMax - current, remaining);
+            if (moved <= 0) continue;
+            stack.count = current + moved;
+            remaining -= moved;
+            if (remaining <= 0) break;
+          }
+          if (remaining > 0) {
+            if (simulated.length >= maxSlots) return false;
+            simulated.push({ ...item, count: remaining, stackMax });
+          }
+          continue;
+        }
+        if (!inventoryCanAccept(simulated, item, maxSlots)) return false;
+        simulated.push(item);
       }
     }
     return true;
@@ -1452,15 +1479,23 @@ export const questsMethods = {
     return item;
   },
 
-  consumeQuestItems(quest) {
+  consumeQuestItems(quest, options = {}) {
     // consume resources or specific items if defined, otherwise fallback to quest items
     if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
+      if (options.skipResources) {
+        if (!Array.isArray(quest.target?.items) || quest.target.items.length <= 0) {
+          this.addToast("Quest resources used");
+          this.publishSnapshot();
+          return;
+        }
+      } else {
       const inputs = {};
       for (const r of quest.target.resources) inputs[r.resource] = (inputs[r.resource] || 0) + (r.count ?? 1);
       consumeResourceInputs(this.player.inventory, inputs);
       this.addToast("Quest resources used");
       this.publishSnapshot();
-      return;
+      if (!Array.isArray(quest.target?.items) || quest.target.items.length <= 0) return;
+      }
     }
     if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
       for (const req of quest.target.items) {
@@ -1488,17 +1523,23 @@ export const questsMethods = {
     for (const target of questItemTargetsForQuest(quest)) {
       const needed = Math.max(1, Math.floor(Number(target.count) || 1));
       let removed = 0;
-      this.player.inventory = this.player.inventory.filter((item) => {
-        // keep item if it's not a matching quest item for this quest
-        if (removed >= needed) return true;
-        if (!item || item.mode !== "quest") return true;
-        if (String(item.questItemId) !== String(target.questItemId)) return true;
-        // only remove if item is bound to this quest instance OR it's a global quest item (null/undefined)
-        if (!(item.questInstanceId == null || String(item.questInstanceId) === String(quest.id))) return true;
-        // remove this item
-        removed += 1;
-        return false;
-      });
+      for (let i = this.player.inventory.length - 1; i >= 0 && removed < needed; i -= 1) {
+        const item = this.player.inventory[i];
+        if (!item || item.mode !== "quest") continue;
+        if (String(item.questItemId) !== String(target.questItemId)) continue;
+        if (questItemStacksByQuestInstance(item.questItemId) && !(item.questInstanceId == null || String(item.questInstanceId) === String(quest.id))) continue;
+        if (questItemCanStack(item.questItemId)) {
+          const count = Math.max(1, Math.floor(Number(item.count) || 1));
+          const used = Math.min(count, needed - removed);
+          removed += used;
+          const remaining = count - used;
+          if (remaining > 0) item.count = remaining;
+          else this.player.inventory.splice(i, 1);
+        } else {
+          removed += 1;
+          this.player.inventory.splice(i, 1);
+        }
+      }
     }
   }
 };

@@ -146,6 +146,8 @@ export function normalizeMonsterType(entry) {
 export function makeQuestItem(questItemId, questInstanceId) {
   const def = QUEST_ITEM_DEFS[questItemId];
   if (!def) return null;
+  const stackMax = questItemStackMax(questItemId);
+  const stackable = questItemCanStack(questItemId);
   return withItemIcon(withItemFlags({
     id: createId(),
     name: def.name,
@@ -168,8 +170,42 @@ export function makeQuestItem(questItemId, questInstanceId) {
     speed: 0,
     magic: 0,
     iconUrl: def.iconUrl ?? QUEST_CONFIG.questItemIconPlaceholder,
+    count: stackable ? 1 : undefined,
+    stackMax: stackable ? stackMax : undefined,
     value: 0,
+  }, {
+    quest: true,
+    questBound: true,
+    stackable,
   }));
+}
+
+export function questItemCanStack(questItemId) {
+  const def = QUEST_ITEM_DEFS[questItemId];
+  return Boolean(def?.stackable) && questItemStackMax(questItemId) > 1;
+}
+
+export function questItemStackMax(questItemId) {
+  const def = QUEST_ITEM_DEFS[questItemId];
+  return Math.max(1, Math.floor(Number(def?.stackMax) || 1));
+}
+
+export function questItemStacksByQuestInstance(questItemId) {
+  const def = QUEST_ITEM_DEFS[questItemId];
+  return Boolean(def?.stackByQuestInstance);
+}
+
+export function questItemsCanStack(incoming, target) {
+  if (!incoming || !target) return false;
+  if (incoming.mode !== "quest" || target.mode !== "quest") return false;
+  if (String(incoming.questItemId ?? "") !== String(target.questItemId ?? "")) return false;
+  if (!questItemCanStack(incoming.questItemId)) return false;
+  if (questItemStacksByQuestInstance(incoming.questItemId)) {
+    const incomingInstance = incoming.questInstanceId == null ? "" : String(incoming.questInstanceId);
+    const targetInstance = target.questInstanceId == null ? "" : String(target.questInstanceId);
+    if (incomingInstance !== targetInstance) return false;
+  }
+  return Math.max(1, Math.floor(Number(target.count) || 1)) < questItemStackMax(target.questItemId);
 }
 
 export function questItemTargetsForQuest(quest) {
@@ -214,11 +250,12 @@ export function questItemTargetsForQuest(quest) {
 }
 
 export function questItemCount(items, questInstanceId, questItemId) {
+  const requiresInstance = questItemStacksByQuestInstance(questItemId);
   return (items ?? []).reduce((sum, item) => (
     item?.mode === "quest"
     && String(item.questItemId) === String(questItemId)
-    && (item.questInstanceId == null || String(item.questInstanceId) === String(questInstanceId))
-      ? sum + 1
+    && (!requiresInstance || item.questInstanceId == null || String(item.questInstanceId) === String(questInstanceId))
+      ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
       : sum
   ), 0);
 }
@@ -226,7 +263,7 @@ export function questItemCount(items, questInstanceId, questItemId) {
 export function questConsumesQuestItem(quest, item) {
   if (!item || item.mode !== "quest") return false;
   // allow quest items that are bound to this quest instance OR global (null/undefined)
-  if (!(item.questInstanceId == null || String(item.questInstanceId) === String(quest?.id))) return false;
+  if (questItemStacksByQuestInstance(item.questItemId) && !(item.questInstanceId == null || String(item.questInstanceId) === String(quest?.id))) return false;
   return questItemTargetsForQuest(quest).some((target) => String(target.questItemId) === String(item.questItemId));
 }
 

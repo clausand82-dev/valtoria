@@ -2122,6 +2122,12 @@ button {
   color: #f1c657;
 }
 
+.consume-action {
+  left: 5px;
+  bottom: 5px;
+  color: #9ee66f;
+}
+
 .poor {
   color: #9a9a9a;
 }

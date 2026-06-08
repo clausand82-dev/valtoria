@@ -499,7 +499,7 @@ export function InventoryPanel({
                       D
                     </button>
                     <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
-                    {(item.mode === "potion" || item.mode === "resource") && item.count > 1 && <b className="stack-count">{item.count}</b>}
+                    {(item.flags?.stackable || item.stackMax > 1) && item.count > 1 && <b className="stack-count">{item.count}</b>}
                     <DurabilityBar item={item} />
                     <span>
                       {item.rarityLabel} | L{item.level} | {item.value}g
@@ -535,7 +535,7 @@ export function InventoryPanel({
                     {item.canConsume && (
                       <button
                         type="button"
-                        className="corner-action merge-action"
+                        className="corner-action consume-action"
                         title="Use"
                         onClick={(event) => {
                           event.stopPropagation();

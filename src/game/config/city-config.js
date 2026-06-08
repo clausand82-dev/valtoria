@@ -180,6 +180,7 @@ export const CITY_EVENT_IDS = Object.keys(CITY_EVENT_DEFS);
 
 export const CITY_STATUS_EFFECT_ICON_URLS = {
   potion_orange_regen_health_mana: "/assets/generated/icon/buff_potion_orange_regen_health_mana.png",
+  potion_speedbuf: "/assets/generated/item/item_potion_mediumrefill.png",
 };
 
 // Durability consequence fields:

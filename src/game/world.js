@@ -540,6 +540,7 @@ export function makePotion(type = Math.random() < 0.5 ? "health" : "mana", level
     restoreManaPct: Number(def?.restoreManaPct) || undefined,
     armorBuffPct: Number(def?.armorBuffPct) || undefined,
     armorBuffDurationMs: Number(def?.armorBuffDurationMs) || undefined,
+    speedBuffPct: Number(def?.speedBuffPct) || undefined,
     durationMs: Number(def?.durationMs) || undefined,
     tickMs: Number(def?.tickMs) || undefined,
     healthRegenPct: Number(def?.healthRegenPct) || undefined,

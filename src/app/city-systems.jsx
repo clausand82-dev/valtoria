@@ -1774,11 +1774,12 @@ function cityStoredResourceCount(progress = {}, resourceId) {
   if (!resourceId) return 0;
   let total = 0;
   for (const building of CITY_BUILDINGS) {
-    if (!cityPaymentStorageBuildingIds().has(building.id)) continue;
     const state = getCityBuildingState(progress, building);
     if ((state.level ?? 0) <= 0) continue;
     const inventories = cityPaymentInventoriesForBuilding(state, building);
-    for (const items of Object.values(inventories)) {
+    for (const section of cityPaymentInventorySections(building, state)) {
+      if (section.cityCostAccess === false) continue;
+      const items = inventories[section.key] ?? [];
       for (const item of items ?? []) {
         if (item?.mode !== "resource" || String(item.resourceId) !== String(resourceId)) continue;
         total += Math.max(1, Math.floor(Number(item.count) || 1));
@@ -1837,14 +1838,16 @@ function consumeCityStoredResource(progress = {}, resourceId, amount = 0) {
   let consumed = 0;
   for (const building of CITY_BUILDINGS) {
     if (remaining <= 0) break;
-    if (!cityPaymentStorageBuildingIds().has(building.id)) continue;
     const state = getCityBuildingState(nextProgress, building);
     if ((state.level ?? 0) <= 0) continue;
+    const sections = cityPaymentInventorySections(building, state);
     const inventories = cityPaymentInventoriesForBuilding(state, building);
     let changed = false;
     const nextInventories = { ...inventories };
-    for (const sectionKey of Object.keys(nextInventories)) {
+    for (const section of sections) {
       if (remaining <= 0) break;
+      if (section.cityCostAccess === false) continue;
+      const sectionKey = section.key;
       const items = [...(nextInventories[sectionKey] ?? [])];
       for (let index = 0; index < items.length && remaining > 0; index += 1) {
         const item = items[index];
@@ -1884,31 +1887,39 @@ function cityPaymentInventoriesForBuilding(state, building) {
 function cityPaymentInventorySections(building, state) {
   const sections = [];
   const baseInventory = normalizeCityPaymentInventoryType(building.inventoryType);
-  if (baseInventory.type !== "none" && baseInventory.slots > 0) {
-    sections.push({ key: "base", slots: baseInventory.slots });
+  if (baseInventory.type !== "none" && baseInventory.slots > 0 && cityPaymentStorageCanSupplyCosts(building, baseInventory)) {
+    sections.push({ key: "base", slots: baseInventory.slots, cityCostAccess: baseInventory.cityCostAccess });
   }
   const bought = new Set(state.addons ?? []);
   for (const addon of building.addons ?? []) {
     if (!bought.has(addon.id)) continue;
     const addonInventory = normalizeCityPaymentInventoryType(addon.inventoryType);
     if (addonInventory.type === "none" || addonInventory.slots <= 0) continue;
-    sections.push({ key: `addon:${addon.id}`, slots: addonInventory.slots });
+    if (!cityPaymentStorageCanSupplyCosts(addon, addonInventory)) continue;
+    const key = addon?.config?.legacyBase ? "base" : `addon:${addon.id}`;
+    if (sections.some((section) => section.key === key)) continue;
+    sections.push({ key, slots: addonInventory.slots, cityCostAccess: addonInventory.cityCostAccess });
   }
   return sections;
 }
 
 function normalizeCityPaymentInventoryType(value) {
   if (!value || value === "none") return { type: "none", slots: 0 };
-  if (typeof value === "number") return { type: "all", slots: Math.max(0, Math.floor(value)) };
-  if (typeof value === "string") return { type: value, slots: 0 };
+  if (typeof value === "number") return { type: "all", slots: Math.max(0, Math.floor(value)), cityCostAccess: true };
+  if (typeof value === "string") return { type: value, slots: 0, cityCostAccess: true };
   return {
     type: String(value.type ?? value.accepts ?? "none"),
     slots: Math.max(0, Math.floor(Number(value.slots ?? value.size ?? 0) || 0)),
+    cityCostAccess: value.cityCostAccess !== false,
   };
 }
 
-function cityPaymentStorageBuildingIds() {
-  return new Set(["bank", "inn"]);
+function cityPaymentStorageCanSupplyCosts(source, inventoryType = normalizeCityPaymentInventoryType(source?.inventoryType)) {
+  return source?.cityCostAccess !== false
+    && source?.lockedForCityUse !== true
+    && source?.config?.cityCostAccess !== false
+    && source?.config?.lockedForCityUse !== true
+    && inventoryType.cityCostAccess !== false;
 }
 
 function cityCostAvailable(snapshot, resourceId, progress = null) {

@@ -106,6 +106,7 @@ export function InventoryItemDetail({ selectedItem, equipment, showSummary = tru
       <b className={selectedItem.mode === "resource" ? "resource-rarity" : selectedItem.rarity} style={{ color: itemNameColor }}>{selectedItem.name}</b>
       {selectedItem.mode === "resource" && <em>Stack: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
       {selectedItem.mode === "potion" && selectedItem.count > 1 && <em>Stack: {selectedItem.count}</em>}
+      {selectedItem.mode === "quest" && (selectedItem.flags?.stackable || selectedItem.stackMax > 1) && <em>Stack: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
       {showDurability && (
         <div className="item-detail-durability">
           <span style={{ color: durColor }}>

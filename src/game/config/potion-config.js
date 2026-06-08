@@ -87,18 +87,51 @@ export const POTION_DEFS = {
     iconUrl: "/assets/generated/item/item_potion_slowrefill.png",
     description: "Giver +2% health og +2% mana pr. sekund i 3 minutter.",
   },
+  potion_speedbuf: {
+    id: "potion_speedbuf",
+    type: "buff",
+    name: "Speed Buffer",
+    rarity: "rare",
+    durationMs: 60000,
+    speedBuffPct: 0.15,
+    dropWeight: 5,
+    color: "#1c9fff",
+    iconKey: "potion_speedbuf",
+    iconUrl: "/assets/generated/item/item_potion_mediumrefill.png",
+    description: "Giver +15% speed i 20 sekunder.",
+  },
 };
 
 export const POTION_IDS = Object.keys(POTION_DEFS);
 
+export const POTION_RECIPE_ACCESS = {
+  BACKPACK: "backpack",
+  ALCHEMY_BENCH: "alchemy_bench",
+};
+
 export const POTION_MERGE_RECIPES = [
-  { inputs: { small_health: 2 }, output: "medium_health", count: 1 },
-  { inputs: { medium_health: 2 }, output: "big_health", count: 1 },
-  { inputs: { small_mana: 2 }, output: "medium_mana", count: 1 },
-  { inputs: { medium_mana: 2 }, output: "big_mana", count: 1 },
-  { inputs: { medium_health: 1, medium_mana:1 }, output: "potion_purple_health_mana_50", count: 1 },
-  { inputs: { big_health: 1, big_mana:1, magic_essence: 1}, output: "potion_orange_regen_health_mana", count: 1 },
+  { inputs: { small_health: 2 }, output: "medium_health", count: 1, access: POTION_RECIPE_ACCESS.BACKPACK },
+  { inputs: { medium_health: 2 }, output: "big_health", count: 1, access: POTION_RECIPE_ACCESS.BACKPACK },
+  { inputs: { small_mana: 2 }, output: "medium_mana", count: 1, access: POTION_RECIPE_ACCESS.BACKPACK },
+  { inputs: { medium_mana: 2 }, output: "big_mana", count: 1, access: POTION_RECIPE_ACCESS.BACKPACK },
+  { inputs: { medium_health: 1, medium_mana: 1 }, output: "potion_purple_health_mana_50", count: 1, access: POTION_RECIPE_ACCESS.ALCHEMY_BENCH },
+  { inputs: { big_health: 1, big_mana: 1, magic_essence: 1 }, output: "potion_orange_regen_health_mana", count: 1, access: POTION_RECIPE_ACCESS.ALCHEMY_BENCH },
+  { inputs: { red_rose: 1, rare_pink_flower: 1, magicmushroom: 1 }, output: "potion_speedbuf", count: 10, access: POTION_RECIPE_ACCESS.ALCHEMY_BENCH },
 ];
+
+export function potionRecipeAvailableAt(recipe, station = POTION_RECIPE_ACCESS.BACKPACK) {
+  const access = String(recipe?.access ?? POTION_RECIPE_ACCESS.BACKPACK);
+  const stationId = String(station ?? POTION_RECIPE_ACCESS.BACKPACK);
+  if (stationId === POTION_RECIPE_ACCESS.BACKPACK) return access === POTION_RECIPE_ACCESS.BACKPACK;
+  if (stationId === POTION_RECIPE_ACCESS.ALCHEMY_BENCH) {
+    return access === POTION_RECIPE_ACCESS.BACKPACK || access === POTION_RECIPE_ACCESS.ALCHEMY_BENCH;
+  }
+  return false;
+}
+
+export function potionRecipesForStation(station = POTION_RECIPE_ACCESS.BACKPACK) {
+  return POTION_MERGE_RECIPES.filter((recipe) => potionRecipeAvailableAt(recipe, station));
+}
 
 const POTION_ID_ALIASES = {
   health: "small_health",
