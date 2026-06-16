@@ -1061,6 +1061,7 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
     }
   }
   applyRegionCityStats(stats, regionCorruption, snapshot);
+  applyNonPopularityEffects(stats, normalizeCityStatAdjustments(progress?.statAdjustments));
   applyCurrentCityStatEffects(stats, progress);
   stats.army = stats.defense;
   stats.city_defence = stats.defense;
@@ -1087,6 +1088,10 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   for (const [statId, amount] of Object.entries(normalizeCityStatBonuses(progress?.statBonuses))) {
     if (normalizeCityStatId(statId) === "popularity") continue;
     addEntry(statId, "City progress", amount);
+  }
+  for (const [statId, amount] of Object.entries(normalizeCityStatAdjustments(progress?.statAdjustments))) {
+    if (normalizeCityStatId(statId) === "popularity") continue;
+    addEntry(statId, "City actions", amount);
   }
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
@@ -1667,6 +1672,21 @@ function addCityPermanentStatBonus(progress = {}, statId, amount) {
   };
 }
 
+function addCityStatAdjustment(progress = {}, statId, amount) {
+  const normalized = normalizeCityStatId(statId);
+  const value = Math.floor(Number(amount) || 0);
+  if (!normalized || normalized === "population" || value === 0) return progress;
+  const current = Math.floor(Number(normalizeCityStatAdjustments(progress.statAdjustments)?.[normalized]) || 0);
+  const nextValue = current + value;
+  const nextAdjustments = normalizeCityStatAdjustments(progress.statAdjustments);
+  if (nextValue === 0) delete nextAdjustments[normalized];
+  else nextAdjustments[normalized] = nextValue;
+  return {
+    ...progress,
+    statAdjustments: nextAdjustments,
+  };
+}
+
 function saveCityProgress(progress, storageKey = CITY_STORAGE_KEY) {
   saveRepository.saveCityProgressSync(storageKey, serializeCityProgress(progress));
 }
@@ -1684,9 +1704,22 @@ function normalizeCityStatBonuses(statBonuses = {}) {
   return normalized;
 }
 
+function normalizeCityStatAdjustments(statAdjustments = {}) {
+  if (!statAdjustments || typeof statAdjustments !== "object" || Array.isArray(statAdjustments)) return {};
+  const normalized = {};
+  for (const [rawId, rawAmount] of Object.entries(statAdjustments)) {
+    const statId = normalizeCityStatId(rawId);
+    if (!statId || statId === "population") continue;
+    const amount = Math.floor(Number(rawAmount) || 0);
+    if (amount === 0) continue;
+    normalized[statId] = amount;
+  }
+  return normalized;
+}
+
 function normalizeCityProgress(progress = {}) {
   const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
-  const reserved = new Set(["areas", "statBonuses", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const reserved = new Set(["areas", "statBonuses", "statAdjustments", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
   const buildingIds = new Set(CITY_BUILDINGS.map((building) => building.id));
   const normalized = {
     areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
@@ -1704,6 +1737,7 @@ function normalizeCityProgress(progress = {}) {
     normalized[key] = nextValue;
   }
   normalized.statBonuses = normalizeCityStatBonuses(raw.statBonuses);
+  normalized.statAdjustments = normalizeCityStatAdjustments(raw.statAdjustments);
   normalized.armoryPoints = normalizeArmoryPoints(raw.armoryPoints);
   normalized.armyUnits = normalizeArmyUnits(raw.armyUnits);
   normalized.threatLevel = Math.max(0, Math.min(100, Number(raw.threatLevel) || 0));
@@ -1721,6 +1755,7 @@ function serializeCityProgress(progress = {}) {
         Object.entries(normalized).filter(([key, value]) => (
           key !== "areas"
           && key !== "statBonuses"
+          && key !== "statAdjustments"
           && key !== "armoryPoints"
           && key !== "armyUnits"
           && key !== "threatLevel"
@@ -1732,6 +1767,7 @@ function serializeCityProgress(progress = {}) {
       )
       : {}),
     ...(cfg.statBonuses ? { statBonuses: { ...(normalized.statBonuses ?? {}) } } : {}),
+    ...(cfg.statAdjustments ? { statAdjustments: { ...(normalized.statAdjustments ?? {}) } } : {}),
     ...(cfg.armoryPoints ? { armoryPoints: normalizeArmoryPoints(normalized.armoryPoints) } : {}),
     ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(normalized.armyUnits) } : {}),
     ...(cfg.threatLevel ? { threatLevel: Math.max(0, Math.min(100, Number(normalized.threatLevel) || 0)) } : {}),
@@ -2001,6 +2037,7 @@ export {
   saveCityProgress,
   serializeCityProgress,
   addCityPermanentStatBonus,
+  addCityStatAdjustment,
   cityArmoryPoints,
   addCityArmoryPoints,
   addCityArmyUnit,

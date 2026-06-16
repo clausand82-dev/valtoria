@@ -10,7 +10,7 @@ import {
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue, makePotion } from "../game/world.js";
-import { consumePotionInputs, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
+import { consumePotionInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
@@ -109,6 +109,7 @@ import {
 
 import {
   addCityPermanentStatBonus,
+  addCityStatAdjustment,
   addCityArmoryPoints,
   cityArmoryPoints,
   applyCityMobProgressForVisit,
@@ -988,6 +989,7 @@ function CityPage({
           progress={cityProgress}
           houseImages={cityAssets.houseImages ?? {}}
           cityStats={cityStats}
+          regionCorruption={regionCorruption}
           onConvertResourceToResource={convertCityResourceToResource}
           onChangeProgress={setCityProgress}
           onClose={() => setSelectedBuildingId(null)}
@@ -2553,7 +2555,7 @@ function cityBuildingHoverSummary(building, progress, snapshot, cityStats = {}) 
   };
 }
 
-function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
+function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, regionCorruption = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
   const [draggedCityItem, setDraggedCityItem] = useState(null);
   const [activeAddonId, setActiveAddonId] = useState(null);
@@ -3000,19 +3002,27 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const brewFarmAle = (recipe) => {
+    const currentProgress = progress ?? {};
+    const currentSnapshot = snapshotRef?.current ?? snapshot;
+    const currentStats = calculateCityStats(currentProgress, currentSnapshot, regionCorruption);
     const inputs = Object.entries(recipe?.inputs ?? {})
       .map(([resourceId, amount]) => [resourceId, Math.max(1, Math.floor(Number(amount) || 1))]);
     const statCosts = Object.entries(recipe?.statCosts ?? {})
       .map(([statId, amount]) => [statId, Math.max(1, Math.floor(Number(amount) || 1))]);
-    if (!statCosts.every(([statId, amount]) => Math.max(0, Math.floor(Number(cityStats?.[statId]) || 0)) >= amount)) return;
+    if (!statCosts.every(([statId, amount]) => Math.max(0, Math.floor(Number(currentStats?.[statId]) || 0)) >= amount)) return;
     const outputResourceId = String(recipe?.outputResourceId ?? "ale");
     const outputCount = Math.max(1, Math.floor(Number(recipe?.outputCount) || 1));
     const output = makeResourceItem(outputResourceId, outputCount);
     if (!output) return;
-    if (!payBuildingEntries(inputs)) return;
+    const simulatedInventory = (currentSnapshot?.player?.inventory ?? []).map((item) => ({ ...item }));
+    if (!inventoryCanAccept(simulatedInventory, output, backpackCapacity)) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+    if (!payBuildingEntries(inputs, currentProgress)) return;
     if (statCosts.length > 0) {
       onChangeProgress((current) => statCosts.reduce(
-        (next, [statId, amount]) => addCityPermanentStatBonus(next, statId, -amount),
+        (next, [statId, amount]) => addCityStatAdjustment(next, statId, -amount),
         current,
       ));
     }
@@ -3021,14 +3031,27 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       return;
     }
     engineRef.current?.addToast?.(`Created ${outputCount}x ${output.name}`);
+    engineRef.current?.publishSnapshot?.();
     engineRef.current?.saveProgress?.({ force: true });
   };
 
   const serveInnAle = (trade) => {
     const resourceId = String(trade?.resourceId ?? "ale");
     const cost = Math.max(1, Math.floor(Number(trade?.cost) || 1));
-    if (!payBuildingEntries([[resourceId, cost]])) return;
-    applyConfiguredCityEffects(trade.effects ?? {});
+    if (!payBuildingEntries([[resourceId, cost]], progress ?? {})) return;
+    const cityEntries = Object.entries(trade.effects ?? {}).filter(([statId]) => String(statId) !== "popularity");
+    const popularity = Math.floor(Number(trade.effects?.popularity) || 0);
+    if (cityEntries.length > 0) {
+      onChangeProgress((current) => cityEntries.reduce(
+        (next, [statId, amount]) => addCityStatAdjustment(next, statId, amount),
+        current,
+      ));
+    }
+    if (popularity !== 0) {
+      engineRef.current?.changePopularity?.(popularity);
+      engineRef.current?.publishSnapshot?.();
+      engineRef.current?.saveProgress?.({ force: true });
+    }
   };
 
   const repairEquippedItem = (slotId, cost = {}) => {

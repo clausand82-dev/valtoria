@@ -140,6 +140,7 @@ export const CITY_BUILDINGS = [
         config: { station: "weapon" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1000 },
+        imageUrl: "/assets/generated/addon/addon_weapon_anvil.png",        
         unlock: { completedQuests: ["lost_anvil"], text: "Requires Den forsvundne anvil." },
       },
       {
@@ -150,6 +151,7 @@ export const CITY_BUILDINGS = [
         panel: "blacksmith",
         config: { station: "armor" },
         inventoryType: { type: "none", slots: 0 },
+        imageUrl: "/assets/generated/addon/addon_armor_anvil.png",
         cost: { gold: 1000 },
       },
       {
@@ -462,17 +464,7 @@ export const CITY_BUILDINGS = [
       },
     ],
   },
-  {
-    id: "farm2",
-    title: "Farm 2",
-    prebuilt: true,
-    help: "A food and settlement supply building.",
-    functionText: "Turns bulk food resources into provision for the settlement.",
-    imageUrl: "/assets/generated/house/house_farm.png",
-    statEffects: { provision: 100 },
-    cost: { gold: CITY_BUILDING_GOLD_COST },
-  },
-  {
+   /*{
     id: "field",
     title: "Field",
     prebuilt: true,
@@ -499,5 +491,5 @@ export const CITY_BUILDINGS = [
         builtLayer: "/assets/generated/city/city_outer1_lvl3.png",
       },
     ],
-  },
+  },*/
 ];

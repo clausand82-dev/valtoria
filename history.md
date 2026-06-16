@@ -3,6 +3,12 @@ History over changes
 TO DO:
 kun en farm, resten er bare areas der hedder farm!
 
+*V. 0.84
+- fixed ale brewing didn't cost and give citystat water
+
+*V. 0.83
+- adding picture for addons/features
+
 *V. 0.82
 - adding more city stats and consequences
 - added icons for buffs (also consequences)
