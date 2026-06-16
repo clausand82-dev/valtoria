@@ -1032,6 +1032,7 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   const armyPower = armyTotalPower(progress?.armyUnits);
   stats.defense = Math.max(0, Math.floor(Number(stats.defense) || 0)) + armyPower;
   applyNonPopularityEffects(stats, normalizeCityStatBonuses(progress?.statBonuses));
+  applyCityStatEffects(stats, normalizeCityTonicBoosts(progress?.cityTonicBoosts));
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
@@ -1088,6 +1089,9 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   for (const [statId, amount] of Object.entries(normalizeCityStatBonuses(progress?.statBonuses))) {
     if (normalizeCityStatId(statId) === "popularity") continue;
     addEntry(statId, "City progress", amount);
+  }
+  for (const [statId, amount] of Object.entries(normalizeCityTonicBoosts(progress?.cityTonicBoosts))) {
+    addEntry(statId, "City Tonics", amount);
   }
   for (const [statId, amount] of Object.entries(normalizeCityStatAdjustments(progress?.statAdjustments))) {
     if (normalizeCityStatId(statId) === "popularity") continue;
@@ -1672,6 +1676,21 @@ function addCityPermanentStatBonus(progress = {}, statId, amount) {
   };
 }
 
+function addCityTonicBoosts(progress = {}, effects = {}) {
+  const normalizedEffects = normalizeCityTonicBoosts(effects);
+  if (Object.keys(normalizedEffects).length === 0) return progress;
+  const nextBoosts = normalizeCityTonicBoosts(progress.cityTonicBoosts);
+  for (const [statId, amount] of Object.entries(normalizedEffects)) {
+    const nextValue = Math.floor(Number(nextBoosts[statId]) || 0) + Math.floor(Number(amount) || 0);
+    if (nextValue === 0) delete nextBoosts[statId];
+    else nextBoosts[statId] = nextValue;
+  }
+  return {
+    ...progress,
+    cityTonicBoosts: nextBoosts,
+  };
+}
+
 function addCityStatAdjustment(progress = {}, statId, amount) {
   const normalized = normalizeCityStatId(statId);
   const value = Math.floor(Number(amount) || 0);
@@ -1704,6 +1723,22 @@ function normalizeCityStatBonuses(statBonuses = {}) {
   return normalized;
 }
 
+function normalizeCityTonicBoosts(cityTonicBoosts = {}) {
+  if (!cityTonicBoosts || typeof cityTonicBoosts !== "object" || Array.isArray(cityTonicBoosts)) return {};
+  const normalized = {};
+  for (const [rawId, rawAmount] of Object.entries(cityTonicBoosts)) {
+    const statId = normalizeCityStatId(rawId);
+    if (!statId || statId === "population" || CITY_STATS_RULES.baseStats?.[statId] === undefined) {
+      console.warn?.(`Ignoring unknown city tonic stat: ${String(rawId)}`);
+      continue;
+    }
+    const amount = Math.floor(Number(rawAmount) || 0);
+    if (amount === 0) continue;
+    normalized[statId] = (normalized[statId] ?? 0) + amount;
+  }
+  return normalized;
+}
+
 function normalizeCityStatAdjustments(statAdjustments = {}) {
   if (!statAdjustments || typeof statAdjustments !== "object" || Array.isArray(statAdjustments)) return {};
   const normalized = {};
@@ -1719,7 +1754,7 @@ function normalizeCityStatAdjustments(statAdjustments = {}) {
 
 function normalizeCityProgress(progress = {}) {
   const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
-  const reserved = new Set(["areas", "statBonuses", "statAdjustments", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const reserved = new Set(["areas", "statBonuses", "cityTonicBoosts", "statAdjustments", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
   const buildingIds = new Set(CITY_BUILDINGS.map((building) => building.id));
   const normalized = {
     areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
@@ -1737,6 +1772,7 @@ function normalizeCityProgress(progress = {}) {
     normalized[key] = nextValue;
   }
   normalized.statBonuses = normalizeCityStatBonuses(raw.statBonuses);
+  normalized.cityTonicBoosts = normalizeCityTonicBoosts(raw.cityTonicBoosts);
   normalized.statAdjustments = normalizeCityStatAdjustments(raw.statAdjustments);
   normalized.armoryPoints = normalizeArmoryPoints(raw.armoryPoints);
   normalized.armyUnits = normalizeArmyUnits(raw.armyUnits);
@@ -1755,6 +1791,7 @@ function serializeCityProgress(progress = {}) {
         Object.entries(normalized).filter(([key, value]) => (
           key !== "areas"
           && key !== "statBonuses"
+          && key !== "cityTonicBoosts"
           && key !== "statAdjustments"
           && key !== "armoryPoints"
           && key !== "armyUnits"
@@ -1767,6 +1804,7 @@ function serializeCityProgress(progress = {}) {
       )
       : {}),
     ...(cfg.statBonuses ? { statBonuses: { ...(normalized.statBonuses ?? {}) } } : {}),
+    ...(cfg.cityTonicBoosts ? { cityTonicBoosts: normalizeCityTonicBoosts(normalized.cityTonicBoosts) } : {}),
     ...(cfg.statAdjustments ? { statAdjustments: { ...(normalized.statAdjustments ?? {}) } } : {}),
     ...(cfg.armoryPoints ? { armoryPoints: normalizeArmoryPoints(normalized.armoryPoints) } : {}),
     ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(normalized.armyUnits) } : {}),
@@ -2037,6 +2075,7 @@ export {
   saveCityProgress,
   serializeCityProgress,
   addCityPermanentStatBonus,
+  addCityTonicBoosts,
   addCityStatAdjustment,
   cityArmoryPoints,
   addCityArmoryPoints,

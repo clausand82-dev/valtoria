@@ -111,6 +111,7 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
   const options = slot.kind === "potion" ? (quickActions.potions ?? []) : (quickActions.spells ?? []);
   const selected = options.find((entry) => String(entry.id) === String(slot.id)) ?? options[0] ?? null;
   const isPotion = slot.kind === "potion";
+  const isChanneledSpell = !isPotion && Boolean(selected?.channeled);
   const isOpen = openPicker === slotId;
   const count = isPotion ? Math.max(0, Math.floor(Number(selected?.count) || 0)) : 0;
   const spellCooldown = !isPotion && selected?.cooldown
@@ -166,8 +167,29 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
         className={`quickslot ${isPotion ? "potion-slot" : "spell-slot"} ${(isPotion ? potionCooldown : spellCooldown) > 0 ? "cooling" : ""}`}
         title={cityOpen ? "Ikke tilgaengelig i byen" : title}
         disabled={disabled}
+        onPointerDown={(event) => {
+          if (!isChanneledSpell) return;
+          stopQuickbarEvent(event);
+          engineRef.current?.activateQuickSlot?.(slotId);
+        }}
+        onPointerUp={(event) => {
+          if (!isChanneledSpell) return;
+          stopQuickbarEvent(event);
+          engineRef.current?.stopHeldSpell?.(slot.id);
+        }}
+        onPointerCancel={(event) => {
+          if (!isChanneledSpell) return;
+          stopQuickbarEvent(event);
+          engineRef.current?.stopHeldSpell?.(slot.id);
+        }}
+        onPointerLeave={(event) => {
+          if (!isChanneledSpell) return;
+          stopQuickbarEvent(event);
+          engineRef.current?.stopHeldSpell?.(slot.id);
+        }}
         onClick={(event) => {
           stopQuickbarEvent(event);
+          if (isChanneledSpell) return;
           engineRef.current?.activateQuickSlot?.(slotId);
         }}
       >

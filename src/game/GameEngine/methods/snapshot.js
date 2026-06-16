@@ -122,6 +122,18 @@ function statusEffectSnapshot(effect = {}) {
       color: effect.color ?? "#58bfff",
     };
   }
+  if (effect.type === "stun") {
+    return {
+      id: effect.sourceId ?? effect.type ?? "stun",
+      sourceId: effect.sourceId ?? null,
+      type: "debuff",
+      label: "Stunned",
+      effect: "Movement and attacks disabled",
+      remainingSeconds: seconds,
+      solution: "Wait for it to expire.",
+      color: effect.color ?? "#d8f6ff",
+    };
+  }
   if (effect.type === "root") {
     return {
       id: effect.sourceId ?? effect.type ?? "root",
@@ -343,6 +355,7 @@ export const snapshotMethods = {
           color: SPELL_DEFS[spellId]?.color,
           cooldown: SPELL_DEFS[spellId]?.cooldown ?? 0,
           manaCost: SPELL_DEFS[spellId]?.manaCost ?? 0,
+          channeled: Boolean(SPELL_DEFS[spellId]?.channeled),
           frameName: SPELL_DEFS[spellId]?.hudFrame ?? "orb",
           iconUrl: SPELL_DEFS[spellId]?.hudIconUrl ?? SPELL_DEFS[spellId]?.visuals?.projectileTexture ?? null,
         })),

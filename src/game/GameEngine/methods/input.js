@@ -7,6 +7,8 @@ export const inputMethods = {
     if (!this.inputLocked) return;
     this.keys.clear();
     this.pointer.down = false;
+    this.pointer.rightDown = false;
+    this.stopHeldSpell?.();
     this.player.target = null;
     this.player.attackTargetId = null;
     this.player.attackObjectId = null;
@@ -46,7 +48,8 @@ export const inputMethods = {
     this.handlePointerMove(event);
     if (event.button === 2) {
       event.preventDefault();
-      this.castSpellAt(this.pointer.worldX, this.pointer.worldY);
+      this.pointer.rightDown = true;
+      this.startHeldSpell?.(this.player.activeSpellId, "pointer");
       return;
     }
     this.pointer.down = true;
@@ -86,38 +89,43 @@ export const inputMethods = {
     this.player.target = { x: this.pointer.worldX, y: this.pointer.worldY };
   },
 
-  handlePointerUp() {
+  handlePointerUp(event) {
     if (this.inputLocked) return;
+    if (!event || event.button === 2) {
+      this.pointer.rightDown = false;
+      this.stopHeldSpell?.();
+    }
     this.pointer.down = false;
   },
 
   handleKeyDown(event) {
     if (this.inputLocked) return;
     const key = event.key.toLowerCase();
+    const wasDown = this.keys.has(key);
     this.keys.add(key);
-    if (key === " ") {
+    if (key === " " && !wasDown) {
       event.preventDefault();
       this.primaryAttack();
     }
-    if (key === "1") {
+    if (key === "1" && !wasDown) {
       event.preventDefault();
       this.activateQuickSlot("1");
     }
-    if (key === "2") {
+    if (key === "2" && !wasDown) {
       event.preventDefault();
       this.activateQuickSlot("2");
     }
-    if (key === "3") {
+    if (key === "3" && !wasDown) {
       event.preventDefault();
       this.activateQuickSlot("3");
     }
-    if (key === "4") {
+    if (key === "4" && !wasDown) {
       event.preventDefault();
       this.activateQuickSlot("4");
     }
-    if (key === "q") {
-      const target = this.nearestMonster(7);
-      this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY);
+    if (key === "q" && !wasDown) {
+      event.preventDefault();
+      this.startHeldSpell?.(this.player.activeSpellId, "nearest");
     }
     if (key === "e") {
       if (this.nearbyQuestgiver) {
@@ -139,6 +147,12 @@ export const inputMethods = {
 
   handleKeyUp(event) {
     if (this.inputLocked) return;
-    this.keys.delete(event.key.toLowerCase());
+    const key = event.key.toLowerCase();
+    this.keys.delete(key);
+    if (["3", "4", "q"].includes(key)) {
+      const slot = this.normalizeQuickSlots?.()[key];
+      if (key === "q") this.stopHeldSpell?.(this.player.activeSpellId);
+      else if (slot?.kind === "spell") this.stopHeldSpell?.(slot.id);
+    }
   }
 };

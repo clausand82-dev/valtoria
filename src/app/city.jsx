@@ -99,6 +99,7 @@ import {
   CityInnAlePanel,
   CityMerchantPanel,
   CityPotionLabPanel,
+  CityTonicLabPanel,
   CitySanctuaryDonationPanel,
   CityClassPanel,
   CityReadableMergePanel,
@@ -109,6 +110,7 @@ import {
 
 import {
   addCityPermanentStatBonus,
+  addCityTonicBoosts,
   addCityStatAdjustment,
   addCityArmoryPoints,
   cityArmoryPoints,
@@ -2398,6 +2400,7 @@ const CITY_BUILDING_PANEL_COMPONENTS = {
   sanctuaryDonation: CitySanctuaryDonationPanel,
   farmAle: CityFarmAlePanel,
   innAle: CityInnAlePanel,
+  cityTonicLab: CityTonicLabPanel,
 };
 
 function normalizeCityBuildingAddons(building) {
@@ -2524,6 +2527,7 @@ function cityBuildingFeatureLabel(panelKey) {
     goldBar: "Minting",
     research: "Research",
     potionLab: "Alchemy",
+    cityTonicLab: "City Tonics",
     socket: "Sockets",
     skillTree: "Skills",
     readableMerge: "Archive",
@@ -2585,6 +2589,18 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     }
     return buildingResourceAvailable(ingredientId, progressOverride);
   };
+  const cityTonicInputStatId = (inputId) => {
+    const raw = String(inputId ?? "");
+    const normalized = raw.replaceAll("-", "_");
+    const statId = CITY_STAT_ALIASES[raw] ?? CITY_STAT_ALIASES[normalized] ?? normalized;
+    return CITY_STATS_RULES.baseStats?.[statId] === undefined ? "" : statId;
+  };
+  const cityTonicInputAvailable = (inputId, progressOverride = progress) => {
+    const id = String(inputId ?? "");
+    if (RESOURCE_DEFS[id] || id === "gold") return buildingResourceAvailable(id, progressOverride);
+    const statId = cityTonicInputStatId(id);
+    return statId ? Math.max(0, Math.floor(Number(calculateCityStats(progressOverride, snapshotRef?.current ?? snapshot, regionCorruption)?.[statId]) || 0)) : 0;
+  };
   const nextBuildingLevel = owned ? cityBuildingNextLevel(building, buildingState.level) : null;
   const nextBuildingLevelCostEntries = cityLevelCostEntries(nextBuildingLevel);
   const nextBuildingLevelRequirementEntries = cityStatRequirementEntries(nextBuildingLevel?.statRequirements ?? nextBuildingLevel?.unlock?.statRequirements, cityStats);
@@ -2632,11 +2648,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           ? `${prebuilt ? "Prebuilt | " : ""}Lvl ${buildingState.level}`
           : "Not owned";
   const storageSections = cityInventorySections(building, buildingState, owned);
-  const activeStorageSection = activeQuestBoard
-    ? null
-    : activeAddon?.panel === "storage"
-      ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
-      : null;
+  const activeAddonStorageSection = activeAddon
+    ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
+    : null;
+  const activeStorageSection = activeQuestBoard ? null : activeAddonStorageSection;
 
   useEffect(() => {
     if (!owned || !questBoardId) {
@@ -3201,6 +3216,59 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     engineRef.current?.saveProgress?.({ force: true });
   };
 
+  const mixCityTonicRecipe = (recipe) => {
+    if (!recipe?.id) return;
+    const inputs = Object.entries(recipe.inputs ?? {})
+      .map(([inputId, amount]) => [String(inputId), Math.max(1, Math.floor(Number(amount) || 1))])
+      .filter(([inputId]) => inputId);
+    const resourceEntries = [];
+    const statCostEntries = [];
+    const invalidInputs = [];
+    for (const [inputId, amount] of inputs) {
+      if (RESOURCE_DEFS[inputId] || inputId === "gold") {
+        resourceEntries.push([inputId, amount]);
+        continue;
+      }
+      const statId = cityTonicInputStatId(inputId);
+      if (statId) {
+        statCostEntries.push([statId, amount]);
+        continue;
+      }
+      invalidInputs.push(inputId);
+    }
+    if (invalidInputs.length > 0) {
+      console.warn?.(`City tonic recipe ${recipe.id} has unknown inputs: ${invalidInputs.join(", ")}`);
+      engineRef.current?.addToast?.(`City tonic has unknown inputs: ${invalidInputs.join(", ")}`);
+      return;
+    }
+    const currentStats = calculateCityStats(progress ?? {}, snapshotRef?.current ?? snapshot, regionCorruption);
+    const missing = inputs
+      .map(([inputId, amount]) => {
+        const available = cityTonicInputAvailable(inputId);
+        return available < amount ? `${cityCostLabel(inputId)} ${available}/${amount}` : "";
+      })
+      .filter(Boolean);
+    if (missing.length > 0) {
+      engineRef.current?.addToast?.(`Missing tonic inputs: ${missing.join(", ")}`);
+      return;
+    }
+    if (!statCostEntries.every(([statId, amount]) => Math.max(0, Math.floor(Number(currentStats?.[statId]) || 0)) >= amount)) {
+      engineRef.current?.addToast?.("Not enough city stats for tonic input.");
+      return;
+    }
+    if (resourceEntries.length > 0 && !payBuildingEntries(resourceEntries)) return;
+    onChangeProgress((current) => {
+      const withCosts = statCostEntries.reduce(
+        (next, [statId, amount]) => addCityStatAdjustment(next, statId, -amount),
+        current,
+      );
+      return addCityTonicBoosts(withCosts, recipe.cityStatEffects ?? {});
+    });
+    engineRef.current?.addToast?.(`Mixed: ${recipe.title ?? recipe.id}`);
+    engineRef.current?.publishSnapshot?.();
+    engineRef.current?.saveProgress?.({ force: true });
+  };
+
   const setMerchantState = (updater) => {
     onChangeProgress((current) => {
       const state = current[building.id] ?? {};
@@ -3377,6 +3445,15 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           <CityPotionLabPanel
             countIngredient={(ingredientId) => potionIngredientAvailable(ingredientId)}
             onMix={(recipe) => mixPotionRecipe(recipe)}
+          />
+        );
+      case "cityTonicLab":
+        return (
+          <CityTonicLabPanel
+            cityStats={cityStats}
+            progress={progress}
+            countInput={(inputId) => cityTonicInputAvailable(inputId)}
+            onMix={(recipe) => mixCityTonicRecipe(recipe)}
           />
         );
       case "socket":

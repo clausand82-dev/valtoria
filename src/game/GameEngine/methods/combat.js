@@ -101,6 +101,9 @@ function spellParticleVisuals(spell = {}) {
     projectileTextureRotationOffset: particles.projectileTextureRotationOffset ?? visuals.projectileTextureRotationOffset ?? 0,
     beam: particles.beam ?? visuals.beam ?? false,
     beamWidth: particles.beamWidth ?? visuals.beamWidth ?? null,
+    beamStyle: particles.beamStyle ?? visuals.beamStyle ?? null,
+    beamJitter: particles.beamJitter ?? visuals.beamJitter ?? null,
+    beamSegments: particles.beamSegments ?? visuals.beamSegments ?? null,
   };
 }
 
@@ -132,6 +135,10 @@ function targetPointInSpellRange(caster, x, y, range) {
 }
 
 export const combatMethods = {
+  isStunned(entity) {
+    return (entity?.statusEffects ?? []).some((effect) => effect.type === "stun" && effect.duration > 0);
+  },
+
   updateMonsters(dt) {
     this.processStatusEffects(this.player, dt, true);
     for (const monster of this.nearbyMonsters(2)) {
@@ -148,7 +155,11 @@ export const combatMethods = {
       const beforeX = monster.x;
       const beforeY = monster.y;
       const d = distance(this.player, monster);
-      if (d < monster.aggro) {
+      const stunned = this.isStunned(monster);
+      if (stunned) {
+        monster.vx = 0;
+        monster.vy = 0;
+      } else if (d < monster.aggro) {
         this.updateMonsterMinions(monster, dt);
         const n = normalize(this.player.x - monster.x, this.player.y - monster.y);
         monster.facingX = n.x || monster.facingX;
@@ -173,7 +184,7 @@ export const combatMethods = {
         monster.vy = Math.sin(a) * monster.speed * 0.28;
       }
 
-      if (Math.hypot(monster.vx, monster.vy) > 0.01) {
+      if (!stunned && Math.hypot(monster.vx, monster.vy) > 0.01) {
         const n = normalize(monster.vx, monster.vy);
         monster.facingX = n.x || monster.facingX;
         monster.facingY = n.y || monster.facingY;
@@ -201,6 +212,7 @@ export const combatMethods = {
 
   tryMonsterLeapAttack(monster, distanceToPlayer, direction) {
     const config = monster.leapAttack;
+    if (this.isStunned(monster)) return false;
     if (!config || monster.attackCooldown > 0) return false;
     const minRange = Math.max(0.2, Number(config.minRange) || 1.2);
     const maxRange = Math.max(minRange, Number(config.maxRange) || 3);
@@ -215,6 +227,7 @@ export const combatMethods = {
   },
 
   applyMonsterMeleeHit(monster, critical = false) {
+    if (this.isStunned(monster)) return;
     const amount = critical ? monster.damage * (Number(monster.critDamage) || 1.5) : monster.damage;
     this.recordBestiaryFought?.(monster);
     this.damagePlayer(amount, monster, critical);
@@ -270,6 +283,7 @@ export const combatMethods = {
 
   updateMonsterMinions(monster, dt) {
     const config = monster.minions;
+    if (this.isStunned(monster)) return;
     if (!monster.haveMinion || !config || monster.isMinion || monster.dead) return;
     monster.minionCooldown = Math.max(0, (Number(monster.minionCooldown) || 0) - dt);
     if (monster.minionCooldown > 0) return;
@@ -741,22 +755,23 @@ export const combatMethods = {
     return { damage: Math.max(1, Math.floor(reduced)), blocked, blockAmount };
   },
 
-  castSpellAt(x, y, spellId = null) {
+  castSpellAt(x, y, spellId = null, options = {}) {
     const stats = this.calcStats();
     const selectedSpellId = spellId ?? this.player.activeSpellId ?? this.player.unlockedSpells?.[0];
     const spell = SPELL_DEFS[selectedSpellId];
     if (!spell) {
       this.addToast("Ingen spellbook er aktiveret i Arcane Archive");
-      return;
+      return false;
     }
-    const manaCost = Math.max(0, Math.floor(Number(spell.manaCost) || 0));
-    if (this.player.mana < manaCost || this.player.spellCooldown > 0 || this.player.hp <= 0) return;
+    const manaCost = Math.max(0, Math.floor(Number(options.manaCost ?? spell.manaCost) || 0));
+    const ignoreCooldown = Boolean(options.ignoreCooldown);
+    if (this.player.mana < manaCost || (!ignoreCooldown && this.player.spellCooldown > 0) || this.player.hp <= 0) return false;
     const n = normalize(x - this.player.x, y - this.player.y);
-    if (!n.x && !n.y) return;
+    if (!n.x && !n.y) return false;
     this.player.mana -= manaCost;
     this.applySpellWorldEnergy(spell);
     this.player.stats.spellsCast += 1;
-    this.player.spellCooldown = spell.cooldown;
+    this.player.spellCooldown = Math.max(0, Number(options.cooldown ?? spell.cooldown) || 0);
     this.player.castAnim = 0.38;
     this.setFacing(n.x, n.y);
     const visuals = spellParticleVisuals(spell);
@@ -774,6 +789,74 @@ export const combatMethods = {
     } else {
       this.launchSpellProjectile({ spell, caster: this.player, owner: "player", x, y, stats, spellInstanceId });
     }
+    return true;
+  },
+
+  spellTargetPointForHold(heldSpell) {
+    const spell = SPELL_DEFS[heldSpell?.spellId];
+    if (!spell) return null;
+    if (heldSpell?.targetMode === "nearest") {
+      const target = this.nearestMonster(Number(spell.range) || 7, spell);
+      if (target) return { x: target.x, y: target.y };
+    }
+    return { x: this.pointer.worldX, y: this.pointer.worldY };
+  },
+
+  startHeldSpell(spellId = null, targetMode = "pointer") {
+    const selectedSpellId = spellId ?? this.player.activeSpellId ?? this.player.unlockedSpells?.[0];
+    const spell = SPELL_DEFS[selectedSpellId];
+    if (!spell?.channeled) {
+      const target = targetMode === "nearest" ? this.nearestMonster(7, spell) : null;
+      this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY, selectedSpellId);
+      return false;
+    }
+    this.heldSpell = {
+      spellId: selectedSpellId,
+      targetMode,
+      tick: 0,
+    };
+    this.tickHeldSpell(0, true);
+    return true;
+  },
+
+  stopHeldSpell(spellId = null) {
+    if (!this.heldSpell) return;
+    if (spellId && this.heldSpell.spellId !== spellId) return;
+    this.heldSpell = null;
+  },
+
+  updateHeldSpell(dt) {
+    if (!this.heldSpell) return;
+    this.tickHeldSpell(dt, false);
+  },
+
+  tickHeldSpell(dt, force = false) {
+    const held = this.heldSpell;
+    const spell = SPELL_DEFS[held?.spellId];
+    if (!held || !spell?.channeled || this.player.hp <= 0) {
+      this.heldSpell = null;
+      return false;
+    }
+    const interval = Math.max(0.05, Number(spell.channelInterval) || 0.2);
+    held.tick = Math.max(0, (Number(held.tick) || 0) - dt);
+    if (!force && held.tick > 0) return false;
+    const manaCost = Math.max(0, Math.floor(Number(spell.channelManaCost ?? spell.manaCost) || 0));
+    if (this.player.mana < manaCost) {
+      this.heldSpell = null;
+      return false;
+    }
+    const point = this.spellTargetPointForHold(held);
+    if (!point) {
+      this.heldSpell = null;
+      return false;
+    }
+    const cast = this.castSpellAt(point.x, point.y, held.spellId, {
+      manaCost,
+      cooldown: spell.channelCooldown ?? interval,
+    });
+    held.tick = interval;
+    if (!cast) this.heldSpell = null;
+    return cast;
   },
 
   scheduleSpellVisualCleanup(spell, spellInstanceId) {
@@ -801,6 +884,7 @@ export const combatMethods = {
   castMonsterSpell(monster, spellId) {
     const spell = SPELL_DEFS[spellId];
     if (!spell || monster.dead) return;
+    if (this.isStunned(monster)) return;
     const n = normalize(this.player.x - monster.x, this.player.y - monster.y);
     if (!n.x && !n.y) return;
     monster.spellCooldown = spell.cooldown + Math.random() * 0.8;
@@ -862,12 +946,16 @@ export const combatMethods = {
       textureRotationOffset: visuals.projectileTextureRotationOffset,
       beam: Boolean(visuals.beam),
       beamWidth: visuals.beamWidth,
+      beamStyle: visuals.beamStyle,
+      beamJitter: visuals.beamJitter,
+      beamSegments: visuals.beamSegments,
       areaRadius: spell.areaRadius ?? 0,
       areaDamage: spell.areaDamage ?? 0,
       dotDamage: spell.dotDamage ?? 0,
       dotDuration: spell.dotDuration ?? 0,
       slowPct: spell.slowPct ?? 0,
       slowDuration: spell.slowDuration ?? 0,
+      stunDuration: spell.stunDuration ?? 0,
       hazardDuration: spell.hazardDuration ?? 0,
       hazardTick: spell.hazardTick ?? 1,
       explodeOnEnd: Boolean(spell.explodeOnEnd),
@@ -937,6 +1025,7 @@ export const combatMethods = {
         dotDuration: spell.dotDuration ?? 0,
         slowPct: spell.slowPct ?? 0,
         slowDuration: spell.slowDuration ?? 0,
+        stunDuration: spell.stunDuration ?? 0,
         hazardDuration: spell.hazardDuration ?? 0,
         hazardTick: spell.hazardTick ?? 1,
         explodeOnEnd: true,
@@ -1019,7 +1108,8 @@ export const combatMethods = {
       } else {
         this.damageMonster(target, damage, "magic", projectile.critical && direct);
       }
-      if (!(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) this.applyProjectileStatus(target, projectile);
+      if (!target.dead && !(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) this.applyProjectileStatus(target, projectile);
+      this.spawnImpactBeamVisual(projectile, target);
     }
     const impact = projectile.particleVisuals?.impact;
     if (impact?.type) {
@@ -1037,6 +1127,34 @@ export const combatMethods = {
     if (projectile.hazardDuration > 0 && projectile.areaRadius > 0) {
       this.spawnGroundHazard(projectile, x, y);
     }
+  },
+
+  spawnImpactBeamVisual(projectile, target) {
+    if (!projectile?.beam || !target) return;
+    this.projectiles.push({
+      id: createId(),
+      type: projectile.type,
+      spellId: projectile.spellId,
+      spellInstanceId: projectile.spellInstanceId ?? null,
+      owner: projectile.owner,
+      x: target.x,
+      y: target.y,
+      vx: 0,
+      vy: 0,
+      radius: 0,
+      life: 0.12,
+      color: projectile.color,
+      beam: true,
+      beamStartX: projectile.beamStartX ?? projectile.x,
+      beamStartY: projectile.beamStartY ?? projectile.y,
+      beamWidth: projectile.beamWidth,
+      beamStyle: projectile.beamStyle,
+      beamJitter: projectile.beamJitter,
+      beamSegments: projectile.beamSegments,
+      noCollision: true,
+      ignoreBlocking: true,
+      particleVisuals: projectile.particleVisuals,
+    });
   },
 
   spawnGroundHazard(projectile, x, y) {
@@ -1256,6 +1374,15 @@ export const combatMethods = {
         particle: projectile.particleVisuals?.status ?? null,
       });
     }
+    if (projectile.stunDuration > 0) {
+      target.statusEffects.push({
+        type: "stun",
+        duration: projectile.stunDuration * (1 + (Number(projectile.casterStats?.statusDurationBonus) || 0)),
+        sourceId: projectile.spellId,
+        color: projectile.color,
+        particle: projectile.particleVisuals?.status ?? null,
+      });
+    }
   },
 
   processStatusEffects(entity, dt, isPlayer = false) {
@@ -1332,6 +1459,7 @@ export const combatMethods = {
   },
 
   statusSpeedMultiplier(entity) {
+    if (this.isStunned(entity)) return 0;
     const rooted = (entity.statusEffects ?? []).some((effect) => effect.type === "root" && effect.duration > 0);
     if (rooted) return 0;
     if (entity === this.player && this.calcStats().slowImmune) return 1;

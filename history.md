@@ -5,6 +5,9 @@ kun en farm, resten er bare areas der hedder farm!
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water
+- added a City Tonic Lab where different city tonic can be made - city tonic adds different city stats
+- new player lightning spell (do damage and do stun); lightning spell is first channeled spell type
+- fixed hero animation sheet (now use one instead of two files)
 
 *V. 0.83
 - adding picture for addons/features

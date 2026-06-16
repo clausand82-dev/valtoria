@@ -45,9 +45,20 @@ export const ATLAS_FRAMES = {
   orb: { x: 724, y: 1076, w: 258, h: 116 },
 };
 
+const USE_HERO_BASE_SHEET_FOR_ALL_ACTIONS = true;
+const USE_HERO_MAIN_SHEET_FOR_CAST = true;
+
 const HERO_SHEET = {
-  url: "/assets/generated/hero-animated-sheet.png",
+  url: USE_HERO_BASE_SHEET_FOR_ALL_ACTIONS
+    ? "/assets/generated/hero-animated-sheet_base.png"
+    : "/assets/generated/hero-animated-sheet.png",
   rows: 4,
+  cols: 8,
+};
+
+const HERO_CAST_SHEET = {
+  url: "/assets/generated/hero_cast_sheet.png",
+  rows: 1,
   cols: 8,
 };
 
@@ -367,11 +378,12 @@ function loadHeroAnimationSheet() {
 }
 
 function loadHeroCastAnimationSheet() {
+  if (USE_HERO_MAIN_SHEET_FOR_CAST) return Promise.resolve(null);
   if (animationPartCache.heroCast) return Promise.resolve(animationPartCache.heroCast);
   if (!animationPartCache.heroCastPromise) {
-    animationPartCache.heroCastPromise = loadImageCanvas("/assets/generated/hero_cast_sheet.png")
+    animationPartCache.heroCastPromise = loadImageCanvas(HERO_CAST_SHEET.url)
       .then((canvas) => {
-        animationPartCache.heroCast = makeAnimationSheet(canvas, 1, 8, "hero");
+        animationPartCache.heroCast = makeAnimationSheet(canvas, HERO_CAST_SHEET.rows, HERO_CAST_SHEET.cols, "hero");
         return animationPartCache.heroCast;
       })
       .catch((error) => {

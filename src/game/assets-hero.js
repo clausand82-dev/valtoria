@@ -32,7 +32,7 @@ function drawAnimatedHeroSheet(ctx, screen, hero, sheet, castSheet) {
 	const cast = hero.castAnim > 0 ? Math.sin((hero.castAnim / 0.38) * Math.PI) : 0;
 	const isCasting = row === 3;
 	const activeSheet = isCasting ? (castSheet ?? sheet) : sheet;
-	const activeRow = isCasting ? 0 : row;
+	const activeRow = isCasting && castSheet ? 0 : row;
 	const heroAnchor = activeSheet.sequenceAnchors?.[activeRow]?.[0];
 	const idleAnchor = sheet.sequenceAnchors?.[0]?.[0];
 	const castCellSprite = isCasting ? activeSheet.cells?.[activeRow]?.[col]?.sprite : null;

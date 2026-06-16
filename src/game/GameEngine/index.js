@@ -93,7 +93,8 @@ export class GameEngine {
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.camera = { offsetX: 0, offsetY: 0, targetOffsetX: 0, targetOffsetY: 0, shake: 0 };
-    this.pointer = { x: 0, y: 0, worldX: this.region.start.x, worldY: this.region.start.y, down: false };
+    this.pointer = { x: 0, y: 0, worldX: this.region.start.x, worldY: this.region.start.y, down: false, rightDown: false };
+    this.heldSpell = null;
     this.hoverMonsterId = null;
     this.nearbyQuestgiver = null;
     this.inputLocked = false;

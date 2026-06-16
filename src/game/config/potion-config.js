@@ -119,6 +119,137 @@ export const POTION_MERGE_RECIPES = [
   { inputs: { red_rose: 1, rare_pink_flower: 1, magicmushroom: 1 }, output: "potion_speedbuf", count: 10, access: POTION_RECIPE_ACCESS.ALCHEMY_BENCH },
 ];
 
+export const CITY_TONIC_RECIPE_ACCESS = {
+  CITY_TONIC_LAB: "city_tonic_lab",
+};
+
+export const CITY_TONIC_RECIPES = [
+  {
+    id: "bone_medicine",
+    title: "Bone Medicine",
+    description: "A dense battlefield medicine made from bonedust, magic essence and rare flowers. Permanently strengthens the settlement's defence and health.",
+    inputs: {
+      bonedust: 100,
+      magic_essence: 25,
+      rare_pink_flower: 5,
+    },
+    cityStatEffects: {
+      city_defence: 1,
+      citizens_health: 1,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "arcane_power",
+    title: "Arcane Power",
+    description: "A concentrated arcane warding mixture that reinforces the settlement's magical defences.",
+    inputs: {
+      bonedust: 100,
+      magic_essence: 50,
+      rare_pink_flower: 10,
+    },
+    cityStatEffects: {
+      city_defence: 2,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "rare_perfume",
+    title: "Rare Perfume",
+    description: "A rare and valuable perfume brewed from roses, water and magic essence. Permanently improves trade.",
+    inputs: {
+      red_rose: 20,
+      magic_essence: 5,
+      water: 1,
+    },
+    cityStatEffects: {
+      trade: 1,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "magic_medicine",
+    title: "Magic Medicine",
+    description: "A strong restorative medicine brewed from magic mushrooms and magic essence. Permanently improves citizen health.",
+    inputs: {
+      magicmushroom: 20,
+      magic_essence: 10,
+    },
+    cityStatEffects: {
+      citizens_health: 2,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "rose_festival_oil",
+    title: "Rose Festival Oil",
+    description: "A fragrant ceremonial oil used in festivals and public rituals. Permanently improves happiness.",
+    inputs: {
+      red_rose: 50,
+      magic_essence: 5,
+      water: 5,
+    },
+    cityStatEffects: {
+      happiness: 2,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "guardian_powder",
+    title: "Guardian Powder",
+    description: "A protective powder spread around gates and walls. Permanently improves defence and citizen health.",
+    inputs: {
+      bonedust: 150,
+      magic_essence: 40,
+      magicmushroom: 10,
+    },
+    cityStatEffects: {
+      city_defence: 2,
+      citizens_health: 1,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "healers_bloom_mix",
+    title: "Healer's Bloom Mix",
+    description: "A flower-based restorative blend used by healers throughout the settlement.",
+    inputs: {
+      rare_pink_flower: 15,
+      red_rose: 30,
+      magic_essence: 10,
+      water: 5,
+    },
+    cityStatEffects: {
+      citizens_health: 2,
+      happiness: 1,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+  {
+    id: "watchmans_incense",
+    title: "Watchman's Incense",
+    description: "A sharp incense burned by guards during night watch. Permanently improves defence and morale.",
+    inputs: {
+      red_rose: 10,
+      bonedust: 50,
+      magic_essence: 20,
+    },
+    cityStatEffects: {
+      city_defence: 1,
+      happiness: 1,
+    },
+    access: CITY_TONIC_RECIPE_ACCESS.CITY_TONIC_LAB,
+    repeatable: true,
+  },
+];
+
 export function potionRecipeAvailableAt(recipe, station = POTION_RECIPE_ACCESS.BACKPACK) {
   const access = String(recipe?.access ?? POTION_RECIPE_ACCESS.BACKPACK);
   const stationId = String(station ?? POTION_RECIPE_ACCESS.BACKPACK);

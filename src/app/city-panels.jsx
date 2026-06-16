@@ -7,7 +7,7 @@ import { makeResourceItem } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
-import { potionDefById, potionRecipesForStation } from "../game/config/potion-config.js";
+import { CITY_TONIC_RECIPES, potionDefById, potionRecipesForStation } from "../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
@@ -716,6 +716,69 @@ function CityPotionLabPanel({ countIngredient, onMix }) {
   );
 }
 
+function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
+  const tonicBoosts = progress?.cityTonicBoosts ?? {};
+  const tonicStatIds = new Set(
+    CITY_TONIC_RECIPES.flatMap((recipe) => Object.keys(recipe.cityStatEffects ?? {}))
+      .map((statId) => {
+        const raw = String(statId ?? "");
+        const normalized = raw.replaceAll("-", "_");
+        return CITY_STAT_ALIASES[raw] ?? CITY_STAT_ALIASES[normalized] ?? normalized;
+      })
+      .filter(Boolean),
+  );
+  const boostEntries = Object.entries(tonicBoosts ?? {}).filter(([statId]) => tonicStatIds.has(statId));
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>City Tonic Lab</h4>
+        <span>Repeatable recipes for permanent settlement boosts.</span>
+      </header>
+      <div className="city-area-costs city-chip-grid">
+        <b>Current tonic boosts</b>
+        {boostEntries.length === 0 ? (
+          <span>None yet</span>
+        ) : boostEntries.map(([statId, amount]) => (
+          <span key={statId}>{cityRuleStatLabel(statId)} +{Math.floor(Number(amount) || 0)}</span>
+        ))}
+      </div>
+      {CITY_TONIC_RECIPES.map((recipe) => {
+        const inputEntries = Object.entries(recipe.inputs ?? {});
+        const effectEntries = Object.entries(recipe.cityStatEffects ?? {});
+        const hasInputs = inputEntries.every(([inputId, count]) => (
+          (countInput?.(inputId) ?? 0) >= Math.max(1, Math.floor(Number(count) || 1))
+        ));
+        const inputText = inputEntries
+          .map(([inputId, count]) => {
+            const name = RESOURCE_DEFS[inputId]?.name ?? cityRuleStatLabel(inputId);
+            const available = countInput?.(inputId) ?? 0;
+            return `${count} ${name} (${available})`;
+          })
+          .join(" + ");
+        const effectText = effectEntries
+          .map(([statId, amount]) => `${Number(amount) > 0 ? "+" : ""}${Math.floor(Number(amount) || 0)} ${cityRuleStatLabel(statId)}`)
+          .join(" | ");
+        const firstEffectRawId = String(effectEntries[0]?.[0] ?? "trade");
+        const firstEffectNormalizedId = firstEffectRawId.replaceAll("-", "_");
+        const firstEffectId = CITY_STAT_ALIASES[firstEffectRawId] ?? CITY_STAT_ALIASES[firstEffectNormalizedId] ?? firstEffectNormalizedId;
+        return (
+          <div className="blacksmith-row" key={recipe.id}>
+            <InventoryIcon iconUrl={CITY_STAT_ICON_URLS[firstEffectId] ?? CITY_STAT_ICON_URLS.trade} />
+            <div>
+              <b>{recipe.title}</b>
+              <span>{recipe.description}</span>
+              <span>{inputText} {"->"} {effectText} | {hasInputs ? "Ready" : "Missing inputs"}</span>
+            </div>
+            <button type="button" disabled={!hasInputs} onClick={() => onMix?.(recipe)}>
+              Mix
+            </button>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
   const [selectedItemIndex, setSelectedItemIndex] = useState(null);
   const socketItems = (inventory ?? []).filter((item) => itemCanHaveSockets(item));
@@ -1125,4 +1188,5 @@ export {
   CityArcaneExtractorPanel,
   CityReadableMergePanel,
   CityPotionLabPanel,
+  CityTonicLabPanel,
 };

@@ -247,6 +247,7 @@ export const lifecycleMethods = {
       this.updateDeath(dt, stats);
     } else {
       this.updatePlayer(dt, stats);
+      this.updateHeldSpell?.(dt);
       this.updateQuestgiver(dt);
       this.updateNearbyActionTarget();
       this.updateFoliageLoot();

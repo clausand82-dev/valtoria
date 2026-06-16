@@ -548,8 +548,7 @@ export const inventoryMethods = {
     if (!slot) return false;
     if (slot.kind === "potion") return this.usePotion(slot.id);
     if (slot.kind === "spell") {
-      const target = this.nearestMonster(7);
-      this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY, slot.id);
+      this.startHeldSpell?.(slot.id, "nearest");
       return true;
     }
     return false;

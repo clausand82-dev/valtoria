@@ -211,6 +211,13 @@ function drawEnergyBeam(ctx, start, end, projectile) {
   const ex = end.x;
   const ey = end.y - 8;
   const width = Math.max(3, Number(projectile.beamWidth) || 7);
+  if (projectile.beamStyle === "lightning") {
+    drawLightningBeam(ctx, sx, sy, ex, ey, projectile, width);
+    return;
+  }
+  const points = projectile.beamStyle === "lightning"
+    ? lightningBeamPoints(sx, sy, ex, ey, projectile)
+    : [{ x: sx, y: sy }, { x: ex, y: ey }];
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.lineCap = "round";
@@ -221,25 +228,16 @@ function drawEnergyBeam(ctx, start, end, projectile) {
   ctx.shadowColor = color;
   ctx.shadowBlur = 22;
   ctx.lineWidth = width * 3.2;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
+  strokeBeamPath(ctx, points);
 
   ctx.globalAlpha = 0.72;
   ctx.lineWidth = width;
-  ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
+  strokeBeamPath(ctx, points);
 
   ctx.globalAlpha = 0.95;
   ctx.strokeStyle = "rgba(255,255,255,0.82)";
   ctx.lineWidth = Math.max(1.2, width * 0.34);
-  ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(ex, ey);
-  ctx.stroke();
+  strokeBeamPath(ctx, points);
 
   ctx.fillStyle = color;
   ctx.globalAlpha = 0.9;
@@ -247,4 +245,104 @@ function drawEnergyBeam(ctx, start, end, projectile) {
   ctx.arc(ex, ey, width * 0.95, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
+}
+
+function drawLightningBeam(ctx, sx, sy, ex, ey, projectile, width) {
+  const color = projectile.color ?? "#d8f6ff";
+  const points = lightningBeamPoints(sx, sy, ex, ey, projectile);
+  const branches = lightningBranches(points, projectile);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "miter";
+
+  ctx.globalAlpha = 0.18;
+  ctx.strokeStyle = "#7de7ff";
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.lineWidth = Math.max(3, width * 1.35);
+  strokeBeamPath(ctx, points);
+
+  ctx.globalAlpha = 0.82;
+  ctx.strokeStyle = color;
+  ctx.shadowBlur = 9;
+  ctx.lineWidth = Math.max(1.6, width * 0.42);
+  strokeBeamPath(ctx, points);
+
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.96)";
+  ctx.shadowBlur = 4;
+  ctx.lineWidth = Math.max(1, width * 0.18);
+  strokeBeamPath(ctx, points);
+
+  ctx.strokeStyle = "rgba(216,246,255,0.82)";
+  ctx.shadowColor = "#7de7ff";
+  ctx.shadowBlur = 6;
+  ctx.lineWidth = Math.max(1, width * 0.16);
+  for (const branch of branches) strokeBeamPath(ctx, branch);
+
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.65;
+  ctx.shadowBlur = 12;
+  ctx.beginPath();
+  ctx.arc(ex, ey, Math.max(3, width * 0.45), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function strokeBeamPath(ctx, points) {
+  if (!points.length) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+  ctx.stroke();
+}
+
+function lightningBeamPoints(sx, sy, ex, ey, projectile) {
+  const segments = Math.max(5, Math.floor(Number(projectile.beamSegments) || 10));
+  const jitter = Math.max(0, Number(projectile.beamJitter) || 14);
+  const dx = ex - sx;
+  const dy = ey - sy;
+  const len = Math.max(1, Math.hypot(dx, dy));
+  const nx = -dy / len;
+  const ny = dx / len;
+  const seed = Math.floor((Number(projectile.life) || 0) * 90) + String(projectile.id ?? "").length * 17;
+  const points = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const t = i / segments;
+    const endpoint = i === 0 || i === segments;
+    const wave = Math.sin((seed + i * 12.9898) * 78.233) * 43758.5453;
+    const rand = wave - Math.floor(wave);
+    const offset = endpoint ? 0 : (rand - 0.5) * jitter * 2;
+    points.push({
+      x: sx + dx * t + nx * offset,
+      y: sy + dy * t + ny * offset,
+    });
+  }
+  return points;
+}
+
+function lightningBranches(points, projectile) {
+  const branches = [];
+  const seed = Math.floor((Number(projectile.life) || 0) * 130) + String(projectile.id ?? "").length * 31;
+  for (let i = 1; i < points.length - 1; i += 2) {
+    const start = points[i];
+    const prev = points[i - 1];
+    const next = points[i + 1];
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    const nx = -dy / len;
+    const ny = dx / len;
+    const wave = Math.sin((seed + i * 19.19) * 41.73) * 24634.6345;
+    const rand = wave - Math.floor(wave);
+    if (rand < 0.35) continue;
+    const side = rand < 0.68 ? -1 : 1;
+    const length = 7 + rand * 18;
+    branches.push([
+      { x: start.x, y: start.y },
+      { x: start.x + nx * side * length + dx * 0.08, y: start.y + ny * side * length + dy * 0.08 },
+    ]);
+  }
+  return branches;
 }

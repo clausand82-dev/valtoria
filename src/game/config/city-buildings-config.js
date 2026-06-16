@@ -220,6 +220,15 @@ export const CITY_BUILDINGS = [
         inventoryType: { type: "potion", slots: 25 },
         cost: { gold: 2000, wood_plank: 25, stone_brick: 25, magic_essence: 2 },
       },
+      {
+        id: "city_tonic_lab",
+        title: "City Tonic Lab",
+        prebuilt: true,
+        help: "Mixes rare herbs, bonedust and magic essence into permanent settlement improvements.",
+        panel: "cityTonicLab",
+        inventoryType: { type: "none", slots: 0 },
+        cost: { gold: 2500, wood_plank: 25, stone_brick: 25, magic_essence: 5 },
+      },
     ],
   },
   {
