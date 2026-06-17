@@ -125,8 +125,8 @@ export const REGION_OBJECT_LOOT_TABLES = {
     { resource: "crystal", min: 1, max: 1, chance: 0.012 },
   ]),
   FRUITBASKETS: Object.freeze([
-    { resource: "fruit_orange", min: 1, max: 2, chance: 0.01 },
-    { resource: "fruit_banana", min: 1, max: 2, chance: 0.01 },
+    { resource: "fruit_orange", min: 1, max: 2, chance: 0.03 },
+    { resource: "fruit_banana", min: 1, max: 2, chance: 0.03 },
     { resource: "fruit", min: 1, max: 2, chance: 0.10 },
   ]),
     METAL: Object.freeze([
@@ -844,6 +844,27 @@ export const REGION_OBJECT_DEFS = {
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_marketstalls.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 },
+  },
+  object_destroyed_marketstalls: {
+    spawnTypes: [{ type: "object_destroyed_marketstalls", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood"],
+    destructible: {
+      hp: 42,
+      damageStages: 3,
+      particleColor: "#8c6a43",
+      loot: [
+      ...REGION_OBJECT_LOOT_TABLES.WOOD,
+      { resource: "junk", min: 1, max: 3, chance: 0.35 },
+      ],
+      rareLoot: [
+        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
+      ],
+    },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_destroyed_marketstalls.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
   },

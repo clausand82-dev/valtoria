@@ -363,6 +363,28 @@ devils_touch: {
     turnInText: "Devil's Touch er faerdige. Runerne reagerer allerede paa din beroring.",
     rewards: { namedItems: [{ namedId: "devils_touch" }] },
   },
+elis_stolen_fruit_barrel: {
+    id: "elis_stolen_fruit_barrel",
+    source: "npc",
+    kind: "side",
+    title: "Elis' tomme frugttoende",
+    repeatable: false,
+    npcIds: ["merchant"],
+    regionIds: ["city"],
+    demands: { factionRep: { village_outskirt: 100 } },
+    spawnChance: 1,
+    type: "collect_quest_item",
+    target: {
+      resources: [
+        { resource: "fruit_banana", count: 16 },
+        { resource: "fruit_orange", count: 18 },
+      ],
+    },
+    story: "Elis har fundet sin stjaalne frugttoende igen, men den er tom. Han mangler 16 bananer og 18 appelsiner. Marketplace er det bedste sted at lede, men frugten er ikke til at redde, mens omraadet stadig er for corrupted. Ryd Marketplace foerst, vend tilbage bagefter, og soeg saa efter frugtkurve og rester af frugt.",
+    acceptText: "Marketplace er nu aabent. Clear regionen foerst, kom tilbage, og saml derefter 16 bananer og 18 appelsiner til Elis.",
+    turnInText: "Elis taeller frugten op og aander lettet ud. Det er ikke hele lasten, men det er nok til at faa handlen i gang igen.",
+    rewards: { xp: 900, gold: 260, lydra: 3, factionRep: { village_outskirt: 4 } },
+  },
 find_annelises_redroses: {
     id: "find_annelises_redroses",
     source: "npc",

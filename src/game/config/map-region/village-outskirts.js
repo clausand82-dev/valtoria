@@ -167,7 +167,7 @@ export function createVillageOutskirtsMapRegions(region) {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
+        { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } }, 
         { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
         { fileName: "foilage/foilage_boneparts.png", scale: 0.75 },
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
@@ -227,21 +227,66 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "market-square",
-      label: "Markedstorv",
+      label: "Marketplace",
       color: "#f0d58a",
-      unlock: { locked: true, text: "Markedstorv kraever en senere historiequest." },
+      mapSize: "medium",
+      unlock: {
+        any: [
+          { questActive: "elis_stolen_fruit_barrel" },
+          { questCompleted: "elis_stolen_fruit_barrel" },
+        ],
+        text: "Marketplace aabnes, naar Elis beder dig finde den stjaalne frugt.",
+      },
       labelX: 50,
       labelY: 45,
-      // TODO:DELETE: weights: { house: 3, tree: 2, rock: 1, foilage: 4, fireplace: 2 }
-      weights: { foilage: 4 },
+      corrupted: true,
+      cityStats: { population: 5, trade: 25, supply: 10 },
+      weather: {
+        possible: [
+          { id: "light_rain", weight: 25 },
+          { id: "heavy_rain", weight: 10 },
+          { id: "thunderstorm", weight: 45, corruption: { min: 5 } },
+          { id: "none", weight: 55, corruption: { max: 4 } },
+        ],
+      },
+      weights: { foilage: 4, water: 8 },
+      foliageSet: [
+        { fileName: "foilage/foilage_food.png", weight: 12, scale: 0.5, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03, fruit: 0.10 }, corruption: { max: 4 } },
+        { fileName: "foilage/foilage_cityplant.png", weight: 10, resourceDrop: { red_rose: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 }, corruption: { max: 4 } },
+        { fileName: "foilage/foliage_rottenfriut.png", scale: 0.5, weight: 12, corruption: { min: 5 } },
+        { fileName: "foilage/foilage_garbage_001.png", weight: 10, corruption: { min: 5 } },
+        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
+        { fileName: "foilage/foilage_deadanimal_verysmall.png", weight: 4, scale: 0.35, particles: { type: "flies", chance: 0.55, count: [2, 6], radius: 18, heightOffset: -10, onlyWhenOnScreen: true }, corruption: { min: 5 } },
+      ],
       objects: [
-        { id: "object_house_mainland", weight: 3 },
-        { id: "object_tree_mainland", weight: 2 },
-        { id: "object_fireplace_mainland", weight: 2 },
+        { id: "object_marketstalls", weight: 14, scale: 1.5, corruption: { max: 5 } },
+        { id: "object_destroyed_marketstalls", scale: 1.5, weight: 14, corruption: { min: 5 } },
+        { id: "object_fruitbaskets", weight: 7, corruption: { max: 4 } },
+        { id: "object_well", weight: 2 },
+        { id: "object_wagons", weight: 5 },
+        { id: "object_house_mainland", weight: 2 },
+        { id: "object_fireplace_mainland", weight: 1 },
         { id: "object_stone_cluster", weight: 1 },
-        { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1, corruption: { min: 5 } },
-        { id: "object_fruitbaskets", weight: 5, /*corruption: { max: 1 }*/ },
+        { id: "object_ruin_mainland", weight: 2, corruption: { min: 5 } },
+      ],
+      decay: [
+        { id: "decay_spiderweb", weight: 12, corruption: { min: 5 } },
+        { id: "decay_cracks", weight: 8, corruption: { min: 5 } },
+        { id: "decay_food", weight: 10, corruption: { min: 5 } },
+        { id: "decay_field", weight: 4 },
+      ],
+      ambientCritters: [
+        { id: "ambient_rat", mobId: "rat", count: { min: 6, max: 12 }, scale: 0.25, behavior: "flee", fleeDistance: 120, hp: 1, canTakeAreaDamage: true, corruption: { min: 5 } },
+        { id: "ambient_spider", mobId: "spider", count: { min: 4, max: 9 }, scale: 0.1, behavior: "wander", hp: 1, canTakeAreaDamage: true, corruption: { min: 5 } },
+      ],
+      mobs: [
+        { type: "Village01", weight: 4, corruption: { min: 5 } },
+        { type: "Village02", weight: 4, corruption: { min: 5 } },
+        { type: "Village03", weight: 4, corruption: { min: 5 } },
+        { type: "Spider", weight: 2, corruption: { min: 5 } },
+        { type: "Snake", weight: 2, corruption: { min: 5 } },
+        { type: "Wild Boar", weight: 3, corruption: { max: 4 } },
+        { type: "Wolf", weight: 2, corruption: { max: 4 } },
       ],
       points: "47.85,40.38 44.26,46.76 46.65,51.01 50.24,48.88 55.02,48.88 56.22,42.51 51.44,38.26",
     }),
@@ -544,7 +589,6 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       objects: [
         { id: "object_metalchest", weight: 4, spawnDamage: "damaged" },
-
       ],
       points: "34.69,36.13 44.26,46.76 47.85,40.38 51.44,38.26 41.87,17.00 41.87,31.88",
     }),
@@ -556,8 +600,8 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
+        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 },  },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
         { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
       decay: [
@@ -597,13 +641,13 @@ export function createVillageOutskirtsMapRegions(region) {
       labelX: 38,
       labelY: 54,
             foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 25, blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { wheat: 0.02 } },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
+        { fileName: "foilage/foilage_field.png", weight: 25, blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { wheat: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 } },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
         { fileName: "foilage/foilage_deadvillages.png", weight: 35, scale: 1.5, actionId: "bury_village_dead", questTargetKey: "bury_village_dead", blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
         { fileName: "object/object_gravestone.png", weight: 0, scale: 0.7, rows: 4, cols: 4 },
         { fileName: "foilage/foilage_village_items_broken.png", weight: 10, scale: 0.7, blockedBy: {questCompleted: "mayor_repair_village_houses"}},
         { fileName: "foilage/foilage_village_debris.png", weight: 10, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
-        { fileName: "foilage/foilage_cityplant.png", weight: 25, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_cityplant.png", weight: 25, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } },
       ],
       decay: [
         { id: "decay_blood", weight: 50, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
@@ -696,8 +740,8 @@ export function createVillageOutskirtsMapRegions(region) {
             monsters: { min: 8, max: 12 },                          // Monster count range.
   },
       foliageSet: [
-        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2 },
+        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
       unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },

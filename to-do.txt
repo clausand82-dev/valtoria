@@ -10,9 +10,31 @@ IMPORTENT:
 
 NEW QUEST:
 
-Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03. Frugterne er quest items og kan kun droppe under questen.
-
+Elis har fået stjålet en tønde med frugt - han har fundet tønden tom, og mangler så 16 bananer og 18 appelsiner (item_quest_banana.png og item_quest_orange.png). Frugterne kan findes ud over alle zoner i VILLAGE OUTSKIRTS med en droprate på 0.03 - questen leder dog primært til marketplace.
 Frugterne kan kun findes i marketplace ved corruption der maks må være 1. Frugterne er orange og banana, som allerede er defineret og gjort klar.
+Quest låses op, når man har 100 point i Village Outskirt - når quest tages, åbnes marketplace region. Bananer og appelsiner kan kun fåes, hvis corruption for marketplace er under 5. Det skal fremgå i questen at man er nødt til at clear region og så derefter vende tilbage (dette quest trackes ikke).
+
+Marketplace region har objekter mm som:
+object_marketstalls (corruption 5 eller derunder)
+object_well
+object_wagons
+object_fruitbasket (corruption 5 eller derunder) - kan give appelsiner og bananer (ved corruption under 5)
+foilage_food (corruption 5+)
+foilage_rottenfood (corruption 5+)
+foilage_garbage (corruption 5+)
+foilage_deadanimal_small (corruption 5+)
+foilage_deadanimal_medium (corruption 5+)
+foilage_cityplants (corruption -5)
+decay_spider (corruption 5+)
+decay_cracks (corruption 5+)
+decay_food (corruption 5+)
+decay_field
+vejret er lyn ved corruption 5+, ingen tordenvejr ved under 5. Altid chance for regn
+rotter og edderkopper som critters ved corruption 5+
+mobs: village1-3, spider, snake ved corruption 5+; ved corruption under 5 vises wildboar og wolf
+
+
+
 
 - random loot i wild (breve - et til annelise fra lost lover, en til borgmester fra forsvunden datter, en til Marla (cook) fra succes fuld søn)
 
