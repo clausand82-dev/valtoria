@@ -32,6 +32,7 @@ export const inputMethods = {
     if (hovered) this.markMobSeen?.(hovered.typeName);
     if (hoverMonsterId !== this.hoverMonsterId) {
       this.hoverMonsterId = hoverMonsterId;
+      this.markRenderDirty?.("hover-monster");
       this.publishSnapshot();
     }
   },
@@ -40,6 +41,7 @@ export const inputMethods = {
     if (this.inputLocked) return;
     if (!this.hoverMonsterId) return;
     this.hoverMonsterId = null;
+    this.markRenderDirty?.("pointer-leave");
     this.publishSnapshot();
   },
 
@@ -50,6 +52,7 @@ export const inputMethods = {
       event.preventDefault();
       this.pointer.rightDown = true;
       this.startHeldSpell?.(this.player.activeSpellId, "pointer");
+      this.markRenderDirty?.("pointer-down");
       return;
     }
     this.pointer.down = true;
@@ -64,6 +67,7 @@ export const inputMethods = {
       } else {
         this.player.target = { x: monster.x, y: monster.y };
       }
+      this.markRenderDirty?.("player-target");
       return;
     }
     const object = this.objectAtScreen(this.pointer.x, this.pointer.y);
@@ -75,6 +79,7 @@ export const inputMethods = {
       } else {
         this.player.target = { x: object.x, y: object.y };
       }
+      this.markRenderDirty?.("player-target");
       return;
     }
     const questgiver = this.questgiverAtScreen(this.pointer.x, this.pointer.y);
@@ -82,11 +87,13 @@ export const inputMethods = {
       this.player.attackTargetId = null;
       this.player.attackObjectId = null;
       this.player.target = { x: questgiver.x, y: questgiver.y };
+      this.markRenderDirty?.("player-target");
       return;
     }
     this.player.attackTargetId = null;
     this.player.attackObjectId = null;
     this.player.target = { x: this.pointer.worldX, y: this.pointer.worldY };
+    this.markRenderDirty?.("player-target");
   },
 
   handlePointerUp(event) {
@@ -94,6 +101,7 @@ export const inputMethods = {
     if (!event || event.button === 2) {
       this.pointer.rightDown = false;
       this.stopHeldSpell?.();
+      this.markRenderDirty?.("pointer-up");
     }
     this.pointer.down = false;
   },
@@ -103,6 +111,7 @@ export const inputMethods = {
     const key = event.key.toLowerCase();
     const wasDown = this.keys.has(key);
     this.keys.add(key);
+    if (!wasDown) this.markRenderDirty?.("key-down");
     if (key === " " && !wasDown) {
       event.preventDefault();
       this.primaryAttack();
@@ -148,7 +157,8 @@ export const inputMethods = {
   handleKeyUp(event) {
     if (this.inputLocked) return;
     const key = event.key.toLowerCase();
-    this.keys.delete(key);
+    const wasDown = this.keys.delete(key);
+    if (wasDown) this.markRenderDirty?.("key-up");
     if (["3", "4", "q"].includes(key)) {
       const slot = this.normalizeQuickSlots?.()[key];
       if (key === "q") this.stopHeldSpell?.(this.player.activeSpellId);

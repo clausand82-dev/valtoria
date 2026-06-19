@@ -6,23 +6,12 @@ IMPORTENT:
 - få åbnet og tilføjet nye regioner
 - juster bygningspriser og lvl priser
 
+- brug note til idol quest istedet for inn
+
 
 
 NEW QUEST:
-Efter quest med Elis forsvundne frugter dukker Miri (poorgirl) op og fortæller at hendes far (Rusk - poorminer) er forsvundet. Hun har hørt at han er en helt, og vil gerne have hjælp til at findes hendes far. Han er forsvundet i minen, men hun ved ikke hvor den rigtige indgang er, men at man i well regionen kan få adgang til minen (i well region skal der være en permanent indgang til området The Mine, som skal bestå af 3 sublevels i medium størrelse. I nederste lvl skal faren kunne findes i en lille prefab med et alter og lidt sten - når quest er aktiv er faren der, når quest er afsluttet er faren der ikke, men prefeb er der stadig.). Man skal snakke med faren, som giver en en ny del af quest. Han vil have man skal finde 7 guldklumper i minen til ham (quest drop fra sten, low droprate). Når man har fundet dem, skal man retunerer til ham. Årsag til at han skal have 7 guldstykker, er fordi hans arbejdsgiver ikke vil lade ham at slippe ud, før han har noget guld med.
-Når guldet er afleveret kan man vende tilbage til poorgirl og afslutte quest (historie mæssigt betyder det at hendes far vender hjem). Når denne quest er afsluttet dukker faren (poorminer) op med en ny quest. Han vil gerne at man konfronterer richman med urimelighederne i det han har været ude for. Man skal snakke med richman som nu skal kunne findes i village regionen. Når man tager til village region og finder richman snakker man med ham, og han ber en om at tage tilbage til minen og udrydde alle mobs der
 
-The Mine sublevels (egentlig er alle tre sublevels til Well regionen) indeholder, indtil man har afsluttet richman's quest, edderkopper i hobevis, masser af edderkoppespind, rotter og blod og lig. Når den quest er afsluttet bliver The Mine områderne mere fredelige, men stadig med lidt edderkopper og rotter. Der kan være få sjældne instants af slanger både før og efter quest. The Mine er foriøvrigt et godt område at mine sten og jern (øget droprate på det).
-
-Når quest fra richman er genneført og alle mobs i minens tre lvl er ryddet, siger han tak, men vil stadig ikke sætte poorminer fri.
-
-Quest ved Borgmester dukker nu op, hvor man kan klage, men borgmester forklare at richman nærmest ejer byen, og man kan ikke gøre noget ved ham, for man har brug for hans penge. Der afsløres svagt at richman er lidt tilhænger af Nethrendor. Borgmesteren ber en om at findes Veldor's Secret Letter, som kan droppe fra en hvilken som helst mob under denne her quest.
-
-Brevet indeholder en historie om hvordan Veldor mistede sin kone i en mine ulykke og derfor er han en bitter og kynisk mand.
-
-Når dette brev dropper, kan dukker priest op med en quest i city, hvor man hører nærmere om brevets indhold og historien bag. Her hører man at richman aldrig fandt sin kone. Man bliver opfordret til at tage til The Forest og finde en anden Mine indgang, der leder til en anden afdelingen af The Mine. Her er fem levels, og tilfældigt på fra lvl 3-5 (5 er nederste lvl) kan død kone til richman dukke op (en tidlgiere quest indeholder vist hvordan det fungerer). Dette lig kan man trykke E ved, og så samler man "hende" op - dvs hendes lig forsvinder. Nu skal man retunerer til richman og afleverer hans døde kone. Herefter lover han at lade poorminer slippe for minen.
-
-Brevet er lore og afleveres ikke ved quest indlevering ved priest. At priest dukker op til quest afslutning afhænger kun af at man har brevet i inventories. Hvis brevet er indleveret som lore i library, tæller det stadig med som man har det (dette er nok en edge case).
 
 -----------------------
 

@@ -408,10 +408,12 @@ export const combatMethods = {
     const chunk = this.getChunk(cx, cy);
     chunk.monsters.push(minion);
     this.monsters.set(minion.id, minion);
+    this.markRenderDirty?.("monster-spawn");
     return true;
   },
 
   updateProjectiles(dt) {
+    const beforeProjectileCount = this.projectiles.length;
     for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
       const projectile = this.projectiles[i];
       projectile.x += projectile.vx * dt;
@@ -455,8 +457,10 @@ export const combatMethods = {
       if (remove) {
         this.particleEngine?.removeEmittersByOwner(projectile.id);
         this.projectiles.splice(i, 1);
+        this.markRenderDirty?.("projectile-remove");
       }
     }
+    if (beforeProjectileCount !== this.projectiles.length) this.markRenderDirty?.("projectiles");
   },
 
   primaryAttack(target = null) {
@@ -558,6 +562,7 @@ export const combatMethods = {
       casterStats: { ...stats },
       casterLevel: this.player.level,
     });
+    this.markRenderDirty?.("projectile-spawn");
     this.drainWeaponDurability();
   },
 
@@ -962,6 +967,7 @@ export const combatMethods = {
       particleVisuals: visuals,
     };
     this.projectiles.push(projectile);
+    this.markRenderDirty?.("projectile-spawn");
     if (visuals.trail?.type) {
       this.particleEngine?.attachEmitterToProjectile(projectile.id, {
         ...visuals.trail,
@@ -1034,6 +1040,7 @@ export const combatMethods = {
         particleVisuals: visuals,
       };
       this.projectiles.push(projectile);
+      this.markRenderDirty?.("projectile-spawn");
       if (visuals.trail?.type) {
         this.particleEngine?.attachEmitterToProjectile(projectile.id, {
           ...visuals.trail,
@@ -1155,6 +1162,7 @@ export const combatMethods = {
       ignoreBlocking: true,
       particleVisuals: projectile.particleVisuals,
     });
+    this.markRenderDirty?.("projectile-spawn");
   },
 
   spawnGroundHazard(projectile, x, y) {
@@ -1181,6 +1189,7 @@ export const combatMethods = {
     };
     this.groundHazards ??= [];
     this.groundHazards.push(hazard);
+    this.markRenderDirty?.("hazard-spawn");
     const cloud = this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life, { ownerId: hazard.id, spellInstanceId: hazard.spellInstanceId });
     hazard.groundCloudParticleId = cloud?.id ?? null;
     const area = projectile.particleVisuals?.area;
@@ -1214,6 +1223,7 @@ export const combatMethods = {
         this.removeHazardLegacyParticles(hazard);
         this.removeHazardAreaParticles(hazard);
         this.groundHazards.splice(i, 1);
+        this.markRenderDirty?.("hazard-remove");
       }
     }
   },
@@ -1624,6 +1634,7 @@ export const combatMethods = {
     if (monster.dead) return;
     this.clearStatusEffectParticles(monster);
     monster.dead = true;
+    this.markRenderDirty?.("monster-death");
     this.recordBestiaryKilled?.(monster);
     this.recordMonsterKill(monster);
     if (monster.elite) {

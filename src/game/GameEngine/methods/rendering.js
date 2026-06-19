@@ -224,8 +224,12 @@ export const renderingMethods = {
 
   updateFogOfWar(force = false) {
     if (!this.fogOfWarActive) {
-      if (this.fogVisibleTiles?.size) this.fogVisibleTiles.clear();
-      return;
+      if (this.fogVisibleTiles?.size) {
+        this.fogVisibleTiles.clear();
+        this.fogOverlayCanvas = null;
+        return true;
+      }
+      return false;
     }
     const px = Math.floor(this.player.x);
     const py = Math.floor(this.player.y);
@@ -235,7 +239,7 @@ export const renderingMethods = {
       && this.fogLastReveal?.x === px
       && this.fogLastReveal?.y === py
       && this.fogLastReveal?.regionId === regionId
-    ) return;
+    ) return false;
 
     const revealRadius = Math.max(1, Number(FOG_OF_WAR_CONFIG.revealRadiusTiles) || 8);
     const visibleRadius = revealRadius + Math.max(
@@ -247,26 +251,43 @@ export const renderingMethods = {
     const stampX = Math.floor(this.player.x / stampSpacing);
     const stampY = Math.floor(this.player.y / stampSpacing);
     const stampKey = `${stampX},${stampY}`;
+    let changed = false;
     if (!this.fogExploredPointKeys?.has(stampKey)) {
       this.fogExploredPointKeys.add(stampKey);
       this.fogExploredPoints.push({ x: this.player.x, y: this.player.y, radius: revealRadius });
+      changed = true;
     }
     const minX = Math.floor(this.player.x - visibleRadius);
     const maxX = Math.ceil(this.player.x + visibleRadius);
     const minY = Math.floor(this.player.y - visibleRadius);
     const maxY = Math.ceil(this.player.y + visibleRadius);
-    this.fogVisibleTiles = new Set();
+    const nextVisibleTiles = new Set();
     for (let y = minY; y <= maxY; y += 1) {
       for (let x = minX; x <= maxX; x += 1) {
         const d = Math.hypot(x + 0.5 - this.player.x, y + 0.5 - this.player.y);
         if (d > visibleRadius) continue;
         if (!this.region.mask?.has(`${x},${y}`)) continue;
         const key = `${x},${y}`;
-        this.fogVisibleTiles.add(key);
-        if (d <= revealRadius) this.fogExploredTiles.add(key);
+        nextVisibleTiles.add(key);
+        if (d <= revealRadius && !this.fogExploredTiles.has(key)) {
+          this.fogExploredTiles.add(key);
+          changed = true;
+        }
       }
     }
+    if (nextVisibleTiles.size !== this.fogVisibleTiles?.size) changed = true;
+    else {
+      for (const key of nextVisibleTiles) {
+        if (!this.fogVisibleTiles.has(key)) {
+          changed = true;
+          break;
+        }
+      }
+    }
+    this.fogVisibleTiles = nextVisibleTiles;
     this.fogLastReveal = { x: px, y: py, regionId };
+    if (changed) this.fogOverlayCanvas = null;
+    return changed;
   },
 
   isTileVisible(x, y) {
@@ -513,6 +534,7 @@ export const renderingMethods = {
     }
 
     chunk.terrainLayer = { canvas, originX, originY, width, height };
+    this.markRenderDirty?.("terrain-layer");
     return chunk.terrainLayer;
   },
 
@@ -546,7 +568,10 @@ export const renderingMethods = {
       entry.chunk.terrainLayer = null;
       cleared += 1;
     }
-    if (cleared > 0) this.terrainLayersCleared = (this.terrainLayersCleared ?? 0) + cleared;
+    if (cleared > 0) {
+      this.terrainLayersCleared = (this.terrainLayersCleared ?? 0) + cleared;
+      this.markRenderDirty?.("terrain-layer-cleanup");
+    }
     return cleared;
   },
 

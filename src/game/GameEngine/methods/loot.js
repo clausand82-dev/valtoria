@@ -180,6 +180,7 @@ export const lootMethods = {
   },
 
   updateLoot(dt) {
+    const beforeLootCount = this.loots.length;
     for (let i = this.loots.length - 1; i >= 0; i -= 1) {
       const loot = this.loots[i];
       loot.bob += dt * 4.5;
@@ -188,6 +189,7 @@ export const lootMethods = {
         if (loot.despawn <= 0) {
           this.handleLootDespawn(loot);
           this.loots.splice(i, 1);
+          this.markRenderDirty?.("loot-remove");
           continue;
         }
       }
@@ -202,6 +204,7 @@ export const lootMethods = {
           this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
           this.addToast(`+${loot.amount} guld`);
           this.loots.splice(i, 1);
+          this.markRenderDirty?.("loot-pickup");
         } else if (isPotionItem(loot.item)) {
           const before = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? 0;
           if (this.addPotionLoot(loot.item)) {
@@ -211,6 +214,7 @@ export const lootMethods = {
             this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
             this.addToast(pickupStatusText(loot.item, picked));
             this.loots.splice(i, 1);
+            this.markRenderDirty?.("loot-pickup");
             this.publishSnapshot();
           } else if (!loot.warned) {
             loot.warned = true;
@@ -223,6 +227,7 @@ export const lootMethods = {
           this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
           this.addToast(pickupStatusText(loot.item, 1));
           this.loots.splice(i, 1);
+          this.markRenderDirty?.("loot-pickup");
           this.publishSnapshot();
         } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item)) {
           const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
@@ -234,6 +239,7 @@ export const lootMethods = {
           this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
           this.addToast(pickupStatusText(loot.item, picked));
           this.loots.splice(i, 1);
+          this.markRenderDirty?.("loot-pickup");
           this.publishSnapshot();
         } else if (!loot.warned) {
           loot.warned = true;
@@ -241,6 +247,7 @@ export const lootMethods = {
         }
       }
     }
+    if (beforeLootCount !== this.loots.length) this.markRenderDirty?.("loot");
   },
 
   updateFoliageLoot() {
@@ -248,6 +255,7 @@ export const lootMethods = {
     const next = target ? this.foliageLootSnapshot(target) : null;
     if ((next?.id ?? null) === (this.nearbyFoliageLoot?.id ?? null)) return;
     this.nearbyFoliageLoot = next;
+    this.markRenderDirty?.("foliage-target");
     this.publishSnapshot();
   },
 
@@ -318,6 +326,7 @@ export const lootMethods = {
       object.foliageLooted = true;
       object.resourceDrops = [];
       this.nearbyFoliageLoot = null;
+      this.markRenderDirty?.("foliage-loot");
       this.publishSnapshot();
       return false;
     }
@@ -331,6 +340,7 @@ export const lootMethods = {
       object.foliageLooted = true;
       object.resourceDrops = [];
       this.nearbyFoliageLoot = null;
+      this.markRenderDirty?.("foliage-loot");
       this.publishSnapshot();
       return false;
     }
@@ -363,6 +373,7 @@ export const lootMethods = {
     this.addParticles(object.x, object.y, color, 10, 0.08);
     this.addFloater(object.x, object.y, toast, first?.rarityColor ?? "#8be9ff", 1.05);
     this.addToast(toast);
+    this.markRenderDirty?.("foliage-loot");
     this.publishSnapshot();
     return true;
   },
@@ -428,6 +439,7 @@ export const lootMethods = {
     this.trackItemDropped(item);
     this.addParticles(chest.x, chest.y, "#ffd85d", 18, 0.12);
     this.addFloater(chest.x, chest.y, item.name, item.rarityColor, 1.05);
+    this.markRenderDirty?.("loot-drop");
 
     // Small chance for chest to also contain a red rose resource
     this.dropResourceLoot(chest.x, chest.y, [{ resource: "red_rose", chance: 0.05, min: 1, max: 1 }]);
@@ -446,6 +458,7 @@ export const lootMethods = {
       despawn: options.despawn ?? GROUND_LOOT_DESPAWN_SECONDS,
     });
     this.trackItemDropped(item);
+    this.markRenderDirty?.("loot-drop");
     return true;
   },
 
@@ -523,6 +536,7 @@ export const lootMethods = {
             bob: Math.random() * Math.PI * 2,
             despawn: GROUND_LOOT_DESPAWN_SECONDS,
           });
+          this.markRenderDirty?.("loot-drop");
         }
       }
 
@@ -585,6 +599,7 @@ export const lootMethods = {
         despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
       this.trackItemDropped(item);
+      this.markRenderDirty?.("loot-drop");
     }
   },
 
@@ -609,6 +624,7 @@ export const lootMethods = {
         despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
       this.trackItemDropped(item);
+      this.markRenderDirty?.("loot-drop");
     }
   },
 
@@ -639,6 +655,7 @@ export const lootMethods = {
         despawn: GROUND_LOOT_DESPAWN_SECONDS,
       });
       this.trackItemDropped(item);
+      this.markRenderDirty?.("loot-drop");
     }
   },
 

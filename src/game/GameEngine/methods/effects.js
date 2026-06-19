@@ -339,10 +339,15 @@ export const effectsMethods = {
     }
     this.toasts = [];
     this.toastLog = [];
+    this.markRenderDirty?.("toast-clear");
     this.publishSnapshot();
   },
 
   updateEffects(dt) {
+    const beforeLegacyParticles = this.particles.length;
+    const beforeEngineParticles = this.particleEngine?.particles?.length ?? 0;
+    const beforeFloaters = this.floaters.length;
+    const beforeToasts = this.toasts.length;
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
       if (p.effectParticle) {
@@ -383,6 +388,14 @@ export const effectsMethods = {
       }
     }
     this.particleEngine?.update(dt, particleContext(this));
+    if (
+      beforeLegacyParticles !== this.particles.length
+      || beforeEngineParticles !== (this.particleEngine?.particles?.length ?? 0)
+      || beforeFloaters !== this.floaters.length
+      || beforeToasts !== this.toasts.length
+    ) {
+      this.markRenderDirty?.("effects");
+    }
   },
 
   updateConfiguredParticles(dt) {
@@ -440,6 +453,7 @@ export const effectsMethods = {
       alpha: event.flashAlpha ?? [0.35, 0.75],
       lifetime: [duration, duration],
     });
+    this.markRenderDirty?.("weather-overlay");
   },
 
   createLightningBolt(duration) {
@@ -478,6 +492,7 @@ export const effectsMethods = {
         maxParticles: config.maxParticles ?? Math.max(8, Math.min(80, Math.round(density * 150))),
       }, { id: key, scope: "ambient" });
       if (emitterId) this.__ambientParticleEmitters.set(key, emitterId);
+      if (emitterId) this.markRenderDirty?.("ambient-particles");
     }
   },
 
@@ -500,6 +515,7 @@ export const effectsMethods = {
         maxParticles: config.maxParticles ?? Math.max(12, Math.min(WEATHER_PARTICLE_MAX, Math.round(density * WEATHER_PARTICLE_MAX))),
       }, { id: key, scope: "weather" });
       if (emitterId) this.__weatherParticleEmitters.set(key, emitterId);
+      if (emitterId) this.markRenderDirty?.("weather-particles");
     }
   },
 
@@ -527,6 +543,7 @@ export const effectsMethods = {
             layer: emitterConfig.layer ?? emitterConfig.renderLayer ?? "aboveObjects",
             maxParticles: emitterConfig.maxParticles ?? Math.max(4, randomIntInRange(emitterConfig.count) || 8),
           }, object);
+          if (object.__particleEmitterIds[key]) this.markRenderDirty?.("attached-particles");
         }
       }
 
@@ -548,6 +565,7 @@ export const effectsMethods = {
             layer: config.layer ?? config.renderLayer ?? "aboveGround",
             maxParticles: config.maxParticles ?? Math.max(4, randomIntInRange(config.count) || 8),
           }, decal);
+          if (decal.__particleEmitterIds[key]) this.markRenderDirty?.("attached-particles");
         }
       }
     }
@@ -567,6 +585,7 @@ export const effectsMethods = {
     if (!this.particleEngine) return;
     this.particleEngine.enabled = Boolean(enabled);
     if (!this.particleEngine.enabled) this.particleEngine.clearAll();
+    this.markRenderDirty?.("particles-enabled");
   },
 
   toggleParticles() {
@@ -577,6 +596,7 @@ export const effectsMethods = {
   setParticleQuality(quality = "high") {
     if (!this.particleEngine) return;
     this.particleEngine.quality = ["low", "medium", "high"].includes(quality) ? quality : "high";
+    this.markRenderDirty?.("particle-quality");
   },
 
   particleDebugStats() {
@@ -608,6 +628,14 @@ export const effectsMethods = {
       quality: this.particleEngine?.quality ?? "high",
       fps: this.lastFrameDt > 0 ? Math.round(1 / this.lastFrameDt) : 0,
       averageFps: this.averageFps ?? 0,
+      updateFps: this.updateFps ?? 0,
+      renderFps: this.renderFps ?? 0,
+      rafCallbacksPerSecond: this.rafCallbacksPerSecond ?? 0,
+      skippedRenderFrames: this.skippedRenderFrames ?? 0,
+      renderDirty: Boolean(this.renderDirty),
+      visualActivity: Boolean(this.hasVisualActivity?.()),
+      lastRenderDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+      canvasMegapixels: Math.round((((this.canvas?.width ?? 0) * (this.canvas?.height ?? 0)) / 1000000) * 100) / 100,
       targetFps: this.targetFps ?? 60,
       dpr: this.dpr ?? 1,
       fogRenderScale: this.fogRenderScale ?? 1,
@@ -626,7 +654,10 @@ export const effectsMethods = {
     if (this.weatherFlash) {
       this.weatherFlash.life -= dt;
       if (this.weatherFlash.bolt) this.weatherFlash.bolt.life -= dt;
-      if (this.weatherFlash.life <= 0) this.weatherFlash = null;
+      if (this.weatherFlash.life <= 0) {
+        this.weatherFlash = null;
+        this.markRenderDirty?.("weather-overlay");
+      }
     }
     if (this.pendingThunder) {
       this.pendingThunder.delay -= dt;
@@ -669,6 +700,7 @@ export const effectsMethods = {
       layer: "effects",
       gravity: upward > 0.12 ? -8 : 0,
     });
+    this.markRenderDirty?.("particles");
   },
 
   addDust(x, y, count = 1) {
@@ -682,6 +714,7 @@ export const effectsMethods = {
       size: dustConfig.size ?? [2, 6],
       alpha: dustConfig.alpha ?? [0.12, 0.35],
     });
+    this.markRenderDirty?.("dust");
   },
 
   spawnHeroHealingEffect() {
@@ -701,6 +734,7 @@ export const effectsMethods = {
       rotationSpeed: [-0.35, 0.35],
       blendMode: "lighter",
     });
+    this.markRenderDirty?.("healing-effect");
   },
 
   spawnObjectBreakDustEffect(x, y) {
@@ -715,6 +749,7 @@ export const effectsMethods = {
       blendMode: "source-over",
       glow: false,
     });
+    this.markRenderDirty?.("object-break-effect");
   },
 
   footstepDustChance(fallback = 0.18) {
@@ -738,6 +773,7 @@ export const effectsMethods = {
       life: duration,
       maxLife: duration,
     });
+    this.markRenderDirty?.("spell-effect");
   },
 
   spawnGroundCloudEffect(x, y, radius, color, duration, options = {}) {
@@ -758,6 +794,7 @@ export const effectsMethods = {
       maxLife: Math.max(0.2, Number(duration) || 1),
     };
     this.particles.push(particle);
+    this.markRenderDirty?.("spell-effect");
     return particle;
   },
 
@@ -776,10 +813,12 @@ export const effectsMethods = {
       maxLife: Math.max(0.05, (Number(options.durationMs) || 350) / 1000),
     });
     this.camera.shake = Math.max(this.camera.shake, Number(options.shake) || 0);
+    this.markRenderDirty?.("spell-effect");
   },
 
   addFloater(x, y, text, color, life = 0.85) {
     this.floaters.push({ x, y, z: 68, text, color, life, maxLife: life });
+    this.markRenderDirty?.("floater");
   },
 
   addToast(text, options = {}) {
@@ -811,8 +850,10 @@ export const effectsMethods = {
     this.toastTimers?.set(id, setTimeout(() => {
       this.clearToastTimer(id);
       this.toasts = this.toasts.filter((entry) => entry.id !== id);
+      this.markRenderDirty?.("toast-expire");
       this.publishSnapshot();
     }, life * 1000));
+    this.markRenderDirty?.("toast");
     this.publishSnapshot();
   }
 };

@@ -711,6 +711,7 @@ export default function App() {
     engine.fogOverlayCanvas = null;
     engine.nextFrameTime = performance.now();
     engine.resize?.();
+    engine.markRenderDirty?.("performance-settings");
     engine.publishSnapshot?.();
   };
 

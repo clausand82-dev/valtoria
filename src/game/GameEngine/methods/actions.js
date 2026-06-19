@@ -143,6 +143,7 @@ export const actionsMethods = {
       if (!this.nearbyActionTarget) return;
       this.nearbyActionTarget = null;
       this.actionTargetCycleId = null;
+      this.markRenderDirty?.("action-target");
       this.publishSnapshot();
       return;
     }
@@ -167,6 +168,7 @@ export const actionsMethods = {
       && (next?.targetIndex ?? 0) === (this.nearbyActionTarget?.targetIndex ?? 0)
     ) return;
     this.nearbyActionTarget = next;
+    this.markRenderDirty?.("action-target");
     this.publishSnapshot();
   },
 
@@ -252,6 +254,7 @@ export const actionsMethods = {
     this.particleEngine?.removeEmittersByOwner(target.id);
     this.removeActionTargetObject(target);
     this.addToast?.("Kisten er aabnet");
+    this.markRenderDirty?.("action-object");
     return { ok: true, changed: true };
   },
 
@@ -298,9 +301,11 @@ export const actionsMethods = {
       const index = chunk.objects.findIndex((entry) => entry.id === object.id);
       if (index >= 0) {
         chunk.objects.splice(index, 1);
+        chunk.terrainLayer = null;
         break;
       }
     }
+    this.markRenderDirty?.("object-remove");
     return true;
   },
 
@@ -318,6 +323,7 @@ export const actionsMethods = {
       ...(completedQuestTargetKey ? { completedQuestTargetKey } : {}),
       ...(typeof options.destructible === "boolean" ? { destructible: options.destructible } : {}),
     });
+    this.markRenderDirty?.("object-replace");
     return true;
   },
 
@@ -342,6 +348,7 @@ export const actionsMethods = {
       replaceFoliageWith: fileName,
       ...replacement,
     });
+    this.markRenderDirty?.("object-replace");
     return true;
   },
 
@@ -390,6 +397,8 @@ export const actionsMethods = {
       defaultActionId: def.defaultActionId ?? null,
     };
     chunk.objects.push(object);
+    chunk.terrainLayer = null;
+    this.markRenderDirty?.("object-spawn");
     return true;
   },
 
@@ -400,9 +409,12 @@ export const actionsMethods = {
     chunk.objects = chunk.objects.filter((object) => {
       const state = states[object.runtimeId];
       if (!state) return true;
-      if (state.removed) return false;
-      if (state.replaceWith) applyReplacementShape(object, state.replaceWith, state);
-      if (state.replaceFoliageWith) applyFoliageReplacementShape(object, state);
+      if (state.removed) {
+        this.markRenderDirty?.("saved-object-state");
+        return false;
+      }
+      if (state.replaceWith && applyReplacementShape(object, state.replaceWith, state)) this.markRenderDirty?.("saved-object-state");
+      if (state.replaceFoliageWith && applyFoliageReplacementShape(object, state)) this.markRenderDirty?.("saved-object-state");
       return true;
     });
   },

@@ -43,6 +43,14 @@ function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
   ];
   const liveTotals = [
     ["FPS", `${liveStats?.averageFps ?? 0} / ${liveStats?.targetFps ?? "-"}`],
+    ["Update FPS", liveStats?.updateFps ?? 0],
+    ["Render FPS", liveStats?.renderFps ?? 0],
+    ["RAF/s", liveStats?.rafCallbacksPerSecond ?? 0],
+    ["Skipped renders", liveStats?.skippedRenderFrames ?? 0],
+    ["Dirty", liveStats?.renderDirty ? "ja" : "nej"],
+    ["Visual active", liveStats?.visualActivity ? "ja" : "nej"],
+    ["Dirty reasons", (liveStats?.lastRenderDirtyReasons ?? []).slice(0, 4).join(", ") || "n/a"],
+    ["Canvas MP", liveStats?.canvasMegapixels ?? 0],
     ["Frame", ms(liveStats?.frameMs)],
     ["Render", ms(liveStats?.render?.totalMs)],
     ["Tiles", ms(liveStats?.render?.tilesMs)],

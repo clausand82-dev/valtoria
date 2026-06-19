@@ -110,6 +110,7 @@ export const regionMethods = {
     if (this.isInSubregion?.()) {
       if (this.exitPromptOpen) {
         this.exitPromptOpen = false;
+        this.markRenderDirty?.("exit-prompt");
         this.publishSnapshot();
       }
       return;
@@ -118,6 +119,7 @@ export const regionMethods = {
     if (distance(this.player, this.region.end) < 0.78) {
       this.exitPromptOpen = true;
       this.player.target = null;
+      this.markRenderDirty?.("exit-prompt");
       this.publishSnapshot();
     }
   },
@@ -125,6 +127,7 @@ export const regionMethods = {
   dismissExitPrompt() {
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 1.2;
+    this.markRenderDirty?.("exit-prompt");
     this.publishSnapshot();
   },
 
@@ -147,6 +150,7 @@ export const regionMethods = {
     this.updateFogOfWar(true);
     this.prepareRegionQuestgiver();
     this.addToast(`Rejst til ${this.region.mapRegion?.label ?? "regionen"}`);
+    this.markRenderDirty?.("region-change");
     this.publishSnapshot();
   },
 
@@ -207,6 +211,7 @@ export const regionMethods = {
     }
     this.rebuildRegionStats?.({ ensureFullRegionGenerated: false });
     this.addToast(`${this.activeMapRegion.label} startet. Find den gyldne exit mod nordoest.`);
+    this.markRenderDirty?.("region-change");
     this.publishSnapshot();
     return true;
   },
@@ -326,6 +331,7 @@ export const regionMethods = {
     this.player.attackObjectId = null;
     this.addToast(cleared ? `${active.label} befriet. Tilbage i byen.` : `${active.label} er stadig corrupted. Tilbage i byen.`);
     this.saveProgress({ force: true });
+    this.markRenderDirty?.("region-change");
     this.publishSnapshot();
   },
 
@@ -365,6 +371,7 @@ export const regionMethods = {
     this.advanceQuestBoardCooldowns?.(1);
     this.addToast(`${active.label} forladt. Progression blev nulstillet, og du er tilbage i byen.`);
     this.saveProgress({ force: true });
+    this.markRenderDirty?.("region-change");
     this.publishSnapshot();
     return true;
   },
@@ -402,6 +409,9 @@ export const regionMethods = {
     this.questState.wildernessNpc = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
+    this.fogOverlayCanvas = null;
+    this.fogMinimapOverlayCanvas = null;
+    this.markRenderDirty?.("region-reset");
   },
 
   placePlayerAtRegionStart() {
@@ -412,6 +422,7 @@ export const regionMethods = {
     this.pointer.worldX = this.player.x;
     this.pointer.worldY = this.player.y;
     this.updateCamera(1);
+    this.markRenderDirty?.("player-position");
   },
 
   ensureFullRegionGenerated() {
@@ -468,6 +479,7 @@ export const regionMethods = {
       const chunk = createChunk(cx, cy, this.region);
       this.applySavedActionObjectStates?.(chunk);
       this.chunks.set(key, chunk);
+      this.markRenderDirty?.("chunk-created");
       for (const monster of chunk.monsters) {
         this.scaleMonsterToHeroLevel(monster);
         this.assignEliteVariant(monster);

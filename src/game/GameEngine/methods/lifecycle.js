@@ -87,6 +87,7 @@ export const lifecycleMethods = {
     this.resize();
     this.ensureWorldAroundPlayer();
     this.updateFogOfWar(true);
+    this.markRenderDirty("start");
     this.publishSnapshot();
     window.addEventListener("resize", this.resize);
     window.addEventListener("keydown", this.handleKeyDown);
@@ -110,6 +111,7 @@ export const lifecycleMethods = {
           for (const chunk of this.chunks.values()) {
             chunk.terrainLayer = null;
           }
+          this.markRenderDirty("atlas-loaded");
         })
         .catch((error) => console.error("Atlas load failed", error));
     }
@@ -117,6 +119,7 @@ export const lifecycleMethods = {
       loadAnimationSheets()
         .then((sheets) => {
           this.animationSheets = sheets;
+          this.markRenderDirty("animation-sheets-loaded");
         })
         .catch((error) => console.error("Animation sheet load failed", error));
     }
@@ -131,6 +134,10 @@ export const lifecycleMethods = {
     }
     this.toastTimers.clear();
     cancelAnimationFrame(this.raf);
+    if (this.hiddenLoopTimer) {
+      clearTimeout(this.hiddenLoopTimer);
+      this.hiddenLoopTimer = null;
+    }
     window.removeEventListener("resize", this.resize);
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
@@ -155,17 +162,32 @@ export const lifecycleMethods = {
     this.vignetteCanvas = null;
     this.fogOverlayCanvas = null;
     this.updateCamera(1);
+    this.markRenderDirty("resize");
   },
 
   loop(now) {
+    this.rafCallbackCount += 1;
+    this.renderStatsWindowRafs += 1;
     if (typeof document !== "undefined" && document.hidden) {
       this.lastTime = now;
-      this.raf = requestAnimationFrame(this.loop);
+      if (!this.hiddenLoopTimer) {
+        this.hiddenLoopTimer = setTimeout(() => {
+          this.hiddenLoopTimer = null;
+          this.raf = requestAnimationFrame(this.loop);
+        }, 1000);
+      }
       return;
     }
     if (this.paused) {
       this.lastTime = now;
       this.nextFrameTime = now;
+      if (this.shouldRenderFrame(now)) {
+        this.render();
+        this.clearRenderDirty();
+        this.lastRenderTime = now;
+        this.renderFrameCount += 1;
+        this.renderStatsWindowRenders += 1;
+      }
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
@@ -188,13 +210,25 @@ export const lifecycleMethods = {
       this.fpsWindowFrames = 0;
     }
     this.frame += 1;
+    this.updateFrameCount += 1;
+    this.renderStatsWindowUpdates += 1;
     this.update(dt);
-    this.render();
+    if (this.shouldRenderFrame(now)) {
+      this.render();
+      this.clearRenderDirty();
+      this.lastRenderTime = now;
+      this.renderFrameCount += 1;
+      this.renderStatsWindowRenders += 1;
+    } else {
+      this.skippedRenderFrames += 1;
+    }
+    this.updateRenderDiagnostics(dt);
     this.raf = requestAnimationFrame(this.loop);
   },
 
   setPaused(paused) {
     this.paused = Boolean(paused);
+    this.markRenderDirty(this.paused ? "paused" : "resumed");
     if (!this.paused) this.lastTime = performance.now();
   },
 
@@ -215,6 +249,7 @@ export const lifecycleMethods = {
     this.nextFrameTime = performance.now();
     this.fogOverlayCanvas = null;
     this.resize();
+    this.markRenderDirty("performance-mode");
     if (typeof window !== "undefined") {
       window.localStorage?.setItem?.("valtoria.performanceMode", profile.id);
     }
@@ -232,7 +267,7 @@ export const lifecycleMethods = {
   update(dt) {
     this.time += dt;
     this.ensureWorldAroundPlayer();
-    this.updateFogOfWar();
+    if (this.updateFogOfWar()) this.markRenderDirty("fog");
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 0, stats.maxHp);
     this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, stats.maxMana);
@@ -276,6 +311,83 @@ export const lifecycleMethods = {
       this.publishSnapshot();
       this.snapshotTimer = 0.2;
     }
+  },
+
+  markRenderDirty(reason = "unknown") {
+    this.renderDirty = true;
+    if (this.renderDirtyReasons) this.renderDirtyReasons.add(String(reason || "unknown"));
+  },
+
+  clearRenderDirty() {
+    this.lastRenderDirtyReasons = this.renderDirtyReasons ? [...this.renderDirtyReasons] : [];
+    this.renderDirty = false;
+    this.renderDirtyReasons?.clear();
+  },
+
+  hasVisualActivity() {
+    if (!this.assetsReady) return true;
+    const player = this.player;
+    if (
+      player?.moving
+      || player?.attackAnim > 0
+      || player?.castAnim > 0
+      || player?.hurtCooldown > 0
+      || player?.deadTimer > 0
+    ) return true;
+
+    const camera = this.camera ?? {};
+    if (camera.shake > 0) return true;
+    if (
+      Math.abs((camera.offsetX ?? 0) - (camera.targetOffsetX ?? 0)) > 0.25
+      || Math.abs((camera.offsetY ?? 0) - (camera.targetOffsetY ?? 0)) > 0.25
+    ) return true;
+
+    for (const monster of this.monsters?.values?.() ?? []) {
+      if (
+        !monster.dead
+        && (
+          monster.moving
+          || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002
+          || monster.attackAnim > 0
+          || monster.hurt > 0
+          || monster.castAnim > 0
+        )
+      ) return true;
+    }
+
+    if ((this.projectiles?.length ?? 0) > 0) return true;
+    if ((this.groundHazards?.length ?? 0) > 0) return true;
+    if ((this.loots?.length ?? 0) > 0) return true;
+    if ((this.spellVisualCleanups?.length ?? 0) > 0) return true;
+    if ((this.floaters?.length ?? 0) > 0) return true;
+    if ((this.toasts?.length ?? 0) > 0) return true;
+    if ((this.particleEngine?.particles?.length ?? 0) > 0) return true;
+    if ((this.particleEngine?.emitters?.size ?? 0) > 0) return true;
+    if ((this.particles?.length ?? 0) > 0) return true;
+    if (this.weatherFlash || this.pendingThunder) return true;
+    if (this.subregionTransition) return true;
+    if (this.exitPromptOpen) return true;
+    return false;
+  },
+
+  shouldRenderFrame(now) {
+    if (this.renderDirty) return true;
+    if (!this.lastRenderTime || this.renderFrameCount <= 0) return true;
+    if (this.hasVisualActivity()) return true;
+    return now - this.lastRenderTime >= (this.maxIdleRenderIntervalMs ?? 1000);
+  },
+
+  updateRenderDiagnostics(dt) {
+    this.renderStatsWindowTime = (this.renderStatsWindowTime ?? 0) + dt;
+    if (this.renderStatsWindowTime < 0.75) return;
+    const seconds = this.renderStatsWindowTime;
+    this.updateFps = Math.round((this.renderStatsWindowUpdates ?? 0) / seconds);
+    this.renderFps = Math.round((this.renderStatsWindowRenders ?? 0) / seconds);
+    this.rafCallbacksPerSecond = Math.round((this.renderStatsWindowRafs ?? 0) / seconds);
+    this.renderStatsWindowTime = 0;
+    this.renderStatsWindowUpdates = 0;
+    this.renderStatsWindowRenders = 0;
+    this.renderStatsWindowRafs = 0;
   },
 
   updateDeath(dt, stats) {
