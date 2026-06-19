@@ -1225,8 +1225,8 @@ button {
   z-index: 32;
   left: 16px;
   bottom: 88px;
-  width: min(760px, calc(100vw - 32px));
-  max-height: min(46vh, 380px);
+  width: min(900px, calc(100vw - 32px));
+  max-height: min(58vh, 560px);
   overflow: auto;
   padding: 10px;
   border: 1px solid rgba(244, 218, 150, 0.28);
@@ -1272,6 +1272,86 @@ button {
   padding: 3px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.06);
+}
+
+.region-debug-live,
+.region-debug-recorder-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.region-debug-live span,
+.region-debug-recorder-grid span {
+  display: flex;
+  justify-content: space-between;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.region-debug-live b,
+.region-debug-recorder-grid b {
+  min-width: 0;
+  max-width: 62%;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-debug-recorder {
+  display: grid;
+  gap: 7px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.region-debug-recorder-head,
+.region-debug-recorder-actions,
+.region-debug-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.region-debug-recorder-head {
+  justify-content: space-between;
+}
+
+.region-debug-recorder-head span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.region-debug-recorder-actions {
+  flex-wrap: wrap;
+}
+
+.region-debug-panel button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.region-debug-summary {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.region-debug-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .region-debug-columns {
@@ -6945,6 +7025,16 @@ button {
     bottom: 82px;
     left: 8px;
     width: auto;
+  }
+
+  .region-debug-live,
+  .region-debug-recorder-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .region-debug-recorder-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .region-debug-columns {

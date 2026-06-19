@@ -29,11 +29,55 @@ function DebugStatsList({ title, values }) {
   );
 }
 
-function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
+function compactReasons(reasons, max = 3) {
+  const entries = (reasons ?? []).filter(Boolean);
+  if (!entries.length) return "n/a";
+  const visible = entries.slice(0, max).join(", ");
+  return entries.length > max ? `${visible}, ...` : visible;
+}
+
+function summaryPercent(summary, key) {
+  const entry = summary?.activitySplit?.[key];
+  if (!entry) return "0%";
+  return `${entry.percent ?? 0}%`;
+}
+
+function downloadJsonFile(fileName, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
   const ms = (value) => Number.isFinite(Number(value)) ? `${value} ms` : "n/a";
   const saveTime = liveStats?.save?.savedAt
     ? new Date(liveStats.save.savedAt).toLocaleTimeString()
     : "n/a";
+  const recording = liveStats?.performanceRecording ?? {};
+  const historySummary = liveStats?.performanceHistory?.last60s ?? null;
+  const recordingSummary = recording.summary ?? null;
+  const startRecording = (seconds) => {
+    engineRef.current?.startPerformanceRecording?.(seconds);
+  };
+  const stopRecording = () => {
+    engineRef.current?.stopPerformanceRecording?.();
+  };
+  const clearRecording = () => {
+    engineRef.current?.clearPerformanceRecording?.();
+  };
+  const exportRecording = () => {
+    const payload = engineRef.current?.exportPerformanceRecording?.();
+    if (!payload) return;
+    const profile = payload.summary?.profileId ?? payload.metadata?.profileAtStart ?? "unknown";
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    downloadJsonFile(`valtoria-performance-${profile}-${stamp}.json`, payload);
+  };
   const totals = [
     ["Objekter", stats?.objects?.total ?? 0],
     ["Monsters", stats?.monsters?.total ?? 0],
@@ -50,9 +94,10 @@ function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
     ["Dirty", liveStats?.renderDirty ? "ja" : "nej"],
     ["Visual active", liveStats?.visualActivity ? "ja" : "nej"],
     ["Activity level", liveStats?.visualActivityLevel ?? "idle"],
-    ["Activity reasons", (liveStats?.visualActivityReasons ?? []).slice(0, 4).join(", ") || "n/a"],
+    ["Activity reasons", compactReasons(liveStats?.visualActivityReasons)],
+    ["Debug reasons", compactReasons(liveStats?.visualDebugReasons)],
     ["Ambient FPS", liveStats?.ambientRenderFps ?? 0],
-    ["Dirty reasons", (liveStats?.lastRenderDirtyReasons ?? []).slice(0, 4).join(", ") || "n/a"],
+    ["Dirty reasons", compactReasons(liveStats?.lastRenderDirtyReasons)],
     ["Canvas MP", liveStats?.canvasMegapixels ?? 0],
     ["Frame", ms(liveStats?.frameMs)],
     ["Render", ms(liveStats?.render?.totalMs)],
@@ -92,6 +137,45 @@ function RegionDebugPanel({ liveStats, onClose, onRefresh, stats }) {
       </div>
       <div className="region-debug-totals region-debug-live">
         {liveTotals.map(([label, value]) => <span key={label}>{label} <b>{value}</b></span>)}
+      </div>
+      <div className="region-debug-recorder">
+        <div className="region-debug-recorder-head">
+          <b>Performance recorder</b>
+          <span>
+            Rolling 60s: update <b>{historySummary?.avgUpdateFps ?? 0}</b> / render <b>{historySummary?.avgRenderFps ?? 0}</b>
+            {" "}max render <b>{ms(historySummary?.maxRenderTotalMs)}</b>
+          </span>
+        </div>
+        <div className="region-debug-recorder-grid">
+          <span>Recording <b>{recording.recording ? "yes" : "no"}</b></span>
+          <span>Remaining <b>{recording.remainingSeconds ?? 0}s</b></span>
+          <span>Samples <b>{recording.samplesCollected ?? 0}</b></span>
+          <span>Last profile <b>{recordingSummary?.profileId ?? historySummary?.profileId ?? "n/a"}</b></span>
+          <span>Idle <b>{summaryPercent(historySummary, "idle")}</b></span>
+          <span>Ambient <b>{summaryPercent(historySummary, "ambient")}</b></span>
+          <span>Active <b>{summaryPercent(historySummary, "active")}</b></span>
+          <span>History samples <b>{liveStats?.performanceHistory?.samples ?? 0}</b></span>
+        </div>
+        <div className="region-debug-recorder-actions">
+          <button type="button" onClick={() => startRecording(30)}>Record 30s</button>
+          <button type="button" onClick={() => startRecording(60)}>Record 60s</button>
+          <button type="button" onClick={() => startRecording(120)}>Record 120s</button>
+          <button type="button" onClick={stopRecording} disabled={!recording.recording}>Stop</button>
+          <button type="button" onClick={clearRecording}>Clear</button>
+          <button type="button" onClick={exportRecording} disabled={!recording.samplesCollected}>Export JSON</button>
+        </div>
+        {recordingSummary?.sampleCount > 0 && (
+          <div className="region-debug-summary">
+            <span>Summary <b>{recordingSummary.profileId}</b>, {recordingSummary.durationSeconds}s, samples {recordingSummary.sampleCount}</span>
+            <span>FPS update/render <b>{recordingSummary.avgUpdateFps}</b> / <b>{recordingSummary.avgRenderFps}</b>, min/max render <b>{recordingSummary.minRenderFps}</b> / <b>{recordingSummary.maxRenderFps}</b></span>
+            <span>Render ms avg/max <b>{recordingSummary.avgRenderTotalMs}</b> / <b>{recordingSummary.maxRenderTotalMs}</b>, fog max <b>{recordingSummary.maxFogMs}</b>, particles max <b>{recordingSummary.maxParticlesMs}</b>, objects max <b>{recordingSummary.maxObjectsMs}</b></span>
+            <span>Split idle/ambient/active <b>{summaryPercent(recordingSummary, "idle")}</b> / <b>{summaryPercent(recordingSummary, "ambient")}</b> / <b>{summaryPercent(recordingSummary, "active")}</b></span>
+            <span>Activity <b>{compactReasons(recordingSummary.topActivityReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>Debug <b>{compactReasons(recordingSummary.topVisualDebugReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>Dirty <b>{compactReasons(recordingSummary.topDirtyReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>Worst <b>{recordingSummary.worstSample?.renderTotalMs ?? "n/a"} ms</b> {compactReasons(recordingSummary.worstSample?.activityReasons)}</span>
+          </div>
+        )}
       </div>
       <div className="region-debug-columns">
         <DebugStatsList title="objects.byQuestTargetKey" values={stats?.objects?.byQuestTargetKey} />
@@ -437,7 +521,7 @@ export function GameHud({
       setRegionDebugLiveStats(engineRef.current?.runtimeDebugStats?.() ?? null);
     };
     refreshLiveStats();
-    const intervalId = window.setInterval(refreshLiveStats, 250);
+    const intervalId = window.setInterval(refreshLiveStats, 1000);
     return () => window.clearInterval(intervalId);
   }, [engineRef, regionDebugOpen]);
 
@@ -509,6 +593,7 @@ export function GameHud({
 
       {CHEAT_SETTINGS.enabled && regionDebugOpen && !cityOpen && (
         <RegionDebugPanel
+          engineRef={engineRef}
           liveStats={regionDebugLiveStats}
           onClose={() => setRegionDebugOpen(false)}
           onRefresh={refreshRegionDebug}

@@ -238,8 +238,12 @@ export const lifecycleMethods = {
     const profile = resolvePerformanceProfile(mode);
     this.performanceMode = profile.id;
     this.targetFps = profile.targetFps;
+    this.ambientRenderFps = Math.max(1, Math.min(30, Number(profile.ambientRenderFps) || 12));
+    this.ambientRenderIntervalMs = 1000 / this.ambientRenderFps;
     this.maxDpr = profile.maxDpr;
     this.fogRenderScale = profile.fogRenderScale;
+    this.lowPowerMode = Boolean(profile.lowPowerMode);
+    this.disableAmbientCritters = Boolean(profile.disableAmbientCritters);
     if (this.particleEngine) {
       this.particleEngine.quality = profile.particleQuality;
       this.particleEngine.maxParticles = profile.maxParticles;
@@ -258,6 +262,7 @@ export const lifecycleMethods = {
     return {
       mode: profile.id,
       targetFps: this.targetFps,
+      ambientRenderFps: this.ambientRenderFps,
       maxDpr: this.maxDpr,
       dpr: this.dpr,
       fogRenderScale: this.fogRenderScale,
@@ -272,6 +277,10 @@ export const lifecycleMethods = {
     if (this.updateFogOfWar()) this.markRenderDirty("fog");
     const stats = this.calcStats();
     this.player.hp = clamp(this.player.hp, 0, stats.maxHp);
+    if (this.player.hp > 0 && this.player.deadTimer > 0) {
+      this.player.deadTimer = 0;
+      this.markRenderDirty("player-death-reset");
+    }
     this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, stats.maxMana);
     this.player.attackCooldown = Math.max(0, this.player.attackCooldown - dt);
     this.player.spellCooldown = Math.max(0, this.player.spellCooldown - dt);
@@ -313,6 +322,7 @@ export const lifecycleMethods = {
       this.publishSnapshot();
       this.snapshotTimer = 0.2;
     }
+    this.updatePerformanceHistory?.();
   },
 
   markRenderDirty(reason = "unknown") {
@@ -326,9 +336,10 @@ export const lifecycleMethods = {
     this.renderDirtyReasons?.clear();
   },
 
-  recordVisualActivity(level = "idle", reasons = []) {
+  recordVisualActivity(level = "idle", reasons = [], debugReasons = []) {
     this.visualActivityLevel = level;
     this.visualActivityReasons = [...new Set(reasons.filter(Boolean))];
+    this.visualDebugReasons = [...new Set(debugReasons.filter(Boolean))];
     return level;
   },
 
@@ -340,9 +351,54 @@ export const lifecycleMethods = {
     return false;
   },
 
+  isWorldPointNearViewport(x, y, z = 0, margin = 180) {
+    const screen = worldToScreen(x, y, z, this.camera);
+    return visibleScreenPoint(screen, this.width, this.height, margin);
+  },
+
+  hasVisibleGroundHazard() {
+    for (const hazard of this.groundHazards ?? []) {
+      if ((Number(hazard.life) || 0) <= 0) continue;
+      const radiusMargin = Math.max(180, (Number(hazard.radius) || 0) * 96);
+      if (this.isWorldPointNearViewport(hazard.x, hazard.y, 0, radiusMargin)) return true;
+    }
+    return false;
+  },
+
+  hasVisibleFloater() {
+    if (Array.isArray(this.floaters)) {
+      const before = this.floaters.length;
+      this.floaters = this.floaters.filter((floater) => (Number(floater.life) || 0) > 0);
+      if (this.floaters.length !== before) this.markRenderDirty?.("floater-expired");
+    }
+    for (const floater of this.floaters ?? []) {
+      if (this.isWorldPointNearViewport(floater.x, floater.y, floater.z ?? 0, 80)) return true;
+    }
+    return false;
+  },
+
+  hasVisibleSpellVisuals() {
+    const particleVisible = (particle) => {
+      if (!particle?.spellInstanceId || (Number(particle.life) || 0) <= 0) return false;
+      if (!Number.isFinite(Number(particle.x)) || !Number.isFinite(Number(particle.y))) return true;
+      return this.isWorldPointNearViewport(particle.x, particle.y, particle.z ?? 0, 220);
+    };
+    if ((this.particleEngine?.particles ?? []).some(particleVisible)) return true;
+    if ((this.particles ?? []).some(particleVisible)) return true;
+    for (const emitter of this.particleEngine?.emitters?.values?.() ?? []) {
+      const config = emitter?.config ?? {};
+      if (!config.spellInstanceId) continue;
+      if (Number.isFinite(Number(config.duration)) && Number(config.duration) <= 0) continue;
+      if (!Number.isFinite(Number(config.x)) || !Number.isFinite(Number(config.y))) return true;
+      if (this.isWorldPointNearViewport(config.x, config.y, 0, 220)) return true;
+    }
+    return false;
+  },
+
   getVisualActivityLevel() {
     const activeReasons = [];
     const ambientReasons = [];
+    const debugReasons = [];
     const assetsReady = Boolean(this.atlas && this.animationSheets);
     if (!assetsReady) return this.recordVisualActivity("active", ["assets-loading"]);
     const player = this.player;
@@ -350,13 +406,14 @@ export const lifecycleMethods = {
     if (player?.attackAnim > 0) activeReasons.push("player-attack");
     if (player?.castAnim > 0) activeReasons.push("player-cast");
     if (player?.hurtCooldown > 0) activeReasons.push("player-hurt");
-    if (player?.deadTimer > 0) activeReasons.push("player-death");
+    if (player?.hp <= 0 && player?.deadTimer > 0 && player.deadTimer < 2.05) activeReasons.push("player-death-animation");
+    if (player?.hp <= 0 && activeReasons.includes("player-death-animation") === false) debugReasons.push("player-death-overlay-static");
 
     const camera = this.camera ?? {};
     if (camera.shake > 0) activeReasons.push("camera-shake");
     if (
-      Math.abs((camera.offsetX ?? 0) - (camera.targetOffsetX ?? 0)) > 0.25
-      || Math.abs((camera.offsetY ?? 0) - (camera.targetOffsetY ?? 0)) > 0.25
+      Math.abs((camera.offsetX ?? 0) - (camera.targetOffsetX ?? 0)) > 0.5
+      || Math.abs((camera.offsetY ?? 0) - (camera.targetOffsetY ?? 0)) > 0.5
     ) activeReasons.push("camera-interpolation");
 
     for (const monster of this.monsters?.values?.() ?? []) {
@@ -369,13 +426,15 @@ export const lifecycleMethods = {
     }
 
     if ((this.projectiles?.length ?? 0) > 0) activeReasons.push("projectiles");
-    if ((this.groundHazards?.length ?? 0) > 0) activeReasons.push("ground-hazards");
-    if ((this.spellVisualCleanups?.length ?? 0) > 0) activeReasons.push("spell-cleanups");
-    if ((this.floaters?.length ?? 0) > 0) activeReasons.push("floaters");
+    if (this.hasVisibleGroundHazard()) activeReasons.push("visible-ground-hazard");
+    else if ((this.groundHazards?.length ?? 0) > 0) debugReasons.push("hidden-ground-hazard");
+    if (this.hasVisibleSpellVisuals()) activeReasons.push("spell-visuals");
+    if ((this.spellVisualCleanups?.length ?? 0) > 0) debugReasons.push("spell-cleanup-queue");
+    if (this.hasVisibleFloater()) activeReasons.push("visible-floaters");
     if (this.weatherFlash) activeReasons.push("screen-weather-flash");
     if (this.subregionTransition) activeReasons.push("region-transition");
 
-    if (activeReasons.length) return this.recordVisualActivity("active", activeReasons);
+    if (activeReasons.length) return this.recordVisualActivity("active", activeReasons, debugReasons);
 
     if (this.visibleLootHasAmbientHover()) ambientReasons.push("visible-loot-hover");
     if ((this.particleEngine?.particles?.length ?? 0) > 0) ambientReasons.push("particles");
@@ -385,8 +444,8 @@ export const lifecycleMethods = {
     if (this.pendingThunder) ambientReasons.push("pending-weather-audio");
     if (this.exitPromptOpen) ambientReasons.push("exit-prompt");
 
-    if (ambientReasons.length) return this.recordVisualActivity("ambient", ambientReasons);
-    return this.recordVisualActivity("idle", []);
+    if (ambientReasons.length) return this.recordVisualActivity("ambient", ambientReasons, debugReasons);
+    return this.recordVisualActivity("idle", [], debugReasons);
   },
 
   hasVisualActivity() {
@@ -435,6 +494,13 @@ export const lifecycleMethods = {
     const t = 1 - Math.pow(0.001, dt);
     this.camera.offsetX = lerp(this.camera.offsetX, this.camera.targetOffsetX, t);
     this.camera.offsetY = lerp(this.camera.offsetY, this.camera.targetOffsetY, t);
+    if (
+      Math.abs(this.camera.offsetX - this.camera.targetOffsetX) <= 0.5
+      && Math.abs(this.camera.offsetY - this.camera.targetOffsetY) <= 0.5
+    ) {
+      this.camera.offsetX = this.camera.targetOffsetX;
+      this.camera.offsetY = this.camera.targetOffsetY;
+    }
     this.camera.shake = Math.max(0, this.camera.shake - dt * 16);
   },
 

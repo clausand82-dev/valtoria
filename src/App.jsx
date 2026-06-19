@@ -80,13 +80,14 @@ function normalizePerformanceSettings(input = {}) {
     useCustom: Boolean(input.useCustom),
     custom: {
       targetFps: clampNumber(custom.targetFps, 30, 60, profile.targetFps),
+      ambientRenderFps: clampNumber(custom.ambientRenderFps, 4, 20, profile.ambientRenderFps ?? 12),
       maxDpr: clampNumber(custom.maxDpr, 1, 2, profile.maxDpr),
-      fogRenderScale: clampNumber(custom.fogRenderScale, 0.35, 1, profile.fogRenderScale),
+      fogRenderScale: clampNumber(custom.fogRenderScale, 0.3, 1, profile.fogRenderScale),
       particleQuality: ["low", "medium", "high"].includes(custom.particleQuality) ? custom.particleQuality : profile.particleQuality,
       maxParticles: Math.floor(clampNumber(custom.maxParticles, 64, 1400, profile.maxParticles)),
       particlesEnabled: custom.particlesEnabled !== false,
       disableAmbientCritters: Boolean(custom.disableAmbientCritters ?? profile.disableAmbientCritters),
-      lowPowerMode: Boolean(custom.lowPowerMode),
+      lowPowerMode: Boolean(custom.lowPowerMode ?? profile.lowPowerMode),
     },
   };
 }
@@ -98,13 +99,14 @@ function resolveRuntimePerformanceSettings(settings) {
     return {
       mode: profile.id,
       targetFps: profile.targetFps,
+      ambientRenderFps: profile.ambientRenderFps ?? 12,
       maxDpr: profile.maxDpr,
       fogRenderScale: profile.fogRenderScale,
       particleQuality: profile.particleQuality,
       maxParticles: profile.maxParticles,
       disableAmbientCritters: profile.disableAmbientCritters,
       particlesEnabled: true,
-      lowPowerMode: false,
+      lowPowerMode: Boolean(profile.lowPowerMode),
       useCustom: false,
     };
   }
@@ -361,10 +363,12 @@ export default function App() {
       disableAmbientCritters: runtimePerformance.disableAmbientCritters,
       maxDpr: runtimePerformance.maxDpr,
       targetFps: runtimePerformance.targetFps,
+      ambientRenderFps: runtimePerformance.ambientRenderFps,
       fogRenderScale: runtimePerformance.fogRenderScale,
       particleQuality: runtimePerformance.particleQuality,
       maxParticles: runtimePerformance.maxParticles,
       particlesEnabled: runtimePerformance.particlesEnabled,
+      useCustomPerformanceProfile: runtimePerformance.useCustom,
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
       deferAssetLoad: true,
@@ -690,11 +694,14 @@ export default function App() {
 
     engine.setPerformanceMode?.(resolved.mode);
     engine.performanceMode = resolved.mode;
+    engine.isCustomPerformanceProfile = Boolean(resolved.useCustom);
     engine.lowPowerMode = Boolean(resolved.lowPowerMode);
     engine.disableAmbientCritters = Boolean(resolved.disableAmbientCritters);
     engine.targetFps = clampNumber(resolved.targetFps, 30, 60, engine.targetFps ?? 50);
+    engine.ambientRenderFps = clampNumber(resolved.ambientRenderFps, 4, 20, engine.ambientRenderFps ?? 12);
+    engine.ambientRenderIntervalMs = 1000 / engine.ambientRenderFps;
     engine.maxDpr = clampNumber(resolved.maxDpr, 1, 2, engine.maxDpr ?? 1.25);
-    engine.fogRenderScale = clampNumber(resolved.fogRenderScale, 0.35, 1, engine.fogRenderScale ?? 0.45);
+    engine.fogRenderScale = clampNumber(resolved.fogRenderScale, 0.3, 1, engine.fogRenderScale ?? 0.45);
     engine.setParticleQuality?.(resolved.particleQuality);
     if (engine.particleEngine) {
       engine.particleEngine.enabled = resolved.particlesEnabled !== false;
@@ -937,7 +944,7 @@ export default function App() {
                   }))}
                 >
                   {profileOptions.map((profile) => (
-                    <option key={profile.id} value={profile.id}>{profile.id}</option>
+                    <option key={profile.id} value={profile.id}>{profile.label ?? profile.id}</option>
                   ))}
                 </select>
               </label>
@@ -972,6 +979,20 @@ export default function App() {
                   />
                 </label>
                 <label>
+                  Ambient FPS
+                  <input
+                    type="number"
+                    min="4"
+                    max="20"
+                    step="1"
+                    value={resolvedDraft.ambientRenderFps}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, ambientRenderFps: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label>
                   Max DPR
                   <input
                     type="number"
@@ -989,7 +1010,7 @@ export default function App() {
                   Fog Scale
                   <input
                     type="number"
-                    min="0.35"
+                    min="0.3"
                     max="1"
                     step="0.05"
                     value={resolvedDraft.fogRenderScale}
