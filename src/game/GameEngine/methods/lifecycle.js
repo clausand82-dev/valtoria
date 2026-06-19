@@ -343,7 +343,8 @@ export const lifecycleMethods = {
   getVisualActivityLevel() {
     const activeReasons = [];
     const ambientReasons = [];
-    if (!this.assetsReady) return this.recordVisualActivity("active", ["assets-loading"]);
+    const assetsReady = Boolean(this.atlas && this.animationSheets);
+    if (!assetsReady) return this.recordVisualActivity("active", ["assets-loading"]);
     const player = this.player;
     if (player?.moving) activeReasons.push("player-moving");
     if (player?.attackAnim > 0) activeReasons.push("player-attack");
