@@ -30,6 +30,7 @@ export const regionStatsMethods = {
     const timings = this.renderTimings ?? {};
     const counts = this.renderDebugCounts ?? {};
     const formatMs = (value) => Number.isFinite(Number(value)) ? Math.round(Number(value) * 10) / 10 : null;
+    const visualActivityLevel = this.getVisualActivityLevel?.() ?? "idle";
     return {
       fps: this.lastFrameDt > 0 ? Math.round(1 / this.lastFrameDt) : 0,
       averageFps: Math.max(0, Math.round(Number(this.averageFps) || 0)),
@@ -38,7 +39,10 @@ export const regionStatsMethods = {
       rafCallbacksPerSecond: Math.max(0, Math.round(Number(this.rafCallbacksPerSecond) || 0)),
       skippedRenderFrames: Math.max(0, Math.floor(Number(this.skippedRenderFrames) || 0)),
       renderDirty: Boolean(this.renderDirty),
-      visualActivity: Boolean(this.hasVisualActivity?.()),
+      visualActivity: visualActivityLevel !== "idle",
+      visualActivityLevel,
+      visualActivityReasons: [...(this.visualActivityReasons ?? [])],
+      ambientRenderFps: Math.max(0, Math.round(Number(this.ambientRenderFps) || 0)),
       lastRenderDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
       canvasMegapixels: Math.round((((this.canvas?.width ?? 0) * (this.canvas?.height ?? 0)) / 1000000) * 100) / 100,
       updateFrameCount: Math.max(0, Math.floor(Number(this.updateFrameCount) || 0)),

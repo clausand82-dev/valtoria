@@ -12,7 +12,9 @@ import {
   lerp,
   normalize,
   screenDirectionToWorld,
+  visibleScreenPoint,
   worldToIso,
+  worldToScreen,
   AUTOSAVE_INTERVAL_SECONDS,
   DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
   normalizeQuickSlots
@@ -324,56 +326,78 @@ export const lifecycleMethods = {
     this.renderDirtyReasons?.clear();
   },
 
-  hasVisualActivity() {
-    if (!this.assetsReady) return true;
+  recordVisualActivity(level = "idle", reasons = []) {
+    this.visualActivityLevel = level;
+    this.visualActivityReasons = [...new Set(reasons.filter(Boolean))];
+    return level;
+  },
+
+  visibleLootHasAmbientHover() {
+    for (const loot of this.loots ?? []) {
+      const screen = worldToScreen(loot.x, loot.y, 0, this.camera);
+      if (visibleScreenPoint(screen, this.width, this.height, 180)) return true;
+    }
+    return false;
+  },
+
+  getVisualActivityLevel() {
+    const activeReasons = [];
+    const ambientReasons = [];
+    if (!this.assetsReady) return this.recordVisualActivity("active", ["assets-loading"]);
     const player = this.player;
-    if (
-      player?.moving
-      || player?.attackAnim > 0
-      || player?.castAnim > 0
-      || player?.hurtCooldown > 0
-      || player?.deadTimer > 0
-    ) return true;
+    if (player?.moving) activeReasons.push("player-moving");
+    if (player?.attackAnim > 0) activeReasons.push("player-attack");
+    if (player?.castAnim > 0) activeReasons.push("player-cast");
+    if (player?.hurtCooldown > 0) activeReasons.push("player-hurt");
+    if (player?.deadTimer > 0) activeReasons.push("player-death");
 
     const camera = this.camera ?? {};
-    if (camera.shake > 0) return true;
+    if (camera.shake > 0) activeReasons.push("camera-shake");
     if (
       Math.abs((camera.offsetX ?? 0) - (camera.targetOffsetX ?? 0)) > 0.25
       || Math.abs((camera.offsetY ?? 0) - (camera.targetOffsetY ?? 0)) > 0.25
-    ) return true;
+    ) activeReasons.push("camera-interpolation");
 
     for (const monster of this.monsters?.values?.() ?? []) {
-      if (
-        !monster.dead
-        && (
-          monster.moving
-          || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002
-          || monster.attackAnim > 0
-          || monster.hurt > 0
-          || monster.castAnim > 0
-        )
-      ) return true;
+      if (monster.dead) continue;
+      if (monster.moving || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002) activeReasons.push("monster-moving");
+      if (monster.attackAnim > 0) activeReasons.push("monster-attack");
+      if (monster.hurt > 0) activeReasons.push("monster-hurt");
+      if (monster.castAnim > 0) activeReasons.push("monster-cast");
+      if (activeReasons.length) break;
     }
 
-    if ((this.projectiles?.length ?? 0) > 0) return true;
-    if ((this.groundHazards?.length ?? 0) > 0) return true;
-    if ((this.loots?.length ?? 0) > 0) return true;
-    if ((this.spellVisualCleanups?.length ?? 0) > 0) return true;
-    if ((this.floaters?.length ?? 0) > 0) return true;
-    if ((this.toasts?.length ?? 0) > 0) return true;
-    if ((this.particleEngine?.particles?.length ?? 0) > 0) return true;
-    if ((this.particleEngine?.emitters?.size ?? 0) > 0) return true;
-    if ((this.particles?.length ?? 0) > 0) return true;
-    if (this.weatherFlash || this.pendingThunder) return true;
-    if (this.subregionTransition) return true;
-    if (this.exitPromptOpen) return true;
-    return false;
+    if ((this.projectiles?.length ?? 0) > 0) activeReasons.push("projectiles");
+    if ((this.groundHazards?.length ?? 0) > 0) activeReasons.push("ground-hazards");
+    if ((this.spellVisualCleanups?.length ?? 0) > 0) activeReasons.push("spell-cleanups");
+    if ((this.floaters?.length ?? 0) > 0) activeReasons.push("floaters");
+    if (this.weatherFlash) activeReasons.push("screen-weather-flash");
+    if (this.subregionTransition) activeReasons.push("region-transition");
+
+    if (activeReasons.length) return this.recordVisualActivity("active", activeReasons);
+
+    if (this.visibleLootHasAmbientHover()) ambientReasons.push("visible-loot-hover");
+    if ((this.particleEngine?.particles?.length ?? 0) > 0) ambientReasons.push("particles");
+    if ((this.particleEngine?.emitters?.size ?? 0) > 0) ambientReasons.push("particle-emitters");
+    if ((this.particles?.length ?? 0) > 0) ambientReasons.push("legacy-particles");
+    if ((this.toasts?.length ?? 0) > 0) ambientReasons.push("toasts");
+    if (this.pendingThunder) ambientReasons.push("pending-weather-audio");
+    if (this.exitPromptOpen) ambientReasons.push("exit-prompt");
+
+    if (ambientReasons.length) return this.recordVisualActivity("ambient", ambientReasons);
+    return this.recordVisualActivity("idle", []);
+  },
+
+  hasVisualActivity() {
+    return this.getVisualActivityLevel() !== "idle";
   },
 
   shouldRenderFrame(now) {
     if (this.renderDirty) return true;
     if (!this.lastRenderTime || this.renderFrameCount <= 0) return true;
-    if (this.hasVisualActivity()) return true;
+    const activityLevel = this.getVisualActivityLevel();
+    if (activityLevel === "active") return true;
+    if (activityLevel === "ambient") return now - this.lastRenderTime >= (this.ambientRenderIntervalMs ?? 1000 / 12);
     return now - this.lastRenderTime >= (this.maxIdleRenderIntervalMs ?? 1000);
   },
 

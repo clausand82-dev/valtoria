@@ -55,7 +55,11 @@ export class GameEngine {
     this.renderDirtyReasons = import.meta.env.DEV ? new Set(["init"]) : null;
     this.lastRenderDirtyReasons = [];
     this.lastRenderTime = 0;
+    this.ambientRenderFps = Math.max(1, Math.min(30, Number(options.ambientRenderFps) || 12));
+    this.ambientRenderIntervalMs = 1000 / this.ambientRenderFps;
     this.maxIdleRenderIntervalMs = Math.max(250, Number(options.maxIdleRenderIntervalMs) || 1000);
+    this.visualActivityLevel = "idle";
+    this.visualActivityReasons = [];
     this.renderFrameCount = 0;
     this.updateFrameCount = 0;
     this.rafCallbackCount = 0;
