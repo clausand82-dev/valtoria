@@ -194,7 +194,9 @@ export const regionMethods = {
       if (!groups.length) continue;
       const targets = Object.fromEntries(groups.map((group) => {
         const total = [...this.chunks.values()].reduce((sum, chunk) => (
-          sum + (chunk.objects ?? []).filter((object) => !object?.removed && object?.questTargetKey === group.questTargetKey).length
+          sum
+          + (chunk.objects ?? []).filter((object) => !object?.removed && object?.questTargetKey === group.questTargetKey).length
+          + (chunk.foliage ?? []).filter((object) => !object?.removed && object?.questTargetKey === group.questTargetKey).length
         ), 0);
         return [group.questTargetKey, { done: 0, total }];
       }));

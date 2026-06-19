@@ -386,12 +386,17 @@ export const snapshotMethods = {
         } : null,
         cityNpcStates: Object.keys(QUEST_NPCS).map((npcId) => {
           const activeQuests = this.questState.active
-            .filter((quest) => (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true) && canNpcTurnInQuest(quest, npcId))
+            .filter((quest) => (
+              !quest.hideActiveInCity
+              && (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true)
+              && canNpcTurnInQuest(quest, npcId)
+            ))
             .map((quest) => questSnapshot(quest, this.player.inventory));
           const offers = this.collectQuestOffers(npcId, "city").map((quest) => questSnapshot(quest, this.player.inventory));
           const hasComplete = activeQuests.some((quest) => quest.complete)
             || this.questState.active.some((quest) => (
-              (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true)
+              !quest.hideActiveInCity
+              && (this.questRuntimeVisibleUnderGlobalGate?.(quest) ?? true)
               && canNpcTurnInQuest(quest, npcId)
               && this.questCompletesByTalkingToNpc?.(quest, npcId)
             ));

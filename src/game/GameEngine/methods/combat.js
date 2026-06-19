@@ -1569,6 +1569,14 @@ export const combatMethods = {
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
     this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
     this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
+    this.tryDropQuestTargetLoot?.({
+      source: "object",
+      sourceId: object.objectDefId ?? object.type,
+      sourceTags: objectMetadataConfig(object).tags,
+      x: object.x,
+      y: object.y,
+      sourceObject: object,
+    });
     this.applyDestroyRewards(object, def);
     this.applyDestroyedFactionRep(object, def);
     for (const tag of objectMetadataConfig(object).tags) {

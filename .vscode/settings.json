@@ -1,3 +1,4 @@
 {
-  "git.showIgnored": false
+  "git.showIgnored": false,
+  "editor.wordWrap": "on"
 }

@@ -247,6 +247,84 @@ export const ACTION_CONFIG = {
     persistence: "whileRootRegionActive",
   },
 
+  enter_the_mine_lvl1: {
+    id: "enter_the_mine_lvl1",
+    type: "enterSubregion",
+    label: "Gaa ned i minen",
+    targetSubregionId: "the_mine_lvl1",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: {
+      any: [
+        { questActive: "miri_find_father" },
+        { flag: "the_mine_unlocked" },
+        { questCompleted: "miri_find_father" },
+        { questActive: "rusk_gold_nuggets" },
+        { questCompleted: "rusk_gold_nuggets" },
+        { questActive: "veldor_clear_the_mine" },
+        { questCompleted: "veldor_clear_the_mine" },
+      ],
+    },
+    setFlags: ["the_mine_unlocked"],
+  },
+
+  enter_the_mine_lvl2: {
+    id: "enter_the_mine_lvl2",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "the_mine_lvl2",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  enter_the_mine_lvl3: {
+    id: "enter_the_mine_lvl3",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "the_mine_lvl3",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  enter_forest_mine_lvl1: {
+    id: "enter_forest_mine_lvl1",
+    type: "enterSubregion",
+    label: "Gaa ind i skovminen",
+    targetSubregionId: "forest_mine_lvl1",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: { questActive: "find_veldors_wife" },
+  },
+
+  enter_forest_mine_lvl2: {
+    id: "enter_forest_mine_lvl2",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "forest_mine_lvl2",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  enter_forest_mine_lvl3: {
+    id: "enter_forest_mine_lvl3",
+    type: "enterSubregion",
+    label: "Gaa dybere",
+    targetSubregionId: "forest_mine_lvl3",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+  },
+
+  inspect_veldors_wife_corpse: {
+    id: "inspect_veldors_wife_corpse",
+    type: "inspect",
+    label: "Undersoeg liget",
+    text: "Den doede kvinde baerer Veldors segl i en bristet kaede. Brevet gav navnet, og her ligger sandheden: Veldors kone blev efterladt i minen.",
+    requires: { questActive: "find_veldors_wife", notFlag: "veldors_wife_found" },
+    setFlags: ["veldors_wife_found"],
+    removeTarget: true,
+    once: true,
+  },
+
   exit_subregion: {
     id: "exit_subregion",
     type: "exitSubregion",

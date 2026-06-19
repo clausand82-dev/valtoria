@@ -104,25 +104,30 @@ export const questsMethods = {
   advanceActionTargetQuestProgress(target, amount = 1) {
     const questTargetKey = String(target?.questTargetKey ?? "").trim();
     if (!questTargetKey) return false;
-    const regionId = String(this.region?.mapRegion?.id ?? "").trim();
+    const regionIds = new Set([
+      this.region?.mapRegion?.id,
+      this.region?.mapRegion?.__subregionRaw?.id,
+      this.region?.mapRegion?.__subregionContext?.subregionId,
+    ].map((id) => String(id ?? "").trim()).filter(Boolean));
     const delta = Math.max(0, Math.floor(Number(amount) || 0));
-    if (!regionId || delta <= 0) return false;
+    if (regionIds.size <= 0 || delta <= 0) return false;
     let changed = false;
     for (const quest of this.questState.active) {
       if (quest.type !== "action_targets") continue;
-      if (String(quest.target?.regionId ?? "") !== regionId) continue;
+      if (!regionIds.has(String(quest.target?.regionId ?? "").trim())) continue;
       const group = actionTargetGroupsForQuest(quest).find((entry) => entry.questTargetKey === questTargetKey);
       if (!group) continue;
-      const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
       const targets = { ...(quest.progress?.targets ?? {}) };
       const targetProgress = targets[questTargetKey] ?? {};
-      const targetTotal = Math.max(0, Math.floor(Number(targetProgress.total) || 0));
+      const fallbackTotal = Math.max(1, Math.floor(Number(quest.target?.count) || 1));
+      const targetTotal = Math.max(0, Math.floor(Number(targetProgress.total ?? quest.progress?.total ?? fallbackTotal) || 0));
       const targetDone = Math.max(0, Math.floor(Number(targetProgress.done) || 0));
       const nextTargetDone = Math.min(targetTotal, targetDone + delta);
       if (nextTargetDone === targetDone) continue;
       targets[questTargetKey] = { ...targetProgress, done: nextTargetDone };
       const done = Object.values(targets).reduce((sum, entry) => sum + Math.max(0, Math.floor(Number(entry?.done) || 0)), 0);
-      quest.progress = { ...(quest.progress ?? {}), targets, done };
+      const total = Math.max(targetTotal, Math.max(0, Math.floor(Number(quest.progress?.total) || 0)));
+      quest.progress = { ...(quest.progress ?? {}), targets, total, done };
       changed = true;
       if (done >= total) this.addToast?.(`${quest.title} klar til indlevering`);
     }
@@ -150,6 +155,28 @@ export const questsMethods = {
     if (effects.worldEnergy) {
       applyWorldEnergy(this, effects.worldEnergy);
       changed = true;
+    }
+    const removeNpcIds = new Set(
+      (Array.isArray(effects.removeNpcIds)
+        ? effects.removeNpcIds
+        : effects.removeNpcIds
+          ? [effects.removeNpcIds]
+          : []
+      )
+        .map((id) => String(id ?? "").trim())
+        .filter(Boolean)
+    );
+    if (removeNpcIds.size > 0 && this.chunks instanceof Map) {
+      for (const chunk of this.chunks.values()) {
+        if (!Array.isArray(chunk?.npcs)) continue;
+        const before = chunk.npcs.length;
+        chunk.npcs = chunk.npcs.filter((npc) => !removeNpcIds.has(String(npc?.npcId ?? "").trim()));
+        if (chunk.npcs.length !== before) changed = true;
+      }
+      if (this.nearbyQuestgiver && removeNpcIds.has(String(this.nearbyQuestgiver.npcId ?? "").trim())) {
+        this.nearbyQuestgiver = null;
+        changed = true;
+      }
     }
     return changed;
   },
@@ -226,6 +253,19 @@ export const questsMethods = {
     let changed = false;
     const completedQuestIds = [];
     for (const quest of this.questState.active) {
+      if (quest.onStart && quest.progress?.onStartApplied !== true) {
+        changed = Boolean(this.applyQuestStepEffects(quest.onStart)) || changed;
+        quest.progress = { ...(quest.progress ?? {}), onStartApplied: true };
+        changed = true;
+      }
+      if ((!Array.isArray(quest.steps) || quest.steps.length <= 0) && quest.completeWhen) {
+        const context = this.questConditionContext({ quest, questId: quest.questId, questInstanceId: quest.id });
+        if (worldConditionMet(quest.completeWhen, this.worldState, context) && quest.progress?.complete !== true) {
+          const total = Math.max(1, Math.floor(Number(quest.progress?.total ?? quest.target?.count) || 1));
+          quest.progress = { ...(quest.progress ?? {}), total, done: total, complete: true };
+          changed = true;
+        }
+      }
       if (!Array.isArray(quest.steps) || quest.steps.length <= 0) continue;
       const completed = new Set((quest.progress?.completedStepIds ?? []).map(String));
       const revealed = new Set((quest.progress?.revealedStepIds ?? []).map(String));
@@ -299,6 +339,7 @@ export const questsMethods = {
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
     }
+    this.applyQuestStepEffects(quest.onComplete);
     this.player.stats.questsCompleted += 1;
     this.addToast(`${quest.title} fuldfoert`);
     this.levelUpIfNeeded();
@@ -313,14 +354,21 @@ export const questsMethods = {
       const interactions = this.getNpcQuestInteractions(questgiver.npcId, "wilderness");
       if (!interactions.offers.length) {
         this.questState.wildernessNpc = null;
-        this.nearbyQuestgiver = null;
-        this.publishSnapshot();
-        return;
       }
     }
-    const nearby = questgiver && distance(this.player, questgiver) <= QUEST_INTERACT_RADIUS
-      ? questgiver
-      : null;
+    const candidates = [];
+    if (this.questState.wildernessNpc) candidates.push(this.questState.wildernessNpc);
+    for (const chunk of this.nearbyChunks(1)) {
+      for (const npc of chunk.npcs ?? []) {
+        if (!npc || npc.removed || npc.actionRemoved || !npc.npcId) continue;
+        const interactions = this.getNpcQuestInteractions(npc.npcId, "wilderness");
+        if (!interactions.active.length && !interactions.offers.length) continue;
+        candidates.push(npc);
+      }
+    }
+    const nearby = candidates
+      .filter((npc) => distance(this.player, npc) <= QUEST_INTERACT_RADIUS + (Number(npc.radius) || 0))
+      .sort((a, b) => distance(this.player, a) - distance(this.player, b))[0] ?? null;
     if ((nearby?.id ?? null) !== (this.nearbyQuestgiver?.id ?? null)) {
       this.nearbyQuestgiver = nearby;
       this.publishSnapshot();
@@ -913,6 +961,10 @@ export const questsMethods = {
       this.publishSnapshot();
       return false;
     }
+    if (!questHasSteps(quest) && quest.onStart) {
+      this.applyQuestStepEffects(quest.onStart);
+      quest.progress = { ...(quest.progress ?? {}), onStartApplied: true };
+    }
     this.refreshQuestStepProgress();
     if (source === "wilderness" && this.questState.wildernessNpc?.npcId === offer.npcId) {
       const interactions = this.getNpcQuestInteractions(offer.npcId, "wilderness");
@@ -1116,29 +1168,25 @@ export const questsMethods = {
     if (changed) this.publishSnapshot();
   },
 
-  dropQuestLoot(monster) {
-    
+  tryDropQuestTargetLoot({ source = "monster", sourceId = null, sourceTags = [], x = 0, y = 0, sourceObject = null, monster = null } = {}) {
+    const sourceKey = String(source ?? "monster");
+    const normalizedSourceId = String(sourceId ?? sourceObject?.objectDefId ?? sourceObject?.type ?? "").trim();
+    const normalizedSourceTags = new Set((sourceTags ?? []).map((tag) => String(tag ?? "").trim()).filter(Boolean));
+
     for (const quest of this.questState.active) {
       if (quest.type !== "collect_quest_item") continue;
       const questItemTargets = questItemTargetsForQuest(quest);
       for (const target of questItemTargets) {
         if (!target?.questItemId) continue;
         if (!this.questItemCanDropInCurrentRegion(quest, target)) continue;
-        if (!this.questItemCanDropFromMonster(target, monster)) continue;
+        if (!this.questTargetMatchesSource(target, { source: sourceKey, sourceId: normalizedSourceId, sourceTags: normalizedSourceTags, monster })) continue;
         const needed = Math.max(1, Math.floor(Number(target.count) || 1));
         const picked = questItemCount(this.player.inventory, quest.id, target.questItemId);
         if (picked >= needed) continue;
         const activeDropped = questItemCount(this.loots.map((loot) => loot.item), quest.id, target.questItemId);
         if (picked + activeDropped >= needed) continue;
-        // Only allow quest item drops when the target source is explicitly a monster drop
-        // or an elite drop. Other sources (rewards, vendor, etc.) should not drop from monsters.
-        const source = target.source ?? "monster";
-        if (source !== "monster" && source !== "elite") continue;
-        if (source === "elite" && !monster.elite) continue;
         const dropChance = Number(target.dropChance ?? 0.05);
-      const roll = Math.random();
-      // Debug/logging for specific rare quest item to help troubleshooting
-      
+        const roll = Math.random();
         if (roll > dropChance) continue;
         const item = makeQuestItem(target.questItemId, quest.id);
         if (!item) continue;
@@ -1146,8 +1194,8 @@ export const questsMethods = {
           id: createId(),
           type: "item",
           item,
-          x: monster.x + (Math.random() - 0.5) * 0.7,
-          y: monster.y + (Math.random() - 0.5) * 0.7,
+          x: Number(x) + (Math.random() - 0.5) * 0.7,
+          y: Number(y) + (Math.random() - 0.5) * 0.7,
           bob: Math.random() * Math.PI * 2,
           pickupDelay: 0.25,
           despawn: GROUND_LOOT_DESPAWN_SECONDS,
@@ -1156,6 +1204,15 @@ export const questsMethods = {
         break;
       }
     }
+  },
+
+  dropQuestLoot(monster) {
+    return this.tryDropQuestTargetLoot({
+      source: monster?.elite ? "elite" : "monster",
+      x: monster?.x ?? 0,
+      y: monster?.y ?? 0,
+      monster,
+    });
   },
 
   questItemCanDropInCurrentRegion(quest, target) {
@@ -1202,6 +1259,35 @@ export const questsMethods = {
     if (!killedType) return false;
     const allowed = configured.map((type) => String(type ?? "").trim().toLowerCase()).filter(Boolean);
     return allowed.includes(killedType);
+  },
+
+  questItemCanDropFromObject(target, { sourceId, sourceTags } = {}) {
+    const configuredIds = [
+      ...(Array.isArray(target?.sourceObjectIds) ? target.sourceObjectIds : target?.sourceObjectIds ? [target.sourceObjectIds] : []),
+      ...(target?.sourceObjectId ? [target.sourceObjectId] : []),
+    ].map((id) => String(id ?? "").trim()).filter(Boolean);
+    if (configuredIds.length && (!sourceId || !configuredIds.includes(String(sourceId)))) return false;
+
+    const configuredTags = [
+      ...(Array.isArray(target?.sourceObjectTags) ? target.sourceObjectTags : target?.sourceObjectTags ? [target.sourceObjectTags] : []),
+      ...(Array.isArray(target?.sourceTags) ? target.sourceTags : target?.sourceTags ? [target.sourceTags] : []),
+    ].map((tag) => String(tag ?? "").trim()).filter(Boolean);
+    if (!configuredTags.length) return true;
+    return configuredTags.some((tag) => sourceTags?.has?.(tag));
+  },
+
+  questTargetMatchesSource(target, { source, sourceId, sourceTags, monster } = {}) {
+    const targetSource = String(target?.source ?? "monster");
+    if (source === "monster" || source === "elite") {
+      if (targetSource !== "monster" && targetSource !== "elite") return false;
+      if (targetSource === "elite" && !monster?.elite) return false;
+      return this.questItemCanDropFromMonster(target, monster);
+    }
+    if (source === "object") {
+      if (targetSource !== "object") return false;
+      return this.questItemCanDropFromObject(target, { sourceId, sourceTags });
+    }
+    return false;
   },
 
   applyQuestItemPickup(item) {
@@ -1273,6 +1359,7 @@ export const questsMethods = {
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
     }
+    this.applyQuestStepEffects(quest.onComplete);
     if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];
     if (quest.repeatable) this.applyQuestBoardCompletionCooldown(quest);
     this.cleanupObsoleteCompletedQuestItems();

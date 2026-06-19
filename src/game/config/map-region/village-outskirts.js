@@ -296,7 +296,13 @@ export function createVillageOutskirtsMapRegions(region) {
       mapSize: "small",
       color: "#7fb6d6",
       cityStats: { population: 5, water: 50 },
-      unlock: { locked: true, text: "Broenden kraever en senere historiequest." },
+      unlock: {
+        any: [
+          { questActive: "miri_find_father" },
+          { questCompleted: "miri_find_father" },
+        ],
+        text: "Broenden aabnes, naar Miri beder dig finde Rusk.",
+      },
       labelX: 53,
       labelY: 52,
       layout: {
@@ -309,7 +315,7 @@ export function createVillageOutskirtsMapRegions(region) {
         minDistanceBetweenPrefabs: 8,
         anchors: ["clearing", "room"],
         pool: [
-          { id: "ruined_shrine", weight: 1, max: 1 },
+          { id: "old_well_clearing", weight: 1, max: 1 },
         ],
       },
       // TODO:DELETE: weights: { tree: 2, rock: 2, foilage: 4, water: 8, fireplace: 1 }
@@ -323,7 +329,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_fireplace_mainland", weight: 10 },
       ],
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
-      mobs: ["Icebear",],
+      mobs: ["wolf",],
     }),
     region({
       id: "inn-of-the-good-oak",
@@ -744,12 +750,26 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: {
+        any: [
+          { questActive: "find_veldors_wife" },
+          { questCompleted: "find_veldors_wife" },
+        ],
+        text: "Skoven aabnes, naar Priest sender dig efter Veldors kone.",
+      },
       labelX: 54,
       labelY: 16,
       // TODO:DELETE: weights: { tree: 11, rock: 2, foilage: 10, fireplace: 1 }
       weights: { foilage: 10 },
       mobs: [{ type: "Wild Boar", weight: 3 }, { type: "Bear", weight: 1.1 }, { type: "Lion", weight: 0.9 }, { type: "Wolf", weight: 2 }, { type: "WolfCub", weight: 2 }, { type: "WolfFenris", weight: 2 }],
+      prefabRules: {
+        maxTotal: 2,
+        minDistanceBetweenPrefabs: 10,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "forest_mine_entrance", weight: 12, max: 1, questActive: "find_veldors_wife" },
+        ],
+      },
       objects: [
         { id: "object_tree_mainland", weight: 25, scale: { min: 0.9, max: 1.5 } },
         { id: "object_talltree_medium", weight: 15, scale: { min: 2, max: 5 } },

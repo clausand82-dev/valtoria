@@ -8,8 +8,9 @@ kun en farm, resten er bare areas der hedder farm!
 - added a City Tonic Lab where different city tonic can be made - city tonic adds different city stats
 - new player lightning spell (do damage and do stun); lightning spell is first channeled spell type
 - fixed hero animation sheet (now use one instead of two files)
-- added new story line quest (elis_stolen_fruit_barrel)
-- new quest opens new region (marketplace)
+- added new story line quest (elis_stolen_fruit_barrel and find poor girls father quest line)
+- new quest opens new regions (marketplace, the well and the forest)
+
 
 *V. 0.83
 - adding picture for addons/features

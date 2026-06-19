@@ -119,7 +119,7 @@ export const MAP_PREFABS = {
     ],
     legend: {
       ".": { type: "keep" },
-      "W": { object: "object_well", blocking: true },
+      "W": { object: "object_well", blocking: false, actionId: "enter_the_mine_lvl1" },
       "B": { foliage: { fileName: "foilage/foilage_boneparts.png" }, variant: 4, size: 0.48 },
       "c": { chest: "basic_chest", blocking: true },
       "g": { foliage: { fileName: "foilage/foilage_plants_mainland.png" }, variant: 6, size: 0.75 },
@@ -273,6 +273,34 @@ export const MAP_PREFABS = {
     monsters: [
       { type: "Spider", x: 1, y: 2 },
       { type: "MiniSpider", x: 5, y: 3 },
+    ],
+  },
+
+  forest_mine_entrance: {
+    id: "forest_mine_entrance",
+    label: "Forest Mine Entrance",
+    w: 6,
+    h: 5,
+    tags: ["cave", "mine", "quest", "forest"],
+    anchor: "room",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 4,
+    avoidExit: 4,
+    objects: [
+      { id: "object_caves", x: 3, y: 2, blocking: false, actionId: "enter_forest_mine_lvl1" },
+      { id: "object_stone_cluster", x: 1, y: 4, blocking: true },
+      { id: "object_stone_cluster", x: 5, y: 4, blocking: true },
+      { id: "object_bones", x: 3, y: 4, blocking: false, scale: 0.7 },
+    ],
+    foliage: [
+      { fileName: "foilage/foilage_roots.png", x: 2, y: 4, size: 0.8 },
+      { fileName: "foilage/foilage_roots.png", x: 4, y: 4, size: 0.7 },
+    ],
+    decals: [
+      { decayId: "decay_cracks", x: 3, y: 2, cell: 8, size: 1.2, alpha: 0.62 },
+      { decayId: "decay_dust", x: 3, y: 3, cell: 5, size: 0.9, alpha: 0.7 },
     ],
   },
 

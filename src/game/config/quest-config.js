@@ -84,6 +84,18 @@ export const QUEST_ITEM_DEFS = {
     stackable: true,
     stackMax: 50,
   },
+  rusk_gold_nugget: {
+    name: "Guldklump",
+    iconUrl: "/assets/generated/item/item_quest_goldnugget.png",
+    placeholderColor: "#d7bd67",
+    stackable: true,
+    stackMax: 20,
+  },
+  veldors_secret_letter: {
+    name: "Veldors hemmelige brev",
+    iconUrl: "/assets/generated/item/item_quest_letter.png",
+    placeholderColor: "#d5d1bd",
+  },
 };
 
 /*

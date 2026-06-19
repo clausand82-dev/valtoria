@@ -230,6 +230,10 @@ export function questItemTargetsForQuest(quest) {
           regionIds: entry.regionIds,
           dropRegionIds: entry.dropRegionIds,
           monsterTypes: entry.monsterTypes,
+          sourceObjectId: entry.sourceObjectId,
+          sourceObjectIds: entry.sourceObjectIds,
+          sourceTags: entry.sourceTags,
+          sourceObjectTags: entry.sourceObjectTags,
         })),
     );
   }
@@ -244,6 +248,10 @@ export function questItemTargetsForQuest(quest) {
       regionIds: target.regionIds ?? defTarget.regionIds,
       dropRegionIds: target.dropRegionIds ?? defTarget.dropRegionIds,
       monsterTypes: target.monsterTypes ?? defTarget.monsterTypes,
+      sourceObjectId: target.sourceObjectId ?? defTarget.sourceObjectId,
+      sourceObjectIds: target.sourceObjectIds ?? defTarget.sourceObjectIds,
+      sourceTags: target.sourceTags ?? defTarget.sourceTags,
+      sourceObjectTags: target.sourceObjectTags ?? defTarget.sourceObjectTags,
     });
   }
   return targets;
@@ -356,6 +364,7 @@ export function makeQuestInstance(def, npcId, context = {}) {
     kind: def.kind,
     category: def.category,
     cooldownMapRuns: def.cooldownMapRuns,
+    hideActiveInCity: Boolean(def.hideActiveInCity),
     type: activeDef.type ?? def.type,
     regionIds,
     story: activeDef.story ?? def.story,
@@ -380,6 +389,8 @@ export function makeQuestInstance(def, npcId, context = {}) {
             : {},
     steps,
     completeWhen: def.completeWhen ? { ...def.completeWhen } : undefined,
+    onStart: def.onStart ? { ...def.onStart } : undefined,
+    onComplete: def.onComplete ? { ...def.onComplete } : undefined,
     autoComplete: Boolean(def.autoComplete),
     rewards: { ...(activeDef.rewards ?? def.rewards) },
     ...sourceFields,
@@ -406,6 +417,7 @@ export function isQuestComplete(quest, inventory = []) {
     return quest.progress?.cleared === true;
   }
   if (quest.type === "action_targets") {
+    if (quest.progress?.complete === true) return true;
     const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
     const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
     return quest.progress?.total !== null && quest.progress?.total !== undefined && total > 0 && done >= total;
@@ -642,6 +654,8 @@ export function normalizeSavedQuestState(saved) {
               ? quest.steps.map((step) => ({ ...step }))
               : undefined,
           completeWhen: quest.completeWhen ?? def?.completeWhen,
+          onStart: quest.onStart ?? def?.onStart,
+          onComplete: quest.onComplete ?? def?.onComplete,
           autoComplete: Boolean(quest.autoComplete ?? def?.autoComplete),
           source: String(quest.source ?? def?.source ?? "npc"),
           kind: quest.kind ?? def?.kind,
@@ -708,7 +722,7 @@ export function normalizeSavedQuestState(saved) {
           const defTarget = def.target;
           const mergedTarget = { ...savedTarget };
 
-          const scalarKeys = ["questItemId", "count", "source", "dropChance", "dropRegionIds"];
+          const scalarKeys = ["questItemId", "count", "source", "dropChance", "dropRegionIds", "sourceObjectId", "sourceObjectIds", "sourceTags", "sourceObjectTags"];
           for (const key of scalarKeys) {
             if (mergedTarget[key] === undefined && defTarget[key] !== undefined) {
               mergedTarget[key] = defTarget[key];
@@ -734,6 +748,7 @@ export function normalizeSavedQuestState(saved) {
             ...(base.target ?? {}),
             ...(Array.isArray(def.target.groups) ? { groups: def.target.groups.map((group) => ({ ...group })) } : {}),
           };
+          base.completeWhen = base.completeWhen ?? def?.completeWhen;
         }
 
         // Ensure monster target is normalized (handles older saves where monster may be an object)

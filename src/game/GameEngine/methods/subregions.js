@@ -539,7 +539,22 @@ function applySubregionOnClear(engine, instanceId) {
   const raw = SUBREGION_CONFIG[subregionId];
   const onClear = raw?.onClear;
   if (!instance || !raw || !onClear || typeof onClear !== "object") return false;
+  const condition = onClear.conditions ?? onClear.condition ?? onClear.when;
+  if (condition && !worldConditionMet(condition, engine.worldState, {
+    worldState: engine.worldState,
+    worldEnergy: engine.worldEnergy,
+    questState: engine.questState,
+    player: engine.player,
+    inventory: engine.player?.inventory,
+    activeMapRegion: engine.activeMapRegion,
+    subregionId,
+    subregionInstanceId: instanceId,
+  })) return false;
   if (!engine.allRegionMonstersCleared?.()) return false;
+  const nonMinionMonsterCount = [...(engine.monsters?.values?.() ?? [])]
+    .filter((monster) => !monster?.isMinion)
+    .length;
+  if (nonMinionMonsterCount <= 0) return false;
   const key = subregionClearKey(instanceId, subregionId, onClear);
   if (onClear.once !== false && engine.worldState?.flags?.[key]) return false;
 

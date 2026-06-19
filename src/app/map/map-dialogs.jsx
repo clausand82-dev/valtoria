@@ -180,10 +180,11 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
       region: resolveMapRegionConfig(rawRegion, worldState, {
         areaMapId: selectedMapId,
         regionId: rawRegion.id,
+        questState: { active: activeQuests, completed: completedQuests },
         worldEnergy,
       }),
     }))
-  ), [selectedMapId, worldState, worldEnergy]);
+  ), [selectedMapId, worldState, worldEnergy, activeQuests, completedQuests]);
   useEffect(() => {
     setSelectedMapId(initialMapId ?? WORLD_MAP.id);
     setHoveredRegionId(null);
