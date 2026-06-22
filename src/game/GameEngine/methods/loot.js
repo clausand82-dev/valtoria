@@ -220,7 +220,7 @@ export const lootMethods = {
             loot.warned = true;
             this.addToast("Potion stack er fuld");
           }
-        } else if (isQuestItem(loot.item) && this.addInventoryItem(loot.item)) {
+        } else if (isQuestItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
           this.player.stats.itemsPicked += 1;
           this.trackItemPicked(loot.item);
           this.applyQuestItemPickup(loot.item);
@@ -229,7 +229,7 @@ export const lootMethods = {
           this.loots.splice(i, 1);
           this.markRenderDirty?.("loot-pickup");
           this.publishSnapshot();
-        } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item)) {
+        } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
           const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
           if (isResourceItem(loot.item)) this.player.stats.resourcesPicked += picked;
           else {
@@ -355,7 +355,7 @@ export const lootMethods = {
 
     let total = 0;
     for (const item of items) {
-      if (!this.addInventoryItem(item)) continue;
+      if (!this.addInventoryItem(item, { countAsCollected: true })) continue;
       const count = Math.max(1, Math.floor(Number(item.count) || 1));
       total += count;
     }
@@ -617,6 +617,7 @@ export const lootMethods = {
         id: createId(),
         type: "item",
         item,
+        countAsCollected: true,
         x: x + (Math.random() - 0.5) * 0.65,
         y: y + (Math.random() - 0.5) * 0.65,
         bob: Math.random() * Math.PI * 2,

@@ -6,14 +6,48 @@ IMPORTENT:
 - få åbnet og tilføjet nye regioner
 - juster bygningspriser og lvl priser
 
-- brug note til idol quest istedet for inn
+- Fortsæt render optimering
 
+
+NEW FEATURES:
+
+
+
+
+
+---
+En tredje addon er noget politisk styre (ved ikke hvad bygning den giver mening i, måske også townhall). Politisk styre er nogle ting mna kan tænde og slukke, og som giver og koster i city stats. Er tingen tændt fås bonusen og koster prisen, er tingne slukket tælelr det ikke med. 
+
+Handelsfrihed	trade +25, wealth +10, safety -5
+Markedsafgift	wealth +20, trade -10, popularity -5
+
+Håndværkerstøtte	supply +20, trade +10, wealth -15
+Gratis kro-suppe	health +10, popularity +15, provision -15
+Militspligt	defense +35, safety +10, culture -5, popularity -10
+Magisk byværn	defense +25, faith +10, magic_essence bør kun være unlock/cost, ikke city stat
+
+
+
+
+ 
 
 
 NEW QUEST:
+Efter quest med poorgirl, poorminer og richman, får man adgang til flere nye quest:
 
+Mechant mangler hjul til sine vogne (de er blevet ødelagte, da mobs hærgede marketplace og village). Han ved at der ligger hjul spredt rundt i regionerne (river-creak, nordlige marker, the forest). Hjulene er foilage med hjul (foilage_woodwheels.png) og ved action tryk på E samler man et hjul op (item_quest_wodden_wheel.png). Foilage droprate på hjul der kan samles op (drop) er meget lav. De nævnte regioner skal have en lav weight på disse træ hjul foilage, og når quest er aktiv, skal action være mulig. Der skal samles 12 hjul.
+
+Smeden har fået til opgave at lave en gave til kongen. Derfor skal han bruge 12 ironbar og 4 gold bar.
+
+Dark Wizard ber om at man tager til Village og ødelægger huse (under denne quest skal huse være destruable igen). Han vil gerne man ødelægger 8 huse. Man har muligheden for at ødelægge husene og gennemføre - hvilket koster lydra og giver netdra, men man kan også vælge at lade være og istedet sladre til borgmesteren. Vælger man at ødelægge husene får man en quest fra borgmester, hvor han er pæn sur på en og det koster village outskirt fractions point (20) samt giver en del netdra. Vælger man at sladre til borgmesteren afsluttes Dark Wizards quest og man får god rep og lydra.
+Wizard quest --> ødelægger huse --> sur borgmester --> reward: -20 rep og giver 2% netdra.
+Wizard quest --> snak med borgmester --> glad borgmester --> reward: +20 rep og 2% lydra.
 
 -----------------------
+
+- NPC: Hunter (er der mon sådan en) vil have en til at jagte kaniner (ny "mobs") i forest (rabbit skal være noncombat/non attacking og evt flygte fra spilelr istedet for at opsøge spiller). Slå X antal kaniner ihjel samle rabbit hide. 
+
+------------------------
 
 Når alle quest er lavet i village outskirt, ber Borgmesteren om at man sørge for at alle åbne regions bliver corruption = 0. Denne quest åbner permanent for elvindale (der mangler en del quest før denne her - så bare note til senere)
 
@@ -22,7 +56,7 @@ Når alle quest er lavet i village outskirt, ber Borgmesteren om at man sørge f
 
 - Flere quest fra borgmester til andre steder (et par quest mere i village)
 
-- NPC: Hunter (er der mon sådan en) vil have en til at jagte kaniner (ny "mobs") i forest. Slå X antal kaniner ihjel og skind dem live (action). Skinning giver skind og kød. NY feature: kræver at død mobs efterlader lig, som kan have en action --> måske noget med at død mobs laver et object/foilage der, hvor det dør (vi gør det allerede næsten ved gravsten).
+
 
 REPEATABLE QUESTS (bør være veksel/opskrift ting):
 - Indlever bonedust (årsag --> bruges til medicin). Hver indlevering giver lidt city health

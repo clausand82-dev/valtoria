@@ -66,6 +66,22 @@ export const CITY_BUILDINGS = [
         inventoryType: { type: "none", slots: 0 },
         config: { boardId: "townHall" },
       },
+      {
+        id: "town_hall_artifacts",
+        title: "Monumenter",
+        prebuilt: true,
+        help: "Koeb engangsmonumenter og artefakter til byen.",
+        panel: "cityArtifacts",
+        inventoryType: { type: "none", slots: 0 },
+      },
+      {
+        id: "town_hall_policies",
+        title: "Politik",
+        prebuilt: true,
+        help: "Slaa politiske regler til og fra for byen.",
+        panel: "cityPolicies",
+        inventoryType: { type: "none", slots: 0 },
+      },
     ],
   },
   {
@@ -76,7 +92,7 @@ export const CITY_BUILDINGS = [
     functionText: "Train melee and ranged army units for city defense and attacks against city mobs.",
     imageUrl: "/assets/generated/house/house_townhall.png",
     inventoryType: { type: "none", slots: 0 },
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 150, stone_brick: 120, iron_bar: 25 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10 },
     addons: [
       {
         id: "melee_training",
@@ -108,7 +124,7 @@ export const CITY_BUILDINGS = [
     functionText: "Donate equipment to gain weaponPoints and armorPoints.",
     imageUrl: "/assets/generated/house/house_blacksmith.png",
     inventoryType: { type: "none", slots: 0 },
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 75, iron_bar: 20 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10 },
     addons: [
       {
         id: "armory_donation_station",
@@ -129,7 +145,7 @@ export const CITY_BUILDINGS = [
     functionText: "Crafting stations for bars, fittings, weapon parts, and armor components will live here.",
     imageUrl: "/assets/generated/house/house_blacksmith.png",
     inventoryType: { type: "none", slots: 0 },
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 50, iron_bar: 25, green_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10, green_gemstone: 1 },
     addons: [
       {
         id: "weapon_anvil",
@@ -192,7 +208,7 @@ export const CITY_BUILDINGS = [
     help: "Controls research connected to skills and long-term unlocks.",
     functionText: "Research projects, skill links, and unlock chains will live here.",
     imageUrl: "/assets/generated/house/house_researchlab.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 25, stone_brick: 100, iron_bar: 10, purple_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 25, stone_brick: 20, iron_bar: 10, purple_gemstone: 1 },
     addons: [
       {
         id: "research_projects",
@@ -238,7 +254,7 @@ export const CITY_BUILDINGS = [
     help: "Stores items and resources in a 100-slot bank box.",
     functionText: "A 100-slot shared storage interface will live here.",
     imageUrl: "/assets/generated/house/house_bank.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 200, stone_brick: 150, iron_bar: 50 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10 },
     addons: [
       {
         id: "main_vault",
@@ -276,7 +292,7 @@ export const CITY_BUILDINGS = [
     help: "Buys and sells normal goods. Prices follow popularity.",
     functionText: "Sell non-quest, non-unique items for gold, or buy overpriced emergency goods.",
     imageUrl: "/assets/generated/house/house_merchant.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 75 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10 },
     addons: [
       {
         id: "trade_counter",
@@ -332,6 +348,14 @@ export const CITY_BUILDINGS = [
         panel: "bestiary",
         inventoryType: { type: "none", slots: 0 },
       },
+      {
+        id: "hall_of_deeds",
+        title: "Bedrifter",
+        prebuilt: true,
+        help: "Hall of Deeds viser byens opnaaede bedrifter.",
+        panel: "cityAchievements",
+        inventoryType: { type: "none", slots: 0 },
+      },
     ],
   },
   {
@@ -341,7 +365,7 @@ export const CITY_BUILDINGS = [
     help: "Controls sleeping places and rest capacity.",
     functionText: "Beds, rest bonuses, visitor capacity, and recovery systems will live here.",
     imageUrl: "/assets/generated/house/house_inn.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 50 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 20, iron_bar: 10 },
     addons: [
       {
         id: "inn_quest_board",
@@ -387,7 +411,7 @@ export const CITY_BUILDINGS = [
     help: "Unlocks and teaches magic.",
     functionText: "Spell learning, magical training, and mana-focused unlocks will live here.",
     imageUrl: "/assets/generated/house/house_magetower.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 100, stone_brick: 100, orange_gemstone: 1 },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 75, stone_brick: 40, iron_bar: 20, orange_gemstone: 1 },
     addons: [
       {
         id: "arcane_extractor",

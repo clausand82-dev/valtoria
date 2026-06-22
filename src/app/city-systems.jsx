@@ -11,6 +11,9 @@ import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-c
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { CITY_ARTIFACTS } from "../game/config/city-artifact-config.js";
+import { CITY_POLICIES } from "../game/config/city-policy-config.js";
+import { CITY_ACHIEVEMENTS } from "../game/config/city-achievement-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
 import {
@@ -818,9 +821,29 @@ function polygonCentroid(points) {
 
 function cityAreaCostEntries(area) {
   const cost = area?.unlock?.cost ?? area?.cost ?? {};
-  return Object.entries(cost)
+  return cityCostResourceEntries(cost);
+}
+
+function cityCostResourceEntries(cost = {}) {
+  const resources = {
+    ...(cost?.resources ?? {}),
+    ...(cost?.gold !== undefined ? { gold: cost.gold } : {}),
+  };
+  for (const [key, value] of Object.entries(cost ?? {})) {
+    if (["resources", "items"].includes(key)) continue;
+    if (value && typeof value === "object") continue;
+    resources[key] = value;
+  }
+  return Object.entries(resources)
     .map(([resourceId, amount]) => [resourceId, Math.max(0, Math.floor(Number(amount) || 0))])
     .filter(([, amount]) => amount > 0);
+}
+
+function cityCostItemEntries(cost = {}) {
+  const items = Array.isArray(cost?.items) ? cost.items : [];
+  return items
+    .map((entry) => ({ ...entry, count: Math.max(1, Math.floor(Number(entry?.count) || 1)) }))
+    .filter((entry) => entry.count > 0);
 }
 
 function cityLevelCostEntries(levelDef) {
@@ -986,6 +1009,10 @@ function cityAreaRequiredItemCount(snapshot, req) {
   ), 0);
 }
 
+function cityItemCostAvailable(snapshot, req) {
+  return cityAreaRequiredItemCount(snapshot, req);
+}
+
 function itemMatchesCityAreaRequirement(item, req) {
   if (!item || !req) return false;
   let match = true;
@@ -1014,6 +1041,198 @@ function cityAreaItemRequirementLabel(req) {
   return "Required item";
 }
 
+function cityItemCostLabel(req) {
+  return cityAreaItemRequirementLabel(req);
+}
+
+function consumeCityItemCostEntries(entries = [], engine) {
+  if (!engine || !Array.isArray(entries) || entries.length === 0) return entries.length === 0;
+  for (const req of entries) {
+    const needed = Math.max(1, Math.floor(Number(req?.count) || 1));
+    if (cityItemCostAvailable({ inventory: engine.player?.inventory ?? [] }, req) < needed) return false;
+  }
+  for (const req of entries) {
+    let remaining = Math.max(1, Math.floor(Number(req?.count) || 1));
+    for (let index = (engine.player?.inventory?.length ?? 0) - 1; index >= 0 && remaining > 0; index -= 1) {
+      const item = engine.player.inventory[index];
+      if (!itemMatchesCityAreaRequirement(item, req)) continue;
+      const count = Math.max(1, Math.floor(Number(item.count) || 1));
+      const used = Math.min(count, remaining);
+      remaining -= used;
+      if (count > used) item.count = count - used;
+      else engine.player.inventory.splice(index, 1);
+    }
+  }
+  engine.publishSnapshot?.();
+  return true;
+}
+
+function normalizeIdListState(value, key = "ids") {
+  if (Array.isArray(value)) return { [key]: [...new Set(value.map(String).filter(Boolean))] };
+  if (!value || typeof value !== "object") return { [key]: [] };
+  return {
+    ...value,
+    [key]: [...new Set((Array.isArray(value[key]) ? value[key] : []).map(String).filter(Boolean))],
+  };
+}
+
+function normalizeCityArtifacts(value = {}) {
+  return normalizeIdListState(value, "boughtIds");
+}
+
+function normalizeCityPolicies(value = {}) {
+  return normalizeIdListState(value, "activeIds");
+}
+
+function normalizeCityAchievements(value = {}) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return {
+    unlockedLevelById: Object.fromEntries(Object.entries(source.unlockedLevelById ?? {})
+      .map(([id, level]) => [String(id), Math.max(0, Math.floor(Number(level) || 0))])),
+    counters: Object.fromEntries(Object.entries(source.counters ?? {})
+      .map(([id, count]) => [String(id), Math.max(0, Math.floor(Number(count) || 0))])),
+  };
+}
+
+function cityArtifactBoughtIds(progress = {}) {
+  return new Set(normalizeCityArtifacts(progress?.artifacts).boughtIds);
+}
+
+function cityPolicyActiveIds(progress = {}) {
+  return new Set(normalizeCityPolicies(progress?.policies).activeIds);
+}
+
+function normalizeRequirementIds(value) {
+  if (value === undefined || value === null) return [];
+  return (Array.isArray(value) ? value : [value])
+    .map(String)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function cityAreaName(areaId) {
+  const id = String(areaId ?? "");
+  return CITY_AREAS.find((area) => String(area.id) === id)?.title ?? id;
+}
+
+function cityPolicyRequirements(policy = {}) {
+  const source = policy.requirements ?? policy.unlock ?? policy.conditions ?? {};
+  return {
+    buildings: normalizeRequirementIds(source.buildings ?? source.buildingIds ?? source.hasBuildings ?? source.hasBuilding),
+    addons: normalizeRequirementIds(source.addons ?? source.addonIds ?? source.hasAddons ?? source.hasAddon),
+    areas: normalizeRequirementIds(source.areas ?? source.areaIds ?? source.hasAreas ?? source.hasArea),
+  };
+}
+
+function cityPolicyRequirementEntries(policy = {}, progress = {}) {
+  const requirements = cityPolicyRequirements(policy);
+  const entries = [];
+  for (const buildingId of requirements.buildings) {
+    const building = CITY_BUILDINGS.find((entry) => String(entry.id) === buildingId);
+    const met = building ? (getCityBuildingState(progress, building).level ?? 0) > 0 : false;
+    entries.push({ key: `building:${buildingId}`, type: "building", id: buildingId, label: building?.title ?? buildingId, met });
+  }
+  for (const addonId of requirements.addons) {
+    let found = null;
+    let met = false;
+    for (const building of CITY_BUILDINGS) {
+      const addon = (building.addons ?? []).find((entry) => String(entry.id) === addonId);
+      if (!addon) continue;
+      found = addon;
+      const state = getCityBuildingState(progress, building);
+      met = (state.level ?? 0) > 0 && (state.addons ?? []).map(String).includes(addonId);
+      break;
+    }
+    entries.push({ key: `addon:${addonId}`, type: "addon", id: addonId, label: found?.title ?? addonId, met });
+  }
+  for (const areaId of requirements.areas) {
+    const area = CITY_AREAS.find((entry) => String(entry.id) === areaId);
+    const met = area ? getCityAreaState(progress, area).unlocked : false;
+    entries.push({ key: `area:${areaId}`, type: "area", id: areaId, label: area?.title ?? areaId, met });
+  }
+  return entries;
+}
+
+function cityPolicyRequirementsMet(policy = {}, progress = {}) {
+  return cityPolicyRequirementEntries(policy, progress).every((entry) => entry.met);
+}
+
+function cityArtifactEffects(progress = {}) {
+  const bought = cityArtifactBoughtIds(progress);
+  return mergeCityStatEffects(CITY_ARTIFACTS
+    .filter((artifact) => bought.has(artifact.id))
+    .map((artifact) => artifact.effects?.cityStats));
+}
+
+function cityPolicyEffects(progress = {}) {
+  const active = cityPolicyActiveIds(progress);
+  return mergeCityStatEffects(CITY_POLICIES
+    .filter((policy) => active.has(policy.id) && cityPolicyRequirementsMet(policy, progress))
+    .map((policy) => policy.effects?.cityStats));
+}
+
+function cityAchievementContext(progress = {}, snapshot = emptySnapshot, cityStats = {}) {
+  return {
+    player: snapshot?.player ?? {},
+    inventory: snapshot?.inventory ?? [],
+    questState: snapshot?.quests ?? {},
+    worldState: snapshot?.worldState,
+    worldEnergy: snapshot?.worldEnergy,
+    cityStats,
+    cityProgress: progress,
+    cityStorage: progress,
+  };
+}
+
+function cityAchievementUnlockedLevel(achievement, progress = {}, snapshot = emptySnapshot, cityStats = {}) {
+  const levels = Array.isArray(achievement?.levels) ? achievement.levels : [];
+  const context = cityAchievementContext(progress, snapshot, cityStats);
+  let unlocked = 0;
+  levels.forEach((level, index) => {
+    if (worldEntryAllowed({ conditions: level.condition ?? level.conditions }, snapshot?.worldState, context)) {
+      unlocked = index + 1;
+    }
+  });
+  return unlocked;
+}
+
+function cityAchievementUnlockedLevels(progress = {}, snapshot = emptySnapshot, cityStats = {}) {
+  return Object.fromEntries(CITY_ACHIEVEMENTS.map((achievement) => [
+    achievement.id,
+    cityAchievementUnlockedLevel(achievement, progress, snapshot, cityStats),
+  ]));
+}
+
+function cityAchievementEffects(progress = {}, snapshot = emptySnapshot, cityStats = {}) {
+  const levelsById = cityAchievementUnlockedLevels(progress, snapshot, cityStats);
+  const effects = [];
+  for (const achievement of CITY_ACHIEVEMENTS) {
+    const unlocked = levelsById[achievement.id] ?? 0;
+    if (unlocked <= 0) continue;
+    for (const level of (achievement.levels ?? []).slice(0, unlocked)) {
+      effects.push(level.effects?.cityStats ?? level.bonus?.cityStats);
+    }
+  }
+  return mergeCityStatEffects(effects);
+}
+
+function syncCityAchievementState(progress = {}, snapshot = emptySnapshot, cityStats = {}) {
+  const current = normalizeCityAchievements(progress?.achievements);
+  const unlockedLevelById = cityAchievementUnlockedLevels(progress, snapshot, cityStats);
+  let changed = false;
+  for (const [id, level] of Object.entries(unlockedLevelById)) {
+    if ((current.unlockedLevelById[id] ?? 0) !== level) changed = true;
+  }
+  if (!changed) return progress;
+  return {
+    ...progress,
+    achievements: {
+      ...current,
+      unlockedLevelById,
+    },
+  };
+}
+
 function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
   const applyNonPopularityEffects = (target, effects) => {
     const filtered = {};
@@ -1033,6 +1252,8 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   stats.defense = Math.max(0, Math.floor(Number(stats.defense) || 0)) + armyPower;
   applyNonPopularityEffects(stats, normalizeCityStatBonuses(progress?.statBonuses));
   applyCityStatEffects(stats, normalizeCityTonicBoosts(progress?.cityTonicBoosts));
+  applyCityStatEffects(stats, cityArtifactEffects(progress));
+  applyCityStatEffects(stats, cityPolicyEffects(progress));
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
     if (!state.unlocked) continue;
@@ -1062,6 +1283,7 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
     }
   }
   applyRegionCityStats(stats, regionCorruption, snapshot);
+  applyCityStatEffects(stats, cityAchievementEffects(progress, snapshot, stats));
   applyNonPopularityEffects(stats, normalizeCityStatAdjustments(progress?.statAdjustments));
   applyCurrentCityStatEffects(stats, progress);
   stats.army = stats.defense;
@@ -1092,6 +1314,15 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   }
   for (const [statId, amount] of Object.entries(normalizeCityTonicBoosts(progress?.cityTonicBoosts))) {
     addEntry(statId, "City Tonics", amount);
+  }
+  for (const [statId, amount] of Object.entries(cityArtifactEffects(progress))) {
+    addEntry(statId, "Monuments", amount);
+  }
+  for (const [statId, amount] of Object.entries(cityPolicyEffects(progress))) {
+    addEntry(statId, "Policies", amount);
+  }
+  for (const [statId, amount] of Object.entries(cityAchievementEffects(progress, snapshot, {}))) {
+    addEntry(statId, "Hall of Deeds", amount);
   }
   for (const [statId, amount] of Object.entries(normalizeCityStatAdjustments(progress?.statAdjustments))) {
     if (normalizeCityStatId(statId) === "popularity") continue;
@@ -1754,7 +1985,7 @@ function normalizeCityStatAdjustments(statAdjustments = {}) {
 
 function normalizeCityProgress(progress = {}) {
   const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
-  const reserved = new Set(["areas", "statBonuses", "cityTonicBoosts", "statAdjustments", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const reserved = new Set(["areas", "statBonuses", "cityTonicBoosts", "statAdjustments", "artifacts", "policies", "achievements", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
   const buildingIds = new Set(CITY_BUILDINGS.map((building) => building.id));
   const normalized = {
     areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
@@ -1774,6 +2005,9 @@ function normalizeCityProgress(progress = {}) {
   normalized.statBonuses = normalizeCityStatBonuses(raw.statBonuses);
   normalized.cityTonicBoosts = normalizeCityTonicBoosts(raw.cityTonicBoosts);
   normalized.statAdjustments = normalizeCityStatAdjustments(raw.statAdjustments);
+  normalized.artifacts = normalizeCityArtifacts(raw.artifacts);
+  normalized.policies = normalizeCityPolicies(raw.policies);
+  normalized.achievements = normalizeCityAchievements(raw.achievements);
   normalized.armoryPoints = normalizeArmoryPoints(raw.armoryPoints);
   normalized.armyUnits = normalizeArmyUnits(raw.armyUnits);
   normalized.threatLevel = Math.max(0, Math.min(100, Number(raw.threatLevel) || 0));
@@ -1793,6 +2027,9 @@ function serializeCityProgress(progress = {}) {
           && key !== "statBonuses"
           && key !== "cityTonicBoosts"
           && key !== "statAdjustments"
+          && key !== "artifacts"
+          && key !== "policies"
+          && key !== "achievements"
           && key !== "armoryPoints"
           && key !== "armyUnits"
           && key !== "threatLevel"
@@ -1806,6 +2043,9 @@ function serializeCityProgress(progress = {}) {
     ...(cfg.statBonuses ? { statBonuses: { ...(normalized.statBonuses ?? {}) } } : {}),
     ...(cfg.cityTonicBoosts ? { cityTonicBoosts: normalizeCityTonicBoosts(normalized.cityTonicBoosts) } : {}),
     ...(cfg.statAdjustments ? { statAdjustments: { ...(normalized.statAdjustments ?? {}) } } : {}),
+    ...(cfg.artifacts ? { artifacts: normalizeCityArtifacts(normalized.artifacts) } : {}),
+    ...(cfg.policies ? { policies: normalizeCityPolicies(normalized.policies) } : {}),
+    ...(cfg.achievements ? { achievements: normalizeCityAchievements(normalized.achievements) } : {}),
     ...(cfg.armoryPoints ? { armoryPoints: normalizeArmoryPoints(normalized.armoryPoints) } : {}),
     ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(normalized.armyUnits) } : {}),
     ...(cfg.threatLevel ? { threatLevel: Math.max(0, Math.min(100, Number(normalized.threatLevel) || 0)) } : {}),
@@ -2047,6 +2287,23 @@ export {
   computeRepairCostEntries,
   cityAreaGateEntries,
   cityAreaCanUnlock,
+  cityCostResourceEntries,
+  cityCostItemEntries,
+  cityItemCostAvailable,
+  cityItemCostLabel,
+  consumeCityItemCostEntries,
+  normalizeCityArtifacts,
+  normalizeCityPolicies,
+  normalizeCityAchievements,
+  cityArtifactBoughtIds,
+  cityPolicyActiveIds,
+  cityPolicyRequirementEntries,
+  cityPolicyRequirementsMet,
+  cityArtifactEffects,
+  cityPolicyEffects,
+  cityAchievementUnlockedLevels,
+  cityAchievementEffects,
+  syncCityAchievementState,
   payCityAreaUnlockCost,
   payCityCostEntries,
   calculateCityStats,

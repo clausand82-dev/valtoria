@@ -10,6 +10,9 @@ kun en farm, resten er bare areas der hedder farm!
 - fixed hero animation sheet (now use one instead of two files)
 - added new story line quest (elis_stolen_fruit_barrel and find poor girls father quest line)
 - new quest opens new regions (marketplace, the well and the forest)
+- more optimizing
+- adjusted building and area prices
+- added artifact/monuments, archivments and policy rules (all can improve city stats)
 
 
 *V. 0.83

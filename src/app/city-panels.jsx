@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MAX_INVENTORY, RARITIES, TILE_H, TILE_W } from "../game/data.js";
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
@@ -11,6 +12,9 @@ import { CITY_TONIC_RECIPES, potionDefById, potionRecipesForStation } from "../g
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { CITY_ARTIFACTS } from "../game/config/city-artifact-config.js";
+import { CITY_POLICIES } from "../game/config/city-policy-config.js";
+import { CITY_ACHIEVEMENTS } from "../game/config/city-achievement-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT, ITEM_REPAIR_GOLD_PER_PCT, ITEM_REPAIR_JUNK_PER_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
@@ -547,6 +551,18 @@ function cityRuleEffectsText(effects = {}) {
     .join(" | ");
 }
 
+function CityEffectChips({ effects = {} }) {
+  return (
+    <div className="city-policy-effects">
+      {Object.entries(effects ?? {}).map(([statId, amount]) => (
+        <span className={Number(amount) >= 0 ? "positive" : "negative"} key={statId}>
+          {Number(amount) > 0 ? "+" : ""}{Math.floor(Number(amount) || 0)} {cityRuleStatLabel(statId)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CitySanctuaryDonationPanel({ inventory, resourceCount, onDonate }) {
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
@@ -777,6 +793,435 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
       })}
     </section>
   );
+}
+
+function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArtifact, onBuy }) {
+  const bought = new Set(progress?.artifacts?.boughtIds ?? []);
+  const hoverState = useFloatingProgressionHover();
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Monumenter</h4>
+        <span>Koebes en gang og giver permanente byeffekter.</span>
+      </header>
+      <div className="city-progression-grid city-artifact-grid">
+        {CITY_ARTIFACTS.map((artifact) => {
+          const owned = bought.has(artifact.id);
+          const buyCheck = canBuyArtifact?.(artifact) ?? { canBuy: false, reasons: [] };
+          const imageUrl = artifact.imageUrl ?? artifact.iconUrl;
+          return (
+            <article
+              className={`city-progression-tile city-artifact-card ${owned ? "active" : ""} ${!owned && !buyCheck.canBuy ? "locked" : ""}`}
+              tabIndex="0"
+              key={artifact.id}
+              onMouseEnter={(event) => hoverState.open(event, { artifact })}
+              onMouseLeave={hoverState.scheduleClose}
+              onFocus={(event) => hoverState.open(event, { artifact })}
+              onBlur={hoverState.scheduleClose}
+            >
+              <div className="city-progression-image-frame">
+                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{artifact.title?.slice(0, 2) ?? "?"}</span>}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      <FloatingProgressionHover hoverState={hoverState} className="city-artifact-hover" width={430} estimatedHeight={285}>
+        {({ artifact }) => {
+          const owned = bought.has(artifact.id);
+          const buyCheck = canBuyArtifact?.(artifact) ?? { canBuy: false, reasons: [] };
+          return (
+            <>
+              <header>
+                <b>{artifact.title}</b>
+                <span>{owned ? "Aktiv" : buyCheck.canBuy ? "Klar" : "Laast"}</span>
+              </header>
+              <p>{artifact.description}</p>
+              <div className="city-effect-list">
+                <span>{cityRuleEffectsText(artifact.effects?.cityStats)}</span>
+                {artifact.effects?.worldEnergy && (
+                  <span>{Object.entries(artifact.effects.worldEnergy).map(([id, amount]) => `${Number(amount) > 0 ? "+" : ""}${amount} ${id}`).join(" | ")}</span>
+                )}
+              </div>
+              <CityArtifactCostList artifact={artifact} countResource={countResource} countItem={countItem} />
+              <button type="button" disabled={owned || !buyCheck.canBuy} onClick={() => onBuy?.(artifact)}>
+                {owned ? "Koebt" : "Koeb"}
+              </button>
+            </>
+          );
+        }}
+      </FloatingProgressionHover>
+    </section>
+  );
+}
+
+function CityArtifactCostList({ artifact, countResource, countItem }) {
+  const resourceEntries = [
+    ...(artifact.cost?.gold ? [["gold", artifact.cost.gold]] : []),
+    ...Object.entries(artifact.cost?.resources ?? {}),
+  ];
+  const itemEntries = artifact.cost?.items ?? [];
+  return (
+    <div className="city-area-costs city-chip-grid city-artifact-costs">
+      {resourceEntries.length === 0 && itemEntries.length === 0 && <span>Gratis</span>}
+      {resourceEntries.map(([resourceId, amount]) => {
+        const available = countResource?.(resourceId) ?? 0;
+        return (
+          <span className={available >= amount ? "met" : "missing"} key={resourceId}>
+            <InventoryIcon iconUrl={resourceId === "gold" ? ITEM_GOLD_ICON_URL : RESOURCE_DEFS[resourceId]?.iconUrl} />
+            <b>{available}/{amount} {RESOURCE_DEFS[resourceId]?.name ?? resourceId}</b>
+          </span>
+        );
+      })}
+      {itemEntries.map((entry, index) => {
+        const amount = Math.max(1, Math.floor(Number(entry.count) || 1));
+        const available = countItem?.(entry) ?? 0;
+        return (
+          <span className={available >= amount ? "met" : "missing"} key={`${entry.questItemId ?? entry.uniqueId ?? entry.namedId ?? index}`}>
+            <b>{available}/{amount} {entry.label ?? entry.questItemId ?? entry.uniqueId ?? entry.namedId ?? "item"}</b>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function useFloatingProgressionHover() {
+  const [hover, setHover] = useState(null);
+  const hideTimerRef = useRef(null);
+
+  const clearHideTimer = () => {
+    if (!hideTimerRef.current) return;
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+  };
+
+  const open = (event, payload) => {
+    clearHideTimer();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setHover({
+      ...payload,
+      rect: {
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+        height: rect.height,
+      },
+    });
+  };
+
+  const close = () => {
+    clearHideTimer();
+    setHover(null);
+  };
+
+  const scheduleClose = () => {
+    clearHideTimer();
+    hideTimerRef.current = setTimeout(() => setHover(null), 80);
+  };
+
+  useEffect(() => () => clearHideTimer(), []);
+
+  return { hover, open, close, scheduleClose, keepOpen: clearHideTimer };
+}
+
+function floatingProgressionHoverStyle(rect, width = 320, estimatedHeight = 240) {
+  const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
+  const viewportHeight = typeof window === "undefined" ? 720 : window.innerHeight;
+  const margin = 14;
+  const actualWidth = Math.min(width, Math.max(220, viewportWidth - margin * 2));
+  let left = rect.left;
+  if (left + actualWidth > viewportWidth - margin) left = viewportWidth - margin - actualWidth;
+  if (left < margin) left = margin;
+
+  let top = rect.bottom + 8;
+  if (top + estimatedHeight > viewportHeight - margin) top = rect.top - estimatedHeight - 8;
+  if (top < margin) top = margin;
+
+  return {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+    width: `${Math.round(actualWidth)}px`,
+  };
+}
+
+function FloatingProgressionHover({ hoverState, className = "", width = 320, estimatedHeight = 240, children }) {
+  const hover = hoverState.hover;
+  if (!hover?.rect || typeof document === "undefined") return null;
+  return createPortal(
+    <div
+      className={`city-progression-floating-hover ${className}`}
+      style={floatingProgressionHoverStyle(hover.rect, width, estimatedHeight)}
+      onMouseEnter={hoverState.keepOpen}
+      onMouseLeave={hoverState.scheduleClose}
+    >
+      {children(hover)}
+    </div>,
+    document.body,
+  );
+}
+
+function CityPolicyPanel({ progress = {}, requirementEntries, onToggle }) {
+  const active = new Set(progress?.policies?.activeIds ?? []);
+  const hoverState = useFloatingProgressionHover();
+  const grouped = CITY_POLICIES.reduce((map, policy) => {
+    const key = policy.category ?? "general";
+    map[key] = [...(map[key] ?? []), policy];
+    return map;
+  }, {});
+  return (
+    <section className="blacksmith-station city-policy-panel">
+      <header>
+        <h4>Politik</h4>
+        <span>Aktive regler taeller med i byens stats.</span>
+      </header>
+      <div className="city-policy-group-grid">
+        {Object.entries(grouped).map(([category, policies]) => (
+          <div className="city-policy-group" key={category}>
+            <h5>{category}</h5>
+            <div className="city-progression-grid city-policy-icon-grid">
+              {policies.map((policy) => {
+                const enabled = active.has(policy.id);
+                const reqs = requirementEntries?.(policy) ?? [];
+                const locked = reqs.some((entry) => !entry.met);
+                const imageUrl = policy.imageUrl ?? policy.iconUrl ?? policyIconUrl(policy);
+                return (
+                  <article
+                    className={`city-progression-tile city-policy-card ${enabled ? "active" : "inactive"} ${locked ? "locked" : ""}`}
+                    key={policy.id}
+                    role="button"
+                    tabIndex="0"
+                    onMouseEnter={(event) => hoverState.open(event, { policy, category, reqs })}
+                    onMouseLeave={hoverState.scheduleClose}
+                    onFocus={(event) => hoverState.open(event, { policy, category, reqs })}
+                    onBlur={hoverState.scheduleClose}
+                    onClick={() => onToggle?.(policy)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      event.preventDefault();
+                      onToggle?.(policy);
+                    }}
+                  >
+                    <div className="city-progression-image-frame">
+                      {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{policy.title?.slice(0, 2) ?? "?"}</span>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <FloatingProgressionHover hoverState={hoverState} className="city-policy-hover" width={285} estimatedHeight={205}>
+        {({ policy, category, reqs = [] }) => {
+          const enabled = active.has(policy.id);
+          const locked = reqs.some((entry) => !entry.met);
+          return (
+            <>
+              <header>
+                <b>{policy.title}</b>
+                <span>{category} | {locked ? "Krav mangler" : enabled ? "Aktiv" : "Inaktiv"}</span>
+              </header>
+              <p>{policy.description}</p>
+              {reqs.length > 0 && (
+                <div className="city-policy-requirements">
+                  {reqs.map((entry) => (
+                    <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
+                  ))}
+                </div>
+              )}
+              <CityEffectChips effects={policy.effects?.cityStats} />
+              <small>{locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
+            </>
+          );
+        }}
+      </FloatingProgressionHover>
+    </section>
+  );
+}
+
+function policyIconUrl(policy) {
+  const firstPositive = Object.entries(policy?.effects?.cityStats ?? {})
+    .find(([, amount]) => Number(amount) > 0)?.[0];
+  const firstStat = firstPositive ?? Object.keys(policy?.effects?.cityStats ?? {})[0];
+  const normalized = CITY_STAT_ALIASES[firstStat] ?? firstStat;
+  return CITY_STAT_ICON_URLS[normalized] ?? CITY_STAT_ICON_URLS.culture;
+}
+
+function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlockedLevels = {} }) {
+  return (
+    <section className="blacksmith-station">
+      <header>
+        <h4>Bedrifter</h4>
+        <span>Hall of Deeds</span>
+      </header>
+      <div className="city-progression-grid city-achievement-list">
+        {CITY_ACHIEVEMENTS.map((achievement) => {
+          const unlocked = unlockedLevels[achievement.id] ?? progress?.achievements?.unlockedLevelById?.[achievement.id] ?? 0;
+          const levels = achievement.levels ?? [];
+          const achievedTier = unlocked > 0 ? achievementTierClass(levels[unlocked - 1]?.tier, levels.length, unlocked - 1) : "locked";
+          const imageUrl = achievement.imageUrl ?? achievement.iconUrl ?? achievementIconUrl(achievement);
+          return (
+            <article className={`city-progression-tile city-achievement-card ${unlocked > 0 ? "unlocked" : "locked"} achievement-tier-${achievedTier}`} tabIndex="0" key={achievement.id}>
+              <div className="city-progression-image-frame">
+                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{achievement.title?.slice(0, 2) ?? "?"}</span>}
+              </div>
+              <div className="city-progression-hover">
+                <header>
+                  <b>{achievement.title}</b>
+                  <span>{achievement.category} | {unlocked}/{levels.length}</span>
+                </header>
+                <p>{achievement.description}</p>
+                <div className="city-achievement-tiers">
+                  {levels.map((level, index) => {
+                    const progressText = achievementLevelProgressText(level, snapshot);
+                    return (
+                      <span className={`${index < unlocked ? "met" : "missing"} tier-${achievementTierClass(level.tier, levels.length, index)}`} key={`${achievement.id}-${index}`}>
+                        <b>{achievementTierLabel(level.tier, levels.length, index)}</b>
+                        <em>{progressText}</em>
+                        {level.effects?.cityStats && <small>{cityRuleEffectsText(level.effects.cityStats)}</small>}
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function achievementLevelProgressText(level, snapshot = emptySnapshot) {
+  const progress = achievementConditionProgress(level?.condition ?? level?.conditions, snapshot);
+  if (!progress) return "0/1";
+  return `${formatCompactNumber(progress.current)}/${formatCompactNumber(progress.target)}${progress.label ? ` ${progress.label}` : ""}`;
+}
+
+function achievementConditionProgress(condition, snapshot = emptySnapshot) {
+  if (!condition || typeof condition !== "object" || Array.isArray(condition)) return null;
+  if (Array.isArray(condition.all)) {
+    const entries = condition.all.map((entry) => achievementConditionProgress(entry, snapshot)).filter(Boolean);
+    if (entries.length === 0) return null;
+    return {
+      current: entries.filter((entry) => Number(entry.current) >= Number(entry.target)).length,
+      target: entries.length,
+      label: "krav",
+    };
+  }
+  if (Array.isArray(condition.any)) {
+    const entries = condition.any.map((entry) => achievementConditionProgress(entry, snapshot)).filter(Boolean);
+    if (entries.length === 0) return null;
+    return entries.reduce((best, entry) => {
+      const bestRatio = Number(best.current) / Math.max(1, Number(best.target));
+      const entryRatio = Number(entry.current) / Math.max(1, Number(entry.target));
+      return entryRatio > bestRatio ? entry : best;
+    }, entries[0]);
+  }
+  if (condition.player && typeof condition.player === "object") {
+    const [path, numberCondition] = Object.entries(condition.player)[0] ?? [];
+    const target = conditionTargetNumber(numberCondition);
+    return {
+      current: clampProgressNumber(readObjectPath(snapshot?.player, path), target),
+      target,
+      label: achievementConditionLabel(path),
+    };
+  }
+  if (condition.counter !== undefined) {
+    const counterId = typeof condition.counter === "object"
+      ? condition.counter.id ?? condition.counter.key
+      : condition.counter;
+    const target = conditionTargetNumber(typeof condition.counter === "object" ? { ...condition.counter, ...condition } : condition);
+    return {
+      current: clampProgressNumber(snapshot?.worldState?.counters?.[String(counterId)] ?? 0, target),
+      target,
+      label: achievementConditionLabel(counterId),
+    };
+  }
+  if (condition.tagKills && typeof condition.tagKills === "object") {
+    const [tagId, numberCondition] = Object.entries(condition.tagKills)[0] ?? [];
+    const target = conditionTargetNumber(numberCondition);
+    return {
+      current: clampProgressNumber(snapshot?.worldState?.counters?.[`tagKill.${tagId}`] ?? 0, target),
+      target,
+      label: tagId,
+    };
+  }
+  if (condition.questCompleted) {
+    const completed = new Set((snapshot?.quests?.completed ?? []).map(String));
+    return {
+      current: completed.has(String(condition.questCompleted)) ? 1 : 0,
+      target: 1,
+      label: "quest",
+    };
+  }
+  if (condition.flag) {
+    return {
+      current: snapshot?.worldState?.flags?.[String(condition.flag)] ? 1 : 0,
+      target: 1,
+      label: "flag",
+    };
+  }
+  return null;
+}
+
+function conditionTargetNumber(condition) {
+  if (typeof condition === "number") return Math.max(1, Number(condition) || 1);
+  if (!condition || typeof condition !== "object") return 1;
+  if (condition.min !== undefined) return Math.max(1, Number(condition.min) || 1);
+  if (condition.gte !== undefined) return Math.max(1, Number(condition.gte) || 1);
+  if (condition.gt !== undefined) return Math.max(1, (Number(condition.gt) || 0) + 1);
+  if (condition.equals !== undefined) return Math.max(1, Number(condition.equals) || 1);
+  return 1;
+}
+
+function clampProgressNumber(value, target) {
+  return Math.max(0, Math.min(Number(target) || 1, Math.floor(Number(value) || 0)));
+}
+
+function readObjectPath(source, path) {
+  if (!source || !path) return 0;
+  return String(path).split(".").reduce((value, key) => value?.[key], source);
+}
+
+function achievementConditionLabel(id) {
+  const key = String(id ?? "");
+  if (key === "stats.killsTotal") return "kills";
+  if (key === "resourceCollected.bonedust") return "bonedust";
+  if (key === "questCompleted.faction.village_outskirt") return "quests";
+  if (key.startsWith("region.") && key.endsWith(".unlocked")) return "regioner";
+  return key.split(".").at(-1) ?? "";
+}
+
+function formatCompactNumber(value) {
+  return Math.floor(Number(value) || 0).toLocaleString("da-DK");
+}
+
+function achievementTierLabel(tier, total, index) {
+  if (tier) return String(tier);
+  if (total === 1) return "gold";
+  if (total === 2) return index === 0 ? "silver" : "gold";
+  return ["bronze", "silver", "gold"][index] ?? `tier ${index + 1}`;
+}
+
+function achievementTierClass(tier, total, index) {
+  return achievementTierLabel(tier, total, index).toLowerCase();
+}
+
+function achievementIconUrl(achievement) {
+  const fallbacks = {
+    monster_slayer: "/assets/generated/mobs/skeleton_animated_sheet.png",
+    defender_of_the_city: "/assets/generated/house/house_townhall.png",
+    village_outskirt_defender: "/assets/generated/map/map_villageoutskirts_v2.png",
+    spiders_bane: "/assets/generated/mobs/spider_animated_sheet.png",
+    fenris_bane: "/assets/generated/mini/mini_wolf.png",
+    bone_collector: "/assets/generated/item/item_res_bonedust.png",
+    savior_of_village_outskirt: "/assets/generated/map/map_villageoutskirts_v2.png",
+  };
+  return fallbacks[achievement?.id] ?? "/assets/generated/item/item_goldidol.png";
 }
 
 function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
@@ -1189,4 +1634,7 @@ export {
   CityReadableMergePanel,
   CityPotionLabPanel,
   CityTonicLabPanel,
+  CityArtifactPanel,
+  CityPolicyPanel,
+  CityAchievementPanel,
 };

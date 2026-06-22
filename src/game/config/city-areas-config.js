@@ -80,7 +80,7 @@ export const CITY_AREAS = [
     rings: [CITY_OUTER_CIRCLE_POINTS, CITY_INNER_CIRCLE_POINTS],
     builtLayer: `${CITY_LAYER_BASE}/city_wall.png`,
     statEffects: { city_defence: 50 },
-    unlock: { level: 3, cost: { gold: 2500, stone_brick: 120, iron_bar: 20 } },
+    unlock: { level: 3, cost: { gold: 25000, stone_brick: 500, iron_bar: 80 } },
   },
   {
     id: "outer_1",
@@ -94,8 +94,8 @@ export const CITY_AREAS = [
     builtLayer: `${CITY_LAYER_BASE}/city_outer1_lvl1.png`,
     statEffects: { provision: 50 },
     levels: [
-      { level: 2, title: "Sprouting Field", stageId: "outer_1_field_sprouting", cost: { gold: 800, wood_plank: 25 }, statEffects: { provision: 75 }, statRequirements: { water: 50 }, builtLayer: `${CITY_LAYER_BASE}/city_outer1_lvl2.png` },
-      { level: 3, title: "Blooming Field", stageId: "outer_1_field_blooming", cost: { gold: 1200, wood_plank: 40 }, statEffects: { provision: 125 }, statRequirements: { water: 100 }, builtLayer: `${CITY_LAYER_BASE}/city_outer1_lvl3.png` },
+      { level: 2, title: "Sprouting Field", stageId: "outer_1_field_sprouting", cost: { gold: 800, wood_plank: 24 }, statEffects: { provision: 75 }, statRequirements: { water: 50 }, builtLayer: `${CITY_LAYER_BASE}/city_outer1_lvl2.png` },
+      { level: 3, title: "Blooming Field", stageId: "outer_1_field_blooming", cost: { gold: 1200, wood_plank: 48 }, statEffects: { provision: 125 }, statRequirements: { water: 100 }, builtLayer: `${CITY_LAYER_BASE}/city_outer1_lvl3.png` },
     ],
     buildings: [
       { id: "farm", x: 914, y: 113 },
@@ -113,10 +113,10 @@ export const CITY_AREAS = [
     builtLayer: `${CITY_LAYER_BASE}/city_outer2_lvl1.png`,
     statEffects: { provision: 50 },
     levels: [
-      { level: 2, title: "Sprouting Field", stageId: "outer_2_field_sprouting", cost: { gold: 800, wood_plank: 25 }, statEffects: { provision: 75 }, statRequirements: { water: 50 }, builtLayer: `${CITY_LAYER_BASE}/city_outer2_lvl2.png` },
-      { level: 3, title: "Blooming Field", stageId: "outer_2_field_blooming", cost: { gold: 1200, wood_plank: 40 }, statEffects: { provision: 125 }, statRequirements: { water: 100 }, builtLayer: `${CITY_LAYER_BASE}/city_outer2_lvl3.png` },
+      { level: 2, title: "Sprouting Field", stageId: "outer_2_field_sprouting", cost: { gold: 800, wood_plank: 24 }, statEffects: { provision: 75 }, statRequirements: { water: 50 }, builtLayer: `${CITY_LAYER_BASE}/city_outer2_lvl2.png` },
+      { level: 3, title: "Blooming Field", stageId: "outer_2_field_blooming", cost: { gold: 1200, wood_plank: 48 }, statEffects: { provision: 125 }, statRequirements: { water: 100 }, builtLayer: `${CITY_LAYER_BASE}/city_outer2_lvl3.png` },
     ],
-    unlock: { level: 3, cost: { gold: 850, wood_plank: 14, stone_brick: 16 } },
+    unlock: { level: 3, cost: { gold: 850, wood_plank: 12, stone_brick: 12 } },
   },
   {
     id: "outer_3",

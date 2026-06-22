@@ -70,6 +70,7 @@ import {
   itemCanHaveSockets,
   normalizeSockets,
 } from "../../config/socket-config.js";
+import { incrementWorldCounter } from "../../world-state.js";
 import {
   ITEM_REPAIR_GOLD_PER_PCT,
   ITEM_REPAIR_JUNK_PER_PCT,
@@ -1370,10 +1371,12 @@ export const inventoryMethods = {
     return true;
   },
 
-  addInventoryItem(item) {
+  addInventoryItem(item, options = {}) {
     const maxSlots = this.inventorySlotCapacity();
     if (!item) return false;
     if (isResourceItem(item)) {
+      const originalCount = Math.max(1, Math.floor(Number(item.count) || 1));
+      const countAsCollected = Boolean(options.countAsCollected ?? item.countAsCollected);
       let remaining = Math.max(1, Math.floor(Number(item.count) || 1));
       const stackMax = resourceStackMax(item.resourceId);
       for (const stack of this.player.inventory) {
@@ -1384,7 +1387,10 @@ export const inventoryMethods = {
         const moved = Math.min(room, remaining);
         stack.count = current + moved;
         remaining -= moved;
-        if (remaining <= 0) return true;
+        if (remaining <= 0) {
+          if (countAsCollected) this.worldState = incrementWorldCounter(this.worldState, `resourceCollected.${item.resourceId}`, originalCount);
+          return true;
+        }
       }
       while (remaining > 0) {
         if (this.player.inventory.length >= maxSlots) {
@@ -1395,6 +1401,7 @@ export const inventoryMethods = {
         this.player.inventory.push({ ...item, id: createId(), count });
         remaining -= count;
       }
+      if (countAsCollected) this.worldState = incrementWorldCounter(this.worldState, `resourceCollected.${item.resourceId}`, originalCount);
       return true;
     }
     if (isPotionItem(item)) {

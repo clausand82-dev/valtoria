@@ -55,6 +55,18 @@ function questStepCompletedFlag(questId, stepId) {
   return `quest.${String(questId ?? "").trim()}.step.${String(stepId ?? "").trim()}.completed`;
 }
 
+function questCompletionCounterKeys(quest = {}) {
+  const keys = [];
+  for (const factionId of Object.keys(quest.rewards?.factionRep ?? {})) {
+    keys.push(`questCompleted.faction.${factionId}`);
+  }
+  for (const regionId of quest.regionIds ?? []) {
+    keys.push(`questCompleted.region.${regionId}`);
+  }
+  if (quest.source) keys.push(`questCompleted.source.${quest.source}`);
+  return [...new Set(keys)];
+}
+
 function talkTargetNpcIds(target = {}) {
   if (Array.isArray(target.targetNpcIds)) return target.targetNpcIds.map(String).filter(Boolean);
   if (target.targetNpcId) return [String(target.targetNpcId)];
@@ -338,6 +350,9 @@ export const questsMethods = {
     this.questState.active.splice(index, 1);
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
+    }
+    for (const key of questCompletionCounterKeys(quest)) {
+      this.worldState = incrementWorldCounter(this.worldState, key, 1);
     }
     this.applyQuestStepEffects(quest.onComplete);
     this.player.stats.questsCompleted += 1;
@@ -1358,6 +1373,9 @@ export const questsMethods = {
     this.questState.active.splice(index, 1);
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
+    }
+    for (const key of questCompletionCounterKeys(quest)) {
+      this.worldState = incrementWorldCounter(this.worldState, key, 1);
     }
     this.applyQuestStepEffects(quest.onComplete);
     if (quest.repeatable && this.questState.cityOfferRolls) delete this.questState.cityOfferRolls[quest.questId];

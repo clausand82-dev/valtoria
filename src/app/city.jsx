@@ -90,6 +90,7 @@ import {
   CITY_BUILDING_CHIPS_ALWAYS_VISIBLE,
 } from "./city-constants.js";
 import { sortInventorySlots } from "../game/inventory-sort.js";
+import { applyWorldEnergy } from "../game/world-energy.js";
 import {
   CityArcaneExtractorPanel,
   CityBlacksmithPanel,
@@ -100,6 +101,9 @@ import {
   CityMerchantPanel,
   CityPotionLabPanel,
   CityTonicLabPanel,
+  CityArtifactPanel,
+  CityPolicyPanel,
+  CityAchievementPanel,
   CitySanctuaryDonationPanel,
   CityClassPanel,
   CityReadableMergePanel,
@@ -126,6 +130,17 @@ import {
   cityAreaCanUnlock,
   cityAreaCenter,
   cityAreaCostEntries,
+  cityCostResourceEntries,
+  cityCostItemEntries,
+  cityItemCostAvailable,
+  cityItemCostLabel,
+  consumeCityItemCostEntries,
+  cityArtifactBoughtIds,
+  cityPolicyActiveIds,
+  cityPolicyRequirementEntries,
+  cityPolicyRequirementsMet,
+  cityAchievementUnlockedLevels,
+  syncCityAchievementState,
   cityAreaGateEntries,
   cityAreaGeometry,
   cityAreaLayerUrls,
@@ -2401,6 +2416,9 @@ const CITY_BUILDING_PANEL_COMPONENTS = {
   farmAle: CityFarmAlePanel,
   innAle: CityInnAlePanel,
   cityTonicLab: CityTonicLabPanel,
+  cityArtifacts: CityArtifactPanel,
+  cityPolicies: CityPolicyPanel,
+  cityAchievements: CityAchievementPanel,
 };
 
 function normalizeCityBuildingAddons(building) {
@@ -2539,6 +2557,9 @@ function cityBuildingFeatureLabel(panelKey) {
     sanctuaryDonation: "Donations",
     farmAle: "Ale",
     innAle: "Ale",
+    cityArtifacts: "Monuments",
+    cityPolicies: "Policies",
+    cityAchievements: "Deeds",
   };
   return labels[panelKey] ?? String(panelKey ?? "Feature");
 }
@@ -2666,6 +2687,11 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     setQuestBoard(board);
   }, [engineRef, owned, questBoardId, activeQuestBoard, cityStats, progress]);
 
+  useEffect(() => {
+    if (!owned || activePanel !== "cityAchievements") return;
+    onChangeProgress((current) => syncCityAchievementState(current, snapshotRef?.current ?? snapshot, cityStats));
+  }, [owned, activePanel, cityStats, snapshot, snapshotRef, onChangeProgress]);
+
   const refreshQuestBoard = () => {
     if (!questBoardId) return;
     const context = { cityStats, cityProgress: progress };
@@ -2742,6 +2768,65 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const buyAddon = (addon) => {
     buyCityBuildingAddon({ progress, building, addon, snapshot: snapshotRef?.current ?? snapshot, cityStats, engineRef, onChangeProgress });
+  };
+
+  const artifactCanBuy = (artifact) => {
+    if (!artifact?.id) return { canBuy: false, reasons: ["Missing artifact id"] };
+    if (cityArtifactBoughtIds(progress).has(artifact.id)) return { canBuy: false, reasons: ["Already bought"] };
+    const resourceReasons = cityCostResourceEntries(artifact.cost)
+      .filter(([resourceId, amount]) => buildingResourceAvailable(resourceId) < amount)
+      .map(([resourceId, amount]) => `${cityCostLabel(resourceId)} ${buildingResourceAvailable(resourceId)}/${amount}`);
+    const itemReasons = cityCostItemEntries(artifact.cost)
+      .filter((entry) => cityItemCostAvailable(snapshotRef?.current ?? snapshot, entry) < entry.count)
+      .map((entry) => `${cityItemCostLabel(entry)} ${cityItemCostAvailable(snapshotRef?.current ?? snapshot, entry)}/${entry.count}`);
+    return { canBuy: resourceReasons.length + itemReasons.length === 0, reasons: [...resourceReasons, ...itemReasons] };
+  };
+
+  const buyArtifact = (artifact) => {
+    const check = artifactCanBuy(artifact);
+    if (!check.canBuy) {
+      engineRef.current?.addToast?.(check.reasons.join(", "));
+      return false;
+    }
+    if (!payBuildingEntries(cityCostResourceEntries(artifact.cost))) return false;
+    if (!consumeCityItemCostEntries(cityCostItemEntries(artifact.cost), engineRef.current)) return false;
+    if (artifact.effects?.worldEnergy) {
+      applyWorldEnergy(engineRef.current, artifact.effects.worldEnergy);
+    }
+    onChangeProgress((current) => ({
+      ...current,
+      artifacts: {
+        ...(current.artifacts ?? {}),
+        boughtIds: [...new Set([...(current.artifacts?.boughtIds ?? []), artifact.id].map(String))],
+      },
+    }));
+    engineRef.current?.addToast?.(`${artifact.title} opfoert`);
+    engineRef.current?.saveProgress?.({ force: true });
+    return true;
+  };
+
+  const togglePolicy = (policy) => {
+    if (!policy?.id) return;
+    const policyIsActive = cityPolicyActiveIds(progress).has(policy.id);
+    if (!policyIsActive && !cityPolicyRequirementsMet(policy, progress)) {
+      const missing = cityPolicyRequirementEntries(policy, progress)
+        .filter((entry) => !entry.met)
+        .map((entry) => entry.label);
+      engineRef.current?.addToast?.(`Kraever: ${missing.join(", ")}`);
+      return;
+    }
+    onChangeProgress((current) => {
+      const active = cityPolicyActiveIds(current);
+      if (active.has(policy.id)) active.delete(policy.id);
+      else active.add(policy.id);
+      return {
+        ...current,
+        policies: {
+          ...(current.policies ?? {}),
+          activeIds: [...active],
+        },
+      };
+    });
   };
 
   const depositInventoryItem = (inventoryIndex, sectionKey, slotIndex, confirmed = false) => {
@@ -3454,6 +3539,32 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             progress={progress}
             countInput={(inputId) => cityTonicInputAvailable(inputId)}
             onMix={(recipe) => mixCityTonicRecipe(recipe)}
+          />
+        );
+      case "cityArtifacts":
+        return (
+          <CityArtifactPanel
+            progress={progress}
+            countResource={(resourceId) => buildingResourceAvailable(resourceId)}
+            countItem={(entry) => cityItemCostAvailable(snapshot, entry)}
+            canBuyArtifact={artifactCanBuy}
+            onBuy={buyArtifact}
+          />
+        );
+      case "cityPolicies":
+        return (
+          <CityPolicyPanel
+            progress={progress}
+            requirementEntries={(policy) => cityPolicyRequirementEntries(policy, progress)}
+            onToggle={togglePolicy}
+          />
+        );
+      case "cityAchievements":
+        return (
+          <CityAchievementPanel
+            progress={progress}
+            snapshot={snapshot}
+            unlockedLevels={cityAchievementUnlockedLevels(progress, snapshot, cityStats)}
           />
         );
       case "socket":

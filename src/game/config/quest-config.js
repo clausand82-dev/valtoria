@@ -45,6 +45,11 @@ export const QUEST_ITEM_DEFS = {
     iconUrl: "/assets/generated/item/item_quest_blacksmithhammer.png",
     placeholderColor: "#8f93a1",
   },
+  mayor_chain: {
+    name: "Borgmesterkaede",
+    iconUrl: "/assets/generated/item/item_quest_silverring.png",
+    placeholderColor: "#d7bd67",
+  },
   noble_watch: {
     name: "Turanios' forsvundne ur",
     iconUrl: "/assets/generated/item/item_quest_noblewatch.png",
