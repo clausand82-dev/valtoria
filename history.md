@@ -14,6 +14,7 @@ kun en farm, resten er bare areas der hedder farm!
 - adjusted building and area prices
 - added artifact/monuments, archivments and policy rules (all can improve city stats)
 - added configuredLoot (for more special case for loot)
+- new loottable system (more simple when adjusted)
 
 
 *V. 0.83
