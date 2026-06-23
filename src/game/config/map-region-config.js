@@ -1,4 +1,4 @@
-import { createVillageOutskirtsMapRegions } from "./map-region/village-outskirts.js";
+﻿import { createVillageOutskirtsMapRegions } from "./map-region/village-outskirts.js";
 
 const AREA_MAP_VIEW = {
   aspect: "1672 / 941",
@@ -161,19 +161,19 @@ region({
   water: [{ fileName: "tileset/tileset_water.png", weight: 1, x: [1, 2], y: [1, 3] }], // Water tiles. Water only appears when spawnCounts.water > 0.
 
   foliageSet: [                                            // Old format: fixed foliage sheets.
-    { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // resourceDrop is chance per placed foliage.
+    { fileName: "foilage/foilage_plants_mainland.png", lootTables: { wood_piece: 0.02 } }, // lootTables is chance per placed foliage.
     { fileName: "foilage/foilage_roots.png", scale: 0.75 }, // fileName is the patch key for foliageSet.
   ],
   foliageSet: {                                             // New format: conditional foliage.
     value: [
-      { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // Default foliage entry.
-      { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05 } }, // rows/cols/particles/depthMode also supported.
+      { fileName: "foilage/foilage_plants_mainland.png", lootTables: { wood_piece: 0.02 } }, // Default foliage entry.
+      { fileName: "foilage/foilage_roots.png", scale: 0.75, lootTables: { bonedust: 0.05 } }, // rows/cols/particles/depthMode also supported.
     ],
     variants: [
       {
         requires: { flag: "region.example-copse.corrupted" }, // Only applies while corrupted flag is true.
         patch: [
-          { fileName: "foilage/foilage_roots.png", scale: 1.1, resourceDrop: { bonedust: 0.15 } }, // Deep-merges into matching default entry.
+          { fileName: "foilage/foilage_roots.png", scale: 1.1, lootTables: { bonedust: 0.15 } }, // Deep-merges into matching default entry.
           { fileName: "foilage/foilage_deadanimal_small.png", particles: { type: "flies", chance: 0.75 } }, // Adds entry if fileName is new.
         ],
       },
@@ -356,23 +356,9 @@ function normalizeMobs(mobs) {
     .filter((entry) => entry?.type);
 }
 
-function normalizeRareMobLootLines(entries) {
-  if (!Array.isArray(entries)) return [];
-  return entries
-    .filter((entry) => entry && typeof entry === "object" && !Array.isArray(entry))
-    .map((entry) => ({ ...entry }));
-}
-
-function normalizeRareMobLoot(loot) {
-  if (!loot || typeof loot !== "object" || Array.isArray(loot)) return null;
-  return {
-    ...loot,
-    mode: loot.mode === "override" ? "override" : "add",
-    resources: normalizeRareMobLootLines(loot.resources),
-    items: normalizeRareMobLootLines(loot.items),
-    named: normalizeRareMobLootLines(loot.named),
-    uniques: normalizeRareMobLootLines(loot.uniques),
-  };
+function normalizeLootTableRefs(value) {
+  const entries = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(entries.map((entry) => String(entry ?? "").trim()).filter(Boolean))];
 }
 
 function normalizeRareMobEntry(entry) {
@@ -383,7 +369,8 @@ function normalizeRareMobEntry(entry) {
     ...entry,
     type: normalizedType,
     chance: Math.max(0, Number(entry.chance) || 0),
-    loot: normalizeRareMobLoot(entry.loot),
+    lootMode: entry.lootMode === "override" ? "override" : "add",
+    lootTables: normalizeLootTableRefs(entry.lootTables ?? entry.lootTable),
   };
   // rareMobs is an instance layer only. Combat/stat changes should be made on a dedicated monster type.
   const blockedMonsterDefinitionFields = [
@@ -394,6 +381,7 @@ function normalizeRareMobEntry(entry) {
     "spells", "onHitStatus", "leapAttack", "attackCooldown", "attackCooldownConfig", "meleeAreaDamage",
     "aggro", "xp", "killLydra", "killNetdra", "eliteKillLydra", "eliteKillNetdra", "allowElite", "isBoss",
     "boss", "noLoot", "despawnOnDeath", "haveMinion", "minions", "minionCooldown", "isMinion", "minionOwnerId",
+    "loot",
   ];
   for (const key of blockedMonsterDefinitionFields) delete normalized[key];
   if (entry.maxPerRegion !== undefined) {
@@ -903,8 +891,8 @@ export const MAP_REGION_SETS = {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
-        { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
+        { fileName: "foilage/foilage_plants_mainland.png", lootTables: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
+        { fileName: "foilage/foilage_roots.png", scale: 0.75, lootTables: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
@@ -1082,8 +1070,8 @@ export const MAP_REGION_SETS = {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
-        { fileName: "foilage/foilage_boneparts.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
+        { fileName: "foilage/foilage_basement.png", lootTables: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
+        { fileName: "foilage/foilage_boneparts.png", scale: 0.75, lootTables: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
         { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
         { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true }, corruption: { min: 5 } },
       ],
@@ -1203,7 +1191,7 @@ export const MAP_REGION_SETS = {
       color: "#b4c46f",
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02 },  },
+        { fileName: "foilage/foilage_field.png", weight: 45, lootTables: { red_rose: 0.02 },  },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
         { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
@@ -1239,12 +1227,12 @@ export const MAP_REGION_SETS = {
       labelX: 38,
       labelY: 54,
             foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 25, resourceDrop: { wheat: 0.02 } },
+        { fileName: "foilage/foilage_field.png", weight: 25, lootTables: { wheat: 0.02 } },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10 },
-        { fileName: "foilage/foilage_deadvillages.png", weight: 50, scale: 1.5, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_deadvillages.png", weight: 50, scale: 1.5, lootTables: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
         { fileName: "foilage/foilage_village_items_broken.png", weight: 10, scale: 0.7},
         { fileName: "foilage/foilage_village_debris.png", weight: 10, },
-        { fileName: "foilage/foilage_cityplant.png", weight: 25, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_cityplant.png", weight: 25, lootTables: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
       ],
       decay: [
         { id: "decay_blood", weight: 50 },
@@ -1279,7 +1267,7 @@ export const MAP_REGION_SETS = {
             monsters: { min: 8, max: 12 },                          // Monster count range.
   },
       foliageSet: [
-        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, lootTables: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2 },
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
@@ -1746,3 +1734,4 @@ export const MAP_REGION_SETS = {
     }),
   ],
 };
+

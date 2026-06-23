@@ -1577,8 +1577,12 @@ export const combatMethods = {
     this.player.target = null;
     this.spawnObjectBreakDustEffect?.(object.x, object.y);
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 28, 0.16);
-    this.dropResourceLoot(object.x, object.y, [...(def.loot ?? []), ...(def.rareLoot ?? [])]);
-    this.dropObjectItemLoot(object.x, object.y, def.itemLoot ?? []);
+    this.dropLootFromTables(object.x, object.y, def.lootTables ?? [], {
+      source: "object",
+      object,
+      sourceEntity: object,
+      conditionContext: this.questConditionContext?.({ source: "object", object }) ?? {},
+    });
     this.tryDropQuestTargetLoot?.({
       source: "object",
       sourceId: object.objectDefId ?? object.type,

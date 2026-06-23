@@ -4,9 +4,7 @@ const DEFAULT_DESTRUCTIBLE_DEF = {
   hp: 1,
   damageStages: 1,
   particleColor: "#d8c091",
-  loot: [],
-  rareLoot: [],
-  itemLoot: [],
+  lootTables: [],
 };
 
 export function isDestructibleObject(object) {

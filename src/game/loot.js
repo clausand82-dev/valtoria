@@ -1,40 +1,19 @@
-import { DEFAULT_LOOT_PROFILE, LOOT_PROFILES, MONSTER_CONFIGURED_LOOT, MONSTER_RESOURCE_DROPS } from "./config/loot-config.js";
-
-export function monsterLootProfile(typeName) {
-  return LOOT_PROFILES[typeName] ?? DEFAULT_LOOT_PROFILE;
+﻿export function normalizeLootTableRefs(source) {
+  const refs = [];
+  if (source?.lootTable) refs.push(source.lootTable);
+  if (Array.isArray(source?.lootTables)) refs.push(...source.lootTables);
+  return [...new Set(refs.map((id) => String(id ?? '').trim()).filter(Boolean))];
 }
 
-export function rollLootCategory(weights) {
-  const entries = Object.entries(weights ?? {});
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  if (total <= 0) return "none";
-  let roll = Math.random() * total;
-  for (const [category, weight] of entries) {
-    roll -= weight;
-    if (roll <= 0) return category;
+export function weightedLootEntry(entries, randomValue = Math.random()) {
+  const weighted = (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry && Number(entry.weight) > 0);
+  const total = weighted.reduce((sum, entry) => sum + Number(entry.weight), 0);
+  if (total <= 0) return null;
+  let roll = Math.max(0, Math.min(1, randomValue)) * total;
+  for (const entry of weighted) {
+    roll -= Number(entry.weight);
+    if (roll <= 0) return entry;
   }
-  return "none";
-}
-
-export function monsterResourceDrops(monster) {
-  const specific = MONSTER_RESOURCE_DROPS[monster?.typeName];
-  // Mob-specific entries inherit default loot unless explicitly disabled in loot-config.js.
-  const inheritDefaultLoot = specific?.inheritDefaultLoot !== false;
-  const inheritDefaultRareLoot = specific?.inheritDefaultRareLoot !== false;
-
-  return [
-    ...(inheritDefaultLoot ? MONSTER_RESOURCE_DROPS.default?.loot ?? [] : []),
-    ...(inheritDefaultRareLoot ? MONSTER_RESOURCE_DROPS.default?.rareLoot ?? [] : []),
-    ...(specific?.loot ?? []),
-    ...(specific?.rareLoot ?? []),
-  ];
-}
-
-export function monsterConfiguredLoot(monster) {
-  const specific = MONSTER_CONFIGURED_LOOT[monster?.typeName];
-  return {
-    items: specific?.items ?? [],
-    named: specific?.named ?? [],
-    uniques: specific?.uniques ?? [],
-  };
+  return weighted[weighted.length - 1] ?? null;
 }

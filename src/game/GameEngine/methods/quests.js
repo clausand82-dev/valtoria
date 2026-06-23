@@ -1200,22 +1200,22 @@ export const questsMethods = {
         if (picked >= needed) continue;
         const activeDropped = questItemCount(this.loots.map((loot) => loot.item), quest.id, target.questItemId);
         if (picked + activeDropped >= needed) continue;
-        const dropChance = Number(target.dropChance ?? 0.05);
-        const roll = Math.random();
-        if (roll > dropChance) continue;
-        const item = makeQuestItem(target.questItemId, quest.id);
-        if (!item) continue;
-        this.loots.push({
-          id: createId(),
-          type: "item",
-          item,
-          x: Number(x) + (Math.random() - 0.5) * 0.7,
-          y: Number(y) + (Math.random() - 0.5) * 0.7,
-          bob: Math.random() * Math.PI * 2,
-          pickupDelay: 0.25,
-          despawn: GROUND_LOOT_DESPAWN_SECONDS,
+        const [drop] = this.rollLootEntry({
+          type: "questItem",
+          id: target.questItemId,
+          questItemId: target.questItemId,
+          questInstanceId: quest.id,
+          chance: Number(target.dropChance ?? 0.05),
+          questItem: true,
+          requires: { questActive: [quest.questId ?? quest.id] },
+        }, {
+          source: sourceKey,
+          quest,
+          questId: quest.id,
+          conditionContext: this.questConditionContext?.({ source: sourceKey, monster, sourceObject }) ?? {},
         });
-        this.trackItemDropped(item);
+        if (!drop?.item) continue;
+        this.dropGroundItem(Number(x), Number(y), drop.item, { pickupDelay: 0.25, countAsCollected: true });
         break;
       }
     }

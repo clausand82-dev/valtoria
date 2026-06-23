@@ -1,4 +1,3 @@
-import { RESOURCE_DEFS } from "./resource-config.js";
 import { normalizeParticleConfigs } from "./particle-presets.js";
 
 const GENERATED_ASSET_PREFIX = "/assets/generated/";
@@ -46,6 +45,11 @@ function normalizeFileName(value) {
   return raw;
 }
 
+function normalizeStringArray(value) {
+  const entries = Array.isArray(value) ? value : value ? [value] : [];
+  return [...new Set(entries.map((entry) => String(entry ?? "").trim()).filter(Boolean))];
+}
+
 function toSpecObject(value) {
   if (!value) return null;
   if (typeof value === "string") return { fileName: value };
@@ -90,36 +94,6 @@ function variantsFromAxisSelection(xSelection, ySelection, grid = DEFAULT_WATER_
     }
   }
   return variants;
-}
-
-function normalizeResourceDropEntry(resourceId, value) {
-  const raw = value && typeof value === "object" && !Array.isArray(value)
-    ? value
-    : { chance: value };
-  const id = String(raw.resource ?? raw.resourceId ?? resourceId ?? "").trim();
-  if (!id || !RESOURCE_DEFS[id]) return null;
-
-  const chance = clampNumber(raw.chance ?? raw.dropChance ?? 1, 0, 1);
-  if (!chance) return null;
-
-  const min = clampInt(raw.min ?? raw.count ?? raw.amount ?? 1, 1, 9999) ?? 1;
-  const max = clampInt(raw.max ?? raw.count ?? raw.amount ?? min, min, 9999) ?? min;
-  return { resource: id, chance, min, max };
-}
-
-function normalizeResourceDrops(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) {
-    return value
-      .map((entry) => normalizeResourceDropEntry(null, entry))
-      .filter(Boolean);
-  }
-  if (typeof value === "object") {
-    return Object.entries(value)
-      .map(([resourceId, entry]) => normalizeResourceDropEntry(resourceId, entry))
-      .filter(Boolean);
-  }
-  return [];
 }
 
 function normalizeRegionTilesetEntry(tilesetInput) {
@@ -204,7 +178,7 @@ function normalizeFoliageEntry(entry, defaults = {}) {
     cols,
     variantCount: rows * cols,
     sheetId: buildFoliageSheetId(fileName, rows, cols),
-    resourceDrops: normalizeResourceDrops(raw.resourceDrops ?? raw.resourceDrop),
+    lootTables: normalizeStringArray(raw.lootTables ?? raw.lootTable),
     particles: normalizeParticleConfigs(raw.particles),
     actionId: raw.actionId ? String(raw.actionId) : null,
     questTargetKey: raw.questTargetKey ? String(raw.questTargetKey) : null,
@@ -237,7 +211,7 @@ export function normalizeRegionFoliageSets(regionConfig = {}) {
   const deduped = [];
   const seen = new Set();
   for (const entry of normalized) {
-    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.resourceDrops)}|${JSON.stringify(entry.particles)}|${entry.actionId ?? ""}|${entry.questTargetKey ?? ""}|${entry.depthMode}|${JSON.stringify(entry.sortAnchor)}|${entry.depthOffset}`;
+    const key = `${entry.sheetId}|${entry.weight}|${entry.scale ?? ""}|${JSON.stringify(entry.lootTables)}|${JSON.stringify(entry.particles)}|${entry.actionId ?? ""}|${entry.questTargetKey ?? ""}|${entry.depthMode}|${JSON.stringify(entry.sortAnchor)}|${entry.depthOffset}`;
     if (seen.has(key)) continue;
     seen.add(key);
     deduped.push(entry);

@@ -8,7 +8,6 @@ import {
   clamp,
   distance,
   makePotion,
-  DESTROYED_ITEM_RESOURCE_DROPS,
   RESOURCE_DEFS,
   isPotionItem,
   isQuestItem,
@@ -988,19 +987,16 @@ export const inventoryMethods = {
   },
 
   dropDestroyedItemResources(item, options = {}) {
-    const profile = DESTROYED_ITEM_RESOURCE_DROPS[item.unique ? "unique" : item.rarity] ?? DESTROYED_ITEM_RESOURCE_DROPS.normal;
+    const tableId = `destroyed_item_${String(item.unique ? "unique" : item.rarity ?? "normal").toLowerCase()}_scrap`;
     const forgeJunkYieldMultiplier = options.forge ? (blacksmithDurabilityModifiers(this.cityProgress).forgeJunkYieldMultiplier ?? 1) : 1;
-    const entries = [
-      ...(profile.guaranteed ?? []).map((entry) => ({ ...entry, chance: 1 })),
-      ...(profile.rare ?? []),
-    ];
-    for (const entry of entries) {
-      if (Math.random() > (entry.chance ?? 1)) continue;
-      const rolledAmount = randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1);
-      const amount = entry.resource === "junk"
-        ? Math.max(1, Math.floor(rolledAmount * forgeJunkYieldMultiplier))
-        : rolledAmount;
-      const resource = makeResourceItem(entry.resource, amount);
+    const drops = this.rollLootTables([tableId], {
+      source: "destroyed_item",
+      sourceEntity: item,
+    });
+    for (const drop of drops) {
+      const resource = drop.item;
+      if (!resource) continue;
+      if (resource.resourceId === "junk") resource.count = Math.max(1, Math.floor((Number(resource.count) || 1) * forgeJunkYieldMultiplier));
       if (!resource) continue;
       if (this.addInventoryItem(resource)) continue;
       this.loots.push({

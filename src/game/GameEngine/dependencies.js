@@ -50,7 +50,6 @@ export {
   worldToScreen,
 } from "../iso.js";
 export {
-  DESTROYED_ITEM_RESOURCE_DROPS,
   RESOURCE_DEFS,
   RESOURCE_MERGE_RECIPES,
   RESOURCE_RARITY_COLOR,
@@ -71,6 +70,7 @@ export {
   potionRecipeAvailableAt,
   potionRecipesForStation,
 } from "../config/potion-config.js";
+export { LOOT_TABLES, lootTableEntries } from "../config/loot-tables-config.js";
 export { QUEST_CONFIG, QUEST_DEFS, QUEST_ITEM_DEFS, QUEST_BOARD_CONFIG, QUEST_GLOBAL_RULES } from "../config/quest-config.js";
 export { QUEST_NPCS } from "../config/npc-config.js";
 export { getRegionObjectFamily, resolveRegionObjectDefBySpawnType, resolveRegionObjectDestructibleDef } from "../config/region-object-config.js";
@@ -80,7 +80,6 @@ export {
 } from "../config/particle-presets.js";
 export { UNIQUE_DROP_CHANCES, RESTRICTED_DROPS } from "../config/loot-config.js";
 export { blacksmithDurabilityModifiers, cityRuntimeModifiers } from "../config/city-consequence-resolver.js";
-export { monsterConfiguredLoot, monsterLootProfile, monsterResourceDrops, rollLootCategory } from "../loot.js";
 export {
   deriveIconKey,
   iconUrlFromKey,

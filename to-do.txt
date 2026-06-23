@@ -22,8 +22,7 @@ Voldgravenes Hersker: bygget alle voldgravene i byen - bonus: +25 defence
 Hero of the City: Bekæmpet 10 city monster grupper med hero, bekæmpet 25 city monster gruppe med hero, bekæmpet 50 monster grupper med hero - bonus: +50 defence
 
 ARTIFACTS:
-Treasure of the Fenris (1x item Treasure of the Fenris, 50 stonebrick, 20 x logs) - bonus: 1% gold find
-(Treasure of the Fenris er nyt item, der kan droppes meget rare i forest fra ulve, hvis spilleren ikke allerede har det i inventory (egen, city eller bygget Treasure of the Fenris))
+
 
 
 

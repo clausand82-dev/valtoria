@@ -167,8 +167,8 @@ export function createVillageOutskirtsMapRegions(region) {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } }, 
-        { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01, }, /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
+        { fileName: "foilage/foilage_plants_mainland.png", lootTables: ["foliage_mainland_magic_plants"]}, 
+        { fileName: "foilage/foilage_roots.png", scale: 0.75, lootTables: ["foliage_bone_dust_roots"] /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
         { fileName: "foilage/foilage_boneparts.png", scale: 0.75 },
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
@@ -193,15 +193,8 @@ export function createVillageOutskirtsMapRegions(region) {
           maxPerRegion: 1,
           levelOffset: 10,
           displayName: "Den Sporsoegende Ulv",
-          loot: {
-            mode: "add",
-            resources: [
-              { resource: "bonedust", min: 1, max: 1, chance: 1, questItem: true },
-            ],
-            items: [
-              { itemId: "iron_sword", chance: 0.08 },
-            ],
-          },
+          lootMode: "add",
+          lootTables: ["rare_document_wolf_loot"],
         },
       ],
       points: "66.99,87.14 35.89,85.02 35.89,68.01 56.22,74.39",
@@ -251,8 +244,8 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       weights: { foilage: 4, water: 8 },
       foliageSet: [
-        { fileName: "foilage/foilage_food.png", weight: 12, scale: 0.5, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03, fruit: 0.10 }, corruption: { max: 4 } },
-        { fileName: "foilage/foilage_cityplant.png", weight: 10, resourceDrop: { red_rose: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 }, corruption: { max: 4 } },
+        { fileName: "foilage/foilage_food.png", weight: 12, scale: 0.5, lootTables: ["foliage_food_fruit"], corruption: { max: 4 } },
+        { fileName: "foilage/foilage_cityplant.png", weight: 10, lootTables: ["foliage_rose_orchard"], corruption: { max: 4 } },
         { fileName: "foilage/foliage_rottenfriut.png", scale: 0.5, weight: 12, corruption: { min: 5 } },
         { fileName: "foilage/foilage_garbage_001.png", weight: 10, corruption: { min: 5 } },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
@@ -420,8 +413,8 @@ export function createVillageOutskirtsMapRegions(region) {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_basement.png", resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } }, 
-        { fileName: "foilage/foilage_boneparts.png", scale: 0.75, resourceDrop: { bonedust: 0.05, magic_essence: 0.02, rare_pink_flower: 0.01 } },
+        { fileName: "foilage/foilage_basement.png", lootTables: ["foliage_basement_scrub"]}, 
+        { fileName: "foilage/foilage_boneparts.png", scale: 0.75, lootTables: ["foliage_bone_dust_roots"]},
         { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true }, corruption: { min: 5 } },
         { fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true }, corruption: { min: 5 } },        
       ],
@@ -575,10 +568,10 @@ export function createVillageOutskirtsMapRegions(region) {
         ],
       },
       foliageSet: [
-        { fileName: "foilage/foilage_garbage_001.png", scale: 0.75, resourceDrop: { magic_essence: 0.05, wood_piece: 0.02, rare_pink_flower: 0.01 } },
+        { fileName: "foilage/foilage_garbage_001.png", scale: 0.75, lootTables: ["foliage_basement_scrub"]},
         { fileName: "foilage/foilage_metalparts.png", scale: 0.75, },
-        { fileName: "foilage/foilage_metalplates.png", scale: 0.75, resourceDrop: { iron_plates: 0.25, } },
-        { fileName: "foilage/foilage_metalchains.png", scale: 0.75, resourceDrop: { iron_chains: 0.20, }},
+        { fileName: "foilage/foilage_metalplates.png", scale: 0.75, lootTables: ["foliage_metal_plates"]},
+        { fileName: "foilage/foilage_metalchains.png", scale: 0.75, lootTables: ["foliage_metal_chains"]},
         //{ fileName: "foilage/foilage_deadvillages.png", scale: 1.35, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
       ,],
       tileset: [
@@ -606,8 +599,8 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 45, resourceDrop: { red_rose: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 },  },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
+        { fileName: "foilage/foilage_field.png", weight: 45, lootTables: ["foliage_rose_orchard"]},
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, lootTables: ["foliage_mainland_fruit_plants"]},
         { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
       ],
       decay: [
@@ -647,13 +640,13 @@ export function createVillageOutskirtsMapRegions(region) {
       labelX: 38,
       labelY: 54,
             foliageSet: [
-        { fileName: "foilage/foilage_field.png", weight: 25, blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { wheat: 0.02, fruit_orange: 0.03, fruit_banana: 0.03 } },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
-        { fileName: "foilage/foilage_deadvillages.png", weight: 35, scale: 1.5, actionId: "bury_village_dead", questTargetKey: "bury_village_dead", blockedBy: {questCompleted: "mayor_repair_village_houses"}, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01 } },
+        { fileName: "foilage/foilage_field.png", weight: 25, blockedBy: {questCompleted: "mayor_repair_village_houses"}, lootTables: ["foliage_field_wheat_fruit"]},
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, lootTables: ["foliage_mainland_fruit_plants"]},
+        { fileName: "foilage/foilage_deadvillages.png", weight: 35, scale: 1.5, actionId: "bury_village_dead", questTargetKey: "bury_village_dead", blockedBy: {questCompleted: "mayor_repair_village_houses"}, lootTables: ["foliage_dead_village_remains"]},
         { fileName: "object/object_gravestone.png", weight: 0, scale: 0.7, rows: 4, cols: 4 },
         { fileName: "foilage/foilage_village_items_broken.png", weight: 10, scale: 0.7, blockedBy: {questCompleted: "mayor_repair_village_houses"}},
         { fileName: "foilage/foilage_village_debris.png", weight: 10, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
-        { fileName: "foilage/foilage_cityplant.png", weight: 25, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } },
+        { fileName: "foilage/foilage_cityplant.png", weight: 25, lootTables: ["foliage_village_cityplants"]},
       ],
       decay: [
         { id: "decay_blood", weight: 50, blockedBy: {questCompleted: "mayor_repair_village_houses"} },
@@ -746,8 +739,8 @@ export function createVillageOutskirtsMapRegions(region) {
             monsters: { min: 8, max: 12 },                          // Monster count range.
   },
       foliageSet: [
-        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, resourceDrop: { red_rose: 0.02, fruit: 0.01, meat: 0.01, wheat: 0.01, fruit_orange: 0.03, fruit_banana: 0.03 } },
-        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2, resourceDrop: { fruit_orange: 0.03, fruit_banana: 0.03 } },
+        { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, lootTables: ["foliage_village_cityplants"]},
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2, lootTables: ["foliage_mainland_fruit_plants"]},
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
         { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
       unlock: {

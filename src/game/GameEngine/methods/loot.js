@@ -15,29 +15,25 @@ import {
   rollUniqueItem,
   clamp,
   distance,
-  READABLE_ITEM_DEFS,
   POTION_DEFS,
   RESOURCE_DEFS,
   UNIQUE_DROP_CHANCES,
   RESTRICTED_DROPS,
-  monsterLootProfile,
-  monsterConfiguredLoot,
-  monsterResourceDrops,
-  rollLootCategory,
   isPotionItem,
   isQuestItem,
   isReadableItem,
   isResourceItem,
   GROUND_LOOT_DESPAWN_SECONDS,
-  cityRuntimeModifiers
+  cityRuntimeModifiers,
+  LOOT_TABLES,
 } from "../dependencies.js";
 import {
   rollItemOfRarity,
   namedItemChanceMultiplier,
   makeResourceItem,
   makeReadableItem,
+  makeQuestItem,
   inventoryCanAccept,
-  readableDropChanceForMonster,
   pickupStatusText,
   randomInt
 } from "../helpers.js";
@@ -109,6 +105,29 @@ function makeConfiguredCommonItem(entry, level) {
     return item;
   }
   return null;
+}
+
+function normalizeLootTableRefs(source) {
+  const refs = [];
+  if (source?.lootTable) refs.push(source.lootTable);
+  if (Array.isArray(source?.lootTables)) refs.push(...source.lootTables);
+  return [...new Set(refs.map((id) => String(id ?? "").trim()).filter(Boolean))];
+}
+
+function weightedLootEntry(entries) {
+  const weighted = (Array.isArray(entries) ? entries : []).filter((entry) => entry && Number(entry.weight) > 0);
+  const total = weighted.reduce((sum, entry) => sum + Number(entry.weight), 0);
+  if (total <= 0) return null;
+  let roll = Math.random() * total;
+  for (const entry of weighted) {
+    roll -= Number(entry.weight);
+    if (roll <= 0) return entry;
+  }
+  return weighted[weighted.length - 1] ?? null;
+}
+
+function chanceValue(entry, fallback = 1) {
+  return Math.max(0, Math.min(1, Number(entry?.chance ?? fallback) || 0));
 }
 
 export const AUTO_LOOT_TYPE_IDS = [
@@ -389,61 +408,28 @@ export const lootMethods = {
   },
 
   dropChestLoot(chest) {
-    const conditionContext = this.questConditionContext?.({ source: "chest", chest }) ?? {};
-    let item = rollUniqueItem(Math.max(1, this.player.level), {
+    const tableIds = normalizeLootTableRefs(chest).length
+      ? normalizeLootTableRefs(chest)
+      : ["chest_unique_named", "chest_common", "chest_bonus_red_rose"];
+    const context = {
       source: "chest",
-      biomeId: this.region.mapRegion?.id,
-      chance: UNIQUE_DROP_CHANCES.chest,
-      worldState: this.worldState,
-      conditionContext,
-    }) ?? rollNamedItem(Math.max(1, this.player.level), {
-      source: "chest",
-      biomeId: this.region.mapRegion?.id,
-      chanceMult: 3,
-      worldState: this.worldState,
-      conditionContext,
-    });
-
-    for (let i = 0; i < 12; i += 1) {
-      if (item) break;
-      const candidate = makeItem(Math.max(1, this.player.level), Math.random());
-      if (candidate.rarity !== "poor") {
-        item = candidate;
-        break;
-      }
-      item = candidate;
+      chest,
+      sourceEntity: chest,
+      conditionContext: this.questConditionContext?.({ source: "chest", chest }) ?? {},
+    };
+    if (normalizeLootTableRefs(chest).length) {
+      this.dropLootFromTables(chest.x, chest.y, tableIds, context, { pickupDelay: 0.35 });
+    } else {
+      const primary = [
+        ...this.rollLootTable("chest_unique_named", context),
+        ...this.rollLootTable("chest_common", context),
+      ].find((drop) => drop.item);
+      if (primary?.item) this.dropGroundItem(chest.x + 0.16, chest.y - 0.16, primary.item, { pickupDelay: 0.35 });
+      this.dropLootFromTables(chest.x, chest.y, ["chest_bonus_red_rose"], context, { pickupDelay: 0.35 });
     }
-
-    if (item?.rarity === "poor") {
-      const poorPrefix = PREFIXES.poor.find((prefix) => item.name.startsWith(`${prefix} `));
-      if (poorPrefix) {
-        item.name = item.name.replace(`${poorPrefix} `, `${PREFIXES.normal[Math.floor(Math.random() * PREFIXES.normal.length)]} `);
-      }
-      item.rarity = "normal";
-      item.rarityLabel = "Normal";
-      item.rarityColor = "#f5f3ea";
-      item.value = itemValue(item);
-    }
-
-    if (!item || this.isDropBlocked(item)) return;
-
-    this.loots.push({
-      id: createId(),
-      type: "item",
-      item,
-      x: chest.x + 0.16,
-      y: chest.y - 0.16,
-      bob: Math.random() * Math.PI * 2,
-      pickupDelay: 0.35,
-      despawn: GROUND_LOOT_DESPAWN_SECONDS,
-    });
-    this.trackItemDropped(item);
     this.addParticles(chest.x, chest.y, "#ffd85d", 18, 0.12);
-    this.addFloater(chest.x, chest.y, item.name, item.rarityColor, 1.05);
+    this.addFloater(chest.x, chest.y, "Chest loot", "#ffd85d", 1.05);
     this.markRenderDirty?.("loot-drop");
-
-    // Small chance for chest to also contain a red rose resource
-    this.dropResourceLoot(chest.x, chest.y, [{ resource: "red_rose", chance: 0.05, min: 1, max: 1 }]);
   },
 
   dropGroundItem(x, y, item, options = {}) {
@@ -452,6 +438,7 @@ export const lootMethods = {
       id: createId(),
       type: "item",
       item,
+      countAsCollected: Boolean(options.countAsCollected),
       x: x + (Math.random() - 0.5) * (options.spread ?? 0.7),
       y: y + (Math.random() - 0.5) * (options.spread ?? 0.7),
       bob: Math.random() * Math.PI * 2,
@@ -463,214 +450,198 @@ export const lootMethods = {
     return true;
   },
 
-  configuredLootLevel(monster, entry = {}) {
-    const baseLevel = Math.max(1, Math.floor(Number(monster?.lootLevel ?? monster?.level) || 1));
+  resolveLootTables(source, context = {}) {
+    const sourceTables = normalizeLootTableRefs(source);
+    if (context.lootMode === "override" || source?.lootMode === "override") return sourceTables;
+    return sourceTables;
+  },
+
+  lootEntryLevel(source, entry = {}) {
+    const baseLevel = Math.max(1, Math.floor(Number(source?.lootLevel ?? source?.level ?? this.player?.level) || 1));
     if (entry.level !== undefined) return Math.max(1, Math.floor(Number(entry.level) || baseLevel));
     if (entry.levelOffset !== undefined) return Math.max(1, baseLevel + Math.floor(Number(entry.levelOffset) || 0));
     return baseLevel;
   },
 
-  dropConfiguredItemEntries(monster, entries = [], conditionContext = {}) {
-    for (const entry of entries) {
-      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
-      if (!entry || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
-      const item = makeConfiguredCommonItem(entry, this.configuredLootLevel(monster, entry));
-      if (!item) continue;
-      this.dropGroundItem(monster.x, monster.y, item);
+  createLootEntryItem(entry, context = {}) {
+    const source = context.sourceEntity ?? context.monster ?? context.object ?? context.chest ?? this.player;
+    const level = this.lootEntryLevel(source, entry);
+    const type = String(entry?.type ?? "").trim();
+    if (type === "resource") {
+      const id = entry.id ?? entry.resourceId ?? entry.resource;
+      const count = Math.max(1, Math.floor(randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1) * (1 + (this.calcStats().resourceFind ?? 0))));
+      const item = makeResourceItem(id, count);
+      if (item && entry.questItem !== undefined) item.questItem = Boolean(entry.questItem);
+      return item;
     }
+    if (type === "potion") return makePotion(entry.potionId ?? entry.id, level);
+    if (type === "potionPool") return makePotion(rollPotionIdForCategory(entry.category ?? "all"), level);
+    if (type === "readable") return makeReadableItem(entry.readableId ?? entry.id);
+    if (type === "questItem") return makeQuestItem(entry.questItemId ?? entry.id, entry.questInstanceId ?? context.quest?.id ?? context.questId);
+    if (type === "item") return makeConfiguredCommonItem(entry, level);
+    if (type === "named") {
+      const id = entry.itemId ?? entry.id;
+      if (id) {
+        const definition = NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(id));
+        if (!definition) return null;
+        if (!worldEntryAllowed(definition, this.worldState, context.conditionContext ?? {})) return null;
+        return makeNamedItem(definition, level);
+      }
+      const monster = context.monster;
+      const chanceMult = entry.chanceMult === "monster"
+        ? namedItemChanceMultiplier(monster) * (1 + (this.calcStats().magicFind ?? 0))
+        : Number(entry.chanceMult ?? 1) * (1 + (entry.magicFind ? this.calcStats().magicFind ?? 0 : 0));
+      return rollNamedItem(level, {
+        source: monster?.isBoss ? "boss" : entry.source ?? context.source ?? "monster",
+        biomeId: this.region.mapRegion?.id,
+        chanceMult,
+        worldState: this.worldState,
+        conditionContext: context.conditionContext ?? {},
+      });
+    }
+    if (type === "unique") {
+      const id = entry.itemId ?? entry.id;
+      if (id) {
+        const definition = UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(id));
+        if (!definition) return null;
+        if (!worldEntryAllowed(definition, this.worldState, context.conditionContext ?? {})) return null;
+        return makeUniqueItem(definition, level);
+      }
+      const monster = context.monster;
+      const baseChance = Number(entry.chance ?? UNIQUE_DROP_CHANCES.monster) || 0;
+      const chance = baseChance * (1 + (entry.magicFind ? this.calcStats().magicFind ?? 0 : 0));
+      return rollUniqueItem(level, {
+        source: monster?.isBoss ? "boss" : entry.source ?? context.source ?? "monster",
+        biomeId: this.region.mapRegion?.id,
+        chance,
+        worldState: this.worldState,
+        conditionContext: context.conditionContext ?? {},
+      });
+    }
+    if (type === "equipment") {
+      const category = String(entry.category ?? "all");
+      if (category === "none") return null;
+      if (entry.rarity) return rollItemOfRarity(level, String(entry.rarity), Math.max(1, Math.floor(Number(entry.tries) || 60)));
+      for (let i = 0; i < Math.max(1, Math.floor(Number(entry.tries) || 1)); i += 1) {
+        const item = makeItem(level, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
+        if (entry.minRarity === "normal" && item?.rarity === "poor") continue;
+        return item;
+      }
+      const item = makeItem(level, Math.random());
+      if (entry.minRarity === "normal" && item?.rarity === "poor") {
+        const poorPrefix = PREFIXES.poor.find((prefix) => item.name.startsWith(`${prefix} `));
+        if (poorPrefix) item.name = item.name.replace(`${poorPrefix} `, `${PREFIXES.normal[Math.floor(Math.random() * PREFIXES.normal.length)]} `);
+        item.rarity = "normal";
+        item.rarityLabel = "Normal";
+        item.rarityColor = "#f5f3ea";
+        item.value = itemValue(item);
+      }
+      return item;
+    }
+    return null;
   },
 
-  dropConfiguredNamedEntries(monster, entries = [], conditionContext = {}) {
-    for (const entry of entries) {
-      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
-      if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
-      const definition = NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(entry.itemId));
-      if (!definition) continue;
-      if (!worldEntryAllowed(definition, this.worldState, conditionContext)) continue;
-      const item = makeNamedItem(definition, this.configuredLootLevel(monster, entry));
-      this.dropGroundItem(monster.x, monster.y, item);
+  lootEntryChance(entry, context = {}) {
+    const type = String(entry?.type ?? "").trim();
+    let chance = chanceValue(entry, entry?.weight !== undefined ? 1 : 1);
+    const stats = this.calcStats();
+    const cityModifiers = cityRuntimeModifiers(this.cityStats);
+    if (type === "resource") {
+      const resourceId = entry.id ?? entry.resourceId ?? entry.resource;
+      chance *= (1 + (stats.resourceFind ?? 0)) * (cityModifiers.resourceDropMultiplierById?.[resourceId] ?? 1);
+    } else if (type === "potion" || type === "potionPool") {
+      chance *= cityModifiers.potionDropMultiplier ?? 1;
+    } else if (type === "gold") {
+      chance *= 1 + (stats.goldFind ?? 0);
     }
+    return Math.max(0, Math.min(1, chance));
   },
 
-  dropConfiguredUniqueEntries(monster, entries = [], conditionContext = {}) {
-    for (const entry of entries) {
-      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
-      if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
-      const definition = UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(entry.itemId));
-      if (!definition) continue;
-      if (!worldEntryAllowed(definition, this.worldState, conditionContext)) continue;
-      const item = makeUniqueItem(definition, this.configuredLootLevel(monster, entry));
-      this.dropGroundItem(monster.x, monster.y, item);
+  rollLootEntry(entry, context = {}) {
+    if (!entry || !worldEntryAllowed(entry, this.worldState, context.conditionContext ?? context)) return [];
+    const type = String(entry.type ?? "").trim();
+    if (type === "gold") {
+      if (Math.random() > this.lootEntryChance(entry, context)) return [];
+      const source = context.sourceEntity ?? context.monster ?? this.player;
+      const level = Math.max(1, Math.floor(Number(source?.lootLevel ?? source?.level ?? this.player?.level) || 1));
+      const cityModifiers = cityRuntimeModifiers(this.cityStats);
+      const stats = this.calcStats();
+      const gold = Math.floor((4 + Math.random() * 9) * (1 + level * 0.28) * Number(entry.goldMult ?? 1) * (1 + stats.goldFind) * (cityModifiers.goldDropMultiplier ?? 1));
+      return gold > 0 ? [{ type: "gold", amount: gold }] : [];
     }
+    const rollsInternally = (type === "unique" || type === "named") && !(entry.itemId ?? entry.id);
+    if (!rollsInternally && Math.random() > this.lootEntryChance(entry, context)) return [];
+    const item = this.createLootEntryItem(entry, context);
+    if (!item || this.isDropBlocked(item)) return [];
+    return [{ type: "item", item, countAsCollected: type === "resource" || Boolean(entry.countAsCollected) }];
+  },
+
+  rollLootTable(tableId, context = {}) {
+    const entries = LOOT_TABLES[String(tableId)] ?? [];
+    if (!Array.isArray(entries) || !entries.length) return [];
+    const drops = [];
+    for (const entry of entries.filter((candidate) => !candidate?.weight)) {
+      drops.push(...this.rollLootEntry(entry, context));
+    }
+    const weighted = weightedLootEntry(entries);
+    if (weighted && !this.isDropCategoryBlocked(weighted.category)) {
+      drops.push(...this.rollLootEntry(weighted, context));
+      if (weighted.category === "all" && context.monster && Math.random() < clamp(0.08 + context.monster.level * 0.01, 0.08, 0.24)) {
+        drops.push(...this.rollLootEntry({ type: "potionPool", category: "all", chance: 1 }, context));
+      }
+    }
+    return drops;
+  },
+
+  rollLootTables(tableIds = [], context = {}) {
+    return tableIds.flatMap((tableId) => this.rollLootTable(tableId, context));
+  },
+
+  dropLootFromTables(x, y, tableIds = [], context = {}, options = {}) {
+    const drops = this.rollLootTables(tableIds, context);
+    for (const drop of drops) {
+      if (drop.type === "gold") {
+        this.loots.push({
+          id: createId(),
+          type: "gold",
+          amount: drop.amount,
+          x: x + (Math.random() - 0.5) * (options.spread ?? 0.5),
+          y: y + (Math.random() - 0.5) * (options.spread ?? 0.5),
+          bob: Math.random() * Math.PI * 2,
+          despawn: GROUND_LOOT_DESPAWN_SECONDS,
+        });
+        this.markRenderDirty?.("loot-drop");
+      } else if (drop.item) {
+        this.dropGroundItem(x, y, drop.item, { spread: options.spread ?? 0.7, pickupDelay: options.pickupDelay ?? 0.35, countAsCollected: drop.countAsCollected });
+      }
+    }
+    return drops;
   },
 
   dropRareMobLoot(monster) {
-    const rareLoot = monster?.rareLoot;
-    if (!rareLoot || typeof rareLoot !== "object") return;
-    const context = this.questConditionContext?.({ monster }) ?? {};
-    const allowedLines = (entries) => (Array.isArray(entries)
-      ? entries.filter((entry) => worldEntryAllowed(entry, this.worldState, context))
-      : []);
-    this.dropResourceLoot(monster.x, monster.y, allowedLines(rareLoot.resources));
-    this.dropConfiguredItemEntries(monster, allowedLines(rareLoot.items), context);
-    this.dropConfiguredNamedEntries(monster, allowedLines(rareLoot.named), context);
-    this.dropConfiguredUniqueEntries(monster, allowedLines(rareLoot.uniques), context);
+    const tableIds = normalizeLootTableRefs(monster?.instanceLootTables?.length ? { lootTables: monster.instanceLootTables } : monster);
+    if (!tableIds.length) return;
+    this.dropLootFromTables(monster.x, monster.y, tableIds, {
+      source: "rare_mob",
+      monster,
+      sourceEntity: monster,
+      conditionContext: this.questConditionContext?.({ monster, source: "rare_mob" }) ?? {},
+    });
   },
 
   dropLoot(monster) {
-    const rareMode = monster?.rareLoot?.mode === "override" ? "override" : "add";
+    const rareMode = monster?.lootMode === "override" ? "override" : "add";
     if (rareMode !== "override") {
-      const profile = monsterLootProfile(monster.typeName);
-      const lootLevel = monster.lootLevel ?? monster.level;
-      const stats = this.calcStats();
-      this.dropResourceLoot(monster.x, monster.y, monsterResourceDrops(monster));
       this.dropQuestLoot(monster);
-      this.dropReadableLoot(monster);
-      const configuredLoot = monsterConfiguredLoot(monster);
-      const configuredLootContext = this.questConditionContext?.({
+      this.dropLootFromTables(monster.x, monster.y, normalizeLootTableRefs(monster), {
+        source: "monster",
         monster,
-        source: "monster_config",
-        sourceRegionId: this.region?.mapRegion?.id,
-      }) ?? {};
-      this.dropConfiguredItemEntries(monster, configuredLoot.items, configuredLootContext);
-      this.dropConfiguredNamedEntries(monster, configuredLoot.named, configuredLootContext);
-      this.dropConfiguredUniqueEntries(monster, configuredLoot.uniques, configuredLootContext);
-      const gearDropSource = monster.isBoss ? "boss" : "monster";
-      if (Math.random() < profile.goldChance) {
-        const cityModifiers = cityRuntimeModifiers(this.cityStats);
-        const gold = Math.floor((4 + Math.random() * 9) * (1 + lootLevel * 0.28) * profile.goldMult * (1 + stats.goldFind) * (cityModifiers.goldDropMultiplier ?? 1));
-        if (gold > 0) {
-          this.loots.push({
-            id: createId(),
-            type: "gold",
-            amount: gold,
-            x: monster.x + (Math.random() - 0.5) * 0.5,
-            y: monster.y + (Math.random() - 0.5) * 0.5,
-            bob: Math.random() * Math.PI * 2,
-            despawn: GROUND_LOOT_DESPAWN_SECONDS,
-          });
-          this.markRenderDirty?.("loot-drop");
-        }
-      }
-
-      const unique = rollUniqueItem(lootLevel, {
-        source: gearDropSource,
-        biomeId: this.region.mapRegion?.id,
-        chance: UNIQUE_DROP_CHANCES.monster * (1 + stats.magicFind),
-        worldState: this.worldState,
-        conditionContext: this.questConditionContext?.({ monster, source: gearDropSource }) ?? {},
+        sourceEntity: monster,
+        conditionContext: this.questConditionContext?.({ monster, source: monster.isBoss ? "boss" : "monster", sourceRegionId: this.region?.mapRegion?.id }) ?? {},
       });
-      if (unique) this.dropGroundItem(monster.x, monster.y, unique);
-
-      const named = rollNamedItem(lootLevel, {
-        source: gearDropSource,
-        biomeId: this.region.mapRegion?.id,
-        chanceMult: namedItemChanceMultiplier(monster) * (1 + stats.magicFind),
-        worldState: this.worldState,
-        conditionContext: this.questConditionContext?.({ monster, source: gearDropSource }) ?? {},
-      });
-      if (named) this.dropGroundItem(monster.x, monster.y, named);
-
-      const category = rollLootCategory(profile.weights);
-      if (category && category !== "none" && !this.isDropCategoryBlocked(category)) {
-        const cityModifiers = cityRuntimeModifiers(this.cityStats);
-        const potionAllowed = category !== "health" && category !== "mana"
-          ? true
-          : Math.random() < (cityModifiers.potionDropMultiplier ?? 1);
-        const item = category === "health" || category === "mana"
-          ? potionAllowed ? makePotion(rollPotionIdForCategory(category), lootLevel) : null
-          : makeItem(lootLevel, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
-        if (item) this.dropGroundItem(monster.x, monster.y, item);
-
-        if (category === "all" && Math.random() < clamp(0.08 + monster.level * 0.01, 0.08, 0.24)) {
-          const potion = makePotion(rollPotionIdForCategory("all"), lootLevel);
-          if (Math.random() < (cityModifiers.potionDropMultiplier ?? 1)) {
-            this.dropGroundItem(monster.x, monster.y, potion, { spread: 0.85 });
-          }
-        }
-      }
     }
 
     this.dropRareMobLoot(monster);
-  },
-
-  dropReadableLoot(monster) {
-    for (const def of READABLE_ITEM_DEFS) {
-      if (!def?.id || !def?.dropTable) continue;
-      const chance = readableDropChanceForMonster(def.dropTable, monster.typeName);
-      if (chance <= 0 || Math.random() > chance) continue;
-      const item = makeReadableItem(def.id);
-      if (!item || this.isDropBlocked(item)) continue;
-      this.loots.push({
-        id: createId(),
-        type: "item",
-        item,
-        x: monster.x + (Math.random() - 0.5) * 0.7,
-        y: monster.y + (Math.random() - 0.5) * 0.7,
-        bob: Math.random() * Math.PI * 2,
-        pickupDelay: 0.25,
-        despawn: GROUND_LOOT_DESPAWN_SECONDS,
-      });
-      this.trackItemDropped(item);
-      this.markRenderDirty?.("loot-drop");
-    }
-  },
-
-  dropResourceLoot(x, y, entries = []) {
-    const stats = this.calcStats();
-    const cityModifiers = cityRuntimeModifiers(this.cityStats);
-    for (const entry of entries) {
-      const resourceMultiplier = cityModifiers.resourceDropMultiplierById?.[entry?.resource] ?? 1;
-      if (!entry?.resource || Math.random() > Math.min(1, (entry.chance ?? 1) * (1 + stats.resourceFind) * resourceMultiplier)) continue;
-      const amount = Math.max(1, Math.floor(randomInt(entry.min ?? 1, entry.max ?? entry.min ?? 1) * (1 + stats.resourceFind)));
-      const item = makeResourceItem(entry.resource, amount);
-      if (!item || this.isDropBlocked(item)) continue;
-      if (entry.questItem !== undefined) item.questItem = Boolean(entry.questItem);
-      this.loots.push({
-        id: createId(),
-        type: "item",
-        item,
-        countAsCollected: true,
-        x: x + (Math.random() - 0.5) * 0.65,
-        y: y + (Math.random() - 0.5) * 0.65,
-        bob: Math.random() * Math.PI * 2,
-        pickupDelay: 0.35,
-        despawn: GROUND_LOOT_DESPAWN_SECONDS,
-      });
-      this.trackItemDropped(item);
-      this.markRenderDirty?.("loot-drop");
-    }
-  },
-
-  dropObjectItemLoot(x, y, entries = []) {
-    const cityModifiers = cityRuntimeModifiers(this.cityStats);
-    for (const entry of entries) {
-      if (!entry || Math.random() > (entry.chance ?? 0)) continue;
-      if (entry.potion || entry.potionId) {
-        if (Math.random() >= (cityModifiers.potionDropMultiplier ?? 1)) continue;
-        const item = makePotion(entry.potionId ?? entry.potion, Math.max(1, Math.floor(Number(entry.level) || this.player?.level || 1)));
-        this.dropGroundItem(x, y, item);
-        continue;
-      }
-      const rarity = String(entry.rarity ?? "legendary");
-      const tries = Math.max(1, Math.floor(Number(entry.tries) || 60));
-      const levelOffset = Math.floor(Number(entry.levelOffset) || 0);
-      const level = Math.max(1, this.player.level + levelOffset);
-      const item = rollItemOfRarity(level, rarity, tries);
-      if (!item || this.isDropBlocked(item)) continue;
-      this.loots.push({
-        id: createId(),
-        type: "item",
-        item,
-        x: x + (Math.random() - 0.5) * 0.65,
-        y: y + (Math.random() - 0.5) * 0.65,
-        bob: Math.random() * Math.PI * 2,
-        pickupDelay: 0.35,
-        despawn: GROUND_LOOT_DESPAWN_SECONDS,
-      });
-      this.trackItemDropped(item);
-      this.markRenderDirty?.("loot-drop");
-    }
   },
 
   isDropRestricted(item) {

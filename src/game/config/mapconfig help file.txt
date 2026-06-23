@@ -1,4 +1,4 @@
-/*
+﻿/*
 Region parameter guide:
 
 Example region with old and conditional formats:
@@ -35,19 +35,19 @@ region({
   water: [{ fileName: "tileset/tileset_water.png", weight: 1, x: [1, 2], y: [1, 3] }], // Water tiles. Water only appears when spawnCounts.water > 0.
 
   foliageSet: [                                            // Old format: fixed foliage sheets.
-    { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // resourceDrop is chance per placed foliage.
+    { fileName: "foilage/foilage_plants_mainland.png", lootTables: { wood_piece: 0.02 } }, // lootTables is chance per placed foliage.
     { fileName: "foilage/foilage_roots.png", scale: 0.75 }, // fileName is the patch key for foliageSet.
   ],
   foliageSet: {                                             // New format: conditional foliage.
     value: [
-      { fileName: "foilage/foilage_plants_mainland.png", resourceDrop: { wood_piece: 0.02 } }, // Default foliage entry.
-      { fileName: "foilage/foilage_roots.png", scale: 0.75, resourceDrop: { bonedust: 0.05 } }, // rows/cols/particles/depthMode also supported.
+      { fileName: "foilage/foilage_plants_mainland.png", lootTables: { wood_piece: 0.02 } }, // Default foliage entry.
+      { fileName: "foilage/foilage_roots.png", scale: 0.75, lootTables: { bonedust: 0.05 } }, // rows/cols/particles/depthMode also supported.
     ],
     variants: [
       {
         requires: { flag: "region.example-copse.corrupted" }, // Only applies while corrupted flag is true.
         patch: [
-          { fileName: "foilage/foilage_roots.png", scale: 1.1, resourceDrop: { bonedust: 0.15 } }, // Deep-merges into matching default entry.
+          { fileName: "foilage/foilage_roots.png", scale: 1.1, lootTables: { bonedust: 0.15 } }, // Deep-merges into matching default entry.
           { fileName: "foilage/foilage_deadanimal_small.png", particles: { type: "flies", chance: 0.75 } }, // Adds entry if fileName is new.
         ],
       },
@@ -197,3 +197,4 @@ tileset: [
 
 Any extra fields passed to region({...}) are preserved on the region object for later use.
 */
+

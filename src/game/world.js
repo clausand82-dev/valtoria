@@ -24,6 +24,7 @@ import {
   normalizeRegionDecaySets,
 } from "./config/decay-config.js";
 import { normalizeParticleConfigs, rollParticleConfigs } from "./config/particle-presets.js";
+import { LOOT_TABLES } from "./config/loot-tables-config.js";
 import { resolveWeatherForRegion } from "./config/weather-presets.js";
 import { potionDefById, normalizePotionId } from "./config/potion-config.js";
 import { BOSS_TINT } from "./config/monster-config.js";
@@ -755,7 +756,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         rows: set.rows,
         cols: set.cols,
         variantCount: set.variantCount,
-        resourceDrops: set.resourceDrops.map((entry) => ({ ...entry })),
+        lootTables: Array.isArray(set.lootTables) ? [...set.lootTables] : [],
         particles: set.particles.map((entry) => ({ ...entry })),
         actionId: set.actionId,
         questTargetKey: set.questTargetKey,
@@ -849,7 +850,8 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
       rareMobs: Array.isArray(regionConfig.rareMobs)
         ? regionConfig.rareMobs.map((entry) => ({
           ...entry,
-          loot: cloneRareMobLoot(entry.loot),
+          lootTables: Array.isArray(entry.lootTables) ? [...entry.lootTables] : [],
+          lootMode: entry.lootMode === "override" ? "override" : "add",
         }))
         : [],
       mapSize: regionConfig.mapSize ?? "medium",
@@ -1124,27 +1126,10 @@ function pickWeightedFoliageSetForChunk(entries, chunk, salt) {
   return entries[entries.length - 1];
 }
 
-function rollFoliageResourceDrops(entry, cx, cy, foliageIndex) {
-  const drops = Array.isArray(entry?.resourceDrops) ? entry.resourceDrops : [];
-  if (!drops.length) return [];
-  const rolled = [];
-  for (let i = 0; i < drops.length; i += 1) {
-    const drop = drops[i];
-    const chance = Math.max(0, Math.min(1, Number(drop.chance) || 0));
-    if (chance <= 0 || rand01(cx, cy, 7060 + foliageIndex * 97 + i * 13) > chance) continue;
-    const min = Math.max(1, Math.floor(Number(drop.min) || 1));
-    const max = Math.max(min, Math.floor(Number(drop.max) || min));
-    const count = min + Math.floor(rand01(cx, cy, 7070 + foliageIndex * 97 + i * 13) * (max - min + 1));
-    rolled.push({
-      resource: drop.resource,
-      count,
-    });
-  }
-  return rolled;
-}
-
 function rollFoliageResourceDropsForChunk(entry, chunk, foliageIndex) {
-  const drops = Array.isArray(entry?.resourceDrops) ? entry.resourceDrops : [];
+  const drops = (Array.isArray(entry?.lootTables) ? entry.lootTables : [])
+    .flatMap((tableId) => LOOT_TABLES[tableId] ?? [])
+    .filter((drop) => drop?.type === "resource");
   if (!drops.length) return [];
   const rolled = [];
   for (let i = 0; i < drops.length; i += 1) {
@@ -1155,7 +1140,7 @@ function rollFoliageResourceDropsForChunk(entry, chunk, foliageIndex) {
     const max = Math.max(min, Math.floor(Number(drop.max) || min));
     const count = min + Math.floor(chunkRand01(chunk, 7070 + foliageIndex * 97 + i * 13) * (max - min + 1));
     rolled.push({
-      resource: drop.resource,
+      resource: drop.id ?? drop.resourceId,
       count,
     });
   }
@@ -1368,7 +1353,7 @@ function resolvePrefabFoliage(item, chunk, index) {
       sheetId: direct.sheetId,
       variantCount: direct.variantCount,
       scale: direct.scale,
-      resourceDrops: direct.resourceDrops,
+      lootTables: Array.isArray(direct.lootTables) ? [...direct.lootTables] : [],
       particles: rollParticleConfigs(direct.particles, () => rand01(chunk.cx, chunk.cy, 7965 + index)),
       depthMode: direct.depthMode,
       sortAnchor: direct.sortAnchor ? { ...direct.sortAnchor } : { x: 0.5, y: 1 },
@@ -1379,7 +1364,7 @@ function resolvePrefabFoliage(item, chunk, index) {
     sheetId: item.id ?? chunk.region?.mapRegion?.foliageSets?.[0]?.sheetId ?? null,
     variantCount: Math.max(1, Math.floor(Number(item.variantCount) || 64)),
     scale: null,
-    resourceDrops: [],
+    lootTables: [],
     particles: [],
     depthMode: "ground",
     sortAnchor: { x: 0.5, y: 1 },
@@ -1416,7 +1401,8 @@ function addPrefabFoliage(chunk, instance) {
       animSeed: rand01(chunk.cx, chunk.cy, 7960 + i) * Math.PI * 2,
       visualScale: hasFixedScale ? 1 : Number(item.visualScale) || 1,
       wind: 0.1,
-      resourceDrops: foliage.resourceDrops,
+      lootTables: Array.isArray(foliage.lootTables) ? [...foliage.lootTables] : [],
+      resourceDrops: rollFoliageResourceDropsForChunk(foliage, chunk, i),
       particles: foliage.particles,
       depthMode: foliage.depthMode,
       sortAnchor: foliage.sortAnchor,
@@ -1876,6 +1862,7 @@ function addFoliage(chunk, safeChunk) {
       animSeed: chunkRand01(chunk, 6800 + i) * Math.PI * 2,
       visualScale: hasFixedScale ? 1 : 0.84 + chunkRand01(chunk, 6900 + i) * 0.38,
       wind: chunkRand01(chunk, 7000 + i) * 0.5,
+      lootTables: Array.isArray(selectedFoliageSet?.lootTables) ? [...selectedFoliageSet.lootTables] : [],
       resourceDrops,
       particles,
       actionId: selectedFoliageSet?.actionId ?? null,
@@ -1979,17 +1966,6 @@ function pickWeightedMob(entries, roll) {
   }
   const last = entries[entries.length - 1];
   return typeof last === "string" ? last : last.type;
-}
-
-function cloneRareMobLoot(loot) {
-  if (!loot || typeof loot !== "object" || Array.isArray(loot)) return null;
-  return {
-    ...loot,
-    resources: Array.isArray(loot.resources) ? loot.resources.map((entry) => ({ ...entry })) : [],
-    items: Array.isArray(loot.items) ? loot.items.map((entry) => ({ ...entry })) : [],
-    named: Array.isArray(loot.named) ? loot.named.map((entry) => ({ ...entry })) : [],
-    uniques: Array.isArray(loot.uniques) ? loot.uniques.map((entry) => ({ ...entry })) : [],
-  };
 }
 
 function clampRareMobScale(value) {
@@ -2157,6 +2133,8 @@ function createChunkMonster(chunk, slotIndex, monsterType, x, y, level, extra = 
     isBoss: Boolean(base.isBoss),
     boss: base.isBoss ? { ...BOSS_TINT } : null,
     noLoot: Boolean(base.noLoot),
+    lootTables: Array.isArray(base.lootTables) ? [...base.lootTables] : [],
+    lootMode: "add",
     despawnOnDeath: Boolean(base.despawnOnDeath),
     onHitStatus: base.onHitStatus ? { ...base.onHitStatus } : null,
     leapAttack: base.leapAttack ? { ...base.leapAttack } : null,
@@ -2247,7 +2225,8 @@ function addMonsters(chunk, safeChunk) {
     chunk.monsters.push(createChunkMonster(chunk, i, monsterType, x, y, level, rareMob ? {
       spawnSource: "rareMobs",
       rareMobId: rareMobKey(rareMob),
-      rareLoot: cloneRareMobLoot(rareMob.loot),
+      instanceLootTables: Array.isArray(rareMob.lootTables) ? [...rareMob.lootTables] : [],
+      lootMode: rareMob.lootMode === "override" ? "override" : "add",
       displayName: rareDisplayName,
       visualScale: Number((baseVisualScale * scaleMultiplier).toFixed(3)),
       color: rareTint || undefined,

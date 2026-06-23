@@ -1,285 +1,118 @@
 import { normalizeParticleConfigs } from "./particle-presets.js";
-import { OBJECT_SOCKET_CONFIG } from "./object-sockets-config.js";
-
-// TODO:DELETE - TREE_OBJECT_BY_BIOME is only used by legacyRegionObjectsFromWeights. All regions now use explicit objects: arrays.
-// const TREE_OBJECT_BY_BIOME = {
-//   sand: "object_tree_sand",
-//   jungle: "object_tree_jungle",
-//   rock: "object_tree_rock",
-//   lava: "object_tree_lava",
-//   mainland: "object_tree_mainland",
-// };
-// TODO:DELETE - legacy tree fallback is disabled. Regions must now specify explicit objects.
-// function getTreeObjectIdForBiome(biomeId) {
-//   const map = { snow: "object_tree_snow", desert: "object_tree_sand", sand: "object_tree_sand", jungle: "object_tree_jungle", rock: "object_tree_rock", lava: "object_tree_lava" };
-//   return map[biomeId] ?? "object_tree_mainland";
-// }
-
-/*
-Region object definition guide
-
-Fields used on each object in REGION_OBJECT_DEFS:
-- spawnTypes: Runtime types that can be spawned for this object id.
-  Example: [{ type: "object_woodboxes_ground", weight: 1 }]
-- TODO:DELETE legacyWeightKey: Only used by legacyRegionObjectsFromWeights (old biodome weight system).
-- defaultDestructible: Default destructible flag if region override is not set.
-- destructible: Inline destructible data used by runtime object damage/loot.
-  destructible.itemLoot can drop gear by rarity or potions by id.
-  Examples: { rarity: "legendary", chance: 0.0035 }, { potion: "potion_orange_regen_health_mana", chance: 0.02 }
-- destroyRewards: Optional raw world energy rewards when this object is destroyed.
-  Example: destroyRewards: { lydra: 1, netdra: 0.1 }
-  Region overrides in map-region-config.js can also set destroyRewards per object spawn entry.
-- defaultActionId: Optional fallback action id for objects spawned from this definition.
-- spawnDamage: Optional start damage state: "all", "damaged", "destroyed",
-  or "damaged_destroyed". Omit for current behavior: spawn undamaged.
-- spawnTags/spawnAvoidRadius: Optional spawn influence metadata, e.g. canopy zones.
-- avoidSpawnTags: Optional list of spawn influence tags this object should avoid.
-- foregroundFade: Optional render fade when this object is in front of actors/loot.
-- renderBiomeId: Optional visual biome override when rendering.
-- graphicsRef: PNG reference text. For new object_* sheet generation this should
-  contain a real file name like "my_object.png".
-- graphics: Optional explicit graphics config.
-  - { mode: "sheet", fileName, rows, cols, renderScale }
-  - { mode: "sheet", files: [...], rows, cols, renderScale } combines variants from multiple sheets.
-  - { mode: "frames", frameFiles: [...], animated: true, ... }
-- depthMode: Render sorting layer. Use "dynamic" for tall/blocking props that
-  should sort with actors, "ground" for flat decoration.
-- sortAnchor: Visual base point inside the rendered sprite, normalized 0..1.
-  Default is { x: 0.5, y: 1 }.
-- depthOffset: Optional pixel offset applied after sortAnchor depth.
-- particles: Optional visual-only particle effects attached to placed objects,
-  for example smoke, embers, flies, spores, or magical glow. particles.type
-  must match PARTICLE_PRESETS in particle-presets.js.
-- sockets: Socket definitions from object-sockets-config.js. Sheet-space x/y
-  are Photoshop coordinates on the whole sheet and are converted to frame-local
-  coordinates at runtime. Missing sockets are valid and skip effects.
-- attachedEffects: Particle or visual effects that attach to named sockets.
-  Use socket for one exact match or socketPrefix for groups like lanternA/B.
-  Region objects can override only enable/settings with effects:
-  { chimneySmoke: false, lanternGlow: true, windowGlow: { enabled: true, onlyAtNight: true } }.
-
-How to tell old vs new system here:
-- New defs-driven sheet path: spawnTypes has exactly one type starting with
-  "object_". See inferSheetObjectType() below.
-- Old path: spawnTypes uses non-object types (for example "firebeacon"), and
-  the visual sheet is still provided by OBJECT_SHEETS in asset-config.js.
-
-Example if firebeacon is moved to new system later:
-object_firebeacon_snow: {
-  spawnTypes: [{ type: "object_firebeacon_snow", weight: 1 }],
-  defaultDestructible: false,
-  renderBiomeId: "snow",
-  graphicsRef: "firebeacon_snow_animated_001.png",
-  graphics: {
-    mode: "frames",
-    frameFiles: [
-      "firebeacon_snow_animated_001.png",
-      "firebeacon_snow_animated_002.png",
-      "firebeacon_snow_animated_003.png",
-      "firebeacon_snow_animated_004.png",
-      "firebeacon_snow_animated_005.png",
-      "firebeacon_snow_animated_006.png",
-      "firebeacon_snow_animated_007.png",
-      "firebeacon_snow_animated_008.png",
-    ],
-    animated: true,
-    renderScale: 0.29,
-  },
-}
-*/
-
-export const REGION_OBJECT_LOOT_TABLES = {
-  WOOD: Object.freeze([
-    { resource: "wood_piece", min: 2, max: 6, chance: 0.45 },
-    { resource: "wood_plank", min: 1, max: 2, chance: 0.02 },
-    { resource: "coal", min: 1, max: 2, chance: 0.01 },
-  ]),
-  STONE: Object.freeze([
-    { resource: "rock_piece", min: 2, max: 5, chance: 0.45 },
-    { resource: "iron_piece", min: 1, max: 2, chance: 0.11 },
-    { resource: "coal", min: 1, max: 2, chance: 0.1 },
-    { resource: "stone_brick", min: 1, max: 1, chance: 0.04 },
-    { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-  ]),
-  RARE: Object.freeze([
-    { resource: "red_gemstone", min: 1, max: 1, chance: 0.004 },
-    { resource: "yellow_gemstone", min: 1, max: 1, chance: 0.004 },
-    { resource: "green_gemstone", min: 1, max: 1, chance: 0.004 },
-    { resource: "blue_gemstone", min: 1, max: 1, chance: 0.004 },
-    { resource: "black_gemstone", min: 1, max: 1, chance: 0.0007 },
-    { resource: "white_gemstone", min: 1, max: 1, chance: 0.0007 },
-    { resource: "diamond", min: 1, max: 1, chance: 0.00045 },
-  ]),
-  HOUSE: Object.freeze([
-    { resource: "junk", min: 2, max: 6, chance: 1 },
-    { resource: "wood_piece", min: 1, max: 5, chance: 0.45 },
-    { resource: "rock_piece", min: 1, max: 4, chance: 0.34 },
-    { resource: "iron_piece", min: 1, max: 2, chance: 0.12 },
-    { resource: "crystal_piece", min: 1, max: 4, chance: 0.06 },
-    { resource: "meat", min: 1, max: 2, chance: 0.05 },
-    { resource: "fruit", min: 1, max: 2, chance: 0.05 },
-    { resource: "coal", min: 1, max: 2, chance: 0.05 },
-    { resource: "wood_plank", min: 1, max: 1, chance: 0.035 },
-    { resource: "stone_brick", min: 1, max: 1, chance: 0.03 },
-    { resource: "iron_bar", min: 1, max: 1, chance: 0.018 },
-    { resource: "crystal", min: 1, max: 1, chance: 0.012 },
-  ]),
-  FRUITBASKETS: Object.freeze([
-    { resource: "fruit_orange", min: 1, max: 2, chance: 0.03 },
-    { resource: "fruit_banana", min: 1, max: 2, chance: 0.03 },
-    { resource: "fruit", min: 1, max: 2, chance: 0.10 },
-  ]),
-    METAL: Object.freeze([
-    { resource: "iron_piece", min: 1, max: 2, chance: 0.15 },
-    { resource: "iron_bar", min: 1, max: 2, chance: 0.01 },
-    { resource: "iron_plates", min: 1, max: 2, chance: 0.01 },
-    { resource: "iron_chains", min: 1, max: 2, chance: 0.01 },
-  ]),
-
-};
 
 export const REGION_OBJECT_DEFS = {
   object_tree_mainland: {
     spawnTypes: [{ type: "object_tree_mainland", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_tree_normal.png (tree sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.95 },
-    particles: {
-      type: "leaves",
-      count: [4, 14],
-      radius: 28,
-      heightOffset: -36,
-      chance: 1,
-      onlyWhenOnScreen: true
-    }
+    particles: { type: "leaves", count: [4, 14], radius: 28, heightOffset: -36, chance: 1, onlyWhenOnScreen: true }
   },
   object_tree_snow: {
     spawnTypes: [{ type: "object_tree_snow", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "snow",
     graphicsRef: "object/object_tree_snow.png (tree sheet)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.95 },
+    sortAnchor: { x: 0.5, y: 0.95 }
   },
   object_tree_sand: {
     spawnTypes: [{ type: "object_tree_sand", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "desert",
     graphicsRef: "object/object_tree_sand.png (tree sheet)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.95 },
+    sortAnchor: { x: 0.5, y: 0.95 }
   },
   object_tree_jungle: {
     spawnTypes: [{ type: "object_tree_jungle", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
     avoidSpawnTags: ["canopy"],
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "jungle",
     graphicsRef: "object/object_tree_jungle.png (tree sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.95 },
-    particles: {
-      type: "leaves",
-      count: [4, 12],
-      radius: 28,
-      heightOffset: -36,
-      chance: 1,
-      onlyWhenOnScreen: true
-    }
+    particles: { type: "leaves", count: [4, 12], radius: 28, heightOffset: -36, chance: 1, onlyWhenOnScreen: true }
   },
   object_tree_rock: {
     spawnTypes: [{ type: "object_tree_rock", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    tags: ["object", "destructible", "stone",],
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    tags: ["object", "destructible", "stone"],
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "rock",
     graphicsRef: "object/object_tree_normal.png (tree sheet)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.95 },
+    sortAnchor: { x: 0.5, y: 0.95 }
   },
   object_tree_lava: {
     spawnTypes: [{ type: "object_tree_lava", weight: 1 }],
-    // legacyWeightKey: "tree", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructible: {
-      hp: 40,
-      damageStages: 3,
-      particleColor: "#b88454",
-      loot: REGION_OBJECT_LOOT_TABLES.WOOD,
-    },
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["object_wood_material"] },
     renderBiomeId: "lava",
     graphicsRef: "object/object_tree_dead.png (tree sheet)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.95 },
+    sortAnchor: { x: 0.5, y: 0.95 }
   },
   object_house_mainland: {
     spawnTypes: [{ type: "object_house_mainland", weight: 1 }],
-    // legacyWeightKey: "house", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "building"],
-    destructible: {
-      hp: 70,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      popularityDelta: -3,
-      loot: REGION_OBJECT_LOOT_TABLES.HOUSE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-    },
+    destructible: { hp: 70, damageStages: 3, particleColor: "#c99b5d", popularityDelta: -3, lootTables: ["object_house_scrap", "object_rare_gemstones"] },
     renderBiomeId: "mainland",
-    graphics: {
-      mode: "sheet",
-      files: [
-        "object/object_house_normal_1.png",
-        //"object/object_house_normal_2.png",
-        //"object/object_house_normal_3.png",
-      ],
-      rows: 4,
+    graphics: { mode: "sheet", files: ["object/object_house_normal_1.png"], rows: 4, cols: 4, renderScale: 2 },
+    sockets: {
+      coordinateSpace: "sheet",
+      frameNumberBase: 1,
       cols: 4,
-      renderScale: 2,
-    },
-    sockets: OBJECT_SOCKET_CONFIG.object_house_mainland,
+      rows: 4,
+      imageWidth: 1254,
+      imageHeight: 1254,
+      files: {
+        "object/object_house_normal_1.png": {
+          "1": {chimney: { x: 174, y: 68 }},
+          "2": {chimney: { x: 428, y: 78 }},
+          "3": {chimney: { x: 832, y: 84 }},
+          "4": {chimney: { x: 1044, y: 62 }},
+          "5": {chimney: { x: 123, y: 388 }},
+          "6": {  },
+          "7": {chimney: { x: 831, y: 359 }, lanternA: { x: 655, y: 528 }},
+          "8": {chimney: { x: 1032, y: 387 }, fireplace: { x: 1126, y: 551 }},
+          "9": {chimney: { x: 191, y: 673 }},
+          "10": {  },
+          "11": {chimney: { x: 704, y: 670 }},
+          "12": {chimney: { x: 1160, y: 697 }},
+          "13": {fireplace: { x: 197, y: 1135 }},
+          "14": {chimney: { x: 498, y: 965 }},
+          "15": {chimney: { x: 714, y: 981 }},
+          "16": {chimney: { x: 1114, y: 984 }, lanternA: { x: 960, y: 1117 }},
+          }
+        },
+        "object/object_house_normal_2.png": {
+          "1": {  },
+          "2": {  },
+          "3": {  },
+          "4": {  }
+        },
+        "object/object_house_normal_3.png": {
+          "1": {  },
+          "2": {  },
+          "3": {  },
+          "4": {  }
+        }
+      },
     attachedEffects: [
       {
         id: "chimneySmoke",
@@ -287,166 +120,89 @@ export const REGION_OBJECT_DEFS = {
         preset: "chimney_smoke",
         socket: "chimney",
         offset: { x: 0, y: -4 },
-        enabledByDefault: true,
+        enabledByDefault: true
       },
-      {
-        id: "lanternGlow",
-        type: "particle",
-        preset: "lantern_glow",
-        socketPrefix: "lantern",
-        enabledByDefault: true,
-      },
-      {
-        id: "windowGlow",
-        type: "particle",
-        preset: "window_glow",
-        socketPrefix: "windowGlow",
-        enabledByDefault: true,
-      },
-      {
-        id: "fireplaceGlow",
-        type: "particle",
-        preset: "fireplace_glow",
-        socket: "fireplace",
-        enabledByDefault: true,
-      },
+      { id: "lanternGlow", type: "particle", preset: "lantern_glow", socketPrefix: "lantern", enabledByDefault: true },
+      { id: "windowGlow", type: "particle", preset: "window_glow", socketPrefix: "windowGlow", enabledByDefault: true },
+      { id: "fireplaceGlow", type: "particle", preset: "fireplace_glow", socket: "fireplace", enabledByDefault: true },
       {
         id: "fireplaceSmoke",
         type: "particle",
         preset: "fireplace_smoke",
         socket: "fireplace",
         offset: { x: 0, y: -6 },
-        enabledByDefault: false,
-      },
+        enabledByDefault: false
+      }
     ],
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.94 },
+    sortAnchor: { x: 0.5, y: 0.94 }
   },
   object_pillar_stone: {
     spawnTypes: [{ type: "object_pillar_stone", weight: 1 }],
-    // legacyWeightKey: "pillar", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#9a9488",
-      loot: [{ resource: "stone_brick", min: 1, max: 2, chance: 0.45 }],
-      rareLoot: [],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#9a9488", lootTables: ["object_object_pillar_stone_loot"] },
     renderBiomeId: "mainland",
-    graphics: {
-      mode: "sheet",
-      files: [
-        "object/object_pillar_stone_1.png",
-        "object/object_pillar_stone_2.png",
-      ],
-      rows: 4,
-      cols: 4,
-      renderScale: 1,
-    },
+    graphics: { mode: "sheet", files: ["object/object_pillar_stone_1.png", "object/object_pillar_stone_2.png"], rows: 4, cols: 4, renderScale: 1 },
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.92 },
+    sortAnchor: { x: 0.5, y: 0.92 }
   },
   object_stone_cluster: {
     spawnTypes: [{ type: "object_stone_cluster", weight: 1 }],
-    // legacyWeightKey: "rock", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructible: {
-      hp: 42,
-      damageStages: 3,
-      particleColor: "#9a9488",
-      loot: REGION_OBJECT_LOOT_TABLES.STONE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-    },
+    destructible: { hp: 42, damageStages: 3, particleColor: "#9a9488", lootTables: ["object_stone_material", "object_rare_gemstones"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_rock_normal.png (rock sheet)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.85 },
+    sortAnchor: { x: 0.5, y: 0.85 }
   },
   object_ruin_normal: {
     spawnTypes: [{ type: "object_ruin_normal", weight: 1 }],
-    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     destructible: {
       hp: 64,
       damageStages: 3,
       particleColor: "#9a9488",
-      loot: REGION_OBJECT_LOOT_TABLES.STONE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-      itemLoot: [
-        { rarity: "legendary", chance: 0.0035, tries: 120 },
-      ],
+      lootTables: ["object_stone_material", "object_rare_gemstones", "object_object_ruin_normal_items"]
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_ruin_normal.png (4x4)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-    object_ruin_snow: {
+  object_ruin_snow: {
     spawnTypes: [{ type: "object_ruin_snow", weight: 1 }],
-    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructible: {
-      hp: 64,
-      damageStages: 3,
-      particleColor: "#9a9488",
-      loot: REGION_OBJECT_LOOT_TABLES.STONE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-      itemLoot: [
-        { rarity: "legendary", chance: 0.0035, tries: 120 },
-      ],
-    },
+    destructible: { hp: 64, damageStages: 3, particleColor: "#9a9488", lootTables: ["object_stone_material", "object_rare_gemstones", "object_object_ruin_snow_items"] },
     renderBiomeId: "snow",
     graphicsRef: "object/object_ruin_snow.png (4x4)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-      object_ruin_sand: {
+  object_ruin_sand: {
     spawnTypes: [{ type: "object_ruin_sand", weight: 1 }],
-    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
-    destructible: {
-      hp: 64,
-      damageStages: 3,
-      particleColor: "#9a9488",
-      loot: REGION_OBJECT_LOOT_TABLES.STONE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-      itemLoot: [
-        { rarity: "legendary", chance: 0.0035, tries: 120 },
-      ],
-    },
+    destructible: { hp: 64, damageStages: 3, particleColor: "#9a9488", lootTables: ["object_stone_material", "object_rare_gemstones", "object_object_ruin_sand_items"] },
     renderBiomeId: "sand",
     graphicsRef: "object/object_ruin_sand.png (4x4)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-        object_ruin_jungle: {
+  object_ruin_jungle: {
     spawnTypes: [{ type: "object_ruin_jungle", weight: 1 }],
-    // legacyWeightKey: "ruin", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: true,
     destructible: {
       hp: 64,
       damageStages: 3,
       particleColor: "#9a9488",
-      loot: REGION_OBJECT_LOOT_TABLES.STONE,
-      rareLoot: REGION_OBJECT_LOOT_TABLES.RARE,
-      itemLoot: [
-        { rarity: "poor", chance: 0.035, tries: 120 },
-        { rarity: "normal", chance: 0.024, tries: 120 },
-        { rarity: "upgraded", chance: 0.012, tries: 120 },
-        { rarity: "rare", chance: 0.01, tries: 120 },
-        { rarity: "epic", chance: 0.0035, tries: 120 },
-        { rarity: "legendary", chance: 0.0012, tries: 120 },
-      ],
+      lootTables: ["object_stone_material", "object_rare_gemstones", "object_object_ruin_jungle_items"]
     },
     renderBiomeId: "jungle",
     graphicsRef: "object/object_ruin_jungle.png (4x4)",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_fireplace_mainland: {
     spawnTypes: [{ type: "fireplace", weight: 1 }],
-    // legacyWeightKey: "fireplace", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: false,
     renderBiomeId: "mainland",
     graphicsRef: "fireplace_normal_01..04.png (animated)",
@@ -454,13 +210,11 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.9 },
     particles: [
       { type: "smoke", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 },
-      { type: "embers", count: [1, 4], radius: 12, heightOffset: -20, chance: 1 },
-    ],
+      { type: "embers", count: [1, 4], radius: 12, heightOffset: -20, chance: 1 }
+    ]
   },
   object_firebeacon_snow: {
-    // Legacy runtime type: still uses "firebeacon" (old OBJECT_SHEETS path).
     spawnTypes: [{ type: "firebeacon", weight: 1 }],
-    // legacyWeightKey: "firebeacon", // TODO:DELETE legacy biodome weight key disabled
     defaultDestructible: false,
     renderBiomeId: "snow",
     graphicsRef: "firebeacon_snow_animated_001..008.png (animated)",
@@ -468,55 +222,29 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.93 },
     particles: [
       { type: "smoke", count: [3, 6], radius: 20, heightOffset: -54, chance: 1 },
-      { type: "embers", count: [2, 5], radius: 16, heightOffset: -32, chance: 1 },
-    ],
+      { type: "embers", count: [2, 5], radius: 16, heightOffset: -32, chance: 1 }
+    ]
   },
   object_woodboxes_ground: {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        ...REGION_OBJECT_LOOT_TABLES.WOOD,
-        ...REGION_OBJECT_LOOT_TABLES.STONE,
-        { resource: "junk", min: 1, max: 3, chance: 0.33 },
-      ],
-      rareLoot: [
-        REGION_OBJECT_LOOT_TABLES.RARE,
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_woodboxes_ground_loot", "object_rare_gemstones"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_woodboxes_ground.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
-    particles: [
-      { type: "dust", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 },
-    ],
+    particles: [{ type: "dust", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 }]
   },
   object_shelfs: {
     spawnTypes: [{ type: "object_shelfs", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "health", min: 1, max: 3, chance: 0.1 },
-        { resource: "paper", min: 1, max: 4, chance: 0.1 },
-        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
-      ],
-      rareLoot: [
-        { resource: "diamond", min: 1, max: 1, chance: 0.005 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_shelfs_loot", "object_object_shelfs_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_shelfs.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.92 },
+    sortAnchor: { x: 0.5, y: 0.92 }
   },
   object_chests_ground: {
     spawnTypes: [{ type: "object_chests_ground", weight: 1 }],
@@ -525,170 +253,73 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_chests_ground.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
-    sheetRenderScale: 0.95,
+    sheetRenderScale: 0.95
   },
   object_field: {
     spawnTypes: [{ type: "object_field", weight: 1 }],
     defaultDestructible: false,
-    // destructibleProfile: "object_field", // TODO: enable again if object_field gets destructible data later
     renderBiomeId: "mainland",
     graphicsRef: "object/object_field.png",
-    depthMode: "ground",
+    depthMode: "ground"
   },
   object_barn: {
     spawnTypes: [{ type: "object_barn", weight: 1 }],
     defaultDestructible: true,
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "junk", min: 1, max: 3, chance: 1 },
-        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
-        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
-      ],
-      rareLoot: [
-        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_barn_loot", "object_object_barn_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_barn.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.94 },
+    sortAnchor: { x: 0.5, y: 0.94 }
   },
   object_well: {
     spawnTypes: [{ type: "object_well", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "stone"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#9a9488",
-      loot: [{ resource: "rock_piece", min: 1, max: 3, chance: 1 }],
-      rareLoot: [
-        { resource: "stone_brick", min: 1, max: 1, chance: 0.06 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#9a9488", lootTables: ["object_object_well_loot", "object_object_well_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_well.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_sacks_ground: {
     spawnTypes: [{ type: "object_sacks_ground", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "leather", "container"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "health", min: 1, max: 3, chance: 0.1 },
-        { resource: "wheat", min: 1, max: 3, chance: 0.65 },
-        { resource: "paper", min: 1, max: 4, chance: 0.1 },
-        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
-      ],
-      rareLoot: [
-        { resource: "diamond", min: 1, max: 1, chance: 0.005 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_sacks_ground_loot", "object_object_sacks_ground_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_sacks_ground.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.88 },
+    sortAnchor: { x: 0.5, y: 0.88 }
   },
   object_barrels_ground: {
     spawnTypes: [{ type: "object_barrels_ground", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "health", min: 1, max: 3, chance: 0.1 },
-        { resource: "wheat", min: 1, max: 3, chance: 0.65 },
-        { resource: "paper", min: 1, max: 4, chance: 0.1 },
-        { resource: "wood_plank", min: 1, max: 4, chance: 0.1 },
-      ],
-      rareLoot: [
-        { resource: "bonedust", min: 1, max: 1, chance: 0.01 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_barrels_ground_loot", "object_object_barrels_ground_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_barrels_ground.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.88 },
+    sortAnchor: { x: 0.5, y: 0.88 }
   },
   object_hay: {
     spawnTypes: [{ type: "object_hay", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "thatch"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "wheat", min: 1, max: 3, chance: 0.75 },
-        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
-        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
-      ],
-      rareLoot: [
-        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_object_hay_loot", "object_object_hay_rare"] },
     renderBiomeId: "mainland",
-    graphics: {
-      mode: "sheet",
-      files: [
-        "object/object_hay01.png",
-        "object/object_hay02.png",
-      ],
-    },
+    graphics: { mode: "sheet", files: ["object/object_hay01.png", "object/object_hay02.png"] },
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-  /*object_hay02: {
-    spawnTypes: [{ type: "object_hay02", weight: 1 }],
-    defaultDestructible: true,
-    tags: ["object", "destructible", "thatch"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#c99b5d",
-      loot: [
-        { resource: "wheat", min: 1, max: 3, chance: 0.75 },
-        { resource: "wood_piece", min: 1, max: 4, chance: 0.10 },
-        { resource: "wood_plank", min: 1, max: 1, chance: 0.05 },
-      ],
-      rareLoot: [
-        { resource: "diamond", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
-    renderBiomeId: "mainland",
-    graphicsRef: "object/object_hay02.png",
-    depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
-  },*/
   object_bones: {
     spawnTypes: [{ type: "object_bones", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant", "bones"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#ffffff",
-      loot: [
-        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ffffff", lootTables: ["object_object_bones_loot", "object_object_bones_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "foilage/foilage_bones.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_inn_cellar_crack: {
     spawnTypes: [{ type: "object_inn_cellar_crack", weight: 1 }],
@@ -697,7 +328,7 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_cracks02.png",
     depthMode: "ground",
     sortAnchor: { x: 0.5, y: 0.7 },
-    sheetRenderScale: 1.75,
+    sheetRenderScale: 1.75
   },
   object_caves: {
     spawnTypes: [{ type: "object_caves", weight: 1 }],
@@ -707,27 +338,17 @@ export const REGION_OBJECT_DEFS = {
     graphicsRef: "object/object_caves.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
-    sheetRenderScale: 1.25,
+    sheetRenderScale: 1.25
   },
-    object_treestumps: {
+  object_treestumps: {
     spawnTypes: [{ type: "object_treestumps", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#ffffff",
-      loot: [
-        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ffffff", lootTables: ["object_object_treestumps_loot", "object_object_treestumps_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_treestumps.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_talltree_medium: {
     spawnTypes: [{ type: "object_talltree_medium", weight: 1 }],
@@ -736,33 +357,23 @@ export const REGION_OBJECT_DEFS = {
     spawnAvoidRadius: 1.8,
     foregroundFade: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#ffffff",
-      loot: [
-        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ffffff", lootTables: ["object_object_talltree_medium_loot", "object_object_talltree_medium_rare"] },
     graphics: {
-  mode: "sheet",
-  files: [
-      "object/trees/object_talltree_medium_1.png",
-      "object/trees/object_talltree_medium_2.png",
-      "object/trees/object_talltree_medium_3.png",
-      "object/trees/object_talltree_medium_4.png",
-      "object/trees/object_talltree_medium_5.png",
-  ],
-  rows: 2,
-  cols: 2,
-  renderScale: 0.5,
-},
+      mode: "sheet",
+      files: [
+        "object/trees/object_talltree_medium_1.png",
+        "object/trees/object_talltree_medium_2.png",
+        "object/trees/object_talltree_medium_3.png",
+        "object/trees/object_talltree_medium_4.png",
+        "object/trees/object_talltree_medium_5.png"
+      ],
+      rows: 2,
+      cols: 2,
+      renderScale: 0.5
+    },
     renderBiomeId: "mainland",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_talltree_big: {
     spawnTypes: [{ type: "object_talltree_big", weight: 1 }],
@@ -771,81 +382,43 @@ export const REGION_OBJECT_DEFS = {
     spawnAvoidRadius: 2.4,
     foregroundFade: true,
     tags: ["object", "destructible", "wood", "tree", "plant"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#ffffff",
-      loot: [
-        { resource: "bonedust", min: 1, max: 3, chance: 0.50 },
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.01 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ffffff", lootTables: ["object_object_talltree_big_loot", "object_object_talltree_big_rare"] },
     graphics: {
-  mode: "sheet",
-  files: [
-    "object/trees/object_talltree_big_1.png",
-    "object/trees/object_talltree_big_2.png",
-    "object/trees/object_talltree_big_3.png",
-    "object/trees/object_talltree_big_4.png",
-    "object/trees/object_talltree_big_5.png",
-  ],
-  rows: 1,
-  cols: 1,
-  renderScale: 0.25,
-},
+      mode: "sheet",
+      files: [
+        "object/trees/object_talltree_big_1.png",
+        "object/trees/object_talltree_big_2.png",
+        "object/trees/object_talltree_big_3.png",
+        "object/trees/object_talltree_big_4.png",
+        "object/trees/object_talltree_big_5.png"
+      ],
+      rows: 1,
+      cols: 1,
+      renderScale: 0.25
+    },
     renderBiomeId: "mainland",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_fruitbaskets: {
     spawnTypes: [{ type: "object_fruitbaskets", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.FRUITBASKETS,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_fruit_baskets", "object_object_fruitbaskets_rare"] },
     renderBiomeId: "mainland",
-    graphics: {
-      mode: "sheet",
-      files: [
-        "object/object_fruitbaskets_01.png",
-        "object/object_fruitbaskets_02.png",
-      ],
-      renderScale: 0.5,
-    },
+    graphics: { mode: "sheet", files: ["object/object_fruitbaskets_01.png", "object/object_fruitbaskets_02.png"], renderScale: 0.5 },
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_marketstalls: {
     spawnTypes: [{ type: "object_marketstalls", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.FRUITBASKETS,
-      ...REGION_OBJECT_LOOT_TABLES.WOOD,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_object_marketstalls_loot", "object_object_marketstalls_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_marketstalls.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_destroyed_marketstalls: {
     spawnTypes: [{ type: "object_destroyed_marketstalls", weight: 1 }],
@@ -855,120 +428,64 @@ export const REGION_OBJECT_DEFS = {
       hp: 42,
       damageStages: 3,
       particleColor: "#8c6a43",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.WOOD,
-      { resource: "junk", min: 1, max: 3, chance: 0.35 },
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
+      lootTables: ["object_object_destroyed_marketstalls_loot", "object_object_destroyed_marketstalls_rare"]
     },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_destroyed_marketstalls.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-    object_wagons: {
+  object_wagons: {
     spawnTypes: [{ type: "object_wagons", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.WOOD,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_wood_material", "object_object_wagons_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_wagons.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-    object_metalchest: {
+  object_metalchest: {
     spawnTypes: [{ type: "object_metalchest", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "metal"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.METAL,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_metal_scrap", "object_object_metalchest_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_metalchest.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-    object_furnace: {
+  object_furnace: {
     spawnTypes: [{ type: "object_furnace", weight: 1 }],
     defaultDestructible: false,
     tags: ["object", "metal"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.METAL,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_metal_scrap", "object_object_furnace_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_furnace.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
-    object_anvil: {
+  object_anvil: {
     spawnTypes: [{ type: "object_anvil", weight: 1 }],
     defaultDestructible: false,
     tags: ["object", "metal"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.METAL,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_metal_scrap", "object_object_anvil_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_anvil.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
+    sortAnchor: { x: 0.5, y: 0.9 }
   },
   object_bellow: {
     spawnTypes: [{ type: "object_bellow", weight: 1 }],
     defaultDestructible: false,
     tags: ["object", "metal"],
-    destructible: {
-      hp: 52,
-      damageStages: 3,
-      particleColor: "#f2b017",
-      loot: [
-      ...REGION_OBJECT_LOOT_TABLES.METAL,
-      ],
-      rareLoot: [
-        { resource: "magic_essence", min: 1, max: 1, chance: 0.001 },
-      ],
-    },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["object_metal_scrap", "object_object_bellow_rare"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_bellow.png",
     depthMode: "dynamic",
-    sortAnchor: { x: 0.5, y: 0.9 },
-  },
-}
+    sortAnchor: { x: 0.5, y: 0.9 }
+  }
+};
 
 function clampNumber(value, min, max) {
   const parsed = Number(value);

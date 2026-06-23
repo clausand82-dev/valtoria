@@ -5,23 +5,7 @@
 // - consumable: can be consumed/used for permanent effects
 // - mergeable: fragment/part used to assemble another readable item
 //
-// mergeLocation values are optional content-gating hints:
-// - backpack (default)
-// - library
-// - mage_tower
-// - barracks
-//
-// dropTable format (optional):
-// dropTable: {
-//   chance: 0.02, // default chance for listed mobs
-//   monsters: [
-//     "Demon", // uses default chance
-//     { type: "Gate Warden", chance: 0.04 }, // per-mob override
-//   ],
-// }
-//
-// questId/readableQuestId (optional): starts a QUEST_DEFS quest when the item is read.
-// The quest itself must use source: "readable"; use turnInNpcIds/completeNpcIds (or legacy npcIds) for hand-in NPCs.
+// Drop rules for readables live in loot-tables-config.js.
 
 export const READABLE_ITEM_DEFS = [
   {
@@ -34,15 +18,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Demon", chance: 0.055 },
-        { type: "Gate Warden", chance: 0.055 },
-      ],
-      chance: 0.055,
-    },
     summary: "En revet seddel med aske i kanterne.",
-    story: "Fragment I af III.",
+    story: "Fragment I af III."
   },
   {
     id: "demon_note_2",
@@ -54,15 +31,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Demon", chance: 0.045 },
-        { type: "Gate Warden", chance: 0.045 },
-      ],
-      chance: 0.045,
-    },
     summary: "Skriftlinjer om ritualer i de sydlige ruiner.",
-    story: "Fragment II af III.",
+    story: "Fragment II af III."
   },
   {
     id: "demon_note_3",
@@ -74,15 +44,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Demon", chance: 0.035 },
-        { type: "Gate Warden", chance: 0.035 },
-      ],
-      chance: 0.035,
-    },
     summary: "Den sidste del mangler stadig et par ord.",
-    story: "Fragment III af III.",
+    story: "Fragment III af III."
   },
   {
     id: "demon_notes_compiled",
@@ -94,9 +57,13 @@ export const READABLE_ITEM_DEFS = [
     value: 70,
     xp: 120,
     mergeLocation: "library",
-    parts: ["demon_note_1", "demon_note_2", "demon_note_3"],
+    parts: [
+      "demon_note_1",
+      "demon_note_2",
+      "demon_note_3"
+    ],
     summary: "Samlede noter om daemondyrkelse og rituelle spor.",
-    story: "De samlede noter beskriver en gammel orden, som brugte tre sejl for at aabne en port under Nethrendor. Den sidste side peger mod ruiner i nord.",
+    story: "De samlede noter beskriver en gammel orden, som brugte tre sejl for at aabne en port under Nethrendor. Den sidste side peger mod ruiner i nord."
   },
   {
     id: "ember_spell_fragment_1",
@@ -108,15 +75,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 12,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Ghost", chance: 0.02 },
-        { type: "Rune Shade", chance: 0.02 },
-      ],
-      chance: 0.02,
-    },
     summary: "Runeudklip med instrukser til ildkanalisering.",
-    story: "Fragment I af II.",
+    story: "Fragment I af II."
   },
   {
     id: "ember_spell_fragment_2",
@@ -128,15 +88,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 12,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Ghost", chance: 0.015 },
-        { type: "Rune Shade", chance: 0.015 },
-      ],
-      chance: 0.015,
-    },
     summary: "En side med maalinger for mana-flow.",
-    story: "Fragment II af II.",
+    story: "Fragment II af II."
   },
   {
     id: "ember_spellbook",
@@ -148,14 +101,19 @@ export const READABLE_ITEM_DEFS = [
     value: 180,
     xp: 220,
     mergeLocation: "mage_tower",
-    parts: ["ember_spell_fragment_1", "ember_spell_fragment_2"],
+    parts: [
+      "ember_spell_fragment_1",
+      "ember_spell_fragment_2"
+    ],
     summary: "En komplet spellbook der styrker magisk skade.",
     story: "Denne bog samler to fragmenter af Ember Rite. Brug den ved mage tower for sikker afkodning.",
     spellUnlock: "fireball",
     consumable: {
       label: "+2 magic permanent",
-      statBonuses: { magic: 2 },
-    },
+      statBonuses: {
+        magic: 2
+      }
+    }
   },
   {
     id: "explosion_spellbook",
@@ -168,9 +126,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 260,
     mergeLocation: "mage_tower",
     spellUnlock: "explosion",
-    dropTable: { monsters: [{ type: "Demon", chance: 0.01 }, { type: "Gate Warden", chance: 0.012 }], chance: 0.008 },
     summary: "A spellbook describing a compact blast rune.",
-    story: "Shatterflare stores pressure in a moving ember and releases it as an area explosion.",
+    story: "Shatterflare stores pressure in a moving ember and releases it as an area explosion."
   },
   {
     id: "ice_bolt_spellbook",
@@ -183,9 +140,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 240,
     mergeLocation: "mage_tower",
     spellUnlock: "ice_bolt",
-    dropTable: { monsters: [{ type: "Spider", chance: 0.012 }, { type: "Rune Shade", chance: 0.012 }], chance: 0.008 },
     summary: "A spellbook about freezing mana into a slowing bolt.",
-    story: "Rime Needle pierces on impact and leaves a short frost pattern that slows nearby enemies.",
+    story: "Rime Needle pierces on impact and leaves a short frost pattern that slows nearby enemies."
   },
   {
     id: "blizzard_spellbook",
@@ -198,9 +154,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 320,
     mergeLocation: "mage_tower",
     spellUnlock: "blizzard",
-    dropTable: { monsters: [{ type: "Ghost", chance: 0.009 }, { type: "Rune Shade", chance: 0.012 }, { type: "MotherSpider", chance: 0.012 }], chance: 0.006 },
     summary: "A spellbook about calling ice shards down over a wide area.",
-    story: "Blizzard opens a cold current above the battlefield, dropping jagged shards of ice that burst into frost on impact.",
+    story: "Blizzard opens a cold current above the battlefield, dropping jagged shards of ice that burst into frost on impact."
   },
   {
     id: "firerain_spell_fragment_1",
@@ -212,15 +167,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 14,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Demon", chance: 0.018 },
-        { type: "Gate Warden", chance: 0.02 },
-      ],
-      chance: 0.018,
-    },
     summary: "A scorched page with skyfall rune marks.",
-    story: "Fragment I af II.",
+    story: "Fragment I af II."
   },
   {
     id: "firerain_spell_fragment_2",
@@ -232,15 +180,8 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 14,
     xp: 0,
-    dropTable: {
-      monsters: [
-        { type: "Demon", chance: 0.014 },
-        { type: "Ghost", chance: 0.016 },
-      ],
-      chance: 0.014,
-    },
     summary: "A heat-warped page describing ember spread patterns.",
-    story: "Fragment II af II.",
+    story: "Fragment II af II."
   },
   {
     id: "energy_beam_spellbook",
@@ -253,9 +194,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 300,
     mergeLocation: "mage_tower",
     spellUnlock: "energy_beam",
-    dropTable: { monsters: [{ type: "Ghost", chance: 0.01 }, { type: "Rune Shade", chance: 0.014 }], chance: 0.007 },
     summary: "A spellbook for a high-damage beam with a long cooldown.",
-    story: "Luminous Lance compresses mana into a single violent line of force.",
+    story: "Luminous Lance compresses mana into a single violent line of force."
   },
   {
     id: "poison_cloud_spellbook",
@@ -268,9 +208,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 250,
     mergeLocation: "mage_tower",
     spellUnlock: "poison_cloud",
-    dropTable: { monsters: [{ type: "Skeleton", chance: 0.01 }, { type: "Snake", chance: 0.012 }], chance: 0.008 },
     summary: "A spellbook about binding poison to lingering mana.",
-    story: "Venom Script leaves a poisonous trace in the target's body and in the air around impact.",
+    story: "Venom Script leaves a poisonous trace in the target's body and in the air around impact."
   },
   {
     id: "lightning_spellbook",
@@ -283,9 +222,8 @@ export const READABLE_ITEM_DEFS = [
     xp: 290,
     mergeLocation: "mage_tower",
     spellUnlock: "lightning",
-    dropTable: { monsters: [{ type: "Wizard", chance: 0.012 }, { type: "Rune Shade", chance: 0.014 }], chance: 0.007 },
     summary: "A spellbook about shaping storm energy into a stunning bolt.",
-    story: "Storm Chain cracks through the air, jolting nearby enemies long enough to interrupt their movement and attacks.",
+    story: "Storm Chain cracks through the air, jolting nearby enemies long enough to interrupt their movement and attacks."
   },
   {
     id: "firerain_spellbook",
@@ -297,11 +235,13 @@ export const READABLE_ITEM_DEFS = [
     value: 280,
     xp: 340,
     mergeLocation: "mage_tower",
-    parts: ["firerain_spell_fragment_1", "firerain_spell_fragment_2"],
+    parts: [
+      "firerain_spell_fragment_1",
+      "firerain_spell_fragment_2"
+    ],
     spellUnlock: "firerain",
-    dropTable: { monsters: [{ type: "Demon", chance: 0.01 }, { type: "Gate Warden", chance: 0.012 }, { type: "Ghost", chance: 0.01 }], chance: 0.006 },
     summary: "A spellbook about raining burning shards over a wide area.",
-    story: "Fire Rain tears open a heated draft above the field, dropping blazing embers that scorch impact zones and leave enemies burning.",
+    story: "Fire Rain tears open a heated draft above the field, dropping blazing embers that scorch impact zones and leave enemies burning."
   },
   {
     id: "sam_tylion_lion_gold_idol_note",
@@ -315,9 +255,9 @@ export const READABLE_ITEM_DEFS = [
     mergeLocation: "library",
     questId: "sam_tylion_lion_gold_idols",
     summary: "En note om en forsvunden kasse med sjældne lion gold idols.",
-    story: "Til den, der finder dette: Jeg er Sam Tylion, og jeg har mistet en kasse med 24 sjældne lion gold idols. Væsnerne rev kassen op og spredte dem gennem regionerne. Hvis du finder alle 24, så aflever dem til min fætter Himus i byen. Han ved, hvordan de kommer sikkert hjem.",
+    story: "Til den, der finder dette: Jeg er Sam Tylion, og jeg har mistet en kasse med 24 sjældne lion gold idols. Væsnerne rev kassen op og spredte dem gennem regionerne. Hvis du finder alle 24, så aflever dem til min fætter Himus i byen. Han ved, hvordan de kommer sikkert hjem."
   },
-    {
+  {
     id: "lord_kealands_missing_daughter",
     title: "Lord Kealand's Missing Daughter",
     iconUrl: "/assets/generated/item/item_book_lore.png",
@@ -327,10 +267,9 @@ export const READABLE_ITEM_DEFS = [
     value: 200,
     xp: 250,
     mergeLocation: "library",
-    dropTable: { monsters: [{ type: "Skeleton", chance: 0.01 }, { type: "Snake", chance: 0.012 }], chance: 0.008 },
     summary: "Historien om Lord Kealands forsvundne datter.",
-    story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev dræbt og hans datter bortført. \n\nHan søgte desperat efter hende i årevis, men uden held. Rygtet siger, at han til sidst blev så desperat, at han begyndte at opsøge fare, og at hans søgen førte ham til en by i udkanten af Elvindalen. Der hørte han om en quest, om troldenes skat, som vil gøre ham rig. \n\nKort efter han begav sig afsted, mødte han Elverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsøg på at konfronterer ham, endte Lord Kealand i Nethrendes fængsel, hvor han mødte Lady Lirian. \n\nDe flygtede sammen og nåede til Troldenøen, hvor et mystisk smykke Lady Lirian bar, afslørede at hun var Lord Kealands forsvunde datter. Hendes første 'far' ord, smeltede hans hjerte. Sammen drog de på flere eventyr.",
-  },
+    story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev dræbt og hans datter bortført. \n\nHan søgte desperat efter hende i årevis, men uden held. Rygtet siger, at han til sidst blev så desperat, at han begyndte at opsøge fare, og at hans søgen førte ham til en by i udkanten af Elvindalen. Der hørte han om en quest, om troldenes skat, som vil gøre ham rig. \n\nKort efter han begav sig afsted, mødte han Elverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsøg på at konfronterer ham, endte Lord Kealand i Nethrendes fængsel, hvor han mødte Lady Lirian. \n\nDe flygtede sammen og nåede til Troldenøen, hvor et mystisk smykke Lady Lirian bar, afslørede at hun var Lord Kealands forsvunde datter. Hendes første 'far' ord, smeltede hans hjerte. Sammen drog de på flere eventyr."
+  }
 ];
 
 export const READABLE_DEF_BY_ID = Object.fromEntries(READABLE_ITEM_DEFS.map((entry) => [entry.id, entry]));

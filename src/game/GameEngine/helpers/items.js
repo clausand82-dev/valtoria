@@ -256,23 +256,6 @@ export function readableMergeOption(recipe) {
   };
 }
 
-export function readableDropChanceForMonster(dropTable, monsterTypeName) {
-  if (!dropTable || !monsterTypeName) return 0;
-  const defaultChance = Number(dropTable.chance ?? 0);
-  const monster = String(monsterTypeName);
-  const entries = Array.isArray(dropTable.monsters) ? dropTable.monsters : [];
-  for (const entry of entries) {
-    if (typeof entry === "string") {
-      if (String(entry) === monster) return defaultChance;
-      continue;
-    }
-    if (!entry || typeof entry !== "object") continue;
-    if (String(entry.type ?? "") !== monster) continue;
-    return Number(entry.chance ?? defaultChance);
-  }
-  return 0;
-}
-
 export function consumeReadableInputs(inventory, inputs) {
   for (const [readableId, neededRaw] of Object.entries(inputs)) {
     let needed = Math.max(0, Math.floor(Number(neededRaw) || 0));
