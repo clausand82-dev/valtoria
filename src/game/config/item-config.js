@@ -92,6 +92,28 @@ export const PREFIXES = {
 // erstatter ikke det almindelige slag og koster ikke mana.
 export const UNIQUE_ITEMS = [
   {
+    id: "treasure_of_the_fenris",
+    name: "Treasure of the Fenris",
+    baseName: "Treasure",
+    rarity: "unique",
+    slot: "quest",
+    mode: "quest",
+    type: "artifact_material",
+    levelMin: 1,
+    sources: ["fenris_wolf"],
+    iconUrl: "/assets/generated/item/item_treasure_of_the_fenris.png",
+    description: "En tung, gammel Fenris-skat, egnet som centrum for et byartefakt.",
+    scaleWithLevel: false,
+    blockedBy: {
+      any: [
+        { inventory: { uniqueId: "treasure_of_the_fenris" } },
+        { cityStorage: { uniqueId: "treasure_of_the_fenris" } },
+        { cityInventory: { uniqueId: "treasure_of_the_fenris" } },
+        { flag: "artifact.treasure_of_the_fenris.built" },
+      ],
+    },
+  },
+  {
     id: "old_walking_staff",
     name: "Gammel Vandrestok",
     baseName: "Rune Staff",

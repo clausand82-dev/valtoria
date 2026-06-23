@@ -125,7 +125,12 @@ export function resolveCityEventModifiers(cityStatsOrEvents = {}) {
 
 export function cityRuntimeModifiers(cityStats = {}) {
   const stats = cityStats?.events ? cityStats : { ...cityStats, events: cityEventFlags(cityStats) };
-  return resolveCityEventModifiers(stats);
+  const modifiers = resolveCityEventModifiers(stats);
+  const goldFindBonusPct = statNumber(stats, "gold_find_bonus_pct", statNumber(stats, "goldFindBonusPct", 0));
+  if (goldFindBonusPct) {
+    modifiers.goldDropMultiplier *= Math.max(0, 1 + goldFindBonusPct / 100);
+  }
+  return modifiers;
 }
 
 export function cityDurabilityConsequenceFor(durability) {

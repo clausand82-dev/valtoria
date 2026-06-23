@@ -1,5 +1,7 @@
+import { normalizeWorldState, setWorldFlag } from "../world-state.js";
+
 // City artifacts are one-time monument purchases.
-// Schema: id, title, description, buildingId, imageUrl/iconUrl, cost { gold/resources/items }, effects { cityStats, worldEnergy }, unlock/conditions.
+// Schema: id, title, description, buildingId, imageUrl/iconUrl, cost { gold/resources/items }, effects { cityStats, worldEnergy }, flagsOnBuilt, unlock/conditions.
 export const CITY_ARTIFACTS = [
   {
     id: "statue_lord_kealand",
@@ -148,6 +150,19 @@ export const CITY_ARTIFACTS = [
     effects: { cityStats: { culture: 15, knowledge: 5 } },
   },
   {
+    id: "treasure_of_the_fenris",
+    title: "Treasure of the Fenris",
+    description: "En aeldgammel Fenris-skat, genopbygget som et byrelikvie, der leder helten mod mere guld.",
+    buildingId: "town_hall",
+    iconUrl: "/assets/generated/item/item_treasure_of_the_fenris.png",
+    cost: {
+      resources: { stone_brick: 50, wood_piece: 20 },
+      items: [{ uniqueId: "treasure_of_the_fenris", count: 1, label: "Treasure of the Fenris" }],
+    },
+    effects: { cityStats: { gold_find_bonus_pct: 1 } },
+    flagsOnBuilt: ["fenris_treasure_restored"],
+  },
+  {
     id: "village_outskirt_war_banner",
     title: "Krigsbanner fra Village Outskirt",
     description: "Et slidt krigsbanner fra kampene omkring Village Outskirt.",
@@ -160,3 +175,43 @@ export const CITY_ARTIFACTS = [
     effects: { cityStats: { defense: 25, culture: 10 } },
   },
 ];
+
+export function getArtifactBuiltFlag(artifactId) {
+  return `artifact.${String(artifactId ?? "").trim()}.built`;
+}
+
+function artifactFlagsOnBuilt(artifact) {
+  if (!artifact || !Array.isArray(artifact.flagsOnBuilt)) return [];
+  return artifact.flagsOnBuilt.map((flag) => String(flag ?? "").trim()).filter(Boolean);
+}
+
+export function setArtifactBuiltFlags(worldState, artifactOrId) {
+  const artifact = typeof artifactOrId === "string"
+    ? CITY_ARTIFACTS.find((entry) => String(entry.id) === String(artifactOrId))
+    : artifactOrId;
+  const artifactId = String(artifact?.id ?? artifactOrId ?? "").trim();
+  if (!artifactId) return { worldState: normalizeWorldState(worldState), changed: false };
+
+  let next = normalizeWorldState(worldState);
+  let changed = false;
+  for (const flag of [getArtifactBuiltFlag(artifactId), ...artifactFlagsOnBuilt(artifact)]) {
+    if (!flag || next.flags[flag]) continue;
+    next = setWorldFlag(next, flag, true);
+    changed = true;
+  }
+  return { worldState: next, changed };
+}
+
+export function syncArtifactBuiltFlags(cityProgress = {}, worldState = {}) {
+  const boughtIds = Array.isArray(cityProgress?.artifacts?.boughtIds)
+    ? cityProgress.artifacts.boughtIds.map(String).filter(Boolean)
+    : [];
+  let next = normalizeWorldState(worldState);
+  let changed = false;
+  for (const artifactId of boughtIds) {
+    const result = setArtifactBuiltFlags(next, artifactId);
+    next = result.worldState;
+    changed = changed || result.changed;
+  }
+  return { worldState: next, changed };
+}

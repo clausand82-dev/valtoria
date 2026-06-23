@@ -21,6 +21,7 @@ import {
   UNIQUE_DROP_CHANCES,
   RESTRICTED_DROPS,
   monsterLootProfile,
+  monsterConfiguredLoot,
   monsterResourceDrops,
   rollLootCategory,
   isPotionItem,
@@ -471,6 +472,7 @@ export const lootMethods = {
 
   dropConfiguredItemEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
+      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
       if (!entry || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const item = makeConfiguredCommonItem(entry, this.configuredLootLevel(monster, entry));
       if (!item) continue;
@@ -480,6 +482,7 @@ export const lootMethods = {
 
   dropConfiguredNamedEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
+      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
       if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const definition = NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(entry.itemId));
       if (!definition) continue;
@@ -491,6 +494,7 @@ export const lootMethods = {
 
   dropConfiguredUniqueEntries(monster, entries = [], conditionContext = {}) {
     for (const entry of entries) {
+      if (!worldEntryAllowed(entry, this.worldState, conditionContext)) continue;
       if (!entry?.itemId || Math.random() > Math.max(0, Math.min(1, Number(entry.chance) || 0))) continue;
       const definition = UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(entry.itemId));
       if (!definition) continue;
@@ -522,6 +526,15 @@ export const lootMethods = {
       this.dropResourceLoot(monster.x, monster.y, monsterResourceDrops(monster));
       this.dropQuestLoot(monster);
       this.dropReadableLoot(monster);
+      const configuredLoot = monsterConfiguredLoot(monster);
+      const configuredLootContext = this.questConditionContext?.({
+        monster,
+        source: "monster_config",
+        sourceRegionId: this.region?.mapRegion?.id,
+      }) ?? {};
+      this.dropConfiguredItemEntries(monster, configuredLoot.items, configuredLootContext);
+      this.dropConfiguredNamedEntries(monster, configuredLoot.named, configuredLootContext);
+      this.dropConfiguredUniqueEntries(monster, configuredLoot.uniques, configuredLootContext);
       const gearDropSource = monster.isBoss ? "boss" : "monster";
       if (Math.random() < profile.goldChance) {
         const cityModifiers = cityRuntimeModifiers(this.cityStats);

@@ -444,6 +444,22 @@ const ratLoot = {
   weights: { health: 3, mana: 2, weapon: 1, armor: 1, none: 93 },
 };
 
+const FENRIS_TREASURE_DROP_REGIONS = [
+  "forest",
+  "life-tree",
+  "quiet-tree",
+  "waterfall-stream",
+  "fishermans-fall",
+  "hunter-trail",
+  "wild-trails",
+  "stone-ring-glade",
+  "hunters-hut",
+  "elflight-glow",
+  "summer-heather",
+];
+
+const FENRIS_TREASURE_REGION_CONDITION = { sourceRegionId: { in: FENRIS_TREASURE_DROP_REGIONS } };
+
 const DEFAULT_MINION_CONFIG = {
   cooldown: 8,
   maxActive: 3,
@@ -927,7 +943,7 @@ export const MONSTER_DEFS = {
       statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 },
     },
   },
-    WolfCub: {
+  WolfCub: {
     sprite: "wolf_cub",
     spriteUrl: sheetUrl("wolf_cub"),
     speciesId: "wolf",
@@ -935,6 +951,9 @@ export const MONSTER_DEFS = {
     stats: { hp: 52, damage: 14, speed: 2.00, range: 0.12, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
+    configuredLoot: {
+      uniques: [{ itemId: "treasure_of_the_fenris", chance: 0.001, requires: FENRIS_TREASURE_REGION_CONDITION }],
+    },
     popularity: { change: -0.35 },
     library: {
       title: "Ulv",
@@ -952,6 +971,9 @@ export const MONSTER_DEFS = {
     stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 84 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
+    configuredLoot: {
+      uniques: [{ itemId: "treasure_of_the_fenris", chance: 0.001, requires: FENRIS_TREASURE_REGION_CONDITION }],
+    },
     popularity: { change: -0.35 },
   },
     WolfFenris: {
@@ -962,6 +984,9 @@ export const MONSTER_DEFS = {
     stats: { hp: 220, damage: 30, speed: 1.25, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     lootProfile: { goldChance: 0.22, goldMult: 0.7, weights: { health: 4, mana: 4, weapon: 4, armor: 4, none: 2 } },
     resources: { loot: [{ resource: "hide", min: 1, max: 2, chance: 0.16 },{ resource: "meat", min: 1, max: 2, chance: 0.06 }] },
+    configuredLoot: {
+      uniques: [{ itemId: "treasure_of_the_fenris", chance: 0.01, requires: FENRIS_TREASURE_REGION_CONDITION }],
+    },
     popularity: { change: -0.35 },
     allowElite: false,
     isBoss: true,
@@ -1035,6 +1060,16 @@ export const MONSTER_RESOURCE_DROPS = {
       .map(([type, def]) => [type, def.resources])
   ),
 };
+
+export const MONSTER_CONFIGURED_LOOT = Object.fromEntries(
+  Object.entries(MONSTER_DEFS)
+    .filter(([, def]) => def.configuredLoot)
+    .map(([type, def]) => [type, {
+      items: Array.isArray(def.configuredLoot?.items) ? def.configuredLoot.items.map((entry) => ({ ...entry })) : [],
+      named: Array.isArray(def.configuredLoot?.named) ? def.configuredLoot.named.map((entry) => ({ ...entry })) : [],
+      uniques: Array.isArray(def.configuredLoot?.uniques) ? def.configuredLoot.uniques.map((entry) => ({ ...entry })) : [],
+    }])
+);
 
 export const MONSTER_POPULARITY_RULES = Object.fromEntries(
   Object.entries(MONSTER_DEFS)

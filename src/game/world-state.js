@@ -477,7 +477,22 @@ function toInventoryList(value) {
   if (Array.isArray(value)) return value;
   if (typeof value === "object") {
     if (Array.isArray(value.items)) return value.items;
-    return Object.values(value).flatMap((entry) => Array.isArray(entry) ? entry : [entry]);
+    return Object.values(value).flatMap((entry) => {
+      if (!entry) return [];
+      if (Array.isArray(entry)) return entry;
+      if (typeof entry === "object") {
+        const looksLikeItem = (
+          entry.mode !== undefined
+          || entry.uniqueId !== undefined
+          || entry.namedId !== undefined
+          || entry.questItemId !== undefined
+          || entry.resourceId !== undefined
+          || entry.readableId !== undefined
+        );
+        return looksLikeItem ? [entry] : toInventoryList(entry);
+      }
+      return [];
+    });
   }
   return [];
 }

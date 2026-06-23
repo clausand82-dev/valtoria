@@ -18,6 +18,7 @@ import { normalizePotionId, potionDefById } from "../game/config/potion-config.j
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { setArtifactBuiltFlags, syncArtifactBuiltFlags } from "../game/config/city-artifact-config.js";
 import { armyTrainingRecipesForAddon } from "../game/config/city-army-recipe-config.js";
 import { CITY_ARMY_UNIT_DEFS, normalizeArmyUnits } from "../game/config/city-army-unit-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
@@ -398,6 +399,14 @@ function CityPage({
     if (!engineRef.current) return;
     engineRef.current.cityStats = cityStats;
     engineRef.current.cityProgress = cityProgress;
+    engineRef.current.cityInventory = cityProgress;
+    engineRef.current.cityStorage = cityProgress;
+    // Backfill artifact built flags for saves created before artifact flags existed.
+    const syncResult = syncArtifactBuiltFlags(cityProgress, engineRef.current.worldState);
+    if (syncResult.changed) {
+      engineRef.current.worldState = syncResult.worldState;
+      engineRef.current.saveProgress?.({ force: true });
+    }
   }, [engineRef, cityStats, cityProgress]);
 
   useEffect(() => {
@@ -2792,6 +2801,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     if (!consumeCityItemCostEntries(cityCostItemEntries(artifact.cost), engineRef.current)) return false;
     if (artifact.effects?.worldEnergy) {
       applyWorldEnergy(engineRef.current, artifact.effects.worldEnergy);
+    }
+    const flagResult = setArtifactBuiltFlags(engineRef.current?.worldState, artifact);
+    if (engineRef.current && flagResult.changed) {
+      engineRef.current.worldState = flagResult.worldState;
     }
     onChangeProgress((current) => ({
       ...current,

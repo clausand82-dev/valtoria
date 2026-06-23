@@ -1,5 +1,6 @@
 import {
   DEFAULT_MONSTER_LOOT_PROFILE,
+  MONSTER_CONFIGURED_LOOT as CONFIGURED_MONSTER_CONFIGURED_LOOT,
   MONSTER_LOOT_PROFILES,
   MONSTER_RESOURCE_DROPS as CONFIGURED_MONSTER_RESOURCE_DROPS,
 } from "./monster-config.js";
@@ -50,3 +51,4 @@ export const LOOT_PROFILES = MONSTER_LOOT_PROFILES;
 // - inheritDefaultLoot: false      -> do not inherit default loot such as meat/fruit
 // - inheritDefaultRareLoot: false  -> do not inherit default rareLoot such as gemstones
 export const MONSTER_RESOURCE_DROPS = CONFIGURED_MONSTER_RESOURCE_DROPS;
+export const MONSTER_CONFIGURED_LOOT = CONFIGURED_MONSTER_CONFIGURED_LOOT;

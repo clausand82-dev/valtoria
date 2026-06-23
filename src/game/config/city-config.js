@@ -226,6 +226,8 @@ export const CITY_STAT_ALIASES = {
   food: "provision",
   army: "defense",
   happiness: "popularity",
+  goldFindBonusPct: "gold_find_bonus_pct",
+  gold_find_bonus_pct: "gold_find_bonus_pct",
 };
 
 export const CITY_STAT_DEFS = [

@@ -8,15 +8,29 @@ IMPORTENT:
 
 - Fortsæt render optimering
 
-
-NEW FEATURES:
-
-
+- Addon til at ødelægge potions
+- Addon til at ødelægge readables
 
 
+ARCHIVEMENTS
+(noget med at kende alle monstere): Set alle monster - bonus: +25 culture
 
----
-En tredje addon er noget politisk styre (ved ikke hvad bygning den giver mening i, måske også townhall). Politisk styre er nogle ting mna kan tænde og slukke, og som giver og koster i city stats. Er tingen tændt fås bonusen og koster prisen, er tingne slukket tælelr det ikke med. 
+Farmer: alle field felter bygget lvl1, alle field felter bygget lvl2, alle field felter bygget lvl 3 - bonus: +100 provision
+
+Voldgravenes Hersker: bygget alle voldgravene i byen - bonus: +25 defence
+
+Hero of the City: Bekæmpet 10 city monster grupper med hero, bekæmpet 25 city monster gruppe med hero, bekæmpet 50 monster grupper med hero - bonus: +50 defence
+
+ARTIFACTS:
+Treasure of the Fenris (1x item Treasure of the Fenris, 50 stonebrick, 20 x logs) - bonus: 1% gold find
+(Treasure of the Fenris er nyt item, der kan droppes meget rare i forest fra ulve, hvis spilleren ikke allerede har det i inventory (egen, city eller bygget Treasure of the Fenris))
+
+
+
+
+
+
+--- TJEK OM DISSE POLICY FINDES ---
 
 Handelsfrihed	trade +25, wealth +10, safety -5
 Markedsafgift	wealth +20, trade -10, popularity -5

@@ -80,7 +80,7 @@ export {
 } from "../config/particle-presets.js";
 export { UNIQUE_DROP_CHANCES, RESTRICTED_DROPS } from "../config/loot-config.js";
 export { blacksmithDurabilityModifiers, cityRuntimeModifiers } from "../config/city-consequence-resolver.js";
-export { monsterLootProfile, monsterResourceDrops, rollLootCategory } from "../loot.js";
+export { monsterConfiguredLoot, monsterLootProfile, monsterResourceDrops, rollLootCategory } from "../loot.js";
 export {
   deriveIconKey,
   iconUrlFromKey,

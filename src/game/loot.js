@@ -1,4 +1,4 @@
-import { DEFAULT_LOOT_PROFILE, LOOT_PROFILES, MONSTER_RESOURCE_DROPS } from "./config/loot-config.js";
+import { DEFAULT_LOOT_PROFILE, LOOT_PROFILES, MONSTER_CONFIGURED_LOOT, MONSTER_RESOURCE_DROPS } from "./config/loot-config.js";
 
 export function monsterLootProfile(typeName) {
   return LOOT_PROFILES[typeName] ?? DEFAULT_LOOT_PROFILE;
@@ -28,4 +28,13 @@ export function monsterResourceDrops(monster) {
     ...(specific?.loot ?? []),
     ...(specific?.rareLoot ?? []),
   ];
+}
+
+export function monsterConfiguredLoot(monster) {
+  const specific = MONSTER_CONFIGURED_LOOT[monster?.typeName];
+  return {
+    items: specific?.items ?? [],
+    named: specific?.named ?? [],
+    uniques: specific?.uniques ?? [],
+  };
 }
