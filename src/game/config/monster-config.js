@@ -1,4 +1,4 @@
-﻿export const DEFAULT_MONSTER_WORLD_ENERGY = {
+export const DEFAULT_MONSTER_WORLD_ENERGY = {
   killLydra: 0,
   killNetdra: 0.05,
   eliteKillLydra: 0,
@@ -462,7 +462,7 @@ export const MONSTER_DEFS = {
     speciesId: "demon",
     tags: ["demon", "medium"],
     stats: { hp: 35, damage: 7, speed: 1.62, range: 0.52, radius: 0.26, color: "#b84d43", xp: 12 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   "Thorn Husk": {
     sprite: "demon",
@@ -470,7 +470,7 @@ export const MONSTER_DEFS = {
     speciesId: "plant",
     tags: ["plant", "medium"],
     stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   "Mire Brute": {
     sprite: "demon",
@@ -478,7 +478,7 @@ export const MONSTER_DEFS = {
     speciesId: "plant",
     tags: ["plant", "large"],
     stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Hollow: {
     sprite: "ghost",
@@ -486,7 +486,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
   },
   "Shard Crawler": {
     sprite: "ghost",
@@ -494,7 +494,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
   },
   "Deep Guard": {
     sprite: "skeleton",
@@ -502,7 +502,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Raider: {
     sprite: "demon",
@@ -510,7 +510,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Ashbound: {
     sprite: "demon",
@@ -518,7 +518,7 @@ export const MONSTER_DEFS = {
     speciesId: "demon",
     tags: ["demon", "medium"],
     stats: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   "Gate Warden": {
     sprite: "skeleton",
@@ -526,7 +526,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_gate_warden_readables"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   "Bone Warden": {
     sprite: "skeleton",
@@ -534,7 +534,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "medium"],
     stats: { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Knight: {
     sprite: "knight",
@@ -543,7 +543,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 96, damage: 17, speed: 1.18, range: 0.68, radius: 0.34, color: "#b8a06f", xp: 34, blockChance: 0.1 },
     popularity: { change: 0.9 },
-    lootTables: ["monster_knight_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_medium", "material_humanoid", "monster_profile_humanoid", "equipment_defender_rare", "monster_special_global"]
   },
   "Wild Boar": {
     sprite: "wildboar",
@@ -552,7 +552,7 @@ export const MONSTER_DEFS = {
     tags: ["beast", "wildlife", "medium"],
     stats: { hp: 76, damage: 15, speed: 1.82, range: 0.56, radius: 0.34, color: "#8a5e3d", xp: 28 },
     popularity: { change: -0.15 },
-    lootTables: ["monster_wild_boar_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_wild_boar_resources"]
+    lootTables: ["gold_low", "material_animal_medium"]
   },
   "Blacksmiths Bane": {
     sprite: "wildboar",
@@ -565,7 +565,7 @@ export const MONSTER_DEFS = {
     popularity: { change: -0.5 },
     attackCooldown: { min: 0.55, max: 0.9 },
     leapAttack: { minRange: 1.35, maxRange: 3.8, speed: 11, cooldown: 2.2 },
-    lootTables: ["monster_blacksmiths_bane_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_blacksmiths_bane_resources"]
+    lootTables: ["gold_low", "material_animal_medium", "equipment_defender_rare", "material_gemstones"]
   },
   Bear: {
     sprite: "bear",
@@ -575,7 +575,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 132, damage: 22, speed: 1.14, range: 0.72, radius: 0.45, color: "#8a6244", xp: 42, blockChance: 0.08 },
     popularity: { change: -0.2 },
     attackCooldown: { min: 1.05, max: 1.55 },
-    lootTables: ["monster_bear_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_bear_resources"]
+    lootTables: ["gold_low", "material_animal_medium"]
   },
   Icebear: {
     sprite: "icebear",
@@ -585,7 +585,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 158, damage: 24, speed: 1.08, range: 0.76, radius: 0.48, color: "#d8edf2", xp: 50, blockChance: 0.1, iceResist: 35, fireResist: -20 },
     popularity: { change: -0.15 },
     attackCooldown: { min: 1.1, max: 1.65 },
-    lootTables: ["monster_icebear_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_icebear_resources"]
+    lootTables: ["gold_low", "material_animal_medium"]
   },
   Lion: {
     sprite: "lion",
@@ -595,7 +595,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 96, damage: 20, speed: 2.04, range: 0.62, radius: 0.38, color: "#c6924d", xp: 38, critChance: 0.08, critDamage: 1.45 },
     popularity: { change: -0.22 },
     leapAttack: { minRange: 1.45, maxRange: 3.2, speed: 9, cooldown: 3.2 },
-    lootTables: ["monster_lion_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_lion_resources"]
+    lootTables: ["gold_low", "material_animal_medium"]
   },
   Rat: {
     sprite: "rat",
@@ -611,7 +611,7 @@ export const MONSTER_DEFS = {
       weaknesses: ["Lavt liv", "Saarbar mod ild"],
       habitatText: "Ses ofte i fugtige skove, kaeldre og ruiner."
     },
-    lootTables: ["monster_rat_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_rat_resources"]
+    lootTables: ["gold_low", "material_animal_small"]
   },
   SickRat: {
     sprite: "sickrat",
@@ -621,7 +621,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 24, damage: 7, speed: 2.08, range: 0.36, radius: 0.19, color: "#7d8f55", xp: 10, poisonResist: 35 },
     popularity: { change: 0.18 },
     onHitStatus: { type: "dot", chance: 0.35, damage: 2, duration: 3, tick: 1, color: "#8fca4a", label: "Sickness" },
-    lootTables: ["monster_sickrat_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_sickrat_resources"]
+    lootTables: ["gold_low"]
   },
   Village01: {
     sprite: "village01",
@@ -630,7 +630,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
     popularity: { change: 0.35 },
-    lootTables: ["monster_village01_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Village02: {
     sprite: "village02",
@@ -639,7 +639,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
     popularity: { change: 0.4 },
-    lootTables: ["monster_village02_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Village03: {
     sprite: "village03",
@@ -648,7 +648,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
     popularity: { change: 0.35 },
-    lootTables: ["monster_village03_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Village04: {
     sprite: "village04",
@@ -657,7 +657,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
     popularity: { change: 0.38 },
-    lootTables: ["monster_village04_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Village05: {
     sprite: "village05",
@@ -666,7 +666,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
     popularity: { change: 0.36 },
-    lootTables: ["monster_village05_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Village06: {
     sprite: "village06",
@@ -675,7 +675,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
     popularity: { change: 0.4 },
-    lootTables: ["monster_village06_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
   },
   Wizard: {
     sprite: "wizard",
@@ -685,14 +685,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 64, damage: 16, speed: 1.12, range: 3.4, radius: 0.3, color: "#6f68c7", xp: 32, magic: 1.1 },
     spells: ["fireball", "energy_beam"],
     popularity: { change: 0.6 },
-    lootTables: [
-      "monster_wizard_profile",
-      "monster_default_special_items",
-      "monster_default_resources",
-      "monster_default_rare_gems",
-      "monster_wizard_resources",
-      "monster_wizard_readables"
-    ]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "material_magic"]
   },
   "Spawn of Hydra": {
     sprite: "hydra",
@@ -701,7 +694,7 @@ export const MONSTER_DEFS = {
     tags: ["beast", "wildlife", "large", "poison"],
     stats: { hp: 118, damage: 17, speed: 1.08, range: 4.4, radius: 0.42, color: "#67b957", xp: 42, magic: 10, spells: ["poison_cloud"] },
     popularity: { change: 1.25 },
-    lootTables: ["monster_spawn_of_hydra_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_spawn_of_hydra_resources"]
+    lootTables: ["gold_low", "material_animal_medium", "monster_special_global", "material_gemstones", "material_magic"]
   },
   Hellhound: {
     sprite: "hellhound",
@@ -710,7 +703,7 @@ export const MONSTER_DEFS = {
     tags: ["demon", "beast", "medium"],
     stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18, fireResist: 30, iceResist: -20 },
     popularity: { change: 0.9 },
-    lootTables: ["monster_hellhound_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_hellhound_resources"]
+    lootTables: ["gold_low", "material_animal_medium", "material_gemstones", "material_magic"]
   },
   Flesheater: {
     sprite: "flesheater",
@@ -728,7 +721,7 @@ export const MONSTER_DEFS = {
       scale: 1,
       statsMult: { hp: 1, damage: 1, speed: 1, xp: 1, magic: 1 }
     },
-    lootTables: ["monster_flesheater_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_flesheater_resources"]
+    lootTables: ["gold_low", "material_plant"]
   },
   "Flesheater Young": {
     sprite: "flesheater_young",
@@ -737,7 +730,7 @@ export const MONSTER_DEFS = {
     tags: ["plant", "small"],
     stats: { hp: 24, damage: 12, speed: 2.55, range: 0.35, radius: 0.18, color: "#8dba4d", xp: 6 },
     allowElite: false,
-    lootTables: ["monster_flesheater_young_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low"]
   },
   "Spawn of Archnogrim": {
     sprite: "archnogrim",
@@ -748,7 +741,7 @@ export const MONSTER_DEFS = {
     popularity: { change: 1 },
     onHitStatus: { type: "root", chance: 0.25, minDuration: 0.5, maxDuration: 1.5, color: "#d7d4c7" },
     leapAttack: { minRange: 1.25, maxRange: 3, speed: 8.5, cooldown: 2.4 },
-    lootTables: ["monster_spawn_of_archnogrim_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_medium", "monster_profile_humanoid", "equipment_attacker_rare", "equipment_defender_rare", "monster_special_global", "material_houses", "material_humanoid"]
   },
   "Infernus Minion": {
     sprite: "infernus",
@@ -758,7 +751,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 90, damage: 16, speed: 1.16, range: 4.2, radius: 0.35, color: "#e56d35", xp: 36, magic: 9, spells: ["fireball"] },
     popularity: { change: 1.15 },
     onHitStatus: { type: "dot", chance: 1, damage: 5, duration: 3.5, tick: 1, color: "#ff7b38", label: "Burn" },
-    lootTables: ["monster_infernus_minion_profile", "monster_default_special_items", "monster_default_rare_gems", "monster_infernus_minion_resources"]
+    lootTables: ["gold_medium", "equipment_attacker_rare", "readable_fire_spellbooks", "material_humanoid"]
   },
   Shadowdragon: {
     sprite: "shadowdragon",
@@ -779,7 +772,7 @@ export const MONSTER_DEFS = {
     popularity: { change: 0 },
     onHitStatus: { type: "dot", chance: 1, damage: 7, duration: 4, tick: 1, color: "#b53c5f", label: "Bleed" }
   },
-  Bjergtroll: {
+  MountainTroll: {
     sprite: "mountaintroll",
     spriteUrl: "/assets/generated/mobs/mountaintroll_animated_sheet.png",
     speciesId: "troll",
@@ -787,9 +780,9 @@ export const MONSTER_DEFS = {
     stats: { hp: 320, damage: 42, speed: 0.62, range: 0.86, radius: 0.62, color: "#8d846f", xp: 72, blockChance: 0.12 },
     popularity: { change: 1.6 },
     attackCooldown: { min: 1.45, max: 2.1 },
-    lootTables: ["monster_bjergtroll_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_bjergtroll_resources"]
+    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global"]
   },
-  Gigantisktroll: {
+  GiantTroll: {
     sprite: "gianttroll",
     spriteUrl: "/assets/generated/mobs/gianttroll_animated_sheet.png",
     speciesId: "troll",
@@ -798,7 +791,7 @@ export const MONSTER_DEFS = {
     popularity: { change: 2.1 },
     attackCooldown: { min: 1.75, max: 2.5 },
     meleeAreaDamage: { radius: 3.2, damageMult: 0.72, visibleOnly: true, color: "#d8c091", shake: 10 },
-    lootTables: ["monster_gigantisktroll_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_gigantisktroll_resources"]
+    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global"]
   },
   "Rune Shade": {
     sprite: "ghost",
@@ -806,7 +799,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_rune_shade_readables"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
   },
   "Iron Revenant": {
     sprite: "skeleton",
@@ -814,7 +807,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
-    lootTables: ["monster_default_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Demon: {
     sprite: "demon",
@@ -823,7 +816,7 @@ export const MONSTER_DEFS = {
     tags: ["demon", "medium"],
     stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
     popularity: { change: 1.7 },
-    lootTables: ["monster_demon_profile", "monster_default_special_items", "monster_default_rare_gems", "monster_demon_resources", "monster_demon_readables"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Ghost: {
     sprite: "ghost",
@@ -832,7 +825,7 @@ export const MONSTER_DEFS = {
     tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
     popularity: { change: 1.35 },
-    lootTables: ["monster_ghost_profile", "monster_default_special_items", "monster_default_rare_gems", "monster_ghost_resources", "monster_ghost_readables"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
   },
   Skeleton: {
     sprite: "skeleton",
@@ -841,7 +834,7 @@ export const MONSTER_DEFS = {
     tags: ["undead", "medium"],
     stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
     popularity: { change: 1.2 },
-    lootTables: ["monster_skeleton_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_skeleton_readables"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
   },
   Scorpion: {
     sprite: "scorpion",
@@ -849,7 +842,7 @@ export const MONSTER_DEFS = {
     speciesId: "scorpion",
     tags: ["beast", "wildlife", "medium", "poison"],
     stats: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
-    lootTables: ["monster_scorpion_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_bone", "material_stone", "material_gemstones", "material_humanoid"]
   },
   Snake: {
     sprite: "snake",
@@ -858,7 +851,7 @@ export const MONSTER_DEFS = {
     tags: ["beast", "wildlife", "medium", "poison"],
     stats: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
     popularity: { change: -0.3 },
-    lootTables: ["monster_snake_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_snake_resources", "monster_snake_readables"]
+    lootTables: ["gold_low", "material_animal_medium"]
   },
   Spider: {
     sprite: "spider",
@@ -874,7 +867,7 @@ export const MONSTER_DEFS = {
       weaknesses: ["Begraenset raekkevidde", "Saarbar naar den holdes i bevaegelse"],
       habitatText: "Traeffes i grotter, lader, ruiner og fugtige underjordiske steder."
     },
-    lootTables: ["monster_spider_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_spider_readables"]
+    lootTables: ["gold_low", "material_bone"]
   },
   MiniSpider: {
     sprite: "minispider",
@@ -883,7 +876,7 @@ export const MONSTER_DEFS = {
     tags: ["spider", "beast", "wildlife", "small"],
     stats: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10 },
     allowElite: false,
-    lootTables: ["monster_minispider_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_bone"]
   },
   MediumSpider: {
     sprite: "mediumspider",
@@ -891,7 +884,7 @@ export const MONSTER_DEFS = {
     speciesId: "spider",
     tags: ["spider", "beast", "wildlife", "medium"],
     stats: { hp: 36, damage: 18, speed: 2, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16, spells: ["web_slow"] },
-    lootTables: ["monster_mediumspider_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_bone"]
   },
   LargeSpider: {
     sprite: "largespider",
@@ -899,7 +892,7 @@ export const MONSTER_DEFS = {
     speciesId: "spider",
     tags: ["spider", "beast", "wildlife", "large"],
     stats: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32, spells: ["web_slow"] },
-    lootTables: ["monster_largespider_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems"]
+    lootTables: ["gold_low", "material_bone"]
   },
   MotherSpider: {
     sprite: "motherspider",
@@ -917,7 +910,7 @@ export const MONSTER_DEFS = {
       scale: 0.42,
       statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 }
     },
-    lootTables: ["monster_motherspider_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_motherspider_readables"]
+    lootTables: ["gold_boss", "material_bone", "material_gemstones", "material_humanoid", "monster_special_global"]
   },
   WolfCub: {
     sprite: "wolf_cub",
@@ -933,14 +926,7 @@ export const MONSTER_DEFS = {
       weaknesses: ["Middel modstandskraft", "Let at holde paa afstand med kontrol"],
       habitatText: "Findes i skovkanter, bakker og urolige landsbyomraader."
     },
-    lootTables: [
-      "monster_wolfcub_profile",
-      "monster_default_special_items",
-      "monster_default_resources",
-      "monster_default_rare_gems",
-      "monster_wolfcub_resources",
-      "monster_wolfcub_configured"
-    ]
+    lootTables: ["gold_low", "material_bone", "material_animal_small", "special_wolffenris_treasure"]
   },
   Wolf: {
     sprite: "wolf",
@@ -949,7 +935,7 @@ export const MONSTER_DEFS = {
     tags: ["beast", "wildlife", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     popularity: { change: -0.35 },
-    lootTables: ["monster_wolf_profile", "monster_default_special_items", "monster_default_resources", "monster_default_rare_gems", "monster_wolf_resources", "monster_wolf_configured"]
+    lootTables: ["gold_low", "material_bone", "material_animal_medium", "special_wolffenris_treasure"]
   },
   WolfFenris: {
     sprite: "wolf_fenris",
@@ -968,14 +954,7 @@ export const MONSTER_DEFS = {
       scale: 0.42,
       statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 }
     },
-    lootTables: [
-      "monster_wolffenris_profile",
-      "monster_default_special_items",
-      "monster_default_resources",
-      "monster_default_rare_gems",
-      "monster_wolffenris_resources",
-      "monster_wolffenris_configured"
-    ]
+    lootTables: ["gold_boss", "special_wolffenris_treasure", "material_animal_medium", "material_humanoid"]
   }
 };
 
@@ -1058,4 +1037,3 @@ export function monsterSpriteId(typeName) {
   if (typeName?.includes("Shade")) return "ghost";
   return "demon";
 }
-

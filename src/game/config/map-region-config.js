@@ -1,4 +1,4 @@
-﻿import { createVillageOutskirtsMapRegions } from "./map-region/village-outskirts.js";
+import { createVillageOutskirtsMapRegions } from "./map-region/village-outskirts.js";
 
 const AREA_MAP_VIEW = {
   aspect: "1672 / 941",
@@ -709,7 +709,7 @@ export const MAP_REGION_SETS = {
       id: "eternal-mountains",
       label: "De Evige Bjerge",
       color: "#a6a0a0",
-      mobs: ["Skeleton", "Ghost", { type: "Icebear", weight: 1.4 }, { type: "Bear", weight: 0.8 }, { type: "Bjergtroll", weight: 1 }, { type: "Gigantisktroll", weight: 0.25 }],
+      mobs: ["Skeleton", "Ghost", { type: "Icebear", weight: 1.4 }, { type: "Bear", weight: 0.8 }, { type: "MountainTroll", weight: 1 }, { type: "GiantTroll", weight: 0.25 }],
       unlock: { locked: true, text: "De Evige Bjerge kraever en senere historiequest." },
       labelX: 90.01,
       labelY: 64.28,

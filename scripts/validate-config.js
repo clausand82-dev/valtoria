@@ -7,8 +7,24 @@ import { QUEST_NPCS } from "../src/game/config/npc-config.js";
 import { REGION_OBJECT_DEFS } from "../src/game/config/region-object-config.js";
 import { RESOURCE_DEFS } from "../src/game/config/resource-config.js";
 import { UNIQUE_ITEMS, NAMED_ITEM_TEMPLATES } from "../src/game/config/item-config.js";
+import { READABLE_ITEM_DEFS } from "../src/game/config/readable-config.js";
+import { RARITIES } from "../src/game/config/rarity-config.js";
+import { LOOT_TABLES } from "../src/game/config/loot-tables-config.js";
+import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
+const RUNTIME_LOOT_TABLE_REFS = new Set([
+  "chest_common",
+  "chest_bonus_red_rose",
+  "destroyed_item_poor_scrap",
+  "destroyed_item_normal_scrap",
+  "destroyed_item_upgraded_scrap",
+  "destroyed_item_rare_scrap",
+  "destroyed_item_epic_scrap",
+  "destroyed_item_legendary_scrap",
+  "destroyed_item_unique_scrap",
+  "gold_treasure",
+]);
 
 const errors = [];
 const warnings = [];
@@ -127,6 +143,60 @@ function checkLootRefs(value, owner, resourceIds, questItemIds, namedItemIds, un
   }
 }
 
+function normalizeLootTableRefs(value) {
+  if (value === undefined || value === null || value === "") return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function checkLootTableRefs(value, owner, lootTableIds, usedLootTableIds) {
+  if (!value || typeof value !== "object") return;
+  for (const [field, refs] of Object.entries({ lootTable: value.lootTable, lootTables: value.lootTables, instanceLootTables: value.instanceLootTables })) {
+    const seen = new Set();
+    normalizeLootTableRefs(refs).forEach((tableId, index) => {
+      const normalized = String(tableId ?? "").trim();
+      if (!normalized) return;
+      if (seen.has(normalized)) addError(`duplicate lootTable "${normalized}" referenced by ${owner}.${field}`);
+      seen.add(normalized);
+      if (!lootTableIds.has(normalized)) addError(`unknown lootTable "${normalized}" referenced by ${owner}.${field}${Array.isArray(refs) ? `[${index}]` : ""}`);
+      else usedLootTableIds.add(normalized);
+    });
+  }
+}
+
+function checkLootTableEntry(tableId, entry, index, resourceIds, questItemIds, namedItemIds, uniqueItemIds, readableIds, rarityIds) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    addError(`lootTable "${tableId}" entry[${index}] must be an object`);
+    return;
+  }
+  const owner = `lootTable "${tableId}" entry[${index}]`;
+  const type = String(entry.type ?? "").trim();
+  if (type === "resource") {
+    const resourceId = entry.id ?? entry.resourceId ?? entry.resource;
+    if (!resourceIds.has(String(resourceId))) addError(`unknown resource id "${resourceId}" referenced by ${owner}`);
+  }
+  if (type === "readable") {
+    const readableId = entry.readableId ?? entry.id;
+    if (!readableIds.has(String(readableId))) addError(`unknown readable id "${readableId}" referenced by ${owner}`);
+  }
+  if (type === "questItem") {
+    const questItemId = entry.questItemId ?? entry.id;
+    if (!questItemIds.has(String(questItemId))) addError(`unknown quest item id "${questItemId}" referenced by ${owner}`);
+  }
+  if (type === "named") {
+    const namedId = entry.itemId ?? entry.id;
+    if (namedId && !namedItemIds.has(String(namedId))) addError(`unknown named item id "${namedId}" referenced by ${owner}`);
+  }
+  if (type === "unique") {
+    const uniqueId = entry.itemId ?? entry.id;
+    if (uniqueId && !uniqueItemIds.has(String(uniqueId))) addError(`unknown unique item id "${uniqueId}" referenced by ${owner}`);
+  }
+  if (type === "equipment") {
+    for (const field of ["rarity", "minRarity"]) {
+      if (entry[field] && !rarityIds.has(String(entry[field]))) addError(`unknown rarity id "${entry[field]}" referenced by ${owner}.${field}`);
+    }
+  }
+}
+
 function checkPrefabRefs(prefabIds) {
   for (const { setId, index, region } of collectRegionEntries()) {
     const owner = `region "${region?.id ?? `${setId}[${index}]`}"`;
@@ -153,6 +223,16 @@ function main() {
   const questItemIds = new Set(Object.keys(QUEST_ITEM_DEFS ?? {}));
   const namedItemIds = new Set((NAMED_ITEM_TEMPLATES ?? []).map((item) => String(item.id)).filter(Boolean));
   const uniqueItemIds = new Set((UNIQUE_ITEMS ?? []).map((item) => String(item.id)).filter(Boolean));
+  const readableIds = new Set((READABLE_ITEM_DEFS ?? []).map((item) => String(item.id)).filter(Boolean));
+  const rarityIds = new Set((RARITIES ?? []).map((rarity) => String(rarity.id)).filter(Boolean));
+  const lootTableIds = new Set(Object.keys(LOOT_TABLES ?? {}));
+  const usedLootTableIds = new Set([...RUNTIME_LOOT_TABLE_REFS].filter((tableId) => lootTableIds.has(tableId)));
+
+  for (const [tableId, entries] of Object.entries(LOOT_TABLES ?? {})) {
+    if (!Array.isArray(entries)) addError(`lootTable "${tableId}" must be an array`);
+    else if (!entries.length) addError(`lootTable "${tableId}" is empty`);
+    else entries.forEach((entry, index) => checkLootTableEntry(tableId, entry, index, resourceIds, questItemIds, namedItemIds, uniqueItemIds, readableIds, rarityIds));
+  }
 
   for (const { setId, index, region } of collectRegionEntries()) {
     const id = idOf(region);
@@ -160,14 +240,21 @@ function main() {
     else if (regionIds.has(id)) addError(`duplicate region id "${id}" in ${regionIds.get(id)} and ${setId}[${index}]`);
     else regionIds.set(id, `${setId}[${index}]`);
 
-    for (const [listKey, entries] of Object.entries({ objects: region.objects, foliage: region.foliageSets, npcs: region.npcs })) {
+    for (const [listKey, entries] of Object.entries({ objects: region.objects, foliage: region.foliageSet ?? region.foliageSets ?? region.foliage, npcs: region.npcs })) {
       if (!Array.isArray(entries)) continue;
       entries.forEach((entry, entryIndex) => {
         const owner = `region "${id || `${setId}[${index}]`}".${listKey}[${entryIndex}]`;
         visitActionRefs(entry, owner, (actionId, refOwner) => checkActionRef(actionId, refOwner, actionIds));
         visitQuestRefs(entry, owner, questIds);
         checkLootRefs(entry, owner, resourceIds, questItemIds, namedItemIds, uniqueItemIds);
+        checkLootTableRefs(entry, owner, lootTableIds, usedLootTableIds);
         if (entry?.npcId && !npcIds.has(String(entry.npcId))) addError(`unknown NPC id "${entry.npcId}" used by ${owner}`);
+      });
+    }
+
+    if (Array.isArray(region.rareMobs)) {
+      region.rareMobs.forEach((entry, entryIndex) => {
+        checkLootTableRefs(entry, `region "${id || `${setId}[${index}]`}".rareMobs[${entryIndex}]`, lootTableIds, usedLootTableIds);
       });
     }
   }
@@ -196,6 +283,7 @@ function main() {
         const owner = `prefab "${prefabId}".${listKey}[${index}]`;
         visitActionRefs(entry, owner, (actionId, refOwner) => checkActionRef(actionId, refOwner, actionIds));
         visitQuestRefs(entry, owner, questIds);
+        checkLootTableRefs(entry, owner, lootTableIds, usedLootTableIds);
         if (entry?.npcId && !npcIds.has(String(entry.npcId))) addError(`unknown NPC id "${entry.npcId}" used by ${owner}`);
       });
     }
@@ -208,6 +296,7 @@ function main() {
         const owner = `subregion "${subregionId}".${listKey}[${index}]`;
         visitActionRefs(entry, owner, (actionId, refOwner) => checkActionRef(actionId, refOwner, actionIds));
         visitQuestRefs(entry, owner, questIds);
+        checkLootTableRefs(entry, owner, lootTableIds, usedLootTableIds);
         if (entry?.npcId && !npcIds.has(String(entry.npcId))) addError(`unknown NPC id "${entry.npcId}" used by ${owner}`);
       });
     }
@@ -229,9 +318,19 @@ function main() {
   for (const [objectId, def] of entriesOf(REGION_OBJECT_DEFS)) {
     if (def.defaultActionId) checkActionRef(String(def.defaultActionId), `region object "${objectId}".defaultActionId`, actionIds);
     checkLootRefs(def.destructible?.loot, `region object "${objectId}".destructible.loot`, resourceIds, questItemIds, namedItemIds, uniqueItemIds);
+    checkLootTableRefs(def, `region object "${objectId}"`, lootTableIds, usedLootTableIds);
+    checkLootTableRefs(def.destructible, `region object "${objectId}".destructible`, lootTableIds, usedLootTableIds);
   }
 
-  const summary = `${actionIds.size} actions, ${questIds.size} quests, ${npcIds.size} npcs, ${regionIds.size} regions, ${prefabIds.size} prefabs, ${subregionIds.size} subregions checked`;
+  for (const [monsterId, def] of entriesOf(MONSTER_DEFS)) {
+    checkLootTableRefs(def, `monster "${monsterId}"`, lootTableIds, usedLootTableIds);
+  }
+
+  for (const tableId of lootTableIds) {
+    if (!usedLootTableIds.has(tableId)) addWarning(`lootTable "${tableId}" is not referenced by config or known runtime defaults`);
+  }
+
+  const summary = `${actionIds.size} actions, ${questIds.size} quests, ${npcIds.size} npcs, ${regionIds.size} regions, ${prefabIds.size} prefabs, ${subregionIds.size} subregions, ${lootTableIds.size} lootTables checked`;
   if (errors.length) {
     console.error(`[validate] FAILED: ${errors.length} errors, ${warnings.length} warnings; ${summary}`);
     process.exit(1);

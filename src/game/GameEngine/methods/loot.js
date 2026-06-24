@@ -130,6 +130,41 @@ function chanceValue(entry, fallback = 1) {
   return Math.max(0, Math.min(1, Number(entry?.chance ?? fallback) || 0));
 }
 
+function rarityRank(rarityId) {
+  return RARITIES.findIndex((rarity) => rarity.id === rarityId);
+}
+
+function itemMeetsMinRarity(item, minRarity) {
+  if (!minRarity) return true;
+  const minRank = rarityRank(String(minRarity));
+  if (minRank < 0) return true;
+  const itemRank = rarityRank(item?.rarity);
+  return itemRank >= minRank;
+}
+
+function forceItemRarity(item, rarityId) {
+  const rarity = RARITIES.find((entry) => entry.id === rarityId);
+  if (!item || !rarity) return item;
+  const oldPrefixes = Object.values(PREFIXES).flat();
+  let baseName = item.baseName;
+  if (!baseName && item.name) {
+    baseName = oldPrefixes.reduce((name, prefix) => (
+      name.startsWith(`${prefix} `) ? name.slice(prefix.length + 1) : name
+    ), item.name);
+  }
+  item.baseName = baseName ?? item.baseName;
+  item.rarity = rarity.id;
+  item.rarityLabel = rarity.label;
+  item.rarityColor = rarity.color;
+  const prefixes = PREFIXES[rarity.id] ?? [];
+  if (prefixes.length > 0 && item.baseName) {
+    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+    item.name = `${prefix} ${item.baseName}`;
+  }
+  item.value = itemValue(item);
+  return item;
+}
+
 export const AUTO_LOOT_TYPE_IDS = [
   "gold",
   "resource",
@@ -410,7 +445,7 @@ export const lootMethods = {
   dropChestLoot(chest) {
     const tableIds = normalizeLootTableRefs(chest).length
       ? normalizeLootTableRefs(chest)
-      : ["chest_unique_named", "chest_common", "chest_bonus_red_rose"];
+      : ["chest_common", "chest_bonus_red_rose"];
     const context = {
       source: "chest",
       chest,
@@ -420,10 +455,7 @@ export const lootMethods = {
     if (normalizeLootTableRefs(chest).length) {
       this.dropLootFromTables(chest.x, chest.y, tableIds, context, { pickupDelay: 0.35 });
     } else {
-      const primary = [
-        ...this.rollLootTable("chest_unique_named", context),
-        ...this.rollLootTable("chest_common", context),
-      ].find((drop) => drop.item);
+      const primary = this.rollLootTable("chest_common", context).find((drop) => drop.item);
       if (primary?.item) this.dropGroundItem(chest.x + 0.16, chest.y - 0.16, primary.item, { pickupDelay: 0.35 });
       this.dropLootFromTables(chest.x, chest.y, ["chest_bonus_red_rose"], context, { pickupDelay: 0.35 });
     }
@@ -448,12 +480,6 @@ export const lootMethods = {
     this.trackItemDropped(item);
     this.markRenderDirty?.("loot-drop");
     return true;
-  },
-
-  resolveLootTables(source, context = {}) {
-    const sourceTables = normalizeLootTableRefs(source);
-    if (context.lootMode === "override" || source?.lootMode === "override") return sourceTables;
-    return sourceTables;
   },
 
   lootEntryLevel(source, entry = {}) {
@@ -522,21 +548,14 @@ export const lootMethods = {
       const category = String(entry.category ?? "all");
       if (category === "none") return null;
       if (entry.rarity) return rollItemOfRarity(level, String(entry.rarity), Math.max(1, Math.floor(Number(entry.tries) || 60)));
-      for (let i = 0; i < Math.max(1, Math.floor(Number(entry.tries) || 1)); i += 1) {
-        const item = makeItem(level, category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random());
-        if (entry.minRarity === "normal" && item?.rarity === "poor") continue;
+      const tries = Math.max(1, Math.floor(Number(entry.tries) || 1));
+      const biasForCategory = () => category === "weapon" ? 0.1 : category === "armor" ? 0.9 : Math.random();
+      for (let i = 0; i < tries; i += 1) {
+        const item = makeItem(level, biasForCategory());
+        if (!itemMeetsMinRarity(item, entry.minRarity)) continue;
         return item;
       }
-      const item = makeItem(level, Math.random());
-      if (entry.minRarity === "normal" && item?.rarity === "poor") {
-        const poorPrefix = PREFIXES.poor.find((prefix) => item.name.startsWith(`${prefix} `));
-        if (poorPrefix) item.name = item.name.replace(`${poorPrefix} `, `${PREFIXES.normal[Math.floor(Math.random() * PREFIXES.normal.length)]} `);
-        item.rarity = "normal";
-        item.rarityLabel = "Normal";
-        item.rarityColor = "#f5f3ea";
-        item.value = itemValue(item);
-      }
-      return item;
+      return forceItemRarity(makeItem(level, biasForCategory()), String(entry.minRarity ?? ""));
     }
     return null;
   },
@@ -618,8 +637,8 @@ export const lootMethods = {
     return drops;
   },
 
-  dropRareMobLoot(monster) {
-    const tableIds = normalizeLootTableRefs(monster?.instanceLootTables?.length ? { lootTables: monster.instanceLootTables } : monster);
+  dropInstanceLootTables(monster) {
+    const tableIds = normalizeLootTableRefs({ lootTables: monster?.instanceLootTables });
     if (!tableIds.length) return;
     this.dropLootFromTables(monster.x, monster.y, tableIds, {
       source: "rare_mob",
@@ -641,7 +660,7 @@ export const lootMethods = {
       });
     }
 
-    this.dropRareMobLoot(monster);
+    this.dropInstanceLootTables(monster);
   },
 
   isDropRestricted(item) {

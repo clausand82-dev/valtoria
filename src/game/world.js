@@ -838,6 +838,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         allNamed: regionConfig.antiDrops?.allNamed ?? false,
         allPotions: regionConfig.antiDrops?.allPotions ?? false,
         allQuestItems: regionConfig.antiDrops?.allQuestItems ?? false,
+        allReadables: regionConfig.antiDrops?.allReadables ?? false,
         allItems: regionConfig.antiDrops?.allItems ?? false,
       },
       mobs: [...(regionConfig.mobs ?? [])],

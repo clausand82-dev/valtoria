@@ -11,7 +11,6 @@ IMPORTENT:
 - Addon til at ødelægge potions
 - Addon til at ødelægge readables
 
-
 ARCHIVEMENTS
 (noget med at kende alle monstere): Set alle monster - bonus: +25 culture
 
