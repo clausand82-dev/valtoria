@@ -24,8 +24,8 @@ export const RESOURCE_DEFS = {
   fruit: { name: "Fruit", stackMax: 100, value: 2, color: "#d5b84e", iconUrl: "/assets/generated/item/item_res_fruit.png" },
   coal: { name: "Coal", stackMax: 100, value: 2, color: "#4d4a48", iconUrl: "/assets/generated/item/item_res_coal.png" },
   wheat: { name: "Wheat", stackMax: 100, value: 2, color: "#d6b85a", iconUrl: "/assets/generated/item/item_res_wheat.png" },
-  paper: { name: "Paper", stackMax: 100, value: 2, color: "#f3f4aa", iconUrl: "/assets/generated/item/item_res_paper.png" },
-  scroll: { name: "Scroll", stackMax: 100, value: 2, color: "#ffbb00", iconUrl: "/assets/generated/item/item_res_scroll.png" },
+  paper: { name: "Paper", stackMax: 100, value: 2, color: "#f3f4aa", iconUrl: "/assets/generated/item/item_res_paper.png", description: "Recycled paper made from old notes and books." },
+  scroll: { name: "Scroll", stackMax: 100, value: 2, color: "#ffbb00", iconUrl: "/assets/generated/item/item_res_scroll.png", description: "A blank scroll crafted from paper." },
   junk: { name: "Junk", stackMax: 100, value: 1, color: "#8f887d", iconUrl: "/assets/generated/item/item_res_junk.png" },
   //gold_ingot: { name: "Gold Ingot", stackMax: 100, value: 1000, color: "#f1c657" },
   gold_bar: { name: "Gold Bar", stackMax: 100, value: 1000, color: "#f1c657", iconUrl: "/assets/generated/item/item_res_goldbar.png" },
@@ -73,4 +73,3 @@ export const RESOURCE_MERGE_RECIPES = [
   { inputs: { blue_gemstone: 1, green_gemstone: 1, yellow_gemstone: 1 }, output: "turquoise_gemstone", count: 1 },
   { inputs: { coal: 1000 }, output: "diamond", count: 1, station: "research_lab" },
 ];
-

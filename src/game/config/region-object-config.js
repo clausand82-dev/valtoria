@@ -73,46 +73,6 @@ export const REGION_OBJECT_DEFS = {
     destructible: { hp: 70, damageStages: 3, particleColor: "#c99b5d", popularityDelta: -3, lootTables: ["material_houses", "material_gemstones"] },
     renderBiomeId: "mainland",
     graphics: { mode: "sheet", files: ["object/object_house_normal_1.png"], rows: 4, cols: 4, renderScale: 2 },
-    sockets: {
-      coordinateSpace: "sheet",
-      frameNumberBase: 1,
-      cols: 4,
-      rows: 4,
-      imageWidth: 1254,
-      imageHeight: 1254,
-      files: {
-        "object/object_house_normal_1.png": {
-          "1": {chimney: { x: 174, y: 68 }},
-          "2": {chimney: { x: 428, y: 78 }},
-          "3": {chimney: { x: 832, y: 84 }},
-          "4": {chimney: { x: 1044, y: 62 }},
-          "5": {chimney: { x: 123, y: 388 }},
-          "6": {  },
-          "7": {chimney: { x: 831, y: 359 }, lanternA: { x: 655, y: 528 }},
-          "8": {chimney: { x: 1032, y: 387 }, fireplace: { x: 1126, y: 551 }},
-          "9": {chimney: { x: 191, y: 673 }},
-          "10": {  },
-          "11": {chimney: { x: 704, y: 670 }},
-          "12": {chimney: { x: 1160, y: 697 }},
-          "13": {fireplace: { x: 197, y: 1135 }},
-          "14": {chimney: { x: 498, y: 965 }},
-          "15": {chimney: { x: 714, y: 981 }},
-          "16": {chimney: { x: 1114, y: 984 }, lanternA: { x: 960, y: 1117 }},
-          }
-        },
-        "object/object_house_normal_2.png": {
-          "1": {  },
-          "2": {  },
-          "3": {  },
-          "4": {  }
-        },
-        "object/object_house_normal_3.png": {
-          "1": {  },
-          "2": {  },
-          "3": {  },
-          "4": {  }
-        }
-      },
     attachedEffects: [
       {
         id: "chimneySmoke",

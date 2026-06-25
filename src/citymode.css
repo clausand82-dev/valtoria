@@ -1053,16 +1053,51 @@
 
 .city-mob-action-popup {
   position: absolute;
-  z-index: 12;
+  z-index: 80;
   width: 320px;
+  max-height: min(760px, calc(100vh - 128px));
+  overflow-y: auto;
   padding: 12px;
   border: 1px solid rgba(244, 218, 150, 0.26);
   border-radius: 8px;
   background: linear-gradient(180deg, rgba(28, 33, 25, 0.96), rgba(13, 17, 14, 0.97));
   color: var(--text);
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, 0);
   pointer-events: auto;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.city-mob-info-panel header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.city-mob-info-panel .city-mob-info-body {
+  gap: 12px;
+}
+
+.city-mob-info-panel .city-mob-pressure-panel {
+  margin: 0;
+}
+
+.city-mob-info-panel > header > button {
+  flex: 0 0 auto;
+  width: 34px;
+  min-height: 34px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+}
+
+.city-mob-action-status {
+  margin: 0;
+  color: rgba(255, 207, 184, 0.82);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .city-mob-action-popup header {
@@ -1110,6 +1145,59 @@
   line-height: 1.2;
 }
 
+.city-mob-action-popup-title > div:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.city-mob-action-popup-title span,
+.city-mob-pressure-panel p {
+  color: rgba(229, 219, 190, 0.78);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.city-mob-pressure-panel {
+  display: grid;
+  gap: 7px;
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(244, 218, 150, 0.14);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.city-mob-pressure-panel > b {
+  font-size: 13px;
+  color: #f4da96;
+}
+
+.city-mob-pressure-panel ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.city-mob-pressure-panel li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.city-mob-pressure-panel strong {
+  color: #ff9f86;
+  font-size: 13px;
+}
+
+.city-mob-pressure-panel p {
+  margin: 0;
+}
+
 .city-mob-action-popup > button {
   display: block;
   width: fit-content;
@@ -1151,6 +1239,16 @@
   margin-top: 4px;
   padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.city-army-send-box.locked {
+  opacity: 0.52;
+  filter: grayscale(0.45);
+}
+
+.city-army-send-box.locked input,
+.city-army-send-box.locked button {
+  cursor: not-allowed;
 }
 
 .city-army-send-box label {

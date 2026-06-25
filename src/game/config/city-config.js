@@ -26,6 +26,8 @@ export const CITY_EVENT_RULES = {
 //   Active when all listed city stats are at least their threshold.
 // - statPopulationRatioBelow: { stat: "wealth", threshold: 0.5 }
 //   Active when cityStats[stat] / max(1, population) is below threshold.
+// - statRatioBelow: { health: 0.75 }
+//   Active when cityStats[stat] / configured cityStatNeeds[stat] is below threshold.
 // - fireRiskAtLeast: 75
 //   Active when computed fire risk is at least this value.
 //
@@ -54,9 +56,9 @@ export const CITY_EVENT_DEFS = {
     id: "famine",
     label: "Famine",
     iconUrl: "/assets/generated/icon/buff_famine.png",
-    detail: "Provision is below population. Food resource drops are reduced by 50%.",
+    detail: "Provision capacity is too low for the population. Food resource drops are reduced by 50%.",
     solution: "Increase provision or reduce population pressure.",
-    conditions: { statBelowPopulation: "provision" },
+    conditions: { statRatioBelow: { provision: 1 } },
     modifiers: {
       resourceDropMultiplierById: {
         meat: 0.5,
@@ -72,9 +74,9 @@ export const CITY_EVENT_DEFS = {
     id: "water_shortage",
     label: "Water shortage",
     iconUrl: "/assets/generated/icon/buff_water_shortage.png",
-    detail: "Water is below population. Potion drops stop until water recovers.",
+    detail: "Water capacity is too low for the population. Potion drops stop until water recovers.",
     solution: "Increase water production before returning to the wilds.",
-    conditions: { statBelowPopulation: "water" },
+    conditions: { statRatioBelow: { water: 1 } },
     modifiers: {
       potionDropMultiplier: 0,
     },
@@ -83,9 +85,9 @@ export const CITY_EVENT_DEFS = {
     id: "disease_outbreak",
     label: "Disease outbreak",
     iconUrl: "/assets/generated/icon/buff_disease_outbreak.png",
-    detail: "Health is too low. Hero max HP is reduced by 25%.",
-    solution: "Raise city health above the disease threshold.",
-    conditions: { statBelow: { health: CITY_EVENT_RULES.diseaseOutbreakHealthThreshold } },
+    detail: "Health capacity is strained. Hero max HP is reduced by 25%.",
+    solution: "Raise health capacity relative to population.",
+    conditions: { statRatioBelow: { health: 0.75 } },
     modifiers: {
       heroMaxHpMultiplier: 0.75,
     },
@@ -94,9 +96,9 @@ export const CITY_EVENT_DEFS = {
     id: "uprising_poorness",
     label: "Uprising risk",
     iconUrl: "/assets/generated/icon/buff_uprising_poorness.png",
-    detail: "Wealth is low compared to population. Gold drops are reduced by 50%.",
-    solution: "Increase wealth relative to population.",
-    conditions: { statPopulationRatioBelow: { stat: "wealth", threshold: CITY_EVENT_RULES.uprisingWealthRatioThreshold } },
+    detail: "Wealth is low compared to the city's needs. Gold drops are reduced by 50%.",
+    solution: "Increase wealth or reduce population pressure.",
+    conditions: { statRatioBelow: { wealth: 0.75 } },
     modifiers: {
       goldDropMultiplier: 0.5,
     },
@@ -117,9 +119,9 @@ export const CITY_EVENT_DEFS = {
     id: "lawlessness",
     label: "Lawlessness",
     iconUrl: "/assets/generated/icon/buff_lawlessness.png",
-    detail: "Safety is low. City mob spawn chance is increased by 10%.",
+    detail: "Safety capacity is strained. City mob spawn chance is increased by 10%.",
     solution: "Raise safety or clear city mobs.",
-    conditions: { statBelow: { safety: CITY_EVENT_RULES.lawlessnessSafetyThreshold } },
+    conditions: { statRatioBelow: { safety: 0.75 } },
     modifiers: {
       cityMobSpawnChanceMultiplier: 1.1,
     },
@@ -128,9 +130,9 @@ export const CITY_EVENT_DEFS = {
     id: "supply_crisis",
     label: "Supply crisis",
     iconUrl: "/assets/generated/icon/buff_supply_crisis.png",
-    detail: "Supply is low. Repair and crafting costs are increased.",
+    detail: "Supply capacity is strained. Repair and crafting costs are increased.",
     solution: "Increase supply through city buildings, addons, or regions.",
-    conditions: { statBelow: { supply: CITY_EVENT_RULES.supplyCrisisSupplyThreshold } },
+    conditions: { statRatioBelow: { supply: 0.75 } },
     modifiers: {
       repairCostMultiplier: 1.25,
       craftingCostMultiplier: 1.25,
@@ -140,9 +142,9 @@ export const CITY_EVENT_DEFS = {
     id: "trade_collapse",
     label: "Trade collapse",
     iconUrl: "/assets/generated/icon/buff_trade_collapse.png",
-    detail: "Trade is low. Merchant stock and prices are worse.",
+    detail: "Trade capacity is strained. Merchant stock and prices are worse.",
     solution: "Increase trade before shopping.",
-    conditions: { statBelow: { trade: CITY_EVENT_RULES.tradeCollapseTradeThreshold } },
+    conditions: { statRatioBelow: { trade: 0.75 } },
     modifiers: {
       merchantBuyPriceMultiplier: 1.25,
       merchantSellPriceMultiplier: 0.75,
@@ -153,9 +155,9 @@ export const CITY_EVENT_DEFS = {
     id: "faith_crisis",
     label: "Faith crisis",
     iconUrl: "/assets/generated/icon/buff_faith_crisis.png",
-    detail: "Faith is low. Health potions restore 50% less health.",
+    detail: "Faith support is strained. Health potions restore 50% less health.",
     solution: "Increase faith. Mana potions are not affected.",
-    conditions: { statBelow: { faith: CITY_EVENT_RULES.faithCrisisFaithThreshold } },
+    conditions: { statRatioBelow: { faith: 0.75 } },
     modifiers: {
       healthPotionHealMultiplier: 0.5,
     },
@@ -167,7 +169,7 @@ export const CITY_EVENT_DEFS = {
     detail: "Wealth and trade are high. Merchant prices and quest gold rewards improve.",
     solution: "Keep wealth and trade high to preserve this bonus.",
     positive: true,
-    conditions: { statsAtLeast: { wealth: CITY_EVENT_RULES.prosperityWealthThreshold, trade: CITY_EVENT_RULES.prosperityTradeThreshold } },
+    conditions: { statRatioAtLeast: { wealth: 1.5, trade: 1.5 } },
     modifiers: {
       merchantBuyPriceMultiplier: 0.9,
       merchantSellPriceMultiplier: 1.1,
@@ -291,13 +293,13 @@ export const CITY_STAT_RULE_TEXT = {
     "Unlocked regions can add current population through their scaled cityStats.population value.",
   ],
   housing: ["If population exceeds housing, later city events can react to overcrowding."],
-  provision: ["If provision is below population, famine becomes active and health is reduced by 15."],
-  water: ["If water is below population, water shortage becomes active and health is reduced by 15."],
+  provision: ["Provision is compared against population-driven need.", "Low provision can trigger famine and reduce health capacity."],
+  water: ["Water is compared against population-driven need.", "Low water can trigger water shortage and reduce health capacity."],
   supply: ["General supply can be improved by regions, buildings, and addons."],
   wealth: ["If wealth/population is below 0.5, uprising risk becomes active."],
   trade: ["Trade can feed later wealth and supply logic."],
-  safety: ["Base safety is 10 and can be raised by city sources up to 100.", "Each city mob level currently present reduces safety by 2 points.", "Low safety raises fire risk and can trigger lawlessness."],
-  health: ["Health is a 0-100 public-health score.", "If health is below 50, disease outbreak becomes active."],
+  safety: ["Safety is capacity compared against city need.", "City mobs apply temporary config-driven penalties while they remain active.", "Low safety raises fire risk and can trigger lawlessness."],
+  health: ["Health is capacity compared against city need.", "Low health ratio can trigger disease outbreak."],
   defense: ["Uses the old army unit power as defense.", "If knowledge is at least population, defense gains +5%."],
   knowledge: ["If knowledge is at least population, defense gains +5%."],
   culture: ["If culture is at least population, popularity gains +10%."],

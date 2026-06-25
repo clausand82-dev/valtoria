@@ -15,7 +15,12 @@ import { CITY_ARTIFACTS } from "../game/config/city-artifact-config.js";
 import { CITY_POLICIES } from "../game/config/city-policy-config.js";
 import { CITY_ACHIEVEMENTS } from "../game/config/city-achievement-config.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
-import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
+import {
+  CITY_STATS_RULES,
+  calculateCityStatNeeds,
+  calculateCityStatRatios,
+  calculateCityStatStatuses,
+} from "../game/config/city-stats-rules-config.js";
 import {
   isArmoryPointId,
   normalizeArmoryPoints,
@@ -45,11 +50,13 @@ import {
 } from "../game/config/city-army-unit-config.js";
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
 import {
+  CITY_MOB_BALANCE,
   CITY_MOB_DAMAGE_PER_LEVEL_PCT,
   CITY_MOB_LEVELS,
   CITY_MOB_LEVEL_UP_CHANCE,
   CITY_MOB_MAX_LEVEL,
   CITY_MOB_POOL,
+  CITY_MOB_TYPE_EFFECTS,
   CITY_SPAWN_AREA_BUILDING_TARGETS,
   CITY_SPAWN_AREA_RULES,
   CITY_SPAWN_PATHS,
@@ -217,12 +224,14 @@ function normalizeCityMobs(cityMobs = []) {
       const area = CITY_AREAS.find((entry) => entry.id === mob.areaId);
       const center = cityAreaCenter(area);
       const poolEntry = CITY_MOB_POOL.find((entry) => entry.type === mob.mobType);
+      const hasSavedVisits = mob.visitsActive !== undefined || mob.turnsActive !== undefined;
       return {
         id: String(mob.id || `${mob.areaId}-${mob.mobType}-${Math.round((mob.x ?? center.x) * 10)}-${Math.round((mob.y ?? center.y) * 10)}`),
         areaId: String(mob.areaId),
         mobType: String(mob.mobType || "Skeleton"),
         level: Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(mob.level) || 1))),
         count: Math.max(1, Math.floor(Number(mob.count) || 1)),
+        visitsActive: Math.max(0, Math.floor(Number(hasSavedVisits ? (mob.visitsActive ?? mob.turnsActive) : 1) || 0)),
         x: Number.isFinite(mob.x) ? mob.x : center.x,
         y: Number.isFinite(mob.y) ? mob.y : center.y,
         iconUrl: mob.iconUrl || poolEntry?.miniIcon || "",
@@ -268,26 +277,146 @@ function cityMapMobRefs(cityMobs = []) {
 }
 
 function cityAttackableMobIds(cityMobs = []) {
-  const groupsByArea = new Map();
-  for (const mob of normalizeCityMobs(cityMobs)) {
-    groupsByArea.set(mob.areaId, [...(groupsByArea.get(mob.areaId) ?? []), mob]);
-  }
-  const attackableAreaIds = new Set();
-  for (const path of CITY_SPAWN_PATHS) {
-    for (let i = path.length - 1; i >= 0; i -= 1) {
-      const areaId = path[i];
-      if ((groupsByArea.get(areaId) ?? []).length > 0) {
-        attackableAreaIds.add(areaId);
-        break;
-      }
-    }
-  }
   const result = new Set();
-  for (const [areaId, mobs] of groupsByArea.entries()) {
-    if (!attackableAreaIds.has(areaId)) continue;
+  const mobsByArea = new Map();
+  const normalized = normalizeCityMobs(cityMobs);
+  let nearestRank = 0;
+  for (const mob of normalized) {
+    mobsByArea.set(mob.areaId, [...(mobsByArea.get(mob.areaId) ?? []), mob]);
+    nearestRank = Math.max(nearestRank, cityMobAttackPriority(mob.areaId));
+  }
+  if (nearestRank <= 0) return result;
+  for (const [areaId, mobs] of mobsByArea.entries()) {
+    if (cityMobAttackPriority(areaId) !== nearestRank) continue;
     for (const mob of mobs) result.add(mob.id);
   }
   return result;
+}
+
+function cityMobAttackPriority(areaId = "") {
+  const zone = cityMobZoneKind(areaId);
+  if (zone === "close") return 4;
+  if (zone === "bridge") return 3;
+  if (zone === "corner") return 2;
+  if (zone === "edge") return 1;
+  if (zone === "border") return 1;
+  return 1;
+}
+
+function cityMobTypeEffectDef(mobType) {
+  return CITY_MOB_TYPE_EFFECTS[mobType] ?? CITY_MOB_TYPE_EFFECTS.default ?? {};
+}
+
+function cityMobDisplayName(mob) {
+  return cityMobTypeEffectDef(mob?.mobType).label ?? String(mob?.mobType || "City threat");
+}
+
+function cityMobAreaLabel(mob) {
+  const area = CITY_AREAS.find((entry) => entry.id === mob?.areaId);
+  return area?.title ?? String(mob?.areaId || "Unknown area");
+}
+
+function cityMobZoneKind(areaId = "") {
+  const raw = String(areaId).toLowerCase();
+  if (raw.includes("close")) return "close";
+  if (raw.includes("bridge")) return "bridge";
+  if (raw.includes("corner")) return "corner";
+  if (raw.includes("edge")) return "edge";
+  if (raw.includes("border")) return "border";
+  return "border";
+}
+
+function cityMobAgeEffectMultiplier(mob) {
+  return Math.max(0, Math.floor(Number(mob?.visitsActive) || 0)) <= 0
+    ? Number(CITY_MOB_BALANCE.newMobWarningEffectMultiplier) || 0.35
+    : 1;
+}
+
+function cityMobLevelEffectMultiplier(mob) {
+  const level = Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(mob?.level) || 1)));
+  return Number(CITY_MOB_BALANCE.levelEffectMultiplierByLevel?.[level]) || 1;
+}
+
+function cityMobStatPenalties(mob) {
+  const effects = cityMobTypeEffectDef(mob?.mobType).cityStats ?? {};
+  const multiplier = cityMobLevelEffectMultiplier(mob) * cityMobAgeEffectMultiplier(mob);
+  const penalties = {};
+  for (const [rawId, rawAmount] of Object.entries(effects)) {
+    const statId = normalizeCityStatId(rawId);
+    if (!statId || statId === "population") continue;
+    const amount = Math.round((Number(rawAmount) || 0) * multiplier);
+    if (amount === 0) continue;
+    penalties[statId] = (penalties[statId] ?? 0) + amount;
+  }
+  return penalties;
+}
+
+function cityMobStatPenaltyEntries(mob) {
+  return Object.entries(cityMobStatPenalties(mob)).map(([statId, amount]) => ({
+    statId,
+    label: cityStatLabel(statId),
+    amount,
+  }));
+}
+
+function cityMobStatPenaltyTotals(progress = {}) {
+  return mergeCityStatEffects(normalizeCityMobs(progress?.cityMobs).map(cityMobStatPenalties));
+}
+
+function cityMobStatBreakdownGroups(progress = {}) {
+  const groups = new Map();
+  for (const mob of normalizeCityMobs(progress?.cityMobs)) {
+    const areaLabel = cityMobAreaLabel(mob);
+    const level = Math.max(1, Math.floor(Number(mob.level) || 1));
+    const label = cityMobDisplayName(mob);
+    for (const [statId, amount] of Object.entries(cityMobStatPenalties(mob))) {
+      const key = `${statId}|${label}|${areaLabel}|${level}`;
+      const current = groups.get(key) ?? { statId, label, areaLabel, level, amount: 0, count: 0 };
+      current.amount += Math.floor(Number(amount) || 0);
+      current.count += 1;
+      groups.set(key, current);
+    }
+  }
+  return [...groups.values()];
+}
+
+function cityMobSpreadChance(mob) {
+  const level = Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(mob?.level) || 1)));
+  return Number(CITY_MOB_BALANCE.spreadChanceByLevel?.[level] ?? CITY_MOB_LEVELS[level]?.spreadChance ?? 0) || 0;
+}
+
+function cityMobEscalationText(mob) {
+  const visitsActive = Math.max(0, Math.floor(Number(mob?.visitsActive) || 0));
+  const minLevel = Math.max(0, Math.floor(Number(CITY_MOB_BALANCE.minVisitsBeforeLevelUp) || 0));
+  const minSpread = Math.max(0, Math.floor(Number(CITY_MOB_BALANCE.minVisitsBeforeSpread) || 0));
+  const levelChance = Math.round((Number(CITY_MOB_BALANCE.levelUpChancePerVisit) || CITY_MOB_LEVEL_UP_CHANCE) * 100);
+  const spreadChance = Math.round(cityMobSpreadChance(mob) * 100);
+  const levelText = visitsActive < minLevel ? `level-up after ${minLevel - visitsActive} more visit` : `${levelChance}% level-up per visit`;
+  const spreadText = Math.max(1, Math.floor(Number(mob?.level) || 1)) < 3
+    ? "spread starts at level 3"
+    : visitsActive < minSpread
+      ? `spread after ${minSpread - visitsActive} more visit`
+      : `${spreadChance}% spread per visit`;
+  return `${levelText}; ${spreadText}`;
+}
+
+function cityMobDurabilityThreatText(mob) {
+  const targetAreaId = CITY_SPAWN_AREA_BUILDING_TARGETS[mob?.areaId];
+  if (!targetAreaId) return "";
+  const target = CITY_AREAS.find((entry) => entry.id === targetAreaId);
+  const zone = cityMobZoneKind(mob?.areaId);
+  const multiplier = Number(CITY_MOB_BALANCE.zoneDamageMultiplier?.[zone]) || 0;
+  if (multiplier <= 0) return "";
+  const baseDamage = Number(CITY_MOB_BALANCE.durabilityDamagePerLevelPct ?? CITY_MOB_DAMAGE_PER_LEVEL_PCT) || 0;
+  const damage = baseDamage * Math.max(1, Number(mob?.level) || 1) * Math.max(1, Number(mob?.count) || 1) * multiplier;
+  return `${target?.title ?? targetAreaId} durability -${damage.toFixed(2)}% per visit`;
+}
+
+function cityMobRecoveryText(mob) {
+  const durabilityThreat = cityMobDurabilityThreatText(mob);
+  return durabilityThreat
+    ? "Clearing this threat removes its stat penalties. Durability damage already done must still be repaired."
+    : "Clearing this threat immediately restores its city stat penalties.";
 }
 
 function pickCityBattleRegion(mobType, mapSize = "small", areaId = null) {
@@ -336,21 +465,33 @@ function applyCityMobProgressForVisit(progress = {}, cityStats = {}) {
 
 function applyCityMobLevelAndSpread(progress = {}) {
   const currentMobs = normalizeCityMobs(progress.cityMobs);
-  const nextMobs = [...currentMobs];
-  const areaCounts = cityMobAreaCounts(currentMobs);
+  const activeMobs = currentMobs.map((mob) => ({
+    ...mob,
+    visitsActive: Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) + 1,
+  }));
+  const nextMobs = [...activeMobs];
+  const areaCounts = cityMobAreaCounts(activeMobs);
+  const maxMobs = Math.max(1, Math.floor(Number(CITY_MOB_BALANCE.maxActiveCityMobs) || 12));
 
-  for (const mob of currentMobs) {
-    if (Math.random() < CITY_MOB_LEVEL_UP_CHANCE) {
+  for (const mob of activeMobs) {
+    if (
+      mob.visitsActive >= (Number(CITY_MOB_BALANCE.minVisitsBeforeLevelUp) || 0)
+      && Math.random() < (Number(CITY_MOB_BALANCE.levelUpChancePerVisit) || CITY_MOB_LEVEL_UP_CHANCE)
+    ) {
       mob.level = Math.min(CITY_MOB_MAX_LEVEL, mob.level + 1);
       mob.count = cityMobCountForLevel(mob.level);
     }
-    const levelDef = CITY_MOB_LEVELS[mob.level] ?? CITY_MOB_LEVELS[1];
-    if (mob.level < 3 || Math.random() >= (levelDef.spreadChance ?? 0)) continue;
+    if (nextMobs.length >= maxMobs) continue;
+    if (
+      mob.level < 3
+      || mob.visitsActive < (Number(CITY_MOB_BALANCE.minVisitsBeforeSpread) || 0)
+      || Math.random() >= cityMobSpreadChance(mob)
+    ) continue;
 
     const spreadTargets = CITY_SPAWN_SPREAD_TARGETS[mob.areaId] ?? [];
     const candidates = spreadTargets.filter((areaId) => (
       cityMobAreaHasRoom(areaCounts, areaId)
-      && citySpawnAreaEligible(progress, currentMobs, areaId)
+      && citySpawnAreaEligible(progress, activeMobs, areaId)
     ));
     if (!candidates.length) continue;
     const targetAreaId = candidates[Math.floor(Math.random() * candidates.length)];
@@ -366,11 +507,14 @@ function applyCityMobNewSpawns(progress = {}, cityStats = {}) {
   const spawnChance = Math.min(1, calcCitySpawnChance(Number(progress.threatLevel) || 0) * (cityRuntimeModifiers(cityStats).cityMobSpawnChanceMultiplier ?? 1));
   if (spawnChance <= 0) return progress;
   const currentMobs = normalizeCityMobs(progress.cityMobs);
+  const maxMobs = Math.max(1, Math.floor(Number(CITY_MOB_BALANCE.maxActiveCityMobs) || 12));
+  if (currentMobs.length >= maxMobs) return progress;
   const nextMobs = [...currentMobs];
 
   const spawnAreas = citySpawnCandidatesForNewSpawn(progress, currentMobs);
 
   for (const areaId of spawnAreas) {
+    if (nextMobs.length >= maxMobs) break;
     if (Math.random() >= spawnChance) continue;
     const mobType = pickCityMobType();
     const spawn = createCityMobGroup(areaId, mobType, 1);
@@ -385,15 +529,19 @@ function applyCityMobBuildingDamage(progress = {}, cityStats = {}) {
   const damageMultiplier = cityRuntimeModifiers(cityStats).cityDurabilityDamageMultiplier ?? 1;
   let next = progress;
   for (const mob of mobs) {
+    if (Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) < (Number(CITY_MOB_BALANCE.minVisitsBeforeDurabilityDamage) || 0)) continue;
     const targetAreaId = CITY_SPAWN_AREA_BUILDING_TARGETS[mob.areaId];
     if (!targetAreaId) continue;
+    const zoneMultiplier = Number(CITY_MOB_BALANCE.zoneDamageMultiplier?.[cityMobZoneKind(mob.areaId)]) || 0;
+    if (zoneMultiplier <= 0) continue;
     const targetArea = CITY_AREAS.find((entry) => entry.id === targetAreaId);
     if (!targetArea) continue;
     const state = getCityAreaState(next, targetArea);
     if (!state.unlocked) continue;
     const rawDurability = Number(state.durability ?? DURABILITY_DEFAULT);
     const currentDurability = Math.max(0, Math.min(100, Number.isFinite(rawDurability) ? rawDurability : DURABILITY_DEFAULT));
-    const damage = CITY_MOB_DAMAGE_PER_LEVEL_PCT * mob.level * Math.max(1, mob.count) * damageMultiplier;
+    const baseDamage = Number(CITY_MOB_BALANCE.durabilityDamagePerLevelPct ?? CITY_MOB_DAMAGE_PER_LEVEL_PCT) || 0;
+    const damage = baseDamage * mob.level * Math.max(1, mob.count) * zoneMultiplier * damageMultiplier;
     const nextDurability = Math.max(0, parseFloat((currentDurability - damage).toFixed(2)));
     if (nextDurability === currentDurability) continue;
     next = {
@@ -484,6 +632,7 @@ function createCityMobGroup(areaId, mobType, level = 1) {
     mobType,
     level: Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(level) || 1))),
     count: cityMobCountForLevel(level),
+    visitsActive: 0,
     x: center.x,
     y: center.y,
     iconUrl,
@@ -1285,6 +1434,7 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   applyRegionCityStats(stats, regionCorruption, snapshot);
   applyCityStatEffects(stats, cityAchievementEffects(progress, snapshot, stats));
   applyNonPopularityEffects(stats, normalizeCityStatAdjustments(progress?.statAdjustments));
+  applyCityStatEffects(stats, cityMobStatPenaltyTotals(progress));
   applyCurrentCityStatEffects(stats, progress);
   stats.army = stats.defense;
   stats.city_defence = stats.defense;
@@ -1372,12 +1522,14 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
     }
   }
   const finalStats = calculateCityStats(progress, snapshot, regionCorruption);
-  const cityMobs = normalizeCityMobs(progress?.cityMobs);
-  const totalCityMobLevels = cityMobs.reduce((sum, mob) => sum + Math.max(1, Math.floor(Number(mob.level) || 1)), 0);
-  if (totalCityMobLevels > 0) addEntry("safety", "City mobs", -(totalCityMobLevels * 2), `${totalCityMobLevels} total mob levels`);
+  for (const group of cityMobStatBreakdownGroups(progress)) {
+    const detail = `${group.areaLabel} Lv.${group.level}${group.count > 1 ? ` x${group.count}` : ""}`;
+    addEntry(group.statId, group.count > 1 ? `${group.label} x${group.count}` : group.label, group.amount, detail);
+  }
   const population = Math.max(0, Math.floor(Number(finalStats.population) || 0));
-  if (Math.max(0, Math.floor(Number(finalStats.provision) || 0)) < population) addEntry("health", "Low provision", -15);
-  if (Math.max(0, Math.floor(Number(finalStats.water) || 0)) < population) addEntry("health", "Low water", -15);
+  const healthNeedPenalty = Math.ceil(population * 0.15);
+  if ((finalStats.ratios?.provision ?? 1) < 1) addEntry("health", "Low provision", -healthNeedPenalty, "Provision below city need");
+  if ((finalStats.ratios?.water ?? 1) < 1) addEntry("health", "Low water", -healthNeedPenalty, "Water below city need");
   if (population > 0 && Math.max(0, Math.floor(Number(finalStats.knowledge) || 0)) >= population) addEntry("defense", "Knowledge threshold", 0, "+5% defense");
   if (population > 0 && Math.max(0, Math.floor(Number(finalStats.culture) || 0)) >= population) addEntry("popularity", "Culture threshold", 0, "+10% toward cap");
   const basePopularity = Math.max(0, Math.floor(Number(snapshot?.player?.popularity) || 0));
@@ -1593,15 +1745,12 @@ function resolveCityArmyBattle({ progress = {}, cityStats = {}, mob, sentUnits =
 
 function applyCurrentCityStatEffects(stats, progress = {}) {
   const population = Math.max(0, Math.floor(Number(stats.population) || 0));
-  const provision = Math.max(0, Math.floor(Number(stats.provision) || 0));
-  const water = Math.max(0, Math.floor(Number(stats.water) || 0));
-  const cityMobs = normalizeCityMobs(progress?.cityMobs);
-  const totalCityMobLevels = cityMobs.reduce((sum, mob) => sum + Math.max(1, Math.floor(Number(mob.level) || 1)), 0);
-  stats.safety = clampPct((Number(stats.safety) || 0) - totalCityMobLevels * 2);
+  const preNeeds = calculateCityStatNeeds(stats);
+  const preRatios = calculateCityStatRatios(stats, preNeeds);
   let healthPenalty = 0;
-  if (provision < population) healthPenalty += 15;
-  if (water < population) healthPenalty += 15;
-  stats.health = clampPct((Number(stats.health) || 0) - healthPenalty);
+  if ((preRatios.provision ?? 1) < 1) healthPenalty += Math.ceil(population * 0.15);
+  if ((preRatios.water ?? 1) < 1) healthPenalty += Math.ceil(population * 0.15);
+  stats.health = Math.max(0, Math.floor((Number(stats.health) || 0) - healthPenalty));
   if (Math.max(0, Math.floor(Number(stats.knowledge) || 0)) >= population && population > 0) {
     stats.defense = Math.floor((Number(stats.defense) || 0) * 1.05);
   }
@@ -1613,9 +1762,12 @@ function applyCurrentCityStatEffects(stats, progress = {}) {
     stats.popularity = basePopularity;
   }
   stats.nonUniqueDropRateBonus = Math.max(0, Math.floor(Number(stats.faith) || 0)) >= population && population > 0 ? 0.05 : 0;
-  stats.maintenance = calculateCityMaintenance(progress, stats.maintenance);
-  stats.safety = clampPct(stats.safety);
-  stats.health = clampPct(stats.health);
+  stats.maintenance = calculateCityMaintenance(progress);
+  stats.safety = Math.max(0, Math.floor(Number(stats.safety) || 0));
+  stats.health = Math.max(0, Math.floor(Number(stats.health) || 0));
+  stats.needs = calculateCityStatNeeds(stats);
+  stats.ratios = calculateCityStatRatios(stats, stats.needs);
+  stats.statuses = calculateCityStatStatuses(stats.ratios);
   stats.events = cityEventFlags(stats);
 }
 
@@ -1623,9 +1775,7 @@ function clampPct(value) {
   return Math.max(0, Math.min(100, Math.floor(Number(value) || 0)));
 }
 
-function calculateCityMaintenance(progress = {}, rawMaintenance = 100) {
-  const baseMaintenance = Math.floor(Number(CITY_STATS_RULES.baseStats?.maintenance) || 100);
-  const modifier = Math.floor(Number(rawMaintenance) || 0) - baseMaintenance;
+function calculateCityMaintenance(progress = {}) {
   const durabilities = [];
   for (const area of CITY_AREAS) {
     const state = getCityAreaState(progress, area);
@@ -1640,7 +1790,7 @@ function calculateCityMaintenance(progress = {}, rawMaintenance = 100) {
   const average = durabilities.length
     ? Math.floor(durabilities.reduce((sum, value) => sum + value, 0) / durabilities.length)
     : 100;
-  return clampPct(average + modifier);
+  return clampPct(average);
 }
 
 function cityAreaActiveStatEffects(area, level = 1) {
@@ -2269,6 +2419,12 @@ export {
   normalizeCityMobs,
   cityMapMobRefs,
   cityAttackableMobIds,
+  cityMobAreaLabel,
+  cityMobDisplayName,
+  cityMobDurabilityThreatText,
+  cityMobEscalationText,
+  cityMobRecoveryText,
+  cityMobStatPenaltyEntries,
   pickCityBattleRegion,
   applyCityMobProgressForVisit,
   cityBuildingLayerUrls,

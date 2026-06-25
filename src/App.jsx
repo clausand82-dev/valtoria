@@ -619,11 +619,27 @@ export default function App() {
   );
   const cityHudStats = useMemo(() => CITY_STAT_DEFS.filter((stat) => stat.id !== "popularity").map((stat) => {
     const value = Math.max(0, Math.floor(Number(derivedCityStats[stat.id]) || 0));
+    const need = Math.max(0, Math.floor(Number(derivedCityStats.needs?.[stat.id]) || 0));
+    const ratio = derivedCityStats.ratios?.[stat.id] ?? null;
+    const status = derivedCityStats.statuses?.[stat.id] ?? null;
     const configuredMax = CITY_STATS_RULES.displayMax?.[stat.id] ?? 500;
-    const max = Math.max(1, Math.floor(Number(typeof stat.max === "function" ? stat.max(snapshot) : stat.max ?? configuredMax) || 1));
+    const max = Math.max(1, Math.floor(Number(need || (typeof stat.max === "function" ? stat.max(snapshot) : stat.max ?? configuredMax)) || 1));
     const pct = Math.max(0, Math.min(100, (value / max) * 100));
     const label = stat.id === "popularity" ? `${stat.label} ${Math.round(value)}%` : `${stat.label} ${value}`;
-    return { ...stat, value, max, pct, label, classId: stat.classId ?? stat.id, breakdown: cityStatBreakdown[stat.id] ?? [] };
+    return {
+      ...stat,
+      value,
+      max,
+      need,
+      ratio,
+      status,
+      statusLabel: status ? CITY_STATS_RULES.balance?.statusLabels?.[status] : "",
+      actionHint: CITY_STATS_RULES.balance?.actionHints?.[stat.id] ?? "",
+      pct,
+      label,
+      classId: stat.classId ?? stat.id,
+      breakdown: cityStatBreakdown[stat.id] ?? [],
+    };
   }), [cityStatBreakdown, derivedCityStats, snapshot]);
   const hoverMonster = snapshot.hoverMonster;
   const monsterHpPct = hoverMonster

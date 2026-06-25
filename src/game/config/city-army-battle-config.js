@@ -7,6 +7,8 @@ export const CITY_ARMY_BATTLE_CONFIG = {
     neutral: 50,
   },
   mobThreatByType: {
+    Peasant: 0.7,
+    Knight: 1.35,
     Demon: 1.6,
     Skeleton: 1.0,
     Ghost: 1.25,

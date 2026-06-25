@@ -8,8 +8,9 @@ import { makeResourceItem } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
-import { CITY_TONIC_RECIPES, potionDefById, potionRecipesForStation } from "../game/config/potion-config.js";
+import { CITY_TONIC_RECIPES, normalizePotionId, potionDefById, potionRecipesForStation } from "../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
+import { READABLE_SALVAGE_CONFIG } from "../game/config/readable-salvage-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
 import { CITY_ARTIFACTS } from "../game/config/city-artifact-config.js";
@@ -563,8 +564,19 @@ function CityEffectChips({ effects = {} }) {
   );
 }
 
-function CitySanctuaryDonationPanel({ inventory, resourceCount, onDonate }) {
+function sanctuaryDonationItem(trade) {
+  const configuredType = String(trade?.itemType ?? "");
+  const potionId = normalizePotionId(trade?.potionId ?? trade?.resourceId);
+  if (configuredType === "potion" || (potionId && potionDefById(potionId))) {
+    return { type: "potion", id: potionId, def: potionDefById(potionId) };
+  }
+  const resourceId = String(trade?.resourceId ?? "");
+  return { type: "resource", id: resourceId, def: RESOURCE_DEFS[resourceId] };
+}
+
+function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, onDonate }) {
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
+  const countPotion = potionCount ?? (() => 0);
   const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
   return (
     <section className="blacksmith-station">
@@ -573,16 +585,18 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, onDonate }) {
         <span>Donate one resource and choose one city benefit.</span>
       </header>
       {trades.map((trade) => {
-        const resourceId = String(trade.resourceId ?? "");
+        const item = sanctuaryDonationItem(trade);
         const cost = Math.max(1, Math.floor(Number(trade.cost) || 1));
-        const available = countResource(resourceId);
-        const def = RESOURCE_DEFS[resourceId];
+        const available = item.type === "potion" ? countPotion(item.id) : countResource(item.id);
+        const iconUrl = item.def?.iconUrl ?? iconUrlFromKey(deriveIconKey(item.type === "potion"
+          ? { mode: "potion", potionId: item.id }
+          : { mode: "resource", resourceId: item.id }));
         return (
-          <div className="blacksmith-row" key={trade.id ?? `${resourceId}-${cityRuleEffectsText(trade.effects)}`}>
-            <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
+          <div className="blacksmith-row" key={trade.id ?? `${item.id}-${cityRuleEffectsText(trade.effects)}`}>
+            <InventoryIcon iconUrl={iconUrl} />
             <div>
-              <b>{trade.label ?? def?.name ?? resourceId}</b>
-              <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
+              <b>{trade.label ?? item.def?.name ?? item.id}</b>
+              <span>{cost} {item.def?.name ?? item.id} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
             </div>
             <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>Donate</button>
           </div>
@@ -1591,30 +1605,70 @@ function CityArcaneExtractorPanel({ inventory, onExtract }) {
   );
 }
 
-function CityReadableMergePanel({ inventory, kind, onMerge }) {
+function CityReadableMergePanel({ inventory, kind, salvageEntries = [], paperCount = 0, salvageRecipes = READABLE_SALVAGE_CONFIG.craftRecipes, onMerge, onRecycleReadable, onCraftReadableRecipe }) {
   const parts = (inventory ?? []).filter((item) => (
     isReadableItem(item)
     && item.readableStatus === "mergeable"
     && item.readableKind === kind
   ));
+  const paperDef = RESOURCE_DEFS.paper;
+  const scrollRecipe = salvageRecipes.find((recipe) => recipe.id === "paper_to_scroll") ?? salvageRecipes[0];
+  const inputCount = Math.max(1, Math.floor(Number(scrollRecipe?.input?.count) || 20));
+  const outputCount = Math.max(1, Math.floor(Number(scrollRecipe?.output?.count) || 1));
+  const outputDef = RESOURCE_DEFS[scrollRecipe?.output?.itemId] ?? null;
   return (
-    <section className="blacksmith-station">
-      <header>
-        <h4>{kind === "spellbook" ? "Spellbook Assembly" : "Lorebook Assembly"}</h4>
-        <span>{kind === "spellbook" ? "Merge spellbook fragments here" : "Merge lore notes here"}</span>
-      </header>
-      {parts.length === 0 && <p>No matching readable fragments in backpack.</p>}
-      {parts.map((item) => (
-        <div className="blacksmith-row" key={item.id}>
-          <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
-          <div>
-            <CityItemName item={item} />
-            <span>{item.summaryText ?? item.readableStatus}</span>
+    <>
+      <section className="blacksmith-station">
+        <header>
+          <h4>{kind === "spellbook" ? "Spellbook Assembly" : "Lorebook Assembly"}</h4>
+          <span>{kind === "spellbook" ? "Merge spellbook fragments here" : "Merge lore notes here"}</span>
+        </header>
+        {parts.length === 0 && <p>No matching readable fragments in backpack.</p>}
+        {parts.map((item) => (
+          <div className="blacksmith-row" key={item.id}>
+            <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
+            <div>
+              <CityItemName item={item} />
+              <span>{item.summaryText ?? item.readableStatus}</span>
+            </div>
+            <button type="button" onClick={() => onMerge(item.index)}>Merge</button>
           </div>
-          <button type="button" onClick={() => onMerge(item.index)}>Merge</button>
+        ))}
+      </section>
+      <section className="blacksmith-station">
+        <header>
+          <h4>Recycle Readables</h4>
+          <span>Old notes and books {"->"} {paperDef?.name ?? "Paper"}</span>
+        </header>
+        {salvageEntries.length === 0 && <p>Du har ingen readables, der kan laves om til paper.</p>}
+        {salvageEntries.map((entry) => (
+          <div className="blacksmith-row" key={entry.key}>
+            <InventoryIcon iconIndex={entry.item.iconIndex} iconSheet={entry.item.iconSheet} iconUrl={entry.item.iconUrl} />
+            <div>
+              <CityItemName item={entry.item} />
+              <span>{entry.sourceLabel} | gives {entry.paperValue} {paperDef?.name ?? "Paper"}</span>
+            </div>
+            <button type="button" onClick={() => onRecycleReadable?.(entry)}>Recycle</button>
+          </div>
+        ))}
+      </section>
+      <section className="blacksmith-station">
+        <header>
+          <h4>Craft Scrolls</h4>
+          <span>Paper owned: {paperCount}</span>
+        </header>
+        <div className="blacksmith-row">
+          <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: scrollRecipe?.output?.itemId ?? "scroll" }))} />
+          <div>
+            <b>{scrollRecipe?.label ?? "Craft Scroll"}</b>
+            <span>{inputCount} {paperDef?.name ?? "Paper"} {"->"} {outputCount} {outputDef?.name ?? "Scroll"}</span>
+          </div>
+          <button type="button" disabled={paperCount < inputCount} onClick={() => onCraftReadableRecipe?.(scrollRecipe)}>
+            Craft
+          </button>
         </div>
-      ))}
-    </section>
+      </section>
+    </>
   );
 }
 

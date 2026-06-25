@@ -47,6 +47,8 @@ export const CITY_STAT_THREAT_WEIGHTS = {
 // --- Tilgængelige mobs i city mode ---
 // type svarer til monster typeName i GameEngine
 export const CITY_MOB_POOL = [
+  { type: "Peasant", weight: 4, miniIcon: "/assets/generated/mini/mini_peasant.png" },
+  { type: "Knight", weight: 3, miniIcon: "/assets/generated/mini/mini_knight.png" },
   { type: "Demon",    weight: 3, miniIcon: "/assets/generated/mini/mini_demon.png" },
   { type: "Skeleton", weight: 5, miniIcon: "/assets/generated/mini/mini_skeleton.png" },
   { type: "Wolf", weight: 6, miniIcon: "/assets/generated/mini/mini_wolf.png" },
@@ -59,17 +61,84 @@ export const CITY_MOB_POOL = [
 export const CITY_MOB_LEVELS = {
   1: { mapSize: "small",  densityMultiplier: 1.0,  spreadChance: 0 },
   2: { mapSize: "small",  densityMultiplier: 1.75, spreadChance: 0 },
-  3: { mapSize: "medium", densityMultiplier: 1.0,  spreadChance: 0.15 },
-  4: { mapSize: "medium", densityMultiplier: 1.25, spreadChance: 0.25 },
-  5: { mapSize: "large",  densityMultiplier: 1.0,  spreadChance: 0.35 },
+  3: { mapSize: "medium", densityMultiplier: 1.0,  spreadChance: 0.08 },
+  4: { mapSize: "medium", densityMultiplier: 1.25, spreadChance: 0.15 },
+  5: { mapSize: "large",  densityMultiplier: 1.0,  spreadChance: 0.25 },
 };
 export const CITY_MOB_MAX_LEVEL = 5;
 
+export const CITY_MOB_BALANCE = {
+  levelUpChancePerVisit: 0.12,
+  durabilityDamagePerLevelPct: 0.12,
+  minVisitsBeforeLevelUp: 1,
+  minVisitsBeforeSpread: 2,
+  minVisitsBeforeDurabilityDamage: 1,
+  maxActiveCityMobs: 12,
+  newMobWarningEffectMultiplier: 0.35,
+  levelEffectMultiplierByLevel: {
+    1: 1,
+    2: 1.5,
+    3: 2,
+    4: 3,
+    5: 4,
+  },
+  spreadChanceByLevel: {
+    3: 0.08,
+    4: 0.15,
+    5: 0.25,
+  },
+  zoneDamageMultiplier: {
+    border: 0,
+    corner: 0.05,
+    edge: 0.05,
+    bridge: 0.45,
+    close: 1,
+  },
+};
+
+export const CITY_MOB_TYPE_EFFECTS = {
+  Peasant: {
+    label: "Angry peasants",
+    cityStats: { safety: -3, provision: -2, popularity: -2 },
+    pressureText: "Local unrest disrupts food supply and public order.",
+  },
+  Knight: {
+    label: "Rogue knights",
+    cityStats: { safety: -5, trade: -3, wealth: -2 },
+    pressureText: "Armed deserters intimidate citizens and block trade.",
+  },
+  Demon: {
+    label: "Demonic incursion",
+    cityStats: { safety: -5, faith: -4, health: -2 },
+    pressureText: "Dark pressure weakens faith and safety until the incursion is cleared.",
+  },
+  Skeleton: {
+    label: "Restless dead",
+    cityStats: { safety: -4, faith: -3, health: -2 },
+    pressureText: "Undead pressure strains city order, faith and public health.",
+  },
+  Wolf: {
+    label: "Wolf pack",
+    cityStats: { safety: -4, provision: -3, trade: -1 },
+    pressureText: "The pack blocks travel and food supply routes.",
+  },
+  Spider: {
+    label: "Spider nest",
+    cityStats: { health: -4, provision: -2, safety: -2 },
+    pressureText: "Venom, webs and infestations hurt health and supply.",
+  },
+  default: {
+    label: "City threat",
+    cityStats: { safety: -3 },
+    pressureText: "This threat reduces city safety while it remains active.",
+  },
+};
+
 // --- Chance for level-up per besøg ---
-export const CITY_MOB_LEVEL_UP_CHANCE = 0.20; // 20% chance per besøg
+export const CITY_MOB_LEVEL_UP_CHANCE = CITY_MOB_BALANCE.levelUpChancePerVisit;
 
 // --- Bygningsskade: % per mob level per mob i feltet per city visit ---
-export const CITY_MOB_DAMAGE_PER_LEVEL_PCT = 0.05;
+export const CITY_MOB_DAMAGE_PER_LEVEL_PCT = CITY_MOB_BALANCE.durabilityDamagePerLevelPct;
 
 // --- Defence tower building-IDs (et pr. retning) ---
 // Towers ligger i "bridge" spawn-områder og beskytter dem

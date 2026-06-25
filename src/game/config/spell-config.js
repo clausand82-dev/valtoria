@@ -9,6 +9,7 @@ export const SPELL_DEFS = {
   ember_spark: {
     id: "ember_spark",
     title: "Ember Spark",
+    description: "A fast arcane spark that hits a single target and splashes light damage around the impact. Reliable starter magic with low cooldown.",
     starter: true,
     manaCost: 14,
     cooldown: 1.2,
@@ -44,6 +45,7 @@ export const SPELL_DEFS = {
   fireball: {
     id: "fireball",
     title: "Fire Ball",
+    description: "A burning projectile that deals strong impact damage, ignites the target, and is especially effective against wood, plants, and webs.",
     manaCost: 16,
     cooldown: 1.25,
     range: 6,
@@ -89,6 +91,7 @@ export const SPELL_DEFS = {
   explosion: {
     id: "explosion",
     title: "Explosion",
+    description: "A slower fire orb that detonates in a large blast at the target point. Best when enemies are grouped or when you need heavy area damage.",
     manaCost: 22,
     cooldown: 2.1,
     range: 5.5,
@@ -126,6 +129,7 @@ export const SPELL_DEFS = {
   ice_bolt: {
     id: "ice_bolt",
     title: "Ice Bolt",
+    description: "A sharp ice projectile that damages and slows enemies. Useful for keeping fast targets away while still dealing steady damage.",
     manaCost: 14,
     cooldown: 1.5,
     range: 6.4,
@@ -152,6 +156,7 @@ export const SPELL_DEFS = {
   blizzard: {
     id: "blizzard",
     title: "Blizzard",
+    description: "Calls down scattered ice shards over an area, leaving frost behind that damages and slows enemies caught inside.",
     castMode: "skyfall",
     manaCost: 34,
     cooldown: 4.4,
@@ -200,6 +205,7 @@ export const SPELL_DEFS = {
   firerain: {
     id: "firerain",
     title: "Fire Rain",
+    description: "Rains burning shards over a wide area and leaves fire on the ground. Strong against clustered enemies and flammable objects.",
     castMode: "skyfall",
     manaCost: 36,
     cooldown: 0.6, //standard er 4.6 - 0.6 er blot test kørsel
@@ -255,6 +261,7 @@ export const SPELL_DEFS = {
   energy_beam: {
     id: "energy_beam",
     title: "Energy Beam",
+    description: "A focused arcane beam with very high direct damage and long reach. Expensive, but excellent for deleting priority targets.",
     manaCost: 28,
     cooldown: 3.2,
     range: 7,
@@ -276,7 +283,7 @@ export const SPELL_DEFS = {
   lightning: {
     id: "lightning",
     title: "Lightning",
-    description: "A crackling bolt of lightning strikes enemies, stunning them briefly.",
+    description: "A channeled lightning strike that can be held on a target, repeatedly dealing damage and briefly stunning enemies in the blast.",
     manaCost: 24,
     cooldown: 0.5, //2.5 er normalen
     target: ["monster", "critter", "object:wood", "object:plant", "object:web", "object:thatch", "object:leather"],
@@ -316,6 +323,7 @@ export const SPELL_DEFS = {
   poison_cloud: {
     id: "poison_cloud",
     title: "Poison Cloud",
+    description: "Creates a lingering toxic cloud that poisons enemies over time. Best for controlling space and wearing down tougher targets.",
     manaCost: 18,
     cooldown: 2.4,
     range: 5.8,
@@ -345,6 +353,7 @@ export const SPELL_DEFS = {
   web_slow: {
     id: "web_slow",
     title: "Web Slow",
+    description: "A sticky web shot used by monsters to slow the target and make escape harder. Low damage, but dangerous when enemies close in.",
     manaCost: 0,
     cooldown: 2.8,
     range: 4.6,

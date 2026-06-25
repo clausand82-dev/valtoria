@@ -10,12 +10,13 @@ import {
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue, makePotion } from "../game/world.js";
-import { consumePotionInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
+import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
 import { normalizePotionId, potionDefById } from "../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
+import { READABLE_SALVAGE_CONFIG, canSalvageReadable, getReadablePaperValue, questReadableIds } from "../game/config/readable-salvage-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
 import { setArtifactBuiltFlags, syncArtifactBuiltFlags } from "../game/config/city-artifact-config.js";
@@ -47,9 +48,7 @@ import { MAX_POTION_STACK, SAVE_STORAGE_KEY, SAVE_VERSION, SHOW_INACTIVE_CITY_NP
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
 import { getKnownFactions, normalizeFactionRep } from "../game/config/faction-config.js";
 import {
-  CITY_MOB_DAMAGE_PER_LEVEL_PCT,
   CITY_MOB_LEVELS,
-  CITY_MOB_LEVEL_UP_CHANCE,
   CITY_MOB_MAX_LEVEL,
   CITY_SPAWN_AREA_BUILDING_TARGETS,
   CITY_SPAWN_AREA_RULES,
@@ -160,6 +159,12 @@ import {
   cityAddonImageKey,
   cityAssetCache,
   cityAttackableMobIds,
+  cityMobAreaLabel,
+  cityMobDisplayName,
+  cityMobDurabilityThreatText,
+  cityMobEscalationText,
+  cityMobRecoveryText,
+  cityMobStatPenaltyEntries,
   cityBuildingActiveStatEffects,
   cityBuildingIconText,
   cityBuildingLayerUrls,
@@ -325,6 +330,10 @@ function CityPage({
   const cityMobs = useMemo(() => normalizeCityMobs(cityProgress?.cityMobs), [cityProgress?.cityMobs]);
   const attackableCityMobIds = useMemo(() => cityAttackableMobIds(cityMobs), [cityMobs]);
   const cityMobRefs = useMemo(() => cityMapMobRefs(cityMobs), [cityMobs]);
+  const selectedCityMob = useMemo(
+    () => cityMobs.find((entry) => entry.id === selectedCityMobId) ?? null,
+    [cityMobs, selectedCityMobId],
+  );
   const cityNpcImageUrls = useMemo(() => {
     const entries = Object.entries(cityAssets.npcImages ?? {}).map(([npcId, image]) => {
       if (!image || typeof image.toDataURL !== "function") return [npcId, QUEST_NPCS[npcId]?.imageUrl ?? ""];
@@ -354,6 +363,7 @@ function CityPage({
     setHoveredAreaId(null);
     setHoveredBuildingId(null);
     setClickedAreaId(null);
+    setSelectedCityMobId(null);
   }, [cityStorageKey]);
 
   useEffect(() => {
@@ -548,10 +558,12 @@ function CityPage({
   const selectArea = (area) => {
     setClickedAreaId(area.id);
     setHoveredAreaId(area.id);
+    setSelectedCityMobId(null);
   };
 
   const openBuilding = (buildingId) => {
     setSelectedQuestNpcId(null);
+    setSelectedCityMobId(null);
     setSelectedBuildingId(buildingId);
   };
 
@@ -804,10 +816,8 @@ function CityPage({
   const openCityMobActions = (mobId) => {
     const mob = cityMobs.find((entry) => entry.id === mobId);
     if (!mob) return;
-    if (!attackableCityMobIds.has(mob.id)) {
-      engineRef.current?.addToast?.("Du skal angribe den inderste mob i stien foerst.");
-      return;
-    }
+    setClickedAreaId(null);
+    setHoveredBuildingId(null);
     setSelectedCityMobId(mob.id);
   };
 
@@ -964,19 +974,19 @@ function CityPage({
             attackableMobIds={attackableCityMobIds}
             onAttack={openCityMobActions}
           />
-          {selectedCityMobId && (
-            <CityMobActionPopup
-              mob={cityMobs.find((entry) => entry.id === selectedCityMobId)}
-              cityProgress={cityProgress}
-              cityStats={cityStats}
-              onHeroBattle={() => attackCityMobWithHero(selectedCityMobId)}
-              onArmyBattle={(sentUnits) => attackCityMobWithArmy(selectedCityMobId, sentUnits)}
-              onClose={() => setSelectedCityMobId(null)}
-            />
-          )}
         </div>
-        <div className={`city-area-panel-slot ${hoveredBuilding || activeAreaPanel ? "has-content" : ""}`}>
-        {hoveredBuilding ? (
+        <div className={`city-area-panel-slot ${selectedCityMob || hoveredBuilding || activeAreaPanel ? "has-content" : ""}`}>
+        {selectedCityMob ? (
+          <CityMobActionPopup
+            mob={selectedCityMob}
+            attackable={attackableCityMobIds.has(selectedCityMob.id)}
+            cityProgress={cityProgress}
+            cityStats={cityStats}
+            onHeroBattle={() => attackCityMobWithHero(selectedCityMob.id)}
+            onArmyBattle={(sentUnits) => attackCityMobWithArmy(selectedCityMob.id, sentUnits)}
+            onClose={() => setSelectedCityMobId(null)}
+          />
+        ) : hoveredBuilding ? (
           <CityBuildingHoverPopover
             building={hoveredBuilding}
             snapshot={snapshot}
@@ -1624,8 +1634,8 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
             type="button"
             className={`city-map-mob-mini ${attackable ? "attackable" : "blocked"}`}
             style={cityMapPositionStyle(mob.x, mob.y)}
-            title={`${mob.mobType} Lv.${mob.level}${attackable ? "" : " (blokeret af sti)"}`}
-            aria-label={`${mob.mobType} level ${mob.level}`}
+            title={`${mob.mobType} Lv.${mob.level}${attackable ? " - attackable" : " - info, blocked by nearer mobs"}`}
+            aria-label={`${mob.mobType} level ${mob.level}${attackable ? ", attackable" : ", blocked by nearer mobs"}`}
             onClick={(event) => {
               event.stopPropagation();
               onAttack(mob.id);
@@ -1640,7 +1650,7 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
   );
 }
 
-function CityMobActionPopup({ mob, cityProgress, cityStats, onHeroBattle, onArmyBattle, onClose }) {
+function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, onHeroBattle, onArmyBattle, onClose }) {
   const armyUnits = normalizeArmyUnits(cityProgress?.armyUnits);
   const [sentUnits, setSentUnits] = useState(() => Object.fromEntries(
     Object.entries(armyUnits).map(([unitId, count]) => [unitId, Math.min(1, count)]),
@@ -1649,43 +1659,72 @@ function CityMobActionPopup({ mob, cityProgress, cityStats, onHeroBattle, onArmy
   const unitEntries = Object.entries(CITY_ARMY_UNIT_DEFS);
   const totalSent = Object.values(sentUnits).reduce((sum, count) => sum + Math.max(0, Math.floor(Number(count) || 0)), 0);
   const preview = resolveCityArmyBattle({ progress: cityProgress, cityStats, mob, sentUnits, rng: () => 0.5 });
+  const penaltyEntries = cityMobStatPenaltyEntries(mob);
+  const durabilityThreat = cityMobDurabilityThreatText(mob);
   return (
-    <div className="city-mob-action-popup" style={cityMapPositionStyle(mob.x + 44, mob.y - 22)}>
+    <aside className="city-area-popover city-mob-info-panel">
       <header>
         <div className="city-mob-action-popup-title">
           <div className="city-mob-action-popup-portrait" aria-hidden="true">
             {mob.iconUrl ? <img src={mob.iconUrl} alt="" draggable="false" /> : <span>{String(mob.mobType || "M").slice(0, 1)}</span>}
           </div>
-          <b>{mob.mobType} Lv.{mob.level}</b>
+          <div>
+            <b>{cityMobDisplayName(mob)}</b>
+            <span>{mob.mobType} Lv.{mob.level} | {cityMobAreaLabel(mob)} | active {Math.max(0, Math.floor(Number(mob.visitsActive) || 0))} visits</span>
+          </div>
         </div>
         <button type="button" onClick={onClose}>X</button>
       </header>
-      <button type="button" onClick={onHeroBattle}>Fight with hero</button>
-      <div className="city-army-send-box">
-        <b>Send army</b>
-        {unitEntries.map(([unitId, def]) => {
-          const available = armyUnits[unitId] ?? 0;
-          return (
-            <label key={unitId}>
-              <span>{def.label}</span>
-              <input
-                type="number"
-                min="0"
-                max={available}
-                value={sentUnits[unitId] ?? 0}
-                onChange={(event) => {
-                  const value = Math.max(0, Math.min(available, Math.floor(Number(event.target.value) || 0)));
-                  setSentUnits((current) => ({ ...current, [unitId]: value }));
-                }}
-              />
-              <i>/ {available}</i>
-            </label>
-          );
-        })}
-        <span>Win chance: {Math.round((preview.winChance ?? 0) * 100)}% | Morale x{preview.morale.toFixed(2)}</span>
-        <button type="button" disabled={totalSent <= 0} onClick={() => onArmyBattle(sentUnits)}>Attack with army</button>
+      <div className="city-area-popover-body city-mob-info-body">
+        <section className="city-mob-pressure-panel" aria-label="City mob pressure">
+          <b>City pressure</b>
+          {penaltyEntries.length > 0 ? (
+            <ul>
+              {penaltyEntries.map((entry) => (
+                <li key={entry.statId}>
+                  <span>{entry.label}</span>
+                  <strong>{entry.amount > 0 ? "+" : ""}{entry.amount}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>No active city stat penalty yet.</p>
+          )}
+          {durabilityThreat && <p>{durabilityThreat}</p>}
+          <p>Risk: {cityMobEscalationText(mob)}</p>
+          <p>{cityMobRecoveryText(mob)}</p>
+        </section>
+        {!attackable && (
+          <p className="city-mob-action-status">Attack locked: clear the mobs closest to the city first.</p>
+        )}
+        <button type="button" disabled={!attackable} onClick={onHeroBattle}>Fight with hero</button>
+        <div className={`city-army-send-box ${attackable ? "" : "locked"}`}>
+          <b>Send army</b>
+          {unitEntries.map(([unitId, def]) => {
+            const available = armyUnits[unitId] ?? 0;
+            return (
+              <label key={unitId}>
+                <span>{def.label}</span>
+                <input
+                  type="number"
+                  min="0"
+                  max={available}
+                  disabled={!attackable}
+                  value={sentUnits[unitId] ?? 0}
+                  onChange={(event) => {
+                    const value = Math.max(0, Math.min(available, Math.floor(Number(event.target.value) || 0)));
+                    setSentUnits((current) => ({ ...current, [unitId]: value }));
+                  }}
+                />
+                <i>/ {available}</i>
+              </label>
+            );
+          })}
+          <span>Win chance: {Math.round((preview.winChance ?? 0) * 100)}% | Morale x{preview.morale.toFixed(2)}</span>
+          <button type="button" disabled={!attackable || totalSent <= 0} onClick={() => onArmyBattle(sentUnits)}>Attack with army</button>
+        </div>
       </div>
-    </div>
+    </aside>
   );
 }
 
@@ -2600,6 +2639,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const [questBoard, setQuestBoard] = useState(null);
   const cityEventModifiers = useMemo(() => cityRuntimeModifiers(cityStats), [cityStats]);
   const blacksmithModifiers = useMemo(() => blacksmithDurabilityModifiers(progress), [progress]);
+  const readableQuestIdSet = useMemo(() => questReadableIds(QUEST_DEFS), []);
   if (!building) return null;
   const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
 
@@ -2619,6 +2659,21 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     }
     return buildingResourceAvailable(ingredientId, progressOverride);
   };
+  const unlockedSpellIds = (snapshotRef?.current ?? snapshot)?.player?.unlockedSpells ?? [];
+  const readableSalvageEntries = [
+    ...((snapshotRef?.current ?? snapshot)?.inventory ?? [])
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => canSalvageReadable(item, { questReadableIds: readableQuestIdSet, unlockedSpells: unlockedSpellIds }))
+      .map(({ item, index }) => ({
+        key: `backpack:${index}:${item.id ?? item.readableId}`,
+        source: "backpack",
+        sourceLabel: "Backpack",
+        inventoryIndex: index,
+        item,
+        paperValue: getReadablePaperValue(item),
+      })),
+    ...cityStoredReadableSalvageEntries(progress, readableQuestIdSet, unlockedSpellIds),
+  ];
   const cityTonicInputStatId = (inputId) => {
     const raw = String(inputId ?? "");
     const normalized = raw.replaceAll("-", "_");
@@ -3108,10 +3163,112 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const applySanctuaryDonation = (trade) => {
-    const resourceId = String(trade?.resourceId ?? "");
+    const potionId = normalizePotionId(trade?.potionId ?? trade?.resourceId);
     const cost = Math.max(1, Math.floor(Number(trade?.cost) || 1));
+    const usesPotion = String(trade?.itemType ?? "") === "potion" || Boolean(trade?.potionId) || Boolean(potionId && potionDefById(potionId));
+    if (usesPotion) {
+      if (!potionId || potionIngredientAvailable(potionId) < cost) return;
+      const currentSnapshot = snapshotRef?.current ?? snapshot;
+      const backpackCount = backpackPotionCount(currentSnapshot, potionId);
+      const fromBackpack = Math.min(backpackCount, cost);
+      let consumed = 0;
+      if (fromBackpack > 0) consumed += engineRef.current?.consumePotion?.(potionId, fromBackpack) ?? 0;
+      const remaining = cost - consumed;
+      if (remaining > 0) {
+        const result = consumeCityStoredPotions(progress, potionId, remaining);
+        consumed += result.consumed;
+        if (result.consumed > 0) onChangeProgress(result.progress);
+      }
+      if (consumed < cost) return;
+      applyConfiguredCityEffects(trade.effects ?? {});
+      return;
+    }
+    const resourceId = String(trade?.resourceId ?? "");
     if (!resourceId || !payBuildingEntries([[resourceId, cost]])) return;
     applyConfiguredCityEffects(trade.effects ?? {});
+  };
+
+  const recycleReadableEntry = (entry) => {
+    const paperValue = Math.max(1, Math.floor(Number(entry?.paperValue) || READABLE_SALVAGE_CONFIG.defaultPaperValue));
+    const output = makeResourceItem(READABLE_SALVAGE_CONFIG.outputItemId, paperValue);
+    if (!entry || !output || !canSalvageReadable(entry.item, { questReadableIds: readableQuestIdSet, unlockedSpells: unlockedSpellIds })) return;
+    const currentSnapshot = snapshotRef?.current ?? snapshot;
+    if (entry.source === "backpack") {
+      const inventory = (currentSnapshot.inventory ?? []).map((item) => item ? { ...item } : item);
+      const liveItem = engineRef.current?.player?.inventory?.[entry.inventoryIndex] ?? null;
+      if (!cityInventoryItemsSameTransferIdentity(entry.item, liveItem)) {
+        engineRef.current?.addToast?.("Backpack aendrede sig. Proev igen.");
+        return;
+      }
+      inventory.splice(entry.inventoryIndex, 1);
+      if (!inventoryCanAccept(inventory, output, backpackCapacity)) {
+        engineRef.current?.addToast?.("Rygsaekken er fuld");
+        return;
+      }
+      const removed = engineRef.current?.takeInventoryItem?.(entry.inventoryIndex);
+      if (!cityInventoryItemsSameTransferIdentity(entry.item, removed)) {
+        if (removed) engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(removed));
+        engineRef.current?.addToast?.("Recycle blev afbrudt.");
+        return;
+      }
+      if (!engineRef.current?.addInventoryItem?.(output)) {
+        engineRef.current?.returnInventoryItem?.(normalizeCityStoredItem(removed));
+        engineRef.current?.addToast?.("Rygsaekken er fuld");
+        engineRef.current?.publishSnapshot?.();
+        return;
+      }
+      engineRef.current?.addToast?.(`Recycled ${removed.name ?? "readable"} into ${paperValue} ${RESOURCE_DEFS[output.resourceId]?.name ?? output.resourceId}.`);
+      engineRef.current?.publishSnapshot?.();
+      engineRef.current?.saveProgress?.({ force: true });
+      return;
+    }
+    if (entry.source === "storage") {
+      if (!inventoryCanAccept((currentSnapshot.inventory ?? []).map((item) => item ? { ...item } : item), output, backpackCapacity)) {
+        engineRef.current?.addToast?.("Rygsaekken er fuld");
+        return;
+      }
+      const result = removeCityStoredReadable(progress, entry);
+      if (!result.removed) {
+        engineRef.current?.addToast?.("City storage aendrede sig. Proev igen.");
+        return;
+      }
+      onChangeProgress(result.progress);
+      if (!engineRef.current?.addInventoryItem?.(output)) {
+        onChangeProgress((current) => restoreCityStoredReadable(current, entry, result.removed));
+        engineRef.current?.addToast?.("Rygsaekken er fuld");
+        return;
+      }
+      engineRef.current?.addToast?.(`Recycled ${result.removed.name ?? "readable"} into ${paperValue} ${RESOURCE_DEFS[output.resourceId]?.name ?? output.resourceId}.`);
+      engineRef.current?.publishSnapshot?.();
+      engineRef.current?.saveProgress?.({ force: true });
+    }
+  };
+
+  const craftReadableSalvageRecipe = (recipe) => {
+    const inputId = String(recipe?.input?.itemId ?? "");
+    const inputCount = Math.max(1, Math.floor(Number(recipe?.input?.count) || 1));
+    const outputId = String(recipe?.output?.itemId ?? "");
+    const outputCount = Math.max(1, Math.floor(Number(recipe?.output?.count) || 1));
+    const output = makeResourceItem(outputId, outputCount);
+    if (!inputId || !output) return;
+    if (buildingResourceAvailable(inputId) < inputCount) {
+      engineRef.current?.addToast?.(`Kraever ${inputCount}x ${RESOURCE_DEFS[inputId]?.name ?? inputId}`);
+      return;
+    }
+    const simulated = (snapshotRef?.current?.inventory ?? snapshot.inventory ?? []).map((item) => item ? { ...item } : item);
+    consumeResourceInputs(simulated, { [inputId]: inputCount });
+    if (!inventoryCanAccept(simulated, output, backpackCapacity)) {
+      engineRef.current?.addToast?.("Rygsaekken er fuld");
+      return;
+    }
+    if (!payBuildingEntries([[inputId, inputCount]])) return;
+    if (!engineRef.current?.addInventoryItem?.(output)) {
+      engineRef.current?.addToast?.("Kunne ikke tilfoeje scroll til rygsaekken.");
+      return;
+    }
+    engineRef.current?.addToast?.(`Crafted ${outputCount} ${RESOURCE_DEFS[outputId]?.name ?? outputId} from ${inputCount} ${RESOURCE_DEFS[inputId]?.name ?? inputId}.`);
+    engineRef.current?.publishSnapshot?.();
+    engineRef.current?.saveProgress?.({ force: true });
   };
 
   const brewFarmAle = (recipe) => {
@@ -3456,7 +3613,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           <CityReadableMergePanel
             inventory={snapshot.inventory}
             kind={activeAddon.config?.kind ?? "lorenote"}
+            salvageEntries={readableSalvageEntries}
+            paperCount={buildingResourceAvailable("paper")}
+            salvageRecipes={READABLE_SALVAGE_CONFIG.craftRecipes}
             onMerge={(index) => engineRef.current?.mergeInventoryItem?.(index)}
+            onRecycleReadable={recycleReadableEntry}
+            onCraftReadableRecipe={craftReadableSalvageRecipe}
           />
         );
       case "bestiary":
@@ -3623,6 +3785,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           <CitySanctuaryDonationPanel
             inventory={snapshot.inventory}
             resourceCount={buildingResourceAvailable}
+            potionCount={potionIngredientAvailable}
             onDonate={applySanctuaryDonation}
           />
         );
@@ -4059,6 +4222,78 @@ function consumeCityStoredPotions(progress = {}, potionId, amount = 0) {
     }
   }
   return { progress: nextProgress, consumed };
+}
+
+function cityStoredReadableSalvageEntries(progress = {}, questReadableIdSet = new Set(), unlockedSpells = []) {
+  const entries = [];
+  for (const building of CITY_BUILDINGS) {
+    if (!isCityBuildingOwned(progress, building)) continue;
+    const state = getCityBuildingState(progress, building);
+    const inventories = normalizeCityInventories(state, building);
+    for (const section of cityInventorySections(building, state, true)) {
+      if (section.cityCostAccess === false || section.fixedDefs?.length) continue;
+      for (const [slotIndex, item] of (inventories[section.key] ?? []).entries()) {
+        if (!canSalvageReadable(item, { questReadableIds: questReadableIdSet, unlockedSpells })) continue;
+        entries.push({
+          key: `storage:${building.id}:${section.key}:${slotIndex}:${item.id ?? item.readableId}`,
+          source: "storage",
+          sourceLabel: `${building.title} / ${section.label}`,
+          buildingId: building.id,
+          sectionKey: section.key,
+          slotIndex,
+          item,
+          paperValue: getReadablePaperValue(item),
+        });
+      }
+    }
+  }
+  return entries;
+}
+
+function removeCityStoredReadable(progress = {}, entry) {
+  const building = CITY_BUILDINGS.find((candidate) => candidate.id === entry?.buildingId);
+  if (!building || !isCityBuildingOwned(progress, building)) return { progress, removed: null };
+  const state = getCityBuildingState(progress, building);
+  const section = cityInventorySections(building, state, true).find((candidate) => candidate.key === entry.sectionKey);
+  if (!section || section.cityCostAccess === false || section.fixedDefs?.length) return { progress, removed: null };
+  const inventories = normalizeCityInventories(state, building);
+  const items = [...(inventories[section.key] ?? [])];
+  const item = items[entry.slotIndex] ?? null;
+  if (!cityInventoryItemsSameTransferIdentity(entry.item, item)) return { progress, removed: null };
+  items[entry.slotIndex] = null;
+  return {
+    removed: item,
+    progress: {
+      ...progress,
+      [building.id]: {
+        ...(progress[building.id] ?? {}),
+        inventories: {
+          ...inventories,
+          [section.key]: items,
+        },
+      },
+    },
+  };
+}
+
+function restoreCityStoredReadable(progress = {}, entry, item) {
+  const building = CITY_BUILDINGS.find((candidate) => candidate.id === entry?.buildingId);
+  if (!building || !item) return progress;
+  const state = getCityBuildingState(progress, building);
+  const inventories = normalizeCityInventories(state, building);
+  const items = [...(inventories[entry.sectionKey] ?? [])];
+  if (items[entry.slotIndex]) return progress;
+  items[entry.slotIndex] = normalizeCityStoredItem(item);
+  return {
+    ...progress,
+    [building.id]: {
+      ...(progress[building.id] ?? {}),
+      inventories: {
+        ...inventories,
+        [entry.sectionKey]: items,
+      },
+    },
+  };
 }
 
 function sortCityStorageSection(progress, buildingId, sectionKey, sortId) {

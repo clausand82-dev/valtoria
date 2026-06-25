@@ -1,4 +1,10 @@
 import { CITY_DURABILITY_CONSEQUENCE_RULES, CITY_EVENT_DEFS, CITY_EVENT_IDS, CITY_EVENT_RULES } from "./city-config.js";
+import {
+  calculateCityStatNeeds,
+  calculateCityStatRatios,
+  calculateCityStatStatuses,
+  cityStatRatio,
+} from "./city-stats-rules-config.js";
 
 const MULTIPLICATIVE_MODIFIER_KEYS = new Set([
   "goldDropMultiplier",
@@ -43,12 +49,17 @@ function population(cityStats) {
 }
 
 function fireRisk(cityStats) {
-  const safety = Math.max(0, Math.min(100, statNumber(cityStats, "safety", 0)));
-  const waterShortage = statNumber(cityStats, "water", 0) < population(cityStats);
-  return Math.max(0, Math.min(100, (100 - safety) + (waterShortage ? CITY_EVENT_RULES.fireRiskWaterShortageBonus : 0)));
+  const needs = cityStats.needs ?? calculateCityStatNeeds(cityStats);
+  const safetyRatio = cityStatRatio(cityStats, "safety", needs) ?? 1;
+  const waterRatio = cityStatRatio(cityStats, "water", needs) ?? 1;
+  const safetyPressure = Math.max(0, 1 - Math.min(1, safetyRatio)) * 100;
+  const waterShortage = waterRatio < 1;
+  return Math.max(0, Math.min(100, safetyPressure + (waterShortage ? CITY_EVENT_RULES.fireRiskWaterShortageBonus : 0)));
 }
 
 function conditionActive(conditions = {}, cityStats = {}) {
+  const needs = cityStats.needs ?? calculateCityStatNeeds(cityStats);
+  const ratios = cityStats.ratios ?? calculateCityStatRatios(cityStats, needs);
   if (conditions.statBelowPopulation) {
     if (statNumber(cityStats, conditions.statBelowPopulation, 0) >= population(cityStats)) return false;
   }
@@ -63,12 +74,21 @@ function conditionActive(conditions = {}, cityStats = {}) {
     const threshold = Number(conditions.statPopulationRatioBelow.threshold);
     if ((statNumber(cityStats, stat, 0) / Math.max(1, population(cityStats))) >= threshold) return false;
   }
+  for (const [statId, threshold] of Object.entries(conditions.statRatioBelow ?? {})) {
+    if ((Number(ratios?.[statId]) || 0) >= Number(threshold)) return false;
+  }
+  for (const [statId, threshold] of Object.entries(conditions.statRatioAtLeast ?? {})) {
+    if ((Number(ratios?.[statId]) || 0) < Number(threshold)) return false;
+  }
   if (conditions.fireRiskAtLeast !== undefined && fireRisk(cityStats) < Number(conditions.fireRiskAtLeast)) return false;
   return true;
 }
 
 export function cityEventFlags(cityStats = {}) {
   const risk = fireRisk(cityStats);
+  const needs = cityStats.needs ?? calculateCityStatNeeds(cityStats);
+  const ratios = cityStats.ratios ?? calculateCityStatRatios(cityStats, needs);
+  const statuses = cityStats.statuses ?? calculateCityStatStatuses(ratios);
   return Object.fromEntries(CITY_EVENT_IDS.map((id) => {
     const def = CITY_EVENT_DEFS[id];
     const active = conditionActive(def.conditions, cityStats);
@@ -79,13 +99,16 @@ export function cityEventFlags(cityStats = {}) {
     if (id === "famine") entry.unavailablePopulationPct = CITY_EVENT_RULES.famineUnavailablePopulationPct;
     if (id === "water_shortage") entry.unavailablePopulationPct = CITY_EVENT_RULES.waterShortageUnavailablePopulationPct;
     if (id === "uprising_poorness") {
-      entry.risk = active ? "high" : "low";
-      entry.wealthRatio = statNumber(cityStats, "wealth", 0) / Math.max(1, population(cityStats));
+      entry.risk = statuses.wealth ?? (active ? "critical" : "good");
+      entry.wealthRatio = ratios.wealth ?? (statNumber(cityStats, "wealth", 0) / Math.max(1, population(cityStats)));
     }
     if (id === "fire") {
       entry.risk = risk;
-      entry.waterShortage = statNumber(cityStats, "water", 0) < population(cityStats);
+      entry.waterShortage = (ratios.water ?? 1) < 1;
     }
+    entry.needs = needs;
+    entry.ratios = ratios;
+    entry.statuses = statuses;
     return [id, entry];
   }));
 }

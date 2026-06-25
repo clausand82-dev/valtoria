@@ -8,8 +8,6 @@ IMPORTENT:
 
 - Fortsæt render optimering
 
-- Addon til at ødelægge potions
-- Addon til at ødelægge readables
 
 ARCHIVEMENTS
 (noget med at kende alle monstere): Set alle monster - bonus: +25 culture
@@ -32,7 +30,6 @@ ARTIFACTS:
 
 Handelsfrihed	trade +25, wealth +10, safety -5
 Markedsafgift	wealth +20, trade -10, popularity -5
-
 Håndværkerstøtte	supply +20, trade +10, wealth -15
 Gratis kro-suppe	health +10, popularity +15, provision -15
 Militspligt	defense +35, safety +10, culture -5, popularity -10
@@ -69,14 +66,6 @@ Når alle quest er lavet i village outskirt, ber Borgmesteren om at man sørge f
 - Flere quest fra borgmester til andre steder (et par quest mere i village)
 
 
-
-REPEATABLE QUESTS (bør være veksel/opskrift ting):
-- Indlever bonedust (årsag --> bruges til medicin). Hver indlevering giver lidt city health
-- Indlever magic essence (årsag --> bruges til magisk defence af city). Hver indlevering giver lidt permanent defence
-- Indlever roser, rare flower, magic mushroom --> giver en eller anden city stats
-
-NY SPELL:
-Lightning - lyn udfra figur til mobs - mobs skal så få stød omkring sig imens og blive lammet. Selve effekt bør kunne være partikler.
 
 TODO senere:
 - Implementér summon action
@@ -120,9 +109,6 @@ Verden kan blive mere levende, hvis byens grafik, lys, huse osv har forskellige 
 
 - marketplace skal layers følge building - de skal kædes sammen på en eller anden måde!
 - man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
-
-
-- resource droprate skal nok sættes en del ned
 
 
 - magi i equimt magi felt skal vise magi info i info panel

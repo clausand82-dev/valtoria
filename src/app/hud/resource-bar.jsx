@@ -82,10 +82,26 @@ function CitySideStat({ icon = null, label, value }) {
 function CityStatTooltip({ stat }) {
   const entries = Array.isArray(stat.breakdown) ? stat.breakdown : [];
   const rules = CITY_STAT_RULE_TEXT[stat.id] ?? [];
+  const ratio = Number(stat.ratio);
+  const hasNeed = Math.max(0, Math.floor(Number(stat.need) || 0)) > 0;
+  const statusClass = stat.status ? `city-stat-status-${stat.status}` : "";
   return (
     <div className="city-stat-tooltip" role="tooltip">
       <b>{stat.label}</b>
-      <span>Current: {cityTopStatValue(stat)}</span>
+      <span>
+        {stat.id === "maintenance"
+          ? `Average durability: ${Math.round(stat.value)}%`
+          : hasNeed
+            ? `Effective: ${stat.value} / ${stat.need}`
+            : `Current: ${cityTopStatValue(stat)}`}
+      </span>
+      {hasNeed && (
+        <div className={`city-stat-status-line ${statusClass}`}>
+          <strong>{stat.statusLabel || "Status"}</strong>
+          <span>{Number.isFinite(ratio) ? `${Math.round(ratio * 100)}% of need` : "No ratio"}</span>
+        </div>
+      )}
+      {hasNeed && stat.actionHint ? <p className="city-stat-action-hint">{stat.actionHint}</p> : null}
       {entries.length > 0 ? (
         <dl>
           {entries.map((entry, index) => (
@@ -133,6 +149,7 @@ function cityTopStatLabel(stat) {
 
 function cityTopStatValue(stat) {
   if (stat.id === "xp") return `${stat.value} / ${stat.max}`;
-  if (stat.id === "popularity" || stat.id === "happiness" || stat.id === "health" || stat.id === "safety" || stat.id === "maintenance") return `${Math.round(stat.value)}%`;
+  if (stat.id === "popularity" || stat.id === "happiness" || stat.id === "maintenance") return `${Math.round(stat.value)}%`;
+  if (stat.need) return `${Math.round(stat.value)} / ${Math.round(stat.need)}`;
   return String(stat.value);
 }

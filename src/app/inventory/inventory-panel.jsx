@@ -10,7 +10,7 @@ import {
   isItemRequiredByActiveQuests,
   itemMatchesInventoryFilter,
 } from "./inventory-filters.js";
-import { InventoryIcon } from "../ui/icons.jsx";
+import { AtlasIcon, ImageIcon, InventoryIcon } from "../ui/icons.jsx";
 import { InventoryItemDetail } from "./inventory-item-detail.jsx";
 import { SPELL_DEFS } from "../../game/config/spell-config.js";
 import { InventorySortSelect } from "./inventory-sort-select.jsx";
@@ -127,6 +127,102 @@ function findEquippedComparisonItem(item, equipmentSlots = []) {
   return equipmentSlots.find((slot) => slot.id === slotId)?.item ?? null;
 }
 
+function formatSpellNumber(value, decimals = 0) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return decimals > 0 ? number.toFixed(decimals) : String(Math.round(number));
+}
+
+function spellDamageText(spell) {
+  if (!spell) return "";
+  const parts = [];
+  const hit = formatSpellNumber(spell.hitDamage);
+  const area = formatSpellNumber(spell.areaDamage);
+  const dot = formatSpellNumber(spell.dotDamage);
+  if (hit) parts.push(`Hit ${hit}`);
+  if (area) parts.push(`Area ${area}`);
+  if (dot && spell.dotDuration) parts.push(`DoT ${dot} / ${formatSpellNumber(spell.dotDuration, 1)}s`);
+  return parts.join(" | ");
+}
+
+function spellActionEntryFor(spellId, spellEntries = []) {
+  return spellEntries.find((entry) => String(entry.id) === String(spellId)) ?? null;
+}
+
+function SpellActionIcon({ entry, spell }) {
+  if (entry?.iconUrl) return <ImageIcon src={entry.iconUrl} />;
+  return <AtlasIcon frameName={entry?.frameName ?? spell?.hudFrame ?? "orb"} />;
+}
+
+function SpellHoverDetail({ spell, spellEntry }) {
+  if (!spell) return null;
+  const damageText = spellDamageText(spell);
+  const range = formatSpellNumber(spell.range, 1);
+  const cooldown = formatSpellNumber(spell.cooldown, 2);
+  const manaCost = formatSpellNumber(spell.manaCost);
+  const radius = formatSpellNumber(spell.areaRadius, 2);
+  const slow = spell.slowPct ? `${formatSpellNumber(Number(spell.slowPct) * 100)}% i ${formatSpellNumber(spell.slowDuration, 1)}s` : "";
+  const stun = spell.stunDuration ? `${formatSpellNumber(spell.stunDuration, 1)}s` : "";
+  return (
+    <div className="spell-hover-detail">
+      <header>
+        <span className="spell-hover-icon" style={{ "--spell-color": spell?.color ?? "#b8a4ff" }} aria-hidden="true">
+          <SpellActionIcon entry={spellEntry} spell={spell} />
+        </span>
+        <div>
+          <b style={{ color: spell.color ?? undefined }}>{spell.title ?? spell.id}</b>
+          <em>{spell.element ?? "magic"}{spell.channeled ? " | channeled" : ""}</em>
+        </div>
+      </header>
+      {spell.description && <p>{spell.description}</p>}
+      <dl>
+        {manaCost && (
+          <>
+            <dt>Mana</dt>
+            <dd>{spell.channeled && spell.channelManaCost ? `${manaCost} + ${formatSpellNumber(spell.channelManaCost)} / tick` : manaCost}</dd>
+          </>
+        )}
+        {cooldown && (
+          <>
+            <dt>Cooldown</dt>
+            <dd>{cooldown}s</dd>
+          </>
+        )}
+        {range && (
+          <>
+            <dt>Range</dt>
+            <dd>{range}</dd>
+          </>
+        )}
+        {damageText && (
+          <>
+            <dt>Damage</dt>
+            <dd>{damageText}</dd>
+          </>
+        )}
+        {radius && (
+          <>
+            <dt>Area</dt>
+            <dd>{radius}</dd>
+          </>
+        )}
+        {slow && (
+          <>
+            <dt>Slow</dt>
+            <dd>{slow}</dd>
+          </>
+        )}
+        {stun && (
+          <>
+            <dt>Stun</dt>
+            <dd>{stun}</dd>
+          </>
+        )}
+      </dl>
+    </div>
+  );
+}
+
 function EquipmentSlotButton({
   className = "",
   draggingItem,
@@ -199,33 +295,76 @@ function EquipmentSlotButton({
   );
 }
 
-function MagicSlotButton({ engineRef, player }) {
-  const spellIds = player?.unlockedSpells ?? [];
-  const activeSpellId = player?.activeSpellId ?? spellIds[0] ?? "ember_spark";
+function MagicSlotButton({
+  engineRef,
+  onHoverLeave,
+  onHoverMove,
+  pickerOpen,
+  player,
+  setPickerOpen,
+  spellEntries,
+}) {
+  const spellIds = (player?.unlockedSpells ?? []).filter((spellId) => SPELL_DEFS[spellId]);
+  const activeSpellId = SPELL_DEFS[player?.activeSpellId] ? player.activeSpellId : spellIds[0] ?? "ember_spark";
   const spell = SPELL_DEFS[activeSpellId];
+  const activeSpellEntry = spellActionEntryFor(activeSpellId, spellEntries);
   return (
-    <button
-      type="button"
-      className="equipment-slot equipment-magic equipped"
-      style={{ "--item-quality": spell?.color ?? "#b8a4ff" }}
-      title="Skift aktiv magi"
-      onClick={() => {
-        if (!spellIds.length) return;
-        const index = spellIds.indexOf(activeSpellId);
-        const next = spellIds[(index + 1) % spellIds.length] ?? spellIds[0];
-        engineRef.current?.setActiveSpell?.(next);
-      }}
-    >
-      <span className="equipment-slot-corners" aria-hidden="true" />
-      <span className="equipment-label">Magic</span>
-      <span className="equipment-icon magic-equipment-icon" aria-hidden="true">
-        <i />
-      </span>
-      <b>{spell?.title ?? "No spell"}</b>
-      <span className="item-card-dur-bar-wrap equipment-durability" title={spell?.title ?? "No spell"}>
-        <span className="item-card-dur-bar-fill" style={{ width: "100%", background: spell?.color ?? "#b8a4ff" }} />
-      </span>
-    </button>
+    <div className="equipment-magic-picker" onMouseLeave={onHoverLeave}>
+      {pickerOpen && spellIds.length > 0 && (
+        <div className="magic-spell-picker" role="listbox" aria-label="Vaelg aktiv magi">
+          {spellIds.map((spellId) => {
+            const option = SPELL_DEFS[spellId];
+            const optionEntry = spellActionEntryFor(spellId, spellEntries);
+            const active = spellId === activeSpellId;
+            return (
+              <button
+                type="button"
+                className={active ? "active" : ""}
+                style={{ "--spell-color": option?.color ?? "#b8a4ff" }}
+                key={spellId}
+                onMouseEnter={(event) => onHoverMove?.(event, spellId)}
+                onMouseMove={(event) => onHoverMove?.(event, spellId)}
+                onFocus={(event) => onHoverMove?.(event, spellId)}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  engineRef.current?.setActiveSpell?.(spellId);
+                  setPickerOpen(false);
+                }}
+                role="option"
+                aria-selected={active}
+              >
+                <SpellActionIcon entry={optionEntry} spell={option} />
+                <span>{option?.title ?? spellId}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <button
+        type="button"
+        className={`equipment-slot equipment-magic equipped ${pickerOpen ? "picker-open" : ""}`}
+        style={{ "--item-quality": spell?.color ?? "#b8a4ff" }}
+        aria-expanded={pickerOpen}
+        onMouseEnter={(event) => onHoverMove?.(event, activeSpellId)}
+        onMouseMove={(event) => onHoverMove?.(event, activeSpellId)}
+        onFocus={(event) => onHoverMove?.(event, activeSpellId)}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (!spellIds.length) return;
+          setPickerOpen((value) => !value);
+        }}
+      >
+        <span className="equipment-slot-corners" aria-hidden="true" />
+        <span className="equipment-label">Magic</span>
+        <span className="equipment-icon magic-equipment-icon" aria-hidden="true">
+          <SpellActionIcon entry={activeSpellEntry} spell={spell} />
+        </span>
+        <b>{spell?.title ?? "No spell"}</b>
+        <span className="item-card-dur-bar-wrap equipment-durability" title={spell?.title ?? "No spell"}>
+          <span className="item-card-dur-bar-fill" style={{ width: "100%", background: spell?.color ?? "#b8a4ff" }} />
+        </span>
+      </button>
+    </div>
   );
 }
 
@@ -247,7 +386,9 @@ export function InventoryPanel({
   const [autoLootOpen, setAutoLootOpen] = React.useState(false);
   const [draggingItem, setDraggingItem] = React.useState(null);
   const [hoveredItem, setHoveredItem] = React.useState(null);
+  const [hoveredSpellId, setHoveredSpellId] = React.useState(null);
   const [hoverPointer, setHoverPointer] = React.useState(null);
+  const [magicPickerOpen, setMagicPickerOpen] = React.useState(false);
   const panelRef = React.useRef(null);
   const autoLoot = snapshot.autoLoot ?? {};
   const playerLevel = Math.max(1, Math.floor(Number(snapshot.player?.level) || 1));
@@ -256,11 +397,20 @@ export function InventoryPanel({
   const handleHoverMove = React.useCallback((event, item) => {
     if (!item) return;
     setHoveredItem(item);
+    setHoveredSpellId(null);
+    setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
+  }, []);
+
+  const handleSpellHoverMove = React.useCallback((event, spellId) => {
+    if (!spellId || !SPELL_DEFS[spellId]) return;
+    setHoveredItem(null);
+    setHoveredSpellId(spellId);
     setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
   }, []);
 
   const clearHoverPanel = React.useCallback(() => {
     setHoveredItem(null);
+    setHoveredSpellId(null);
     setHoverPointer(null);
   }, []);
 
@@ -288,6 +438,9 @@ export function InventoryPanel({
     && hoveredEquippedItem
     && String(hoveredEquippedItem.id ?? "") !== String(hoveredItem.id ?? "")
   );
+
+  const hoveredSpell = hoveredSpellId ? SPELL_DEFS[hoveredSpellId] : null;
+  const hoveredSpellEntry = hoveredSpellId ? spellActionEntryFor(hoveredSpellId, snapshot.quickActions?.spells) : null;
 
   const hoverPanelStyle = React.useMemo(() => {
     if (!hoverPanelLayout) return null;
@@ -333,8 +486,10 @@ export function InventoryPanel({
         ref={panelRef}
         onMouseLeave={() => {
           setSelectedItem(null);
+          setMagicPickerOpen(false);
           clearHoverPanel();
         }}
+        onClick={() => setMagicPickerOpen(false)}
       >
         <header className="inventory-titlebar">
           <span className="inventory-title-flourish" aria-hidden="true" />
@@ -357,7 +512,18 @@ export function InventoryPanel({
             <div className="equipment-grid">
               {CHARACTER_SLOT_LAYOUT.map((slotId) => {
                 if (slotId === "magic") {
-                  return <MagicSlotButton engineRef={engineRef} key="magic" player={snapshot.player} />;
+                  return (
+                    <MagicSlotButton
+                      engineRef={engineRef}
+                      key="magic"
+                      onHoverLeave={clearHoverPanel}
+                      onHoverMove={handleSpellHoverMove}
+                      pickerOpen={magicPickerOpen}
+                      player={snapshot.player}
+                      setPickerOpen={setMagicPickerOpen}
+                      spellEntries={snapshot.quickActions?.spells ?? []}
+                    />
+                  );
                 }
                 const count = usedSlotCounts.get(slotId) ?? 0;
                 usedSlotCounts.set(slotId, count + 1);
@@ -606,17 +772,26 @@ export function InventoryPanel({
           </div>
         </aside>
       </aside>
-      {hoveredItem && hoverPanelStyle && (
+      {(hoveredItem || hoveredSpell) && hoverPanelStyle && (
         <aside className="item-hover-stack is-floating" style={hoverPanelStyle} aria-hidden="true">
-          <section className="item-hover-panel is-floating">
-            <span className="item-hover-panel-title">Valgt item</span>
-            <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
-          </section>
-          {showEquippedHover && hoveredEquippedItem && (
-            <section className="item-hover-panel is-floating equipped">
-              <span className="item-hover-panel-title">Udstyret item</span>
-              <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
+          {hoveredSpell ? (
+            <section className="item-hover-panel is-floating spell-hover-panel">
+              <span className="item-hover-panel-title">Aktiv magi</span>
+              <SpellHoverDetail spell={hoveredSpell} spellEntry={hoveredSpellEntry} />
             </section>
+          ) : (
+            <>
+              <section className="item-hover-panel is-floating">
+                <span className="item-hover-panel-title">Valgt item</span>
+                <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
+              </section>
+              {showEquippedHover && hoveredEquippedItem && (
+                <section className="item-hover-panel is-floating equipped">
+                  <span className="item-hover-panel-title">Udstyret item</span>
+                  <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
+                </section>
+              )}
+            </>
           )}
         </aside>
       )}

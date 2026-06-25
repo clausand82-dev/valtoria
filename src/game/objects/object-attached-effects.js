@@ -1,8 +1,19 @@
+import { OBJECT_SOCKET_CONFIG } from "../config/object-sockets-config.js";
+
 const DEFAULT_FRAME_WIDTH = 256;
 const DEFAULT_FRAME_HEIGHT = 256;
 
-export function resolveObjectSocketsForVariant({ objectDef, runtimeObject }) {
-  const sockets = objectDef?.sockets;
+export function resolveObjectSocketConfig({ objectDef, runtimeObject, regionObjectConfig }) {
+  if (objectDef?.sockets) return objectDef.sockets;
+  for (const id of objectSocketConfigIds({ objectDef, runtimeObject, regionObjectConfig })) {
+    const sockets = OBJECT_SOCKET_CONFIG[id];
+    if (sockets) return sockets;
+  }
+  return null;
+}
+
+export function resolveObjectSocketsForVariant({ objectDef, runtimeObject, regionObjectConfig }) {
+  const sockets = resolveObjectSocketConfig({ objectDef, runtimeObject, regionObjectConfig });
   if (!sockets?.files || !runtimeObject) return {};
 
   const variant = Math.max(0, Math.floor(Number(runtimeObject.treeVariant ?? runtimeObject.variant ?? 0) || 0));
@@ -47,7 +58,7 @@ export function resolveObjectSocketsForVariant({ objectDef, runtimeObject }) {
 export function resolveAttachedObjectEffects({ objectDef, runtimeObject, regionObjectConfig }) {
   const effects = Array.isArray(objectDef?.attachedEffects) ? objectDef.attachedEffects : [];
   if (!effects.length) return [];
-  const sockets = resolveObjectSocketsForVariant({ objectDef, runtimeObject });
+  const sockets = resolveObjectSocketsForVariant({ objectDef, runtimeObject, regionObjectConfig });
   if (!Object.keys(sockets).length) return [];
 
   const overrides = regionObjectConfig?.effects ?? runtimeObject?.effects ?? {};
@@ -158,6 +169,23 @@ function graphicsFiles(graphics) {
 
 function stripAssetPrefix(fileName) {
   return String(fileName ?? "").replace(/^\/?assets\/generated\//, "");
+}
+
+function objectSocketConfigIds({ objectDef, runtimeObject, regionObjectConfig }) {
+  const ids = [];
+  addSocketConfigId(ids, regionObjectConfig?.id);
+  addSocketConfigId(ids, runtimeObject?.objectDefId);
+  for (const spawnType of objectDef?.spawnTypes ?? []) {
+    addSocketConfigId(ids, spawnType?.type);
+  }
+  addSocketConfigId(ids, runtimeObject?.spawnType);
+  addSocketConfigId(ids, runtimeObject?.type);
+  return ids;
+}
+
+function addSocketConfigId(ids, value) {
+  const id = String(value ?? "").trim();
+  if (id && !ids.includes(id)) ids.push(id);
 }
 
 function positiveInt(value, fallback) {

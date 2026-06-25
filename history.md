@@ -3,7 +3,7 @@ History over changes
 TO DO:
 kun en farm, resten er bare areas der hedder farm!
 
-*V. 0.84
+*V. 0.9
 - fixed ale brewing didn't cost and give citystat water
 - added a City Tonic Lab where different city tonic can be made - city tonic adds different city stats
 - new player lightning spell (do damage and do stun); lightning spell is first channeled spell type
@@ -15,6 +15,13 @@ kun en farm, resten er bare areas der hedder farm!
 - added artifact/monuments, archivments and policy rules (all can improve city stats)
 - added configuredLoot (for more special case for loot)
 - new loottable system (more simple when adjusted)
+- monster config file optimized
+- mana potion can now be donated for defence
+- health potion can now be donated for health
+- extra spellbook, notes and lore books can now be recycled to paper
+- paper can craft scrolls
+- added two new city mobs and made some big balance and feature change in city mob system
+- changed citystats behaivor a lot
 
 
 *V. 0.83
