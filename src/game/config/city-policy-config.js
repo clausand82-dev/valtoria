@@ -38,6 +38,7 @@ export const CITY_POLICIES = [
     buildingId: "town_hall",
     category: "trade",
     requirements: { areas: ["city_wall", "market"], buildings: ["merchant"] },
+    exclusiveWith: ["strict_customs"],
     effects: { cityStats: { trade: 20, wealth: 10, safety: -10 } },
   },
   {
@@ -48,6 +49,7 @@ export const CITY_POLICIES = [
     buildingId: "town_hall",
     category: "trade",
     requirements: { areas: ["city_wall", "market"], buildings: ["merchant"] },
+    exclusiveWith: ["open_city_gates"],
     effects: { cityStats: { wealth: 20, safety: 8, trade: -10, popularity: -4 } },
   },
   {
@@ -57,6 +59,7 @@ export const CITY_POLICIES = [
     iconUrl: "/assets/generated/policy/rations.png",
     buildingId: "town_hall",
     category: "supply",
+    exclusiveWith: ["festival_days"],
     effects: { cityStats: { provision: 25, supply: 15, popularity: -10, trade: -5 } },
   },
   {
@@ -67,6 +70,7 @@ export const CITY_POLICIES = [
     buildingId: "town_hall",
     category: "culture",
     requirements: { areas: ["market"] },
+    exclusiveWith: ["rationing"],
     effects: { cityStats: { popularity: 15, culture: 18, wealth: -10, supply: -10 } },
   },
   {

@@ -1253,7 +1253,24 @@ function normalizeCityArtifacts(value = {}) {
 }
 
 function normalizeCityPolicies(value = {}) {
-  return normalizeIdListState(value, "activeIds");
+  const normalized = normalizeIdListState(value, "activeIds");
+  return {
+    ...normalized,
+    // Save/backfill conflict cleanup: keep the first active policy id in save order
+    // and drop later active policies that conflict with already-kept policies.
+    activeIds: normalizeCityPolicyActiveIds(normalized.activeIds),
+  };
+}
+
+function normalizeCityPolicyActiveIds(activeIds = []) {
+  const kept = [];
+  for (const rawId of Array.isArray(activeIds) ? activeIds : []) {
+    const policyId = String(rawId || "");
+    if (!policyId) continue;
+    if (kept.some((activeId) => cityPoliciesConflict(policyId, activeId))) continue;
+    kept.push(policyId);
+  }
+  return kept;
 }
 
 function normalizeCityAchievements(value = {}) {
@@ -1272,6 +1289,49 @@ function cityArtifactBoughtIds(progress = {}) {
 
 function cityPolicyActiveIds(progress = {}) {
   return new Set(normalizeCityPolicies(progress?.policies).activeIds);
+}
+
+function cityPolicyById(policyId) {
+  const id = String(policyId ?? "");
+  return CITY_POLICIES.find((policy) => String(policy.id) === id) ?? null;
+}
+
+function cityPolicyExclusiveIds(policy = {}) {
+  return normalizeRequirementIds(policy?.exclusiveWith);
+}
+
+function cityPoliciesConflict(policyIdA, policyIdB) {
+  const idA = String(policyIdA ?? "");
+  const idB = String(policyIdB ?? "");
+  if (!idA || !idB || idA === idB) return false;
+  const policyA = cityPolicyById(idA);
+  const policyB = cityPolicyById(idB);
+  return cityPolicyExclusiveIds(policyA).includes(idB) || cityPolicyExclusiveIds(policyB).includes(idA);
+}
+
+function cityPolicyExclusiveEntries(policy = {}, progress = {}) {
+  const active = cityPolicyActiveIds(progress);
+  return [...active]
+    .filter((activeId) => cityPoliciesConflict(policy.id, activeId))
+    .map((activeId) => {
+      const activePolicy = cityPolicyById(activeId);
+      const policyNamesActive = cityPolicyExclusiveIds(activePolicy).includes(policy.id);
+      const currentPolicyNamesActive = cityPolicyExclusiveIds(policy).includes(activeId);
+      return {
+        key: `exclusive:${activeId}`,
+        id: activeId,
+        label: activePolicy?.title ?? activeId,
+        reason: currentPolicyNamesActive && policyNamesActive
+          ? `${policy.title ?? policy.id} og ${activePolicy?.title ?? activeId} udelukker hinanden.`
+          : currentPolicyNamesActive
+            ? `${policy.title ?? policy.id} kan ikke bruges sammen med ${activePolicy?.title ?? activeId}.`
+            : `${activePolicy?.title ?? activeId} udelukker ${policy.title ?? policy.id}.`,
+      };
+    });
+}
+
+function cityPolicyBlockedByExclusive(policy = {}, progress = {}) {
+  return cityPolicyExclusiveEntries(policy, progress).length > 0;
 }
 
 function normalizeRequirementIds(value) {
@@ -2477,6 +2537,8 @@ export {
   normalizeCityAchievements,
   cityArtifactBoughtIds,
   cityPolicyActiveIds,
+  cityPolicyBlockedByExclusive,
+  cityPolicyExclusiveEntries,
   cityPolicyRequirementEntries,
   cityPolicyRequirementsMet,
   cityArtifactEffects,

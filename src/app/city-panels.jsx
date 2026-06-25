@@ -977,7 +977,7 @@ function FloatingProgressionHover({ hoverState, className = "", width = 320, est
   );
 }
 
-function CityPolicyPanel({ progress = {}, requirementEntries, onToggle }) {
+function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, onToggle }) {
   const active = new Set(progress?.policies?.activeIds ?? []);
   const hoverState = useFloatingProgressionHover();
   const grouped = CITY_POLICIES.reduce((map, policy) => {
@@ -1000,16 +1000,18 @@ function CityPolicyPanel({ progress = {}, requirementEntries, onToggle }) {
                 const enabled = active.has(policy.id);
                 const reqs = requirementEntries?.(policy) ?? [];
                 const locked = reqs.some((entry) => !entry.met);
+                const exclusives = enabled ? [] : exclusiveEntries?.(policy) ?? [];
+                const blocked = exclusives.length > 0;
                 const imageUrl = policy.imageUrl ?? policy.iconUrl ?? policyIconUrl(policy);
                 return (
                   <article
-                    className={`city-progression-tile city-policy-card ${enabled ? "active" : "inactive"} ${locked ? "locked" : ""}`}
+                    className={`city-progression-tile city-policy-card ${enabled ? "active" : "inactive"} ${locked || blocked ? "locked" : ""}`}
                     key={policy.id}
                     role="button"
                     tabIndex="0"
-                    onMouseEnter={(event) => hoverState.open(event, { policy, category, reqs })}
+                    onMouseEnter={(event) => hoverState.open(event, { policy, category, reqs, exclusives })}
                     onMouseLeave={hoverState.scheduleClose}
-                    onFocus={(event) => hoverState.open(event, { policy, category, reqs })}
+                    onFocus={(event) => hoverState.open(event, { policy, category, reqs, exclusives })}
                     onBlur={hoverState.scheduleClose}
                     onClick={() => onToggle?.(policy)}
                     onKeyDown={(event) => {
@@ -1029,16 +1031,29 @@ function CityPolicyPanel({ progress = {}, requirementEntries, onToggle }) {
         ))}
       </div>
       <FloatingProgressionHover hoverState={hoverState} className="city-policy-hover" width={285} estimatedHeight={205}>
-        {({ policy, category, reqs = [] }) => {
+        {({ policy, category, reqs = [], exclusives = [] }) => {
           const enabled = active.has(policy.id);
           const locked = reqs.some((entry) => !entry.met);
+          const blocked = !enabled && exclusives.length > 0;
           return (
             <>
               <header>
                 <b>{policy.title}</b>
-                <span>{category} | {locked ? "Krav mangler" : enabled ? "Aktiv" : "Inaktiv"}</span>
+                <span>{category} | {blocked ? "Blokeret" : locked ? "Krav mangler" : enabled ? "Aktiv" : "Inaktiv"}</span>
               </header>
               <p>{policy.description}</p>
+              {blocked && (
+                <div className="city-policy-requirements">
+                  {exclusives.map((entry) => (
+                    <span className="missing" key={entry.key}>Blokeret af aktiv policy: {entry.label}</span>
+                  ))}
+                </div>
+              )}
+              {blocked && exclusives.map((entry) => (
+                <p className="city-policy-conflict-note" key={`${entry.key}:reason`}>
+                  {entry.reason}
+                </p>
+              ))}
               {reqs.length > 0 && (
                 <div className="city-policy-requirements">
                   {reqs.map((entry) => (
@@ -1047,7 +1062,7 @@ function CityPolicyPanel({ progress = {}, requirementEntries, onToggle }) {
                 </div>
               )}
               <CityEffectChips effects={policy.effects?.cityStats} />
-              <small>{locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
+              <small>{blocked ? `Deaktiver ${exclusives.map((entry) => entry.label).join(", ")} for at aktivere denne policy.` : locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
             </>
           );
         }}

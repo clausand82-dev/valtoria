@@ -73,7 +73,7 @@ const SPAWN_AREA_INTERACTIVE = false; // set to true for testing - normal is fal
 export const CITY_AREAS = [
   {
     id: "city_wall",
-    title: "City Wall",
+    title: "City Wall",    
     description: "Stone defenses around the city. Improves city defence when restored.",
     category: "wall",
     showLabel: true,
@@ -540,7 +540,7 @@ export const CITY_AREAS = [
     showLabel: true,
     points: "170.27368612015684,213.6364410602661 218.16287939465428,250.35147705852916 260.73105119420757,213.10432673392003 255.4100297192634,136.48162967357575 208.58502450128594,104.02338649756474 167.61317538268474,137.54581773009573 167.61317538268474,141.8026511485199",
     builtLayer: `${CITY_LAYER_BASE}/city_defencetower_nw.png`,
-    unlock: { level: 3, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
+    unlock: { level: 20, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
   },
   {
     id: "defence_tower_sw",
@@ -549,7 +549,7 @@ export const CITY_AREAS = [
     showLabel: true,
     points: "139.69126621067565,742.7720821398842 180.6631315677457,777.3055204434297 222.2203003559017,740.4308684155402 223.97625530494904,667.2668454629527 180.0778281366597,632.1480590725319 137.35003015843702,666.0961716170967 137.35003015843702,666.0961716170967",
     builtLayer: `${CITY_LAYER_BASE}/city_defencetower_sw.png`,
-    unlock: { level: 3, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
+    unlock: { level: 20, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
   },
   {
     id: "defence_tower_ne",
@@ -558,7 +558,7 @@ export const CITY_AREAS = [
     showLabel: true,
     points: "1331.972530239098,302.0319001637329 1379.382867305482,331.88282170701183 1425.0372047670294,299.6906641114943 1426.2078116292014,226.52661883101212 1378.2122157875208,187.8959895261807 1333.7284851881454,228.86785488325071 1333.7284851881454,228.86785488325071",
     builtLayer: `${CITY_LAYER_BASE}/city_defencetower_ne.png`,
-    unlock: { level: 3, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
+    unlock: { level: 20, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
   },
   {
     id: "defence_tower_se",
@@ -567,7 +567,7 @@ export const CITY_AREAS = [
     showLabel: true,
     points: "1455.3004332134299,794.1598555593536 1501.0612503748873,831.4070261820488 1543.6294221744406,797.3524806231717 1543.6294221744406,717.0050441726631 1497.3365515808953,681.3542165290062 1456.8967558943818,719.6655549101353 1456.8967558943818,719.1334608818753",
     builtLayer: `${CITY_LAYER_BASE}/city_defencetower_se.png`,
-    unlock: { level: 3, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
+    unlock: { level: 20, cost: { gold: 1200, stone_brick: 35, iron_bar: 8 } },
   },
   {
     id: "outercircle",

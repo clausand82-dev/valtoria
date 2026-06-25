@@ -138,6 +138,8 @@ import {
   consumeCityItemCostEntries,
   cityArtifactBoughtIds,
   cityPolicyActiveIds,
+  cityPolicyBlockedByExclusive,
+  cityPolicyExclusiveEntries,
   cityPolicyRequirementEntries,
   cityPolicyRequirementsMet,
   cityAchievementUnlockedLevels,
@@ -2945,10 +2947,22 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       engineRef.current?.addToast?.(`Kraever: ${missing.join(", ")}`);
       return;
     }
+    if (!policyIsActive && cityPolicyBlockedByExclusive(policy, progress)) {
+      const blockers = cityPolicyExclusiveEntries(policy, progress).map((entry) => entry.label);
+      engineRef.current?.addToast?.(`Kan ikke aktiveres, mens ${blockers.join(", ")} er aktiv.`);
+      return;
+    }
     onChangeProgress((current) => {
       const active = cityPolicyActiveIds(current);
       if (active.has(policy.id)) active.delete(policy.id);
-      else active.add(policy.id);
+      else {
+        const blockers = cityPolicyExclusiveEntries(policy, current).map((entry) => entry.label);
+        if (blockers.length > 0) {
+          engineRef.current?.addToast?.(`Kan ikke aktiveres, mens ${blockers.join(", ")} er aktiv.`);
+          return current;
+        }
+        active.add(policy.id);
+      }
       return {
         ...current,
         policies: {
@@ -3793,6 +3807,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           <CityPolicyPanel
             progress={progress}
             requirementEntries={(policy) => cityPolicyRequirementEntries(policy, progress)}
+            exclusiveEntries={(policy) => cityPolicyExclusiveEntries(policy, progress)}
             onToggle={togglePolicy}
           />
         );
