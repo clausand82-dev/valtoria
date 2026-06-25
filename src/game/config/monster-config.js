@@ -825,7 +825,7 @@ export const MONSTER_DEFS = {
     tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
     popularity: { change: 1.35 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "monster_profile_humanoid", "monster_special_global"]
   },
   Skeleton: {
     sprite: "skeleton",
@@ -834,7 +834,7 @@ export const MONSTER_DEFS = {
     tags: ["undead", "medium"],
     stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
     popularity: { change: 1.2 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "monster_profile_humanoid", "monster_special_global"]
   },
   Scorpion: {
     sprite: "scorpion",
