@@ -20,6 +20,10 @@ const MULTIPLICATIVE_MODIFIER_KEYS = new Set([
   "merchantStockMultiplier",
   "healthPotionHealMultiplier",
   "questGoldRewardMultiplier",
+  "armyRecruitmentCostMultiplier",
+  "sanctuaryDonationMultiplier",
+  "innRumorMultiplier",
+  "townHallBoardQuestMultiplier",
 ]);
 
 export const CITY_EVENT_MODIFIER_DEFAULTS = {
@@ -37,6 +41,10 @@ export const CITY_EVENT_MODIFIER_DEFAULTS = {
   merchantStockMultiplier: 1,
   healthPotionHealMultiplier: 1,
   questGoldRewardMultiplier: 1,
+  armyRecruitmentCostMultiplier: 1,
+  sanctuaryDonationMultiplier: 1,
+  innRumorMultiplier: 1,
+  townHallBoardQuestMultiplier: 1,
 };
 
 function statNumber(cityStats, statId, fallback = 0) {
@@ -149,6 +157,17 @@ export function resolveCityEventModifiers(cityStatsOrEvents = {}) {
 export function cityRuntimeModifiers(cityStats = {}) {
   const stats = cityStats?.events ? cityStats : { ...cityStats, events: cityEventFlags(cityStats) };
   const modifiers = resolveCityEventModifiers(stats);
+  for (const [key, value] of Object.entries(stats.runtimeModifiers ?? {})) {
+    if (key === "resourceDropMultiplierById") {
+      for (const [resourceId, multiplier] of Object.entries(value ?? {})) {
+        modifiers.resourceDropMultiplierById[resourceId] = (modifiers.resourceDropMultiplierById[resourceId] ?? 1) * (Number(multiplier) || 1);
+      }
+    } else if (MULTIPLICATIVE_MODIFIER_KEYS.has(key)) {
+      modifiers[key] = (Number(modifiers[key]) || 1) * (Number(value) || 1);
+    } else {
+      modifiers[key] = value;
+    }
+  }
   const goldFindBonusPct = statNumber(stats, "gold_find_bonus_pct", statNumber(stats, "goldFindBonusPct", 0));
   if (goldFindBonusPct) {
     modifiers.goldDropMultiplier *= Math.max(0, 1 + goldFindBonusPct / 100);

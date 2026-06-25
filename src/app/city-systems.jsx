@@ -56,7 +56,11 @@ import {
   CITY_MOB_LEVELS,
   CITY_MOB_LEVEL_UP_CHANCE,
   CITY_MOB_MAX_LEVEL,
+  CITY_MOB_OCCUPATION_PROFILES,
+  CITY_MOB_OCCUPATION_TARGETS,
   CITY_MOB_POOL,
+  CITY_MOB_THEFT_CONFIG,
+  CITY_MOB_THEFT_PROFILES,
   CITY_MOB_TYPE_EFFECTS,
   CITY_SPAWN_AREA_BUILDING_TARGETS,
   CITY_SPAWN_AREA_RULES,
@@ -227,6 +231,9 @@ function normalizeCityMobs(cityMobs = []) {
       const center = cityAreaCenter(area);
       const poolEntry = CITY_MOB_POOL.find((entry) => entry.type === mob.mobType);
       const hasSavedVisits = mob.visitsActive !== undefined || mob.turnsActive !== undefined;
+      const breachState = mob.breachState === "inside" || mob.occupiedAreaId || mob.occupiedBuildingId
+        ? "inside"
+        : "outside";
       return {
         id: String(mob.id || `${mob.areaId}-${mob.mobType}-${Math.round((mob.x ?? center.x) * 10)}-${Math.round((mob.y ?? center.y) * 10)}`),
         areaId: String(mob.areaId),
@@ -234,6 +241,13 @@ function normalizeCityMobs(cityMobs = []) {
         level: Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(mob.level) || 1))),
         count: Math.max(1, Math.floor(Number(mob.count) || 1)),
         visitsActive: Math.max(0, Math.floor(Number(hasSavedVisits ? (mob.visitsActive ?? mob.turnsActive) : 1) || 0)),
+        breachState,
+        occupiedAreaId: mob.occupiedAreaId ? String(mob.occupiedAreaId) : null,
+        occupiedBuildingId: mob.occupiedBuildingId ? String(mob.occupiedBuildingId) : null,
+        occupationVisitsActive: Math.max(0, Math.floor(Number(mob.occupationVisitsActive) || 0)),
+        occupationProfileId: mob.occupationProfileId ? String(mob.occupationProfileId) : null,
+        raidProfileId: mob.raidProfileId ? String(mob.raidProfileId) : cityMobTypeEffectDef(mob.mobType)?.raidProfileId ?? null,
+        lastRaidVisitId: mob.lastRaidVisitId ? String(mob.lastRaidVisitId) : null,
         x: Number.isFinite(mob.x) ? mob.x : center.x,
         y: Number.isFinite(mob.y) ? mob.y : center.y,
         iconUrl: mob.iconUrl || poolEntry?.miniIcon || "",
@@ -417,9 +431,124 @@ function cityMobDurabilityThreatText(mob) {
 
 function cityMobRecoveryText(mob) {
   const durabilityThreat = cityMobDurabilityThreatText(mob);
+  const occupation = cityMobOccupationEntry(mob);
+  if (occupation) return "Clearing this threat restores the occupied city function. Any storage already lost stays lost.";
   return durabilityThreat
     ? "Clearing this threat removes its stat penalties. Durability damage already done must still be repaired."
     : "Clearing this threat immediately restores its city stat penalties.";
+}
+
+function cityMobTags(mobOrType) {
+  const type = typeof mobOrType === "string" ? mobOrType : mobOrType?.mobType;
+  return new Set((cityMobTypeEffectDef(type).tags ?? []).map(String));
+}
+
+function cityMobCanUseOccupationProfile(mob, profile) {
+  if (!profile) return false;
+  const tags = cityMobTags(mob);
+  const allowed = profile.allowedMobTags ?? [];
+  if (!allowed.length) return true;
+  return allowed.some((tag) => tags.has(String(tag)));
+}
+
+function cityMobOccupationProfile(profileId) {
+  return CITY_MOB_OCCUPATION_PROFILES?.[profileId] ?? null;
+}
+
+function cityMobOccupationEntry(mob) {
+  if (!mob || mob.breachState !== "inside") return null;
+  const profile = cityMobOccupationProfile(mob.occupationProfileId);
+  if (!profile) return null;
+  const building = mob.occupiedBuildingId
+    ? CITY_BUILDINGS.find((entry) => entry.id === mob.occupiedBuildingId)
+    : null;
+  const area = mob.occupiedAreaId
+    ? CITY_AREAS.find((entry) => entry.id === mob.occupiedAreaId)
+    : null;
+  return {
+    mob,
+    profile,
+    profileId: mob.occupationProfileId,
+    building,
+    area,
+    targetLabel: building?.title ?? area?.title ?? "Inner city",
+  };
+}
+
+function cityMobOccupationEntries(progress = {}) {
+  return normalizeCityMobs(progress?.cityMobs)
+    .map(cityMobOccupationEntry)
+    .filter(Boolean);
+}
+
+function cityMobOccupationForBuilding(progress = {}, buildingId) {
+  const id = String(buildingId ?? "");
+  if (!id) return null;
+  return cityMobOccupationEntries(progress).find((entry) => String(entry.mob.occupiedBuildingId ?? "") === id) ?? null;
+}
+
+function cityMobOccupationForArea(progress = {}, areaId) {
+  const id = String(areaId ?? "");
+  if (!id) return null;
+  return cityMobOccupationEntries(progress).find((entry) => String(entry.mob.occupiedAreaId ?? "") === id) ?? null;
+}
+
+function cityMobOccupationConsequences(mob) {
+  const entry = cityMobOccupationEntry(mob);
+  if (!entry) return [];
+  const consequences = Array.isArray(entry.profile.consequences) ? entry.profile.consequences : [];
+  const raidText = cityMobTheftRiskText(mob);
+  return raidText ? [...consequences, `Theft risk: ${raidText}`] : consequences;
+}
+
+function cityMobTheftRiskText(mob) {
+  const raidProfileId = mob?.raidProfileId ?? cityMobTypeEffectDef(mob?.mobType).raidProfileId;
+  const profile = CITY_MOB_THEFT_PROFILES?.[raidProfileId];
+  if (!profile) return "";
+  const occupation = cityMobOccupationEntry(mob);
+  if (!occupation?.profile?.runtimeModifiers?.storageRaidEnabled && occupation?.profileId !== "storage_raid") return "";
+  return profile.label ?? "low";
+}
+
+function cityMobOccupationStatPenalties(progress = {}) {
+  return mergeCityStatEffects(cityMobOccupationEntries(progress).map((entry) => entry.profile.cityStats ?? {}));
+}
+
+function cityMobOccupationRuntimeModifiers(progress = {}) {
+  const modifiers = {};
+  for (const entry of cityMobOccupationEntries(progress)) {
+    mergeRuntimeModifierValues(modifiers, entry.profile.runtimeModifiers ?? {});
+  }
+  return modifiers;
+}
+
+function mergeRuntimeModifierValues(target, source = {}) {
+  const multiplicative = new Set([
+    "merchantBuyPriceMultiplier",
+    "merchantSellPriceMultiplier",
+    "merchantStockMultiplier",
+    "repairCostMultiplier",
+    "craftingCostMultiplier",
+    "armyRecruitmentCostMultiplier",
+    "sanctuaryDonationMultiplier",
+    "innRumorMultiplier",
+    "townHallBoardQuestMultiplier",
+  ]);
+  for (const [key, value] of Object.entries(source ?? {})) {
+    if (multiplicative.has(key)) {
+      target[key] = (Number(target[key]) || 1) * (Number(value) || 1);
+    } else {
+      target[key] = value;
+    }
+  }
+  return target;
+}
+
+function cityMobOccupationStatusText(mob) {
+  const occupation = cityMobOccupationEntry(mob);
+  if (occupation) return `Occupying: ${occupation.targetLabel}`;
+  if (mob?.breachState === "inside") return "Inside the city";
+  return cityMobZoneKind(mob?.areaId) === "close" ? "At the city wall" : "Outside the city";
 }
 
 function pickCityBattleRegion(mobType, mapSize = "small", areaId = null) {
@@ -462,6 +591,8 @@ function applyCityMobProgressForVisit(progress = {}, cityStats = {}) {
 
   next = applyCityMobLevelAndSpread(next);
   next = applyCityMobNewSpawns(next, cityStats);
+  next = applyCityMobInsideMoves(next);
+  next = applyCityMobStorageRaids(next);
   next = applyCityMobBuildingDamage(next, cityStats);
   return next;
 }
@@ -530,6 +661,153 @@ function applyCityMobNewSpawns(progress = {}, cityStats = {}) {
     spawnedThisVisit += 1;
   }
   return { ...progress, cityMobs: nextMobs };
+}
+
+function applyCityMobInsideMoves(progress = {}) {
+  const currentMobs = normalizeCityMobs(progress.cityMobs);
+  if (!currentMobs.length || isCityWallBlocking(progress)) return progress;
+  let changed = false;
+  const nextMobs = currentMobs.map((mob) => {
+    if (mob.breachState === "inside") {
+      const occupationVisitsActive = Math.max(0, Math.floor(Number(mob.occupationVisitsActive) || 0)) + 1;
+      if (occupationVisitsActive === mob.occupationVisitsActive) return mob;
+      changed = true;
+      return { ...mob, occupationVisitsActive };
+    }
+    if (cityMobZoneKind(mob.areaId) !== "close") return mob;
+    if (Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) < (Number(CITY_MOB_BALANCE.minVisitsBeforeInsideMove) || 0)) return mob;
+    const level = Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, Math.floor(Number(mob.level) || 1)));
+    const chance = Number(CITY_MOB_BALANCE.insideMoveChanceByLevel?.[level]) || 0;
+    if (chance <= 0 || Math.random() >= chance) return mob;
+    const target = pickCityMobOccupationTarget(progress, mob);
+    if (!target) return mob;
+    changed = true;
+    return {
+      ...mob,
+      breachState: "inside",
+      occupiedAreaId: target.areaId ?? null,
+      occupiedBuildingId: target.buildingId ?? null,
+      occupationProfileId: target.profileId,
+      raidProfileId: mob.raidProfileId ?? cityMobTypeEffectDef(mob.mobType)?.raidProfileId ?? null,
+      occupationVisitsActive: 0,
+    };
+  });
+  return changed ? { ...progress, cityMobs: nextMobs } : progress;
+}
+
+function pickCityMobOccupationTarget(progress = {}, mob) {
+  const candidates = [];
+  for (const target of CITY_MOB_OCCUPATION_TARGETS ?? []) {
+    const profileId = String(target.profileId ?? "");
+    const profile = cityMobOccupationProfile(profileId);
+    if (!profile || !cityMobCanUseOccupationProfile(mob, profile)) continue;
+    for (const buildingId of profile.buildingIds ?? []) {
+      const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
+      if (!building || !isCityBuildingOwned(progress, building)) continue;
+      if (cityMobOccupationForBuilding(progress, building.id)) continue;
+      candidates.push({
+        profileId,
+        buildingId: building.id,
+        weight: Math.max(1, Number(target.weight) || 1),
+      });
+    }
+    for (const areaId of profile.areaIds ?? []) {
+      const area = CITY_AREAS.find((entry) => entry.id === areaId);
+      if (!area || !isCityAreaUnlockedById(progress, area.id)) continue;
+      if (cityMobOccupationForArea(progress, area.id)) continue;
+      candidates.push({
+        profileId,
+        areaId: area.id,
+        weight: Math.max(1, Number(target.weight) || 1),
+      });
+    }
+  }
+  if (!candidates.length) return null;
+  const total = candidates.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of candidates) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry;
+  }
+  return candidates[candidates.length - 1];
+}
+
+function applyCityMobStorageRaids(progress = {}) {
+  if (CITY_MOB_THEFT_CONFIG.enabled === false) return progress;
+  const mobs = normalizeCityMobs(progress.cityMobs);
+  if (!mobs.length) return progress;
+  let next = progress;
+  const logs = [];
+  for (const mob of mobs) {
+    const occupation = cityMobOccupationEntry(mob);
+    if (!occupation?.profile?.runtimeModifiers?.storageRaidEnabled && occupation?.profileId !== "storage_raid") continue;
+    if (Math.max(0, Math.floor(Number(mob.occupationVisitsActive) || 0)) <= 0) continue;
+    const raidProfileId = mob.raidProfileId ?? cityMobTypeEffectDef(mob.mobType)?.raidProfileId;
+    const raidProfile = CITY_MOB_THEFT_PROFILES?.[raidProfileId];
+    if (!raidProfile) continue;
+    const chance = Number(CITY_MOB_THEFT_CONFIG.chancePerOccupiedMobPerVisit) || 0;
+    if (chance <= 0 || Math.random() >= chance) continue;
+    const result = applyCityMobStorageRaid(next, mob, occupation, raidProfile);
+    if (!result.stolen.length) continue;
+    next = result.progress;
+    logs.push(...result.stolen);
+  }
+  if (!logs.length) return next;
+  const limit = Math.max(1, Math.floor(Number(CITY_MOB_THEFT_CONFIG.logLimit) || 8));
+  return {
+    ...next,
+    cityMobRaidLog: [...logs, ...(Array.isArray(next.cityMobRaidLog) ? next.cityMobRaidLog : [])].slice(0, limit),
+  };
+}
+
+function applyCityMobStorageRaid(progress = {}, mob, occupation, raidProfile = {}) {
+  const maxStacks = Math.max(1, Math.floor(Number(raidProfile.maxStacks ?? CITY_MOB_THEFT_CONFIG.maxStacksPerMobPerVisit) || 1));
+  const maxCount = Math.max(1, Math.floor(Number(raidProfile.maxItemCountPerStack ?? CITY_MOB_THEFT_CONFIG.maxItemCountPerStack) || 1));
+  let nextProgress = progress;
+  const stolen = [];
+  for (const building of CITY_BUILDINGS) {
+    if (stolen.length >= maxStacks) break;
+    const state = getCityBuildingState(nextProgress, building);
+    if ((state.level ?? 0) <= 0) continue;
+    const sections = cityPaymentInventorySections(building, state);
+    if (!sections.length) continue;
+    const inventories = cityPaymentInventoriesForBuilding(state, building);
+    let changed = false;
+    const nextInventories = { ...inventories };
+    for (const section of sections) {
+      if (stolen.length >= maxStacks) break;
+      if (section.cityCostAccess === false) continue;
+      const items = [...(nextInventories[section.key] ?? [])];
+      for (let index = 0; index < items.length && stolen.length < maxStacks; index += 1) {
+        const item = items[index];
+        if (!canCityMobStealItem(item, null, raidProfile, CITY_MOB_THEFT_CONFIG)) continue;
+        const count = Math.max(1, Math.floor(Number(item.count) || 1));
+        const amount = Math.min(count, maxCount);
+        const remaining = count - amount;
+        items[index] = remaining > 0 ? { ...item, count: remaining } : null;
+        changed = true;
+        stolen.push({
+          id: `raid-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          mobId: mob.id,
+          mobName: cityMobDisplayName(mob),
+          targetLabel: occupation.targetLabel,
+          itemName: item.name ?? item.resourceId ?? item.baseName ?? "stored item",
+          amount,
+          mode: raidProfile.mode ?? "steal",
+        });
+      }
+      nextInventories[section.key] = items;
+    }
+    if (!changed) continue;
+    nextProgress = {
+      ...nextProgress,
+      [building.id]: {
+        ...(nextProgress[building.id] ?? {}),
+        inventories: nextInventories,
+      },
+    };
+  }
+  return { progress: nextProgress, stolen };
 }
 
 function applyCityMobBuildingDamage(progress = {}, cityStats = {}) {
@@ -1518,7 +1796,10 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
   applyCityStatEffects(stats, cityAchievementEffects(progress, snapshot, stats));
   applyNonPopularityEffects(stats, normalizeCityStatAdjustments(progress?.statAdjustments));
   applyCityStatEffects(stats, cityMobStatPenaltyTotals(progress));
+  applyCityStatEffects(stats, cityMobOccupationStatPenalties(progress));
+  stats.runtimeModifiers = cityMobOccupationRuntimeModifiers(progress);
   applyCurrentCityStatEffects(stats, progress);
+  stats.runtimeModifiers = cityMobOccupationRuntimeModifiers(progress);
   stats.army = stats.defense;
   stats.city_defence = stats.defense;
   stats.citizens_health = stats.health;
@@ -1608,6 +1889,11 @@ function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, reg
   for (const group of cityMobStatBreakdownGroups(progress)) {
     const detail = `${group.areaLabel} Lv.${group.level}${group.count > 1 ? ` x${group.count}` : ""}`;
     addEntry(group.statId, group.count > 1 ? `${group.label} x${group.count}` : group.label, group.amount, detail);
+  }
+  for (const entry of cityMobOccupationEntries(progress)) {
+    for (const [statId, amount] of Object.entries(entry.profile.cityStats ?? {})) {
+      addEntry(statId, entry.profile.label ?? "City occupation", amount, entry.targetLabel);
+    }
   }
   const population = Math.max(0, Math.floor(Number(finalStats.population) || 0));
   const healthNeedPenalty = Math.ceil(population * 0.15);
@@ -2218,7 +2504,7 @@ function normalizeCityStatAdjustments(statAdjustments = {}) {
 
 function normalizeCityProgress(progress = {}) {
   const raw = progress && typeof progress === "object" && !Array.isArray(progress) ? progress : {};
-  const reserved = new Set(["areas", "statBonuses", "cityTonicBoosts", "statAdjustments", "artifacts", "policies", "achievements", "armoryPoints", "armyUnits", "threatLevel", "cityMobs"]);
+  const reserved = new Set(["areas", "statBonuses", "cityTonicBoosts", "statAdjustments", "artifacts", "policies", "achievements", "armoryPoints", "armyUnits", "threatLevel", "cityMobs", "cityMobRaidLog"]);
   const buildingIds = new Set(CITY_BUILDINGS.map((building) => building.id));
   const normalized = {
     areas: raw.areas && typeof raw.areas === "object" && !Array.isArray(raw.areas) ? { ...raw.areas } : {},
@@ -2245,6 +2531,20 @@ function normalizeCityProgress(progress = {}) {
   normalized.armyUnits = normalizeArmyUnits(raw.armyUnits);
   normalized.threatLevel = Math.max(0, Math.min(100, Number(raw.threatLevel) || 0));
   normalized.cityMobs = normalizeCityMobs(raw.cityMobs);
+  normalized.cityMobRaidLog = Array.isArray(raw.cityMobRaidLog)
+    ? raw.cityMobRaidLog
+      .filter((entry) => entry && typeof entry === "object")
+      .slice(0, Math.max(1, Math.floor(Number(CITY_MOB_THEFT_CONFIG.logLimit) || 8)))
+      .map((entry) => ({
+        id: String(entry.id || `raid-${entry.mobId ?? "mob"}-${entry.itemName ?? "item"}`),
+        mobId: entry.mobId ? String(entry.mobId) : "",
+        mobName: String(entry.mobName ?? "City mob"),
+        targetLabel: String(entry.targetLabel ?? "City storage"),
+        itemName: String(entry.itemName ?? "stored item"),
+        amount: Math.max(1, Math.floor(Number(entry.amount) || 1)),
+        mode: String(entry.mode ?? "steal"),
+      }))
+    : [];
   return normalized;
 }
 
@@ -2267,6 +2567,7 @@ function serializeCityProgress(progress = {}) {
           && key !== "armyUnits"
           && key !== "threatLevel"
           && key !== "cityMobs"
+          && key !== "cityMobRaidLog"
           && value
           && typeof value === "object"
           && !Array.isArray(value)
@@ -2283,6 +2584,7 @@ function serializeCityProgress(progress = {}) {
     ...(cfg.armyUnits ? { armyUnits: normalizeArmyUnits(normalized.armyUnits) } : {}),
     ...(cfg.threatLevel ? { threatLevel: Math.max(0, Math.min(100, Number(normalized.threatLevel) || 0)) } : {}),
     ...(cfg.cityMobs ? { cityMobs: normalizeCityMobs(normalized.cityMobs) } : {}),
+    ...(cfg.cityMobRaidLog ? { cityMobRaidLog: normalized.cityMobRaidLog ?? [] } : {}),
   };
 }
 
@@ -2315,6 +2617,48 @@ function resourceCountFromSnapshot(snapshot, resourceId) {
       ? sum + Math.max(1, Math.floor(Number(item.count) || 1))
       : sum
   ), 0);
+}
+
+function cityMobStorageItemType(item) {
+  if (isResourceItem(item)) return "resource";
+  if (isEquippableItem(item)) return "equipment";
+  if (isPotionItem(item)) return "potion";
+  if (isQuestItem(item)) return "quest";
+  if (isReadableItem(item)) return "readable";
+  return item?.mode ? String(item.mode) : "";
+}
+
+function canCityMobStealItem(item, gameState = null, theftProfile = {}, theftConfig = CITY_MOB_THEFT_CONFIG) {
+  if (!item) return false;
+  const itemType = cityMobStorageItemType(item);
+  if (!itemType) return false;
+  if (isQuestItem(item)) {
+    if (theftConfig.allowQuestItemTheft !== true) return false;
+    const activeQuestIds = new Set((gameState?.quests?.active ?? []).map((quest) => String(quest.id)));
+    const completedQuestIds = new Set((gameState?.quests?.completed ?? []).map(String));
+    const questId = String(item.questId ?? item.sourceQuestId ?? item.questItemId ?? "");
+    if (questId && activeQuestIds.has(questId) && theftConfig.allowActiveQuestItemTheft !== true) return false;
+    if (questId && !completedQuestIds.has(questId) && theftConfig.allowIncompleteQuestItemTheft !== true) return false;
+  }
+  const protectedTypes = new Set((theftConfig.protectedItemTypes ?? []).map(String));
+  if (itemType !== "quest" && protectedTypes.has(itemType)) return false;
+  const protectedTags = new Set((theftConfig.protectedItemTags ?? []).map(String));
+  const itemTags = [
+    ...(Array.isArray(item.tags) ? item.tags : []),
+    ...(item.unique ? ["unique"] : []),
+    ...(item.artifact ? ["artifact"] : []),
+    ...(item.keyItem ? ["keyItem"] : []),
+    ...(item.progression ? ["progression"] : []),
+  ].map(String);
+  if (itemTags.some((tag) => protectedTags.has(tag))) return false;
+  if (item.unique || item.artifact || item.keyItem || item.progression) return false;
+  const allowedTypes = new Set((theftProfile.allowedItemTypes ?? []).map(String));
+  if (allowedTypes.size > 0 && !allowedTypes.has(itemType)) return false;
+  if (itemType === "resource") {
+    const allowedIds = new Set((theftProfile.allowedResourceIds ?? []).map(String));
+    if (allowedIds.size > 0 && !allowedIds.has(String(item.resourceId ?? ""))) return false;
+  }
+  return true;
 }
 
 function cityStoredResourceCount(progress = {}, resourceId) {
@@ -2506,8 +2850,16 @@ export {
   cityMobDisplayName,
   cityMobDurabilityThreatText,
   cityMobEscalationText,
+  cityMobOccupationConsequences,
+  cityMobOccupationEntry,
+  cityMobOccupationEntries,
+  cityMobOccupationForArea,
+  cityMobOccupationForBuilding,
+  cityMobOccupationStatusText,
   cityMobRecoveryText,
   cityMobStatPenaltyEntries,
+  cityMobTheftRiskText,
+  canCityMobStealItem,
   isCityWallBlocking,
   pickCityBattleRegion,
   applyCityMobProgressForVisit,

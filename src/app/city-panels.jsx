@@ -552,6 +552,15 @@ function cityRuleEffectsText(effects = {}) {
     .join(" | ");
 }
 
+function scaleCityRuleEffects(effects = {}, multiplier = 1) {
+  const scale = Number(multiplier);
+  if (!Number.isFinite(scale) || scale === 1) return effects ?? {};
+  return Object.fromEntries(Object.entries(effects ?? {}).map(([statId, amount]) => [
+    statId,
+    Math.floor((Number(amount) || 0) * scale),
+  ]));
+}
+
 function CityEffectChips({ effects = {} }) {
   return (
     <div className="city-policy-effects">
@@ -574,15 +583,17 @@ function sanctuaryDonationItem(trade) {
   return { type: "resource", id: resourceId, def: RESOURCE_DEFS[resourceId] };
 }
 
-function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, onDonate }) {
+function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, effectMultiplier = 1, onDonate }) {
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const countPotion = potionCount ?? (() => 0);
   const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
+  const multiplier = Math.max(0, Number(effectMultiplier) || 1);
   return (
     <section className="blacksmith-station">
       <header>
         <h4>Donation</h4>
         <span>Donate one resource and choose one city benefit.</span>
+        {multiplier !== 1 && <p>Donation effects x{multiplier.toFixed(2)} while Sanctuary is disrupted.</p>}
       </header>
       {trades.map((trade) => {
         const item = sanctuaryDonationItem(trade);
@@ -596,7 +607,7 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, onD
             <InventoryIcon iconUrl={iconUrl} />
             <div>
               <b>{trade.label ?? item.def?.name ?? item.id}</b>
-              <span>{cost} {item.def?.name ?? item.id} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
+              <span>{cost} {item.def?.name ?? item.id} {"->"} {cityRuleEffectsText(scaleCityRuleEffects(trade.effects, multiplier))} | Available: {available}</span>
             </div>
             <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>Donate</button>
           </div>

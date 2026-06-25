@@ -35,6 +35,8 @@ Gratis kro-suppe	health +10, popularity +15, provision -15
 Militspligt	defense +35, safety +10, culture -5, popularity -10
 Magisk byværn	defense +25, faith +10, magic_essence bør kun være unlock/cost, ikke city stat
 
+Kloak føring: +health, -water
+Vandings system: -water, +provision
 
 
 
@@ -111,8 +113,6 @@ Verden kan blive mere levende, hvis byens grafik, lys, huse osv har forskellige 
 - man bliver ved med at få samme populationGain ved gennemførsel af run - man burde kun få 2% anden gang+
 
 
-- magi i equimt magi felt skal vise magi info i info panel
-
 
 - skal junk kunne veksles til forskellige ting som ironbar, wood plank, stone brick mm - måske et sandsynligheds tjek og chance for ingen drop
 12 junk, 1-3 ironbar (12%), 1-3 wood plank (14%), 1-2 stonebrick (6%) - roll for alt??? ellers er det jo bare weight der skal bruges istedet - tænker roll på alt der er muligt
@@ -138,27 +138,12 @@ et eller andet med flygtninge fra området (jo flere corrupted zoner, jo flere f
 
 
 
-
-
--- MAGI --
-- teleport item, der konsekvensløs kan hive en ud af map og tilbage til city (kan evt være et merge item, der skal samles fra forskellige ingredienser)
-nye potion: fuld liv, magisk save (1 x rød rose, 2 x sjælden lilla blomst, 10 x magic essens = 2 magisk save). Magisk save lader en forlade et map, uden konsekvens.
-
-
-
 -- NYT udstyr --
 
 REPAIRKIT (item_tools_repairkit.png, maxstack: 3)
 special item, der kan reparerer et våben eller armor med 15-25% durability
 er der en eksisterende stats, der kan påvirke dette specil item?
 
-
-
-
-
-
-MOBS ATTACK:
-- der skal laves attack path længere end til ringmuren
 
 -- FOLIGAGE --
 - måske skal foilage forsvinde, når man looter det?
@@ -204,7 +189,4 @@ Skal vises pænere og mere. Hænger sammen med worldstate.
 
 FRACTIONER - NY IDE:
 Hvis fractioner nu er de grundlæggende (som også findes på samlekort), så kan hvert map være knyttet op på hvilken fraction region styres af (kan også bruges i betingelser) - evt. rulles der efter hvert map besøg?
-
-
-MAGIC GØRE SKADE PÅ OBJECT UDFRA MATERIAL
 

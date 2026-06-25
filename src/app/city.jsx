@@ -166,8 +166,13 @@ import {
   cityMobDisplayName,
   cityMobDurabilityThreatText,
   cityMobEscalationText,
+  cityMobOccupationConsequences,
+  cityMobOccupationForArea,
+  cityMobOccupationForBuilding,
+  cityMobOccupationStatusText,
   cityMobRecoveryText,
   cityMobStatPenaltyEntries,
+  cityMobTheftRiskText,
   cityBuildingActiveStatEffects,
   cityBuildingIconText,
   cityBuildingLayerUrls,
@@ -1155,6 +1160,7 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
   const gates = cityAreaGateEntries(area, snapshot, cityStats);
   const costEntries = cityAreaCostEntries(area);
   const activeEffects = cityAreaActiveStatEffects(area, areaState.level);
+  const occupation = cityMobOccupationForArea(progress, area.id);
   const panelImageUrl = buildingRefs[0]?.building
     ? cityBuildingMapImageUrl(buildingImageUrls, buildingRefs[0].building, progress)
     : CITY_MAP_IMAGE.src;
@@ -1176,6 +1182,20 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
       </header>
       {unlocked ? (
         <div className="city-area-popover-body">
+          {occupation && (
+            <CityPanelSection title="Occupation">
+              <div className="city-area-work-card no-top-border">
+                <div className="city-area-work-head">
+                  <span>{occupation.profile.label ?? "Occupied"}</span>
+                  <span>{occupation.mob ? cityMobDisplayName(occupation.mob) : "City mob"}</span>
+                </div>
+                <p>{cityMobOccupationStatusText(occupation.mob)}</p>
+                <ul className="city-panel-list">
+                  {cityMobOccupationConsequences(occupation.mob).map((text) => <li key={text}>{text}</li>)}
+                </ul>
+              </div>
+            </CityPanelSection>
+          )}
           <CityPanelSection title="Stats">
             <CityStatEffectsSummary effects={activeEffects} />
           </CityPanelSection>
@@ -1265,6 +1285,7 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
   const costEntries = Object.entries(building.cost ?? {});
   const statRequirementEntries = cityStatRequirementEntries(building.statRequirements ?? building.unlock?.statRequirements ?? building.unlock?.stats, cityStats);
   const durabilityValue = Math.max(0, Math.min(100, Number(summary.state.durability ?? DURABILITY_DEFAULT) || 0));
+  const occupation = cityMobOccupationForBuilding(progress, building.id);
   return (
     <aside className={`city-area-popover city-building-hover-popover ${summary.owned ? "unlocked" : "locked"}`}>
       <header style={{ "--city-area-panel-image": `url("${building.imageUrl ?? CITY_MAP_IMAGE.src}")` }}>
@@ -1278,6 +1299,20 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
         </div>
       </header>
       <div className="city-area-popover-body">
+        {occupation && (
+          <CityPanelSection title="Occupation">
+            <div className="city-area-work-card no-top-border">
+              <div className="city-area-work-head">
+                <span>{occupation.profile.label ?? "Occupied"}</span>
+                <span>{cityMobDisplayName(occupation.mob)}</span>
+              </div>
+              <p>{cityMobOccupationStatusText(occupation.mob)}</p>
+              <ul className="city-panel-list">
+                {cityMobOccupationConsequences(occupation.mob).map((text) => <li key={text}>{text}</li>)}
+              </ul>
+            </div>
+          </CityPanelSection>
+        )}
         <CityPanelSection title="Status">
           <div className="city-area-work-card no-top-border">
             <div className="city-area-work-head">
@@ -1725,6 +1760,9 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
   const preview = resolveCityArmyBattle({ progress: cityProgress, cityStats, mob, sentUnits, rng: () => 0.5 });
   const penaltyEntries = cityMobStatPenaltyEntries(mob);
   const durabilityThreat = cityMobDurabilityThreatText(mob);
+  const occupationConsequences = cityMobOccupationConsequences(mob);
+  const theftRisk = cityMobTheftRiskText(mob);
+  const raidLogs = (cityProgress?.cityMobRaidLog ?? []).filter((entry) => String(entry.mobId ?? "") === String(mob.id)).slice(0, 3);
   return (
     <aside className="city-area-popover city-mob-info-panel">
       <header>
@@ -1740,6 +1778,26 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
         <button type="button" onClick={onClose}>X</button>
       </header>
       <div className="city-area-popover-body city-mob-info-body">
+        <section className="city-mob-pressure-panel" aria-label="City mob occupation">
+          <b>Status</b>
+          <p>{cityMobOccupationStatusText(mob)}</p>
+          {occupationConsequences.length > 0 && (
+            <ul>
+              {occupationConsequences.map((text) => <li key={text}>{text}</li>)}
+            </ul>
+          )}
+          {theftRisk && <p>Storage raid risk: {theftRisk}</p>}
+          {raidLogs.length > 0 && (
+            <ul>
+              {raidLogs.map((entry) => (
+                <li key={entry.id}>
+                  <span>{entry.mode === "spoil" ? "Spoiled" : entry.mode === "destroy" ? "Destroyed" : "Stole"} {entry.itemName}</span>
+                  <strong>-{entry.amount}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
         <section className="city-mob-pressure-panel" aria-label="City mob pressure">
           <b>City pressure</b>
           {penaltyEntries.length > 0 ? (
@@ -2710,6 +2768,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
   const prebuilt = Boolean(building.prebuilt);
+  const occupation = cityMobOccupationForBuilding(progress, building.id);
+  const occupationConsequences = occupation ? cityMobOccupationConsequences(occupation.mob) : [];
   const payBuildingEntries = (entries, progressOverride = progress) => (
     payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
   );
@@ -2940,6 +3000,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const togglePolicy = (policy) => {
     if (!policy?.id) return;
     const policyIsActive = cityPolicyActiveIds(progress).has(policy.id);
+    if (!policyIsActive && cityEventModifiers.policyChangesDisabled) {
+      engineRef.current?.addToast?.("Policy changes are blocked while Town Hall is occupied.");
+      return;
+    }
     if (!policyIsActive && !cityPolicyRequirementsMet(policy, progress)) {
       const missing = cityPolicyRequirementEntries(policy, progress)
         .filter((entry) => !entry.met)
@@ -3223,11 +3287,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const applyConfiguredCityEffects = (effects = {}) => {
+    const donationMultiplier = Math.max(0, Number(cityEventModifiers.sanctuaryDonationMultiplier ?? 1) || 1);
     const cityEntries = Object.entries(effects ?? {}).filter(([statId]) => String(statId) !== "popularity");
-    const popularity = Math.floor(Number(effects.popularity) || 0);
+    const popularity = Math.floor((Number(effects.popularity) || 0) * donationMultiplier);
     if (cityEntries.length > 0) {
       onChangeProgress((current) => cityEntries.reduce(
-        (next, [statId, amount]) => addCityPermanentStatBonus(next, statId, amount),
+        (next, [statId, amount]) => addCityPermanentStatBonus(next, statId, Math.floor((Number(amount) || 0) * donationMultiplier)),
         current,
       ));
     }
@@ -3426,7 +3491,11 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const trainArmyUnit = (recipe) => {
     if (!recipe?.unitId || !cityArmyCanTrainUnit(progress, cityStats, recipe.unitId, recipe.count ?? 1)) return;
-    const entries = Object.entries(recipe.cost ?? {});
+    const recruitmentMultiplier = Math.max(0, Number(cityEventModifiers.armyRecruitmentCostMultiplier ?? 1) || 1);
+    const entries = Object.entries(recipe.cost ?? {}).map(([resourceId, amount]) => [
+      resourceId,
+      Math.max(1, Math.ceil((Number(amount) || 0) * recruitmentMultiplier)),
+    ]);
     if (!payBuildingEntries(entries)) return;
     onChangeProgress((current) => addCityArmyUnit(current, recipe.unitId, recipe.count ?? 1));
   };
@@ -3755,6 +3824,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             progress={progress}
             cityStats={cityStats}
             snapshot={snapshot}
+            costMultiplier={cityEventModifiers.armyRecruitmentCostMultiplier ?? 1}
             onTrain={trainArmyUnit}
           />
         );
@@ -3863,6 +3933,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             inventory={snapshot.inventory}
             resourceCount={buildingResourceAvailable}
             potionCount={potionIngredientAvailable}
+            effectMultiplier={cityEventModifiers.sanctuaryDonationMultiplier ?? 1}
             onDonate={applySanctuaryDonation}
           />
         );
@@ -3935,6 +4006,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           </div>
           <button type="button" className="city-popup-close" onClick={onClose}>X</button>
         </header>
+        {occupation && (
+          <div className="city-building-occupation-warning">
+            <b>{occupation.profile.label ?? "Building occupied"}</b>
+            <span>{cityMobDisplayName(occupation.mob)} is disrupting this building.</span>
+            {occupationConsequences.length > 0 && <small>{occupationConsequences.join(" | ")}</small>}
+          </div>
+        )}
 
         {activeBaseTab && <div className="city-popup-summary">
           <div className="city-building-thumb">
@@ -4658,16 +4736,18 @@ function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
   );
 }
 
-function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, onTrain }) {
+function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costMultiplier = 1, onTrain }) {
   const recipes = armyTrainingRecipesForAddon(addon?.id);
   const armyUnits = normalizeArmyUnits(progress?.armyUnits);
   const used = cityArmyUnitCount(armyUnits);
   const capacity = cityUsableSoldierCapacity(cityStats);
+  const trainingCostMultiplier = Math.max(0, Number(costMultiplier) || 1);
   return (
     <section className="blacksmith-station">
       <header>
         <h4>{addon.title}</h4>
         <span>Soldiers {used} / {capacity} usable citizens</span>
+        {trainingCostMultiplier !== 1 && <p>Recruitment costs x{trainingCostMultiplier.toFixed(2)} while Barracks are disrupted.</p>}
       </header>
       {Object.entries(CITY_ARMY_UNIT_DEFS).map(([unitId, def]) => (
         <div className="blacksmith-row" key={`owned-${unitId}`}>
@@ -4680,7 +4760,11 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, onTra
       ))}
       {recipes.map((recipe) => {
         const def = CITY_ARMY_UNIT_DEFS[recipe.unitId];
-        const hasResources = Object.entries(recipe.cost ?? {}).every(([resourceId, count]) => cityCostAvailable(snapshot, resourceId, progress) >= count);
+        const costEntries = Object.entries(recipe.cost ?? {}).map(([resourceId, count]) => [
+          resourceId,
+          Math.max(1, Math.ceil((Number(count) || 0) * trainingCostMultiplier)),
+        ]);
+        const hasResources = costEntries.every(([resourceId, count]) => cityCostAvailable(snapshot, resourceId, progress) >= count);
         const hasCapacity = cityArmyCanTrainUnit(progress, cityStats, recipe.unitId, recipe.count ?? 1);
         return (
           <div className="blacksmith-row" key={recipe.id}>
@@ -4688,7 +4772,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, onTra
             <div>
               <b>Train {def?.label ?? recipe.unitId}</b>
               <div className="city-area-costs city-army-training-costs">
-                {Object.entries(recipe.cost ?? {}).map(([resourceId, count]) => {
+                {costEntries.map(([resourceId, count]) => {
                   const available = cityCostAvailable(snapshot, resourceId, progress);
                   return (
                     <span className={available >= count ? "met" : "missing"} key={resourceId}>

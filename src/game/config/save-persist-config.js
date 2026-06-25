@@ -49,5 +49,6 @@ export const SAVE_PERSIST_CONFIG = {
     armyUnits: true,
     threatLevel: true,
     cityMobs: true,
+    cityMobRaidLog: true,
   },
 };

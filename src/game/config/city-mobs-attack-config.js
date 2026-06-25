@@ -75,6 +75,7 @@ export const CITY_MOB_BALANCE = {
   minVisitsBeforeLevelUp: 1,
   minVisitsBeforeSpread: 2,
   minVisitsBeforeDurabilityDamage: 1,
+  minVisitsBeforeInsideMove: 2,
   maxActiveCityMobs: 12,
   maxNewCityMobsPerVisitByThreat: {
     90: 1,
@@ -94,6 +95,11 @@ export const CITY_MOB_BALANCE = {
     4: 0.15,
     5: 0.25,
   },
+  insideMoveChanceByLevel: {
+    3: 0.1,
+    4: 0.2,
+    5: 0.35,
+  },
   zoneDamageMultiplier: {
     border: 0,
     corner: 0.05,
@@ -106,38 +112,207 @@ export const CITY_MOB_BALANCE = {
 export const CITY_MOB_TYPE_EFFECTS = {
   Peasant: {
     label: "Angry peasants",
+    tags: ["humanoid", "raider"],
+    raidProfileId: "humanoid_raider",
     cityStats: { safety: -3, provision: -2, popularity: -2 },
     pressureText: "Local unrest disrupts food supply and public order.",
   },
   Knight: {
     label: "Rogue knights",
+    tags: ["humanoid", "raider"],
+    raidProfileId: "humanoid_raider",
     cityStats: { safety: -5, trade: -3, wealth: -2 },
     pressureText: "Armed deserters intimidate citizens and block trade.",
   },
   Demon: {
     label: "Demonic incursion",
+    tags: ["demon", "corrupted"],
+    raidProfileId: "corrupted_burn",
     cityStats: { safety: -5, faith: -4, health: -2 },
     pressureText: "Dark pressure weakens faith and safety until the incursion is cleared.",
   },
   Skeleton: {
     label: "Restless dead",
+    tags: ["undead"],
     cityStats: { safety: -4, faith: -3, health: -2 },
     pressureText: "Undead pressure strains city order, faith and public health.",
   },
   Wolf: {
     label: "Wolf pack",
+    tags: ["beast"],
+    raidProfileId: "beast_food",
     cityStats: { safety: -4, provision: -3, trade: -1 },
     pressureText: "The pack blocks travel and food supply routes.",
   },
   Spider: {
     label: "Spider nest",
+    tags: ["beast"],
+    raidProfileId: "beast_food",
     cityStats: { health: -4, provision: -2, safety: -2 },
     pressureText: "Venom, webs and infestations hurt health and supply.",
   },
   default: {
     label: "City threat",
+    tags: [],
     cityStats: { safety: -3 },
     pressureText: "This threat reduces city safety while it remains active.",
+  },
+};
+
+export const CITY_MOB_OCCUPATION_PROFILES = {
+  merchant_disruption: {
+    label: "Merchant occupied",
+    buildingIds: ["merchant"],
+    allowedMobTags: ["humanoid", "raider"],
+    cityStats: { trade: -8, wealth: -5, safety: -3 },
+    runtimeModifiers: {
+      merchantBuyPriceMultiplier: 1.25,
+      merchantSellPriceMultiplier: 0.75,
+      merchantStockMultiplier: 0.5,
+    },
+    consequences: [
+      "Merchant stock reduced",
+      "Worse buy and sell prices",
+    ],
+  },
+  blacksmith_disruption: {
+    label: "Blacksmith occupied",
+    buildingIds: ["blacksmith"],
+    allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
+    cityStats: { maintenance: -8, defense: -5 },
+    runtimeModifiers: {
+      repairCostMultiplier: 1.5,
+      craftingCostMultiplier: 1.5,
+    },
+    consequences: [
+      "Repairs cost more",
+      "Crafting pressure increased",
+    ],
+  },
+  inn_disruption: {
+    label: "Inn occupied",
+    buildingIds: ["inn"],
+    allowedMobTags: ["humanoid", "raider", "beast", "undead"],
+    cityStats: { popularity: -8, safety: -4, culture: -3 },
+    runtimeModifiers: {
+      innRumorMultiplier: 0.5,
+    },
+    consequences: [
+      "Rumors and local jobs are disrupted",
+      "Popularity pressure increased",
+    ],
+  },
+  town_hall_disruption: {
+    label: "Town Hall occupied",
+    buildingIds: ["town_hall"],
+    allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
+    cityStats: { popularity: -10, safety: -5, culture: -4 },
+    runtimeModifiers: {
+      policyChangesDisabled: true,
+      townHallBoardQuestMultiplier: 0.5,
+    },
+    consequences: [
+      "Policy changes blocked",
+      "Civic quest board disrupted",
+    ],
+  },
+  sanctuary_disruption: {
+    label: "Sanctuary occupied",
+    buildingIds: ["sanctuary"],
+    allowedMobTags: ["undead", "demon", "corrupted", "humanoid"],
+    cityStats: { faith: -10, culture: -4, health: -3 },
+    runtimeModifiers: {
+      sanctuaryDonationMultiplier: 0.5,
+    },
+    consequences: [
+      "Sanctuary donations are weakened",
+      "Faith pressure increased",
+    ],
+  },
+  barracks_disruption: {
+    label: "Barracks occupied",
+    buildingIds: ["barracks", "armory"],
+    allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
+    cityStats: { defense: -10, safety: -4 },
+    runtimeModifiers: {
+      armyRecruitmentCostMultiplier: 1.5,
+    },
+    consequences: [
+      "Army recruitment costs more",
+      "Defense pressure increased",
+    ],
+  },
+  storage_raid: {
+    label: "Storage occupied",
+    buildingIds: ["bank", "inn"],
+    allowedMobTags: ["humanoid", "raider", "beast"],
+    cityStats: { safety: -6, trade: -4 },
+    runtimeModifiers: {
+      storageRaidEnabled: true,
+    },
+    consequences: [
+      "City storage can be raided each visit",
+      "Stored quest and unique items are protected",
+    ],
+  },
+};
+
+export const CITY_MOB_OCCUPATION_TARGETS = [
+  { profileId: "merchant_disruption", weight: 5 },
+  { profileId: "blacksmith_disruption", weight: 4 },
+  { profileId: "inn_disruption", weight: 4 },
+  { profileId: "town_hall_disruption", weight: 3 },
+  { profileId: "sanctuary_disruption", weight: 3 },
+  { profileId: "barracks_disruption", weight: 3 },
+  { profileId: "storage_raid", weight: 4 },
+];
+
+export const CITY_MOB_THEFT_CONFIG = {
+  enabled: true,
+  chancePerOccupiedMobPerVisit: 0.25,
+  maxStacksPerMobPerVisit: 1,
+  maxItemCountPerStack: 2,
+  maxGoldPerMobPerVisit: 50,
+  allowQuestItemTheft: false,
+  allowActiveQuestItemTheft: false,
+  allowIncompleteQuestItemTheft: false,
+  protectedItemTags: ["unique", "artifact", "keyItem", "progression"],
+  protectedItemTypes: ["quest", "readable"],
+  logLimit: 8,
+};
+
+export const CITY_MOB_THEFT_PROFILES = {
+  humanoid_raider: {
+    label: "low",
+    mode: "steal",
+    allowedItemTypes: ["resource", "equipment"],
+    allowedResourceIds: [
+      "food",
+      "meat",
+      "fruit",
+      "wheat",
+      "ale",
+      "wood_piece",
+      "wood_plank",
+      "iron_piece",
+      "iron_bar",
+      "gold_bar",
+    ],
+    maxStacks: 1,
+  },
+  beast_food: {
+    label: "low",
+    mode: "spoil",
+    allowedItemTypes: ["resource"],
+    allowedResourceIds: ["food", "meat", "fruit", "wheat", "ale"],
+    maxStacks: 1,
+  },
+  corrupted_burn: {
+    label: "low",
+    mode: "destroy",
+    allowedItemTypes: ["resource"],
+    allowedResourceIds: ["magic_essence", "crystal_piece", "crystal"],
+    maxStacks: 1,
   },
 };
 
@@ -221,10 +396,6 @@ export const CITY_SPAWN_SPREAD_TARGETS = {
   SE_SPAWN_BORDER:       ["SE_SPAWN_CORNER", "SE_SPAWN_BRIDGE"],
   SE_SPAWN_BRIDGE:       ["SE_SPAWN_CLOSE"],
 };
-
-// TODO city mob occupation: the current city map only has border/edge/corner/bridge/close spawn areas.
-// If inner city spawn/occupation anchors are added later, close mobs should be able to spread into
-// occupiedAreaId targets with derived area-efficiency penalties while the mob remains active.
 
 // --- Bygninger der tager skade hvis mobs er i disse areas ---
 // bridge-areas angriber defence towers; close-areas angriber city wall

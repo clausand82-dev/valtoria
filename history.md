@@ -14,6 +14,10 @@ kun en farm, resten er bare areas der hedder farm!
 - paper can craft scrolls
 - added two new city mobs and made some big balance and feature change in city mob system
 - changed citystats behaivor a lot
+- added exclusiveWith function to policy
+- magic slot i charater sheet now shows magic info in hover
+- active magic can now be selected instead of a cycle
+- added icons to magic slot
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water

@@ -739,8 +739,15 @@ export const questsMethods = {
       if (!def.repeatable && this.questState.completed.includes(String(questId))) return false;
       return this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides);
     });
-    const minAvailable = Math.max(0, Math.floor(Number(config.minAvailable) || 0));
-    const maxAvailable = Math.max(minAvailable, Math.floor(Number(config.maxAvailable) || minAvailable));
+    const modifiers = cityRuntimeModifiers(contextOverrides?.cityStats ?? this.cityStats ?? {});
+    const boardMultiplier = boardId === "inn"
+      ? modifiers.innRumorMultiplier ?? 1
+      : boardId === "townHall"
+        ? modifiers.townHallBoardQuestMultiplier ?? 1
+        : 1;
+    const minAvailable = Math.max(0, Math.floor((Number(config.minAvailable) || 0) * Math.max(0, Number(boardMultiplier) || 1)));
+    const configuredMax = Math.max(Number(config.minAvailable) || 0, Number(config.maxAvailable) || Number(config.minAvailable) || 0);
+    const maxAvailable = Math.max(minAvailable, Math.floor(configuredMax * Math.max(0, Number(boardMultiplier) || 1)));
     if (boardState.availableQuestIds.length < minAvailable) {
       const picked = new Set(boardState.availableQuestIds.map(String));
       while (boardState.availableQuestIds.length < maxAvailable) {
