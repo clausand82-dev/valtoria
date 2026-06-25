@@ -38,7 +38,7 @@ export const CITY_ARMY_TRAINING_RECIPES = [
     id: "train_james_gray",
     addonId: "melee_training",
     unitId: "james_gray",
-    count: 1,
+    count: 10,
     cost: { gold: 1 },
   },
 ];

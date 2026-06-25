@@ -198,3 +198,36 @@ export function cityStatStatusForRatio(ratio) {
 export function calculateCityStatStatuses(ratios = {}) {
   return Object.fromEntries(Object.entries(ratios).map(([statId, ratio]) => [statId, cityStatStatusForRatio(ratio)]));
 }
+
+export function debugCityStatBalanceScenarios(baseStats = CITY_STATS_RULES.baseStats, populations = [10, 50, 100, 200, 500, 1000]) {
+  const rows = populations.map((population) => {
+    const stats = { ...(baseStats ?? {}), population };
+    const needs = calculateCityStatNeeds(stats);
+    const ratios = calculateCityStatRatios(stats, needs);
+    const statuses = calculateCityStatStatuses(ratios);
+    return {
+      population,
+      needs,
+      ratios: Object.fromEntries(Object.entries(ratios).map(([statId, ratio]) => [statId, Number(ratio.toFixed(2))])),
+      statuses,
+    };
+  });
+  if (typeof console !== "undefined" && typeof console.table === "function") {
+    console.table(rows.map((row) => ({
+      population: row.population,
+      housingNeed: row.needs.housing,
+      provisionNeed: row.needs.provision,
+      waterNeed: row.needs.water,
+      healthNeed: row.needs.health,
+      safetyNeed: row.needs.safety,
+      defenseNeed: row.needs.defense,
+      housing: row.statuses.housing,
+      provision: row.statuses.provision,
+      water: row.statuses.water,
+      health: row.statuses.health,
+      safety: row.statuses.safety,
+      defense: row.statuses.defense,
+    })));
+  }
+  return rows;
+}

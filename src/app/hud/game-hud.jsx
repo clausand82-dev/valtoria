@@ -477,6 +477,8 @@ export function GameHud({
   popularityValue,
   setConfirmMapAbandonOpen,
   setCitySettingsOpen,
+  setHoveredCityStatId,
+  setSelectedCityStatId,
   setCityStorageOpen,
   setHeroOpen,
   setInventoryOpen,
@@ -538,7 +540,7 @@ export function GameHud({
                 events={derivedCityStats.events}
               />
             </div>
-            <CityStatsTopBar stats={cityHudStats} />
+            <CityStatsTopBar stats={cityHudStats} onHoverStat={setHoveredCityStatId} onSelectStat={setSelectedCityStatId} />
           </>
         ) : (
           <>

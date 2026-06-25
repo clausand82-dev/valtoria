@@ -3,15 +3,7 @@ History over changes
 TO DO:
 kun en farm, resten er bare areas der hedder farm!
 
-*V. 0.9
-- fixed ale brewing didn't cost and give citystat water
-- added a City Tonic Lab where different city tonic can be made - city tonic adds different city stats
-- new player lightning spell (do damage and do stun); lightning spell is first channeled spell type
-- fixed hero animation sheet (now use one instead of two files)
-- added new story line quest (elis_stolen_fruit_barrel and find poor girls father quest line)
-- new quest opens new regions (marketplace, the well and the forest)
-- more optimizing
-- adjusted building and area prices
+*V. 0.90
 - added artifact/monuments, archivments and policy rules (all can improve city stats)
 - added configuredLoot (for more special case for loot)
 - new loottable system (more simple when adjusted)
@@ -23,6 +15,15 @@ kun en farm, resten er bare areas der hedder farm!
 - added two new city mobs and made some big balance and feature change in city mob system
 - changed citystats behaivor a lot
 
+*V. 0.84
+- fixed ale brewing didn't cost and give citystat water
+- added a City Tonic Lab where different city tonic can be made - city tonic adds different city stats
+- new player lightning spell (do damage and do stun); lightning spell is first channeled spell type
+- fixed hero animation sheet (now use one instead of two files)
+- added new story line quest (elis_stolen_fruit_barrel and find poor girls father quest line)
+- new quest opens new regions (marketplace, the well and the forest)
+- more optimizing
+- adjusted building and area prices
 
 *V. 0.83
 - adding picture for addons/features

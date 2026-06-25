@@ -1,3 +1,5 @@
+import { calculateCityStatNeeds, calculateCityStatRatios } from "./city-stats-rules-config.js";
+
 // ============================================================
 // CITY MOBS ATTACK CONFIG
 // Alle regler for threat meter, mob spawn og angreb på by.
@@ -61,19 +63,24 @@ export const CITY_MOB_POOL = [
 export const CITY_MOB_LEVELS = {
   1: { mapSize: "small",  densityMultiplier: 1.0,  spreadChance: 0 },
   2: { mapSize: "small",  densityMultiplier: 1.75, spreadChance: 0 },
-  3: { mapSize: "medium", densityMultiplier: 1.0,  spreadChance: 0.08 },
+  3: { mapSize: "small",  densityMultiplier: 2.25, spreadChance: 0.08 },
   4: { mapSize: "medium", densityMultiplier: 1.25, spreadChance: 0.15 },
-  5: { mapSize: "large",  densityMultiplier: 1.0,  spreadChance: 0.25 },
+  5: { mapSize: "medium", densityMultiplier: 1.75, spreadChance: 0.25 },
 };
 export const CITY_MOB_MAX_LEVEL = 5;
 
 export const CITY_MOB_BALANCE = {
   levelUpChancePerVisit: 0.12,
-  durabilityDamagePerLevelPct: 0.12,
+  durabilityDamagePerLevelPct: 0.18,
   minVisitsBeforeLevelUp: 1,
   minVisitsBeforeSpread: 2,
   minVisitsBeforeDurabilityDamage: 1,
   maxActiveCityMobs: 12,
+  maxNewCityMobsPerVisitByThreat: {
+    90: 1,
+    95: 1,
+    100: 2,
+  },
   newMobWarningEffectMultiplier: 0.35,
   levelEffectMultiplierByLevel: {
     1: 1,
@@ -195,6 +202,12 @@ export const CITY_SPAWN_PATHS = [
   ["SE_SPAWN_BORDER", "SE_SPAWN_BRIDGE", "SE_SPAWN_CLOSE"],
 ];
 
+export const CITY_ATTACK_AREA_RULES = {
+  W_SPAWN_EDGE: { blockedByOccupiedAreas: ["NW_SPAWN_CORNER", "SW_SPAWN_BORDER"] },
+  SE_SPAWN_BORDER: { blockedByOccupiedAreas: ["SE_SPAWN_BRIDGE"] },
+  SE_SPAWN_CORNER: { blockedByOccupiedAreas: ["SE_SPAWN_BRIDGE"] },
+};
+
 // --- Sprednings-naboer: hvorfra kan en mob sprede sig hen? ---
 // Brugt til lvl 3+ spredning. Mobs spreder sig til relateret naboområde.
 export const CITY_SPAWN_SPREAD_TARGETS = {
@@ -208,6 +221,10 @@ export const CITY_SPAWN_SPREAD_TARGETS = {
   SE_SPAWN_BORDER:       ["SE_SPAWN_CORNER", "SE_SPAWN_BRIDGE"],
   SE_SPAWN_BRIDGE:       ["SE_SPAWN_CLOSE"],
 };
+
+// TODO city mob occupation: the current city map only has border/edge/corner/bridge/close spawn areas.
+// If inner city spawn/occupation anchors are added later, close mobs should be able to spread into
+// occupiedAreaId targets with derived area-efficiency penalties while the mob remains active.
 
 // --- Bygninger der tager skade hvis mobs er i disse areas ---
 // bridge-areas angriber defence towers; close-areas angriber city wall
@@ -227,6 +244,20 @@ export function calcCitySpawnChance(threatLevel) {
   if (threatLevel < CITY_THREAT_SPAWN_THRESHOLD) return 0;
   const over = threatLevel - CITY_THREAT_SPAWN_THRESHOLD;
   return (CITY_THREAT_SPAWN_BASE_CHANCE + over * CITY_THREAT_SPAWN_CHANCE_PER_PCT) / 100;
+}
+
+export function getMaxNewCityMobsPerVisit(threatLevel) {
+  const threat = Math.max(0, Math.floor(Number(threatLevel) || 0));
+  if (threat < CITY_THREAT_SPAWN_THRESHOLD) return 0;
+  const entries = Object.entries(CITY_MOB_BALANCE.maxNewCityMobsPerVisitByThreat ?? {})
+    .map(([threshold, max]) => [Number(threshold), Math.max(0, Math.floor(Number(max) || 0))])
+    .filter(([threshold]) => Number.isFinite(threshold))
+    .sort((a, b) => a[0] - b[0]);
+  let result = 1;
+  for (const [threshold, max] of entries) {
+    if (threat >= threshold) result = max;
+  }
+  return result;
 }
 
 // --- Hjælpefunktion: vælg mob fra pool via vægtet tilfældig ---
@@ -273,6 +304,13 @@ function pctPressure(value, lowGoodAt, highBadAt) {
   return 0;
 }
 
+function ratioPressure(ratio) {
+  const current = Number(ratio);
+  if (!Number.isFinite(current)) return 0;
+  if (current < 1) return Math.max(0, Math.min(1, 1 - current));
+  return -Math.max(0, Math.min(1, current - 1));
+}
+
 export function calcThreatDeltaFromCityStats(cityStats = {}) {
   const stats = cityStats && typeof cityStats === "object" && !Array.isArray(cityStats) ? cityStats : {};
   const weights = CITY_STAT_THREAT_WEIGHTS;
@@ -285,33 +323,35 @@ export function calcThreatDeltaFromCityStats(cityStats = {}) {
   const defense = Math.max(0, Math.floor(statNumber(stats, ["defense", "city_defence"], 0)));
   const maintenance = Math.max(0, Math.min(100, statNumber(stats, ["maintenance", "stability"], 75)));
   const corruption = Math.max(0, Math.min(100, statNumber(stats, ["corruption", "corruptionPressure"], 50)));
+  const needs = stats.needs ?? calculateCityStatNeeds(stats);
+  const ratios = stats.ratios ?? calculateCityStatRatios(stats, needs);
 
   let delta = 0;
   delta += ((corruption - 50) / 50) * weights.corruption;
 
   if (population > 0) {
-    const provisionPressure = shortageRatio(provision, population);
+    const provisionPressure = ratios.provision !== undefined ? ratioPressure(ratios.provision) : shortageRatio(provision, population);
     delta += provisionPressure >= 0
       ? provisionPressure * weights.provisionShortage
       : Math.abs(provisionPressure) * weights.provisionSurplus;
 
-    const waterPressure = shortageRatio(water, population);
+    const waterPressure = ratios.water !== undefined ? ratioPressure(ratios.water) : shortageRatio(water, population);
     delta += waterPressure >= 0
       ? waterPressure * weights.waterShortage
       : Math.abs(waterPressure) * weights.waterSurplus;
 
-    const housingPressure = shortageRatio(housing, population);
+    const housingPressure = ratios.housing !== undefined ? ratioPressure(ratios.housing) : shortageRatio(housing, population);
     delta += housingPressure >= 0
       ? housingPressure * weights.housingShortage
       : Math.abs(housingPressure) * weights.housingSurplus;
 
-    const defensePressure = shortageRatio(defense, population);
+    const defensePressure = ratios.defense !== undefined ? ratioPressure(ratios.defense) : shortageRatio(defense, population);
     delta += defensePressure >= 0
       ? defensePressure * weights.defenseLow
       : Math.abs(defensePressure) * weights.defenseHigh;
   }
 
-  const healthPressure = pctPressure(health, 60, 85);
+  const healthPressure = ratios.health !== undefined ? ratioPressure(ratios.health) : pctPressure(health, 60, 85);
   delta += healthPressure >= 0 ? healthPressure * weights.healthLow : Math.abs(healthPressure) * weights.healthHigh;
 
   const popularityPressure = pctPressure(popularity, 50, 80);

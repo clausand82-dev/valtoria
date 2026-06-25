@@ -51,6 +51,7 @@ import {
 import { SAVE_PERSIST_CONFIG } from "../game/config/save-persist-config.js";
 import {
   CITY_MOB_BALANCE,
+  CITY_ATTACK_AREA_RULES,
   CITY_MOB_DAMAGE_PER_LEVEL_PCT,
   CITY_MOB_LEVELS,
   CITY_MOB_LEVEL_UP_CHANCE,
@@ -63,6 +64,7 @@ import {
   CITY_SPAWN_SPREAD_TARGETS,
   CITY_THREAT_SPAWN_THRESHOLD,
   calcCitySpawnChance,
+  getMaxNewCityMobsPerVisit,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
 import { CITY_EVENT_RULES } from "../game/config/city-config.js";
@@ -280,27 +282,28 @@ function cityAttackableMobIds(cityMobs = []) {
   const result = new Set();
   const mobsByArea = new Map();
   const normalized = normalizeCityMobs(cityMobs);
-  let nearestRank = 0;
   for (const mob of normalized) {
     mobsByArea.set(mob.areaId, [...(mobsByArea.get(mob.areaId) ?? []), mob]);
-    nearestRank = Math.max(nearestRank, cityMobAttackPriority(mob.areaId));
   }
-  if (nearestRank <= 0) return result;
-  for (const [areaId, mobs] of mobsByArea.entries()) {
-    if (cityMobAttackPriority(areaId) !== nearestRank) continue;
-    for (const mob of mobs) result.add(mob.id);
+  for (const path of CITY_SPAWN_PATHS) {
+    for (let index = path.length - 1; index >= 0; index -= 1) {
+      const areaId = path[index];
+      const mobs = mobsByArea.get(areaId) ?? [];
+      if (!mobs.length) continue;
+      if (cityAttackAreaBlocked(areaId, mobsByArea)) break;
+      for (const mob of mobs) result.add(mob.id);
+      break;
+    }
   }
   return result;
 }
 
-function cityMobAttackPriority(areaId = "") {
-  const zone = cityMobZoneKind(areaId);
-  if (zone === "close") return 4;
-  if (zone === "bridge") return 3;
-  if (zone === "corner") return 2;
-  if (zone === "edge") return 1;
-  if (zone === "border") return 1;
-  return 1;
+function cityAttackAreaBlocked(areaId, mobsByArea) {
+  const rules = CITY_ATTACK_AREA_RULES[areaId] ?? {};
+  if (Array.isArray(rules.blockedByOccupiedAreas)) {
+    return rules.blockedByOccupiedAreas.some((blockedByAreaId) => (mobsByArea.get(blockedByAreaId) ?? []).length > 0);
+  }
+  return false;
 }
 
 function cityMobTypeEffectDef(mobType) {
@@ -504,21 +507,27 @@ function applyCityMobLevelAndSpread(progress = {}) {
 }
 
 function applyCityMobNewSpawns(progress = {}, cityStats = {}) {
-  const spawnChance = Math.min(1, calcCitySpawnChance(Number(progress.threatLevel) || 0) * (cityRuntimeModifiers(cityStats).cityMobSpawnChanceMultiplier ?? 1));
+  const threatLevel = Number(progress.threatLevel) || 0;
+  const maxNewMobs = Math.max(0, Math.floor(Number(getMaxNewCityMobsPerVisit(threatLevel)) || 0));
+  if (maxNewMobs <= 0) return progress;
+  const spawnChance = Math.min(1, calcCitySpawnChance(threatLevel) * (cityRuntimeModifiers(cityStats).cityMobSpawnChanceMultiplier ?? 1));
   if (spawnChance <= 0) return progress;
   const currentMobs = normalizeCityMobs(progress.cityMobs);
   const maxMobs = Math.max(1, Math.floor(Number(CITY_MOB_BALANCE.maxActiveCityMobs) || 12));
   if (currentMobs.length >= maxMobs) return progress;
   const nextMobs = [...currentMobs];
+  let spawnedThisVisit = 0;
 
   const spawnAreas = citySpawnCandidatesForNewSpawn(progress, currentMobs);
 
   for (const areaId of spawnAreas) {
     if (nextMobs.length >= maxMobs) break;
+    if (spawnedThisVisit >= maxNewMobs) break;
     if (Math.random() >= spawnChance) continue;
     const mobType = pickCityMobType();
     const spawn = createCityMobGroup(areaId, mobType, 1);
     nextMobs.push(spawn);
+    spawnedThisVisit += 1;
   }
   return { ...progress, cityMobs: nextMobs };
 }
@@ -602,11 +611,11 @@ function citySpawnAreaEligible(progress = {}, cityMobs = [], areaId) {
       NE: "defence_tower_ne",
       SE: "defence_tower_se",
     }[rules.requiresNoDefenceTower];
-    if (isCityAreaUnlockedById(progress, towerId)) return false;
+    if (isCityAreaBlockingById(progress, towerId)) return false;
   }
 
   if (rules.requiresNoCityWall) {
-    if (isCityAreaUnlockedById(progress, "city_wall")) return false;
+    if (isCityWallBlocking(progress)) return false;
   }
 
   const occupiedAreas = new Set(normalizeCityMobs(cityMobs).map((mob) => mob.areaId));
@@ -620,6 +629,20 @@ function isCityAreaUnlockedById(progress = {}, areaId) {
   const area = CITY_AREAS.find((entry) => entry.id === areaId);
   if (!area) return false;
   return getCityAreaState(progress, area).unlocked;
+}
+
+function isCityAreaBlockingById(progress = {}, areaId) {
+  if (!areaId) return false;
+  const area = CITY_AREAS.find((entry) => entry.id === areaId);
+  if (!area) return false;
+  const state = getCityAreaState(progress, area);
+  if (!state.unlocked) return false;
+  const durability = Math.max(0, Math.min(100, Number(state.durability ?? DURABILITY_DEFAULT) || 0));
+  return durability > 0;
+}
+
+function isCityWallBlocking(progress = {}) {
+  return isCityAreaBlockingById(progress, "city_wall");
 }
 
 function createCityMobGroup(areaId, mobType, level = 1) {
@@ -2425,6 +2448,7 @@ export {
   cityMobEscalationText,
   cityMobRecoveryText,
   cityMobStatPenaltyEntries,
+  isCityWallBlocking,
   pickCityBattleRegion,
   applyCityMobProgressForVisit,
   cityBuildingLayerUrls,

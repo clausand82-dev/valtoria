@@ -193,6 +193,8 @@ export default function App() {
   const [questToastModal, setQuestToastModal] = useState(null);
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
   const [cityStorageOpen, setCityStorageOpen] = useState(false);
+  const [selectedCityStatId, setSelectedCityStatId] = useState(null);
+  const [hoveredCityStatId, setHoveredCityStatId] = useState(null);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
   const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
   const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
@@ -554,6 +556,8 @@ export default function App() {
     if (cityOpen) return;
     setCityStorageOpen(false);
     setCitySettingsOpen(false);
+    setSelectedCityStatId(null);
+    setHoveredCityStatId(null);
   }, [cityOpen]);
 
   useEffect(() => {
@@ -641,6 +645,14 @@ export default function App() {
       breakdown: cityStatBreakdown[stat.id] ?? [],
     };
   }), [cityStatBreakdown, derivedCityStats, snapshot]);
+  const selectedCityStat = useMemo(
+    () => cityHudStats.find((stat) => stat.id === selectedCityStatId) ?? null,
+    [cityHudStats, selectedCityStatId],
+  );
+  const hoveredCityStat = useMemo(
+    () => cityHudStats.find((stat) => stat.id === hoveredCityStatId) ?? null,
+    [cityHudStats, hoveredCityStatId],
+  );
   const hoverMonster = snapshot.hoverMonster;
   const monsterHpPct = hoverMonster
     ? Math.max(0, Math.min(100, (hoverMonster.hp / hoverMonster.maxHp) * 100))
@@ -902,6 +914,8 @@ export default function App() {
         popularityValue={effectivePopularity}
         setConfirmMapAbandonOpen={setConfirmMapAbandonOpen}
         setCitySettingsOpen={setCitySettingsOpen}
+        setHoveredCityStatId={setHoveredCityStatId}
+        setSelectedCityStatId={setSelectedCityStatId}
         setCityStorageOpen={setCityStorageOpen}
         setHeroOpen={setHeroOpen}
         setInventoryOpen={setInventoryOpen}
@@ -1477,6 +1491,9 @@ export default function App() {
           cityStorageKey={gameSession.slot.cityStorageKey}
           cityProgressRefreshToken={cityProgressRefreshToken}
           regionCorruption={regionCorruption}
+          hoveredCityStat={hoveredCityStat}
+          selectedCityStat={selectedCityStat}
+          onClearSelectedCityStat={() => setSelectedCityStatId(null)}
           onProgressChange={setCityProgressHud}
           onStartCityMobBattle={startCityMobBattle}
           skipMobProgressForVisit={skipCityMobProgressReturnId === snapshot.mapReturn?.id}

@@ -119,11 +119,11 @@ export const CITY_EVENT_DEFS = {
     id: "lawlessness",
     label: "Lawlessness",
     iconUrl: "/assets/generated/icon/buff_lawlessness.png",
-    detail: "Safety capacity is strained. City mob spawn chance is increased by 10%.",
+    detail: "Safety capacity is strained. City mob spawn chance is increased by 25%.",
     solution: "Raise safety or clear city mobs.",
     conditions: { statRatioBelow: { safety: 0.75 } },
     modifiers: {
-      cityMobSpawnChanceMultiplier: 1.1,
+      cityMobSpawnChanceMultiplier: 1.25,
     },
   },
   supply_crisis: {

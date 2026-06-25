@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import { cityEventEntries } from "../../game/config/city-config.js";
 import {
   CITY_CITIZEN_CONDITION_DEFS,
@@ -24,18 +24,24 @@ export function ResourceBar({ type, value, label }) {
   );
 }
 
-export function CityStatsTopBar({ stats }) {
-  const [hoveredStatId, setHoveredStatId] = useState(null);
+export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null }) {
   return (
     <div className="city-top-stat-bar" aria-label="City stats">
       {stats.map((stat) => (
         <div
           className={`city-top-stat city-top-stat-${stat.classId}`}
           key={stat.id}
-          onMouseEnter={() => setHoveredStatId(stat.id)}
-          onMouseLeave={() => setHoveredStatId((current) => current === stat.id ? null : current)}
-          onFocus={() => setHoveredStatId(stat.id)}
-          onBlur={() => setHoveredStatId((current) => current === stat.id ? null : current)}
+          onMouseEnter={() => onHoverStat?.(stat.id)}
+          onMouseLeave={() => onHoverStat?.(null)}
+          onFocus={() => onHoverStat?.(stat.id)}
+          onBlur={() => onHoverStat?.(null)}
+          onClick={() => onSelectStat?.(stat.id)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onSelectStat?.(stat.id);
+          }}
+          role="button"
           tabIndex={0}
         >
           <img src={CITY_STAT_ICON_URLS[stat.id]} alt="" draggable="false" />
@@ -43,7 +49,6 @@ export function CityStatsTopBar({ stats }) {
             <span>{cityTopStatLabel(stat)}</span>
             <b>{cityTopStatValue(stat)}</b>
           </div>
-          {hoveredStatId === stat.id && <CityStatTooltip stat={stat} />}
         </div>
       ))}
     </div>
@@ -61,7 +66,15 @@ export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, event
         <div className="city-side-events" aria-label="Active city events">
           <b>EVENT</b>
           {activeEvents.map((event) => (
-            <span key={event.id} title={event.detail}>{event.label}</span>
+            <span className="city-side-event-entry" key={event.id} tabIndex={0}>
+              {event.label}
+              <span className="city-side-event-tooltip" role="tooltip">
+                <strong>{event.label}</strong>
+                {event.detail ? <small>{event.detail}</small> : null}
+                {event.solution ? <small>{event.solution}</small> : null}
+                {citySideEventModifierText(event.modifiers) ? <em>{citySideEventModifierText(event.modifiers)}</em> : null}
+              </span>
+            </span>
           ))}
         </div>
       )}
@@ -79,14 +92,33 @@ function CitySideStat({ icon = null, label, value }) {
   );
 }
 
-function CityStatTooltip({ stat }) {
+function citySideEventModifierText(modifiers = {}) {
+  const parts = [];
+  const pct = (value) => `${Math.round((Number(value) || 1) * 100)}%`;
+  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(`Max HP ${pct(modifiers.heroMaxHpMultiplier)}`);
+  if (modifiers.goldDropMultiplier !== undefined) parts.push(`Gold drops ${pct(modifiers.goldDropMultiplier)}`);
+  if (modifiers.potionDropMultiplier !== undefined) parts.push(`Potion drops ${pct(modifiers.potionDropMultiplier)}`);
+  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(`Health potions ${pct(modifiers.healthPotionHealMultiplier)}`);
+  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(`City mob spawn ${pct(modifiers.cityMobSpawnChanceMultiplier)}`);
+  if (modifiers.repairCostMultiplier !== undefined) parts.push(`Repair cost ${pct(modifiers.repairCostMultiplier)}`);
+  if (modifiers.craftingCostMultiplier !== undefined) parts.push(`Crafting cost ${pct(modifiers.craftingCostMultiplier)}`);
+  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(`Buy prices ${pct(modifiers.merchantBuyPriceMultiplier)}`);
+  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(`Sell prices ${pct(modifiers.merchantSellPriceMultiplier)}`);
+  if (modifiers.merchantStockMultiplier !== undefined) parts.push(`Merchant stock ${pct(modifiers.merchantStockMultiplier)}`);
+  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(`Quest gold ${pct(modifiers.questGoldRewardMultiplier)}`);
+  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(`City decay chance ${pct(modifiers.cityDurabilityDegradeChanceMultiplier)}`);
+  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(`City damage ${pct(modifiers.cityDurabilityDamageMultiplier)}`);
+  return parts.join(" | ");
+}
+
+export function CityStatDetailPanel({ stat, compact = false }) {
   const entries = Array.isArray(stat.breakdown) ? stat.breakdown : [];
   const rules = CITY_STAT_RULE_TEXT[stat.id] ?? [];
   const ratio = Number(stat.ratio);
   const hasNeed = Math.max(0, Math.floor(Number(stat.need) || 0)) > 0;
   const statusClass = stat.status ? `city-stat-status-${stat.status}` : "";
   return (
-    <div className="city-stat-tooltip" role="tooltip">
+    <div className={compact ? "city-stat-tooltip" : "city-stat-detail-panel"} role={compact ? "tooltip" : "group"}>
       <b>{stat.label}</b>
       <span>
         {stat.id === "maintenance"

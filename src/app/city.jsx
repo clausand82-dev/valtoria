@@ -77,6 +77,7 @@ import {
 import {
   CITY_CITIZEN_CONDITION_DEFS,
   CITY_STAT_ALIASES,
+  CityStatDetailPanel,
   CITY_STAT_ICON_URLS,
 } from "./hud/resource-bar.jsx";
 import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
@@ -253,6 +254,9 @@ function CityPage({
   onQuestCompleted,
   onProgressChange,
   onStartCityMobBattle,
+  hoveredCityStat = null,
+  selectedCityStat = null,
+  onClearSelectedCityStat,
   storageOpen = false,
   onCloseStorage,
 }) {
@@ -264,6 +268,7 @@ function CityPage({
   const [selectedQuestNpcId, setSelectedQuestNpcId] = useState(null);
   const [hoveredAreaId, setHoveredAreaId] = useState(null);
   const [hoveredBuildingId, setHoveredBuildingId] = useState(null);
+  const [hoveredCityMobId, setHoveredCityMobId] = useState(null);
   const [clickedAreaId, setClickedAreaId] = useState(null);
   const [selectedCityMobId, setSelectedCityMobId] = useState(null);
   const [armyBattleResult, setArmyBattleResult] = useState(null);
@@ -282,7 +287,6 @@ function CityPage({
     () => interactiveAreas.find((area) => area.id === clickedAreaId) ?? null,
     [clickedAreaId, interactiveAreas],
   );
-  const activeAreaPanel = clickedArea ?? hoveredArea;
   const hoveredBuilding = useMemo(
     () => CITY_BUILDINGS.find((building) => building.id === hoveredBuildingId) ?? null,
     [hoveredBuildingId],
@@ -317,11 +321,6 @@ function CityPage({
   const visibleDamageAreas = useMemo(() => (
     interactiveAreas.filter((area) => isCityAreaUnlocked(cityProgress, area))
   ), [interactiveAreas, cityProgress]);
-  const activeAreaPanelBuildings = useMemo(() => (
-    activeAreaPanel && isCityAreaUnlocked(cityProgress, activeAreaPanel)
-      ? cityAreaBuildingRefs(activeAreaPanel)
-      : []
-  ), [activeAreaPanel, cityProgress]);
   const cityMapNpcs = useMemo(() => (
     getCityMapQuestNpcs(snapshot.quests?.cityNpcStates ?? [], SHOW_INACTIVE_CITY_NPCS, npcPlacementSeedRef.current)
   ), [snapshot.quests?.cityNpcStates]);
@@ -334,6 +333,34 @@ function CityPage({
     () => cityMobs.find((entry) => entry.id === selectedCityMobId) ?? null,
     [cityMobs, selectedCityMobId],
   );
+  const hoveredCityMob = useMemo(
+    () => cityMobs.find((entry) => entry.id === hoveredCityMobId) ?? null,
+    [cityMobs, hoveredCityMobId],
+  );
+  const panelInfo = hoveredBuilding
+    ? { type: "building", value: hoveredBuilding }
+    : hoveredCityMob
+      ? { type: "mob", value: hoveredCityMob, hover: true }
+      : hoveredCityStat
+        ? { type: "stat", value: hoveredCityStat, hover: true }
+        : hoveredArea
+          ? { type: "area", value: hoveredArea, hover: true }
+          : selectedCityStat
+            ? { type: "stat", value: selectedCityStat }
+            : selectedCityMob
+              ? { type: "mob", value: selectedCityMob }
+              : clickedArea
+                ? { type: "area", value: clickedArea }
+                : null;
+  const panelArea = panelInfo?.type === "area" ? panelInfo.value : null;
+  const panelMob = panelInfo?.type === "mob" ? panelInfo.value : null;
+  const panelStat = panelInfo?.type === "stat" ? panelInfo.value : null;
+  const panelBuilding = panelInfo?.type === "building" ? panelInfo.value : null;
+  const panelAreaBuildings = useMemo(() => (
+    panelArea && isCityAreaUnlocked(cityProgress, panelArea)
+      ? cityAreaBuildingRefs(panelArea)
+      : []
+  ), [panelArea, cityProgress]);
   const cityNpcImageUrls = useMemo(() => {
     const entries = Object.entries(cityAssets.npcImages ?? {}).map(([npcId, image]) => {
       if (!image || typeof image.toDataURL !== "function") return [npcId, QUEST_NPCS[npcId]?.imageUrl ?? ""];
@@ -559,11 +586,13 @@ function CityPage({
     setClickedAreaId(area.id);
     setHoveredAreaId(area.id);
     setSelectedCityMobId(null);
+    onClearSelectedCityStat?.();
   };
 
   const openBuilding = (buildingId) => {
     setSelectedQuestNpcId(null);
     setSelectedCityMobId(null);
+    onClearSelectedCityStat?.();
     setSelectedBuildingId(buildingId);
   };
 
@@ -811,6 +840,7 @@ function CityPage({
     if (completedTalkQuests.length > 0) onQuestCompleted?.(completedTalkQuests[0]);
     setSelectedBuildingId(null);
     setSelectedQuestNpcId(npcId);
+    onClearSelectedCityStat?.();
   };
 
   const openCityMobActions = (mobId) => {
@@ -818,6 +848,7 @@ function CityPage({
     if (!mob) return;
     setClickedAreaId(null);
     setHoveredBuildingId(null);
+    onClearSelectedCityStat?.();
     setSelectedCityMobId(mob.id);
   };
 
@@ -881,6 +912,7 @@ function CityPage({
           onClick={(event) => {
             if (event.target.closest?.(".city-map-area, .city-area-popover, .city-map-action-icon")) return;
             setClickedAreaId(null);
+            onClearSelectedCityStat?.();
           }}
         >
           <img className="city-map-background" src={CITY_MAP_IMAGE.src} alt="" draggable="false" />
@@ -973,38 +1005,41 @@ function CityPage({
             mobRefs={cityMobRefs}
             attackableMobIds={attackableCityMobIds}
             onAttack={openCityMobActions}
+            onHover={setHoveredCityMobId}
           />
         </div>
-        <div className={`city-area-panel-slot ${selectedCityMob || hoveredBuilding || activeAreaPanel ? "has-content" : ""}`}>
-        {selectedCityMob ? (
+        <div className={`city-area-panel-slot ${panelInfo ? "has-content" : ""}`}>
+        {panelMob ? (
           <CityMobActionPopup
-            mob={selectedCityMob}
-            attackable={attackableCityMobIds.has(selectedCityMob.id)}
+            mob={panelMob}
+            attackable={attackableCityMobIds.has(panelMob.id)}
             cityProgress={cityProgress}
             cityStats={cityStats}
-            onHeroBattle={() => attackCityMobWithHero(selectedCityMob.id)}
-            onArmyBattle={(sentUnits) => attackCityMobWithArmy(selectedCityMob.id, sentUnits)}
+            onHeroBattle={() => attackCityMobWithHero(panelMob.id)}
+            onArmyBattle={(sentUnits) => attackCityMobWithArmy(panelMob.id, sentUnits)}
             onClose={() => setSelectedCityMobId(null)}
           />
-        ) : hoveredBuilding ? (
+        ) : panelBuilding ? (
           <CityBuildingHoverPopover
-            building={hoveredBuilding}
+            building={panelBuilding}
             snapshot={snapshot}
             progress={cityProgress}
             cityStats={cityStats}
           />
-        ) : activeAreaPanel ? (
+        ) : panelArea ? (
           <CityAreaPopover
-            area={activeAreaPanel}
+            area={panelArea}
             snapshot={snapshot}
             progress={cityProgress}
             cityStats={cityStats}
-            buildingRefs={activeAreaPanelBuildings}
+            buildingRefs={panelAreaBuildings}
             buildingImageUrls={cityBuildingImageUrls}
-            onUnlock={() => unlockArea(activeAreaPanel)}
-            onUpgrade={() => upgradeArea(activeAreaPanel)}
+            onUnlock={() => unlockArea(panelArea)}
+            onUpgrade={() => upgradeArea(panelArea)}
             onRepair={(area, percent) => repairArea(area, percent)}
           />
+        ) : panelStat ? (
+          <CityStatInfoPanel stat={panelStat} onClose={onClearSelectedCityStat} />
         ) : (
           <aside className="city-area-popover city-area-popover-empty" aria-hidden="true" />
         )}
@@ -1624,7 +1659,7 @@ function CityThreatMeter({ threatLevel }) {
   );
 }
 
-function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
+function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack, onHover }) {
   return (
     <div className="city-map-hover-icons city-map-mob-icons" aria-label="City mobs">
       {mobRefs.map((mob) => {
@@ -1634,8 +1669,12 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
             type="button"
             className={`city-map-mob-mini ${attackable ? "attackable" : "blocked"}`}
             style={cityMapPositionStyle(mob.x, mob.y)}
-            title={`${mob.mobType} Lv.${mob.level}${attackable ? " - attackable" : " - info, blocked by nearer mobs"}`}
-            aria-label={`${mob.mobType} level ${mob.level}${attackable ? ", attackable" : ", blocked by nearer mobs"}`}
+            title={`${mob.mobType} Lv.${mob.level}${attackable ? " - attackable" : " - clear closer threats before attacking"}`}
+            aria-label={`${mob.mobType} level ${mob.level}${attackable ? ", attackable" : ", clear closer threats before attacking"}`}
+            onMouseEnter={() => onHover?.(mob.id)}
+            onMouseLeave={() => onHover?.(null)}
+            onFocus={() => onHover?.(mob.id)}
+            onBlur={() => onHover?.(null)}
             onClick={(event) => {
               event.stopPropagation();
               onAttack(mob.id);
@@ -1647,6 +1686,29 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack }) {
         );
       })}
     </div>
+  );
+}
+
+function CityStatInfoPanel({ stat, onClose }) {
+  if (!stat) return null;
+  return (
+    <aside className="city-area-popover city-stat-info-panel">
+      <header>
+        <div className="city-mob-action-popup-title city-stat-info-title">
+          <div className="city-mob-action-popup-portrait city-stat-info-portrait" aria-hidden="true">
+            {CITY_STAT_ICON_URLS[stat.id] ? <img src={CITY_STAT_ICON_URLS[stat.id]} alt="" draggable="false" /> : <span>{String(stat.label || "S").slice(0, 1)}</span>}
+          </div>
+          <div>
+            <b>{stat.label}</b>
+            <span>City stat details</span>
+          </div>
+        </div>
+        <button type="button" onClick={onClose}>X</button>
+      </header>
+      <div className="city-area-popover-body">
+        <CityStatDetailPanel stat={stat} />
+      </div>
+    </aside>
   );
 }
 
@@ -1695,7 +1757,7 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
           <p>{cityMobRecoveryText(mob)}</p>
         </section>
         {!attackable && (
-          <p className="city-mob-action-status">Attack locked: clear the mobs closest to the city first.</p>
+          <p className="city-mob-action-status">Clear closer threats before attacking outer mobs.</p>
         )}
         <button type="button" disabled={!attackable} onClick={onHeroBattle}>Fight with hero</button>
         <div className={`city-army-send-box ${attackable ? "" : "locked"}`}>
