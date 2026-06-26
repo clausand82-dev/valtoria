@@ -11,6 +11,7 @@ import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-c
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { cityConfigEntryOwnedFromStart } from "../game/config/city-state-helpers.js";
 import { CITY_ARTIFACTS } from "../game/config/city-artifact-config.js";
 import { CITY_POLICIES } from "../game/config/city-policy-config.js";
 import { CITY_ACHIEVEMENTS } from "../game/config/city-achievement-config.js";
@@ -212,6 +213,7 @@ function drawIsoTile(ctx, atlas, gx, gy, x, y, type) {
 
 function cityAreaLayerUrls(area, progress) {
   const state = getCityAreaState(progress, area);
+  if ((state.level ?? 0) <= 0) return [];
   return [
     area?.builtLayer,
     ...(Array.isArray(area?.builtLayers) ? area.builtLayers : []),
@@ -220,6 +222,34 @@ function cityAreaLayerUrls(area, progress) {
       ...(Array.isArray(level?.builtLayers) ? level.builtLayers : []),
     ]),
   ].filter(Boolean);
+}
+
+function cityAreaRawLockedLayerUrls(area) {
+  return [
+    area?.lockedLayer,
+    area?.level0Layer,
+    area?.ruinLayer,
+    ...(Array.isArray(area?.lockedLayers) ? area.lockedLayers : []),
+    ...(Array.isArray(area?.level0Layers) ? area.level0Layers : []),
+    ...(Array.isArray(area?.ruinLayers) ? area.ruinLayers : []),
+  ].filter(Boolean);
+}
+
+function cityAreaClearCostEntries(area) {
+  const cost = area?.unlock?.clearCost
+    ?? area?.unlock?.ruinClearCost
+    ?? area?.clearCost
+    ?? area?.ruinClearCost
+    ?? {};
+  return cityCostResourceEntries(cost);
+}
+
+function cityAreaUsesLevelZeroUnlock(area) {
+  return cityAreaRawLockedLayerUrls(area).length > 0 && cityAreaClearCostEntries(area).length > 0;
+}
+
+function cityAreaLockedLayerUrls(area) {
+  return cityAreaUsesLevelZeroUnlock(area) ? cityAreaRawLockedLayerUrls(area) : [];
 }
 
 function normalizeCityMobs(cityMobs = []) {
@@ -960,6 +990,7 @@ function cityBuildingLayerUrls(progress) {
 }
 
 function cityAreaPreviewLayerUrls(area) {
+  if (cityAreaLockedLayerUrls(area).length > 0) return [];
   return [
     area?.builtLayer,
     ...(Array.isArray(area?.builtLayers) ? area.builtLayers : []),
@@ -970,9 +1001,20 @@ function cityAreaPreviewLayerUrls(area) {
   ].filter(Boolean);
 }
 
+function cityAreaNextPreviewLayerUrls(area, progress) {
+  const state = getCityAreaState(progress, area);
+  if (!state.unlocked) return cityAreaPreviewLayerUrls(area);
+  const nextLevel = cityAreaNextLevel(area, state.level);
+  if (!nextLevel) return [];
+  return [
+    nextLevel?.builtLayer,
+    ...(Array.isArray(nextLevel?.builtLayers) ? nextLevel.builtLayers : []),
+  ].filter(Boolean);
+}
+
 function getCityAreaState(progress, area) {
   if (!area?.id) return { unlocked: false, level: 0, durability: DURABILITY_DEFAULT };
-  if (area.prebuilt) {
+  if (cityConfigEntryOwnedFromStart(area)) {
     const saved = progress?.areas?.[area.id];
     const savedLevel = typeof saved === "object" ? saved.level : 0;
     return {
@@ -985,10 +1027,11 @@ function getCityAreaState(progress, area) {
   const saved = progress?.areas?.[area.id];
   if (saved === true) return { unlocked: true, level: 1, durability: DURABILITY_DEFAULT };
   if (!saved || typeof saved !== "object") return { unlocked: false, level: 0, durability: DURABILITY_DEFAULT };
+  const savedLevel = saved.level === undefined ? 1 : Math.max(0, Math.floor(Number(saved.level) || 0));
   return {
     ...saved,
     unlocked: Boolean(saved.unlocked),
-    level: saved.unlocked ? Math.max(1, saved.level ?? 1) : 0,
+    level: saved.unlocked ? savedLevel : 0,
     durability: saved.durability ?? DURABILITY_DEFAULT,
   };
 }
@@ -1002,7 +1045,7 @@ function getCityBuildingState(progress, building) {
   if (!building?.id) return { level: 0, paid: {}, durability: DURABILITY_DEFAULT, addons: [] };
   const saved = progress?.[building.id] ?? {};
   const prebuiltAddons = (building.addons ?? [])
-    .filter((addon) => addon.prebuilt)
+    .filter((addon) => cityConfigEntryOwnedFromStart(addon))
     .map((addon) => addon.id);
   const legacyAddons = Array.isArray(saved.addons) ? saved.addons : [];
   const purchasedAddons = [
@@ -1011,7 +1054,7 @@ function getCityBuildingState(progress, building) {
   ];
   return {
     ...saved,
-    level: building.prebuilt ? Math.max(1, saved.level ?? 0) : (saved.level ?? 0),
+    level: cityConfigEntryOwnedFromStart(building) ? Math.max(1, saved.level ?? 0) : (saved.level ?? 0),
     paid: saved.paid ?? {},
     durability: saved.durability ?? DURABILITY_DEFAULT,
     purchasedAddons: [...new Set(purchasedAddons)],
@@ -1042,6 +1085,14 @@ function cityAreaBuildingRefs(area) {
       y: Number.isFinite(entry?.y) ? entry.y : fallback.y,
     }];
   });
+}
+
+function cityAreaForBuilding(buildingId) {
+  const id = String(buildingId ?? "");
+  if (!id) return null;
+  return CITY_AREAS.find((area) => (
+    (area?.buildings ?? []).some((entry) => String(typeof entry === "string" ? entry : entry?.id) === id)
+  )) ?? null;
 }
 
 function getCityMapQuestNpcs(cityNpcStates = [], showInactive = SHOW_INACTIVE_CITY_NPCS, seed = 0) {
@@ -1274,6 +1325,10 @@ function cityAreaCostEntries(area) {
   return cityCostResourceEntries(cost);
 }
 
+function cityAreaUnlockCostEntries(area) {
+  return cityAreaUsesLevelZeroUnlock(area) ? cityAreaClearCostEntries(area) : cityAreaCostEntries(area);
+}
+
 function cityCostResourceEntries(cost = {}) {
   const resources = {
     ...(cost?.resources ?? {}),
@@ -1342,14 +1397,14 @@ function cityAreaGateEntries(area, snapshot, cityStats = {}) {
 }
 
 function cityAreaCanUnlock(area, snapshot, cityStats = {}, progress = null) {
-  if (!area || area.prebuilt) return false;
+  if (!area || cityConfigEntryOwnedFromStart(area)) return false;
   const gatesMet = cityAreaGateEntries(area, snapshot, cityStats).every((entry) => entry.met);
   if (!gatesMet) return false;
-  return cityAreaCostEntries(area).every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) >= amount);
+  return cityAreaUnlockCostEntries(area).every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) >= amount);
 }
 
 function payCityAreaUnlockCost(area, engine, snapshot) {
-  return payCityCostEntries(cityAreaCostEntries(area), engine, snapshot);
+  return payCityCostEntries(cityAreaUnlockCostEntries(area), engine, snapshot);
 }
 
 function payCityCostEntries(entries, engine, snapshot, progress = null, onChangeProgress = null) {
@@ -2163,6 +2218,7 @@ function calculateCityMaintenance(progress = {}) {
 }
 
 function cityAreaActiveStatEffects(area, level = 1) {
+  if (Math.floor(Number(level) || 0) <= 0) return {};
   return mergeCityStatEffects([
     area?.statEffects ?? area?.effects?.cityStats,
     ...cityReachedLevels(area, level).map((entry) => entry.statEffects ?? entry.effects?.cityStats),
@@ -2210,6 +2266,25 @@ function cityNextLevel(config, currentLevel = 1) {
 }
 
 function cityAreaNextLevel(area, currentLevel = 1) {
+  const level = Math.floor(Number(currentLevel) || 0);
+  const hasBaseLayer = Boolean(area?.builtLayer || (Array.isArray(area?.builtLayers) && area.builtLayers.length > 0));
+  if (level <= 0) {
+    const configuredLevelOne = (area?.levels ?? [])
+      .filter((entry) => Math.floor(Number(entry?.level) || 0) === 1)
+      .sort((a, b) => (a.level ?? 0) - (b.level ?? 0))[0] ?? null;
+    if (configuredLevelOne) return configuredLevelOne;
+  }
+  if (level <= 0 && hasBaseLayer) {
+    return {
+      level: 1,
+      title: area?.level1Title ?? area?.builtTitle ?? area?.title,
+      cost: area?.level1Cost ?? area?.buildCost ?? area?.unlock?.level1Cost ?? area?.unlock?.buildCost ?? area?.unlock?.cost ?? area?.cost ?? {},
+      statEffects: area?.statEffects ?? area?.effects?.cityStats,
+      statRequirements: area?.level1StatRequirements ?? area?.buildStatRequirements ?? area?.unlock?.level1StatRequirements ?? area?.unlock?.buildStatRequirements,
+      builtLayer: area?.builtLayer,
+      builtLayers: area?.builtLayers,
+    };
+  }
   return cityNextLevel(area, currentLevel);
 }
 
@@ -2314,6 +2389,7 @@ function collectCityLayerUrlsFrom(entry, urls) {
   if (!entry) return;
   if (entry.builtLayer) urls.add(entry.builtLayer);
   for (const url of entry.builtLayers ?? []) urls.add(url);
+  for (const url of cityAreaLockedLayerUrls(entry)) urls.add(url);
   if (entry.previewLayer) urls.add(entry.previewLayer);
   for (const url of entry.previewLayers ?? []) urls.add(url);
 }
@@ -2843,6 +2919,7 @@ export {
   cityAddonImageKey,
   cityAssetCache,
   cityAreaLayerUrls,
+  cityAreaLockedLayerUrls,
   normalizeCityMobs,
   cityMapMobRefs,
   cityAttackableMobIds,
@@ -2865,8 +2942,10 @@ export {
   applyCityMobProgressForVisit,
   cityBuildingLayerUrls,
   cityAreaPreviewLayerUrls,
+  cityAreaNextPreviewLayerUrls,
   getCityAreaState,
   isCityAreaUnlocked,
+  cityAreaForBuilding,
   cityAreaPathD,
   cityAreaBuildingRefs,
   getCityMapQuestNpcs,
@@ -2875,6 +2954,7 @@ export {
   cityAreaCenter,
   cityAreaGeometry,
   cityAreaCostEntries,
+  cityAreaUnlockCostEntries,
   cityLevelCostEntries,
   computeRepairCostEntries,
   cityAreaGateEntries,

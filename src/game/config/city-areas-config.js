@@ -64,6 +64,11 @@ const SPAWN_AREA_INTERACTIVE = false; // set to true for testing - normal is fal
 
 // points use the natural pixel coordinate system from CITY_MAP_IMAGE.
 // builtLayer/builtLayers are same-size transparent PNG overlays for future expansion.
+// lockedLayer/lockedLayers, level0Layer/level0Layers, or ruinLayer/ruinLayers are same-size overlays shown while an area is locked.
+// The level 0/ruin flow only activates when BOTH a locked/level0/ruin layer and clear-cost are configured.
+// Use clearCost, ruinClearCost, unlock.clearCost, or unlock.ruinClearCost for that locked -> level 0 price.
+// If either the layer or clear-cost is missing, the level 0/ruin flow is ignored and normal unlock.cost behavior is used.
+// Upgrading from level 0 then applies the normal builtLayer/builtLayers as level 1 and uses unlock.cost unless level1Cost/buildCost is set.
 // Areas can use statEffects and unlock.statRequirements/statRequirements with these ids:
 // city_defence, population, housing, provision, water, army, happiness, citizens_health.
 // Effects are additive, and requirements are checked against the current calculated city stats.
@@ -87,6 +92,7 @@ export const CITY_AREAS = [
     category: "outer",
     showLabel: true,
     prebuilt: true,
+    ownedFromStart: true,
     points: "853,62 918,65 986,84 965,163 912,150 853,141 853,141",
     title: "Plowed Field",
     description: "Farmland outside the inner city. Improves provision as it is upgraded.",
@@ -338,6 +344,7 @@ export const CITY_AREAS = [
     showLabel: true,
     prebuilt: true,
     points: "844,344 843,235 858,227 921,241 982,273 984,288 904,368 873,352 873,352",
+    level0Layer: `${CITY_LAYER_BASE}/city_market_lvl0.png`, clearCost: { gold: 100 },
     builtLayers: [
       `${CITY_LAYER_BASE}/city_marketplace.png`,
       `${CITY_LAYER_BASE}/city_marketplace_bank.png`,
@@ -385,6 +392,7 @@ export const CITY_AREAS = [
     category: "district",
     showLabel: false,
     prebuilt: true,
+    ownedFromStart: true,
     points: "749,415 770,399 795,387 850,388 873,398 894,414 909,445 912,485 897,522 874,544 837,558 807,561 767,544 749,524 734,484 735,445",
     builtLayer: `${CITY_LAYER_BASE}/city_townhall.png`,
     buildings: [
@@ -414,7 +422,6 @@ export const CITY_AREAS = [
     points: "740,574 764,590 801,601 803,711 790,725 719,703 660,668 657,650",
     builtLayer: `${CITY_LAYER_BASE}/city_housing.png`,
     statEffects: { population: 50 },
-
     unlock: { cost: { gold: 800, wood_plank: 30, wheat: 15 } },
   },
   {
@@ -423,6 +430,7 @@ export const CITY_AREAS = [
     category: "district",
     showLabel: true,
     prebuilt: true,
+    ownedFromStart: true,
     points: "691,488 698,518 717,550 637,629 619,630 585,577 559,497 571,488 571,488",
         buildings: [
       { id: "inn", x: 624, y: 556 },

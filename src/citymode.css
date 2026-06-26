@@ -1753,6 +1753,31 @@
   overflow: visible;
 }
 
+.city-map-action-icon.building.locked {
+  border-color: rgba(170, 155, 122, 0.34);
+  background:
+    linear-gradient(180deg, rgba(35, 34, 31, 0.72), rgba(9, 10, 10, 0.78));
+  color: rgba(244, 239, 227, 0.48);
+  box-shadow:
+    0 5px 12px rgba(0, 0, 0, 0.28),
+    0 0 10px rgba(100, 91, 72, 0.12);
+  opacity: 0.58;
+}
+
+.city-map-action-icon.building.locked .city-building-portrait {
+  background: rgba(8, 9, 10, 0.72);
+  filter: grayscale(0.8) saturate(0.42) brightness(0.72);
+}
+
+.city-map-action-icon.building.locked b {
+  color: rgba(244, 239, 227, 0.62);
+}
+
+.city-map-action-icon.building.locked:hover,
+.city-map-action-icon.building.locked:focus-visible {
+  opacity: 0.76;
+}
+
 .city-building-portrait {
   width: 100%;
   height: 100%;

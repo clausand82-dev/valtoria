@@ -211,6 +211,7 @@ export default function App() {
   const [cityProgressRefreshToken, setCityProgressRefreshToken] = useState(0);
   const [skipCityMobProgressReturnId, setSkipCityMobProgressReturnId] = useState(null);
   const snapshotRef = useRef(emptySnapshot);
+  const regionCorruptionRef = useRef(regionCorruption);
   const gameSessionRef = useRef(null);
   const lastMapReturnIdRef = useRef(null);
   const lastDeathIdRef = useRef(null);
@@ -371,6 +372,19 @@ export default function App() {
       maxParticles: runtimePerformance.maxParticles,
       particlesEnabled: runtimePerformance.particlesEnabled,
       useCustomPerformanceProfile: runtimePerformance.useCustom,
+      cityStorageKey: slot.cityStorageKey,
+      loadCityProgress,
+      saveCityProgress,
+      onCityProgressChange: (progress) => {
+        if (engineRef.current) {
+          engineRef.current.cityProgress = progress;
+          engineRef.current.cityInventory = progress;
+          engineRef.current.cityStorage = progress;
+          engineRef.current.cityStats = calculateCityStats(progress, snapshotRef.current, regionCorruptionRef.current);
+        }
+        setCityProgressHud(progress);
+        setCityProgressRefreshToken((value) => value + 1);
+      },
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
       deferAssetLoad: true,
@@ -393,6 +407,10 @@ export default function App() {
   useEffect(() => {
     snapshotRef.current = snapshot;
   }, [snapshot]);
+
+  useEffect(() => {
+    regionCorruptionRef.current = regionCorruption;
+  }, [regionCorruption]);
 
   useEffect(() => {
     installValtoriaCheats({
@@ -1123,6 +1141,8 @@ export default function App() {
                   <button type="button" onClick={() => runCheatCommand("resetAllQuests")}>resetAllQuests</button>
                   <button type="button" onClick={() => runCheatCommand("repairCityBuildings")}>repairCityBuildings</button>
                   <button type="button" onClick={() => runCheatCommand("repairCityAreas")}>repairCityAreas</button>
+                  <button type="button" onClick={() => runCheatCommand("prebuilt", "on")}>prebuilt on</button>
+                  <button type="button" onClick={() => runCheatCommand("prebuilt", "off")}>prebuilt off</button>
                 </div>
 
                 <div className="city-settings-cheat-inline">

@@ -10,6 +10,7 @@ import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-c
 import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { cityConfigEntryOwnedFromStart } from "../game/config/city-state-helpers.js";
 import { DURABILITY_DEFAULT, DURABILITY_DEGRADE_CHANCE, DURABILITY_DEGRADE_MIN_PCT, DURABILITY_DEGRADE_MAX_PCT } from "../game/config/durability-config.js";
 import { CITY_STATS_RULES } from "../game/config/city-stats-rules-config.js";
 import { SPELL_DEFS } from "../game/config/spell-config.js";
@@ -376,7 +377,7 @@ function applyDurabilityDegradationForVisit(progress, cityStats = {}) {
     const saved = next.areas?.[area.id];
     const state = typeof saved === "object"
       ? saved
-      : area.prebuilt
+      : cityConfigEntryOwnedFromStart(area)
         ? { unlocked: true, level: 1, durability: DURABILITY_DEFAULT }
         : null;
     if (!state || !state.unlocked) continue;

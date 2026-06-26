@@ -4,6 +4,8 @@ export const CITY_BUILDING_GOLD_COST = 1000;
 // - Building = the house/frame on the city map. It owns construction cost, durability, image, levels, and broad statEffects.
 // - Addon/feature = every tab, station, storage section, action, and sub-function inside the building.
 // - Use addons for compatibility, but treat each addon as a generic building feature.
+// - `ownedFromStart: true` means the city owns it from a real new game start.
+// - `prebuilt: true` is a test bootstrap flag controlled by CHEAT_SETTINGS.respectPrebuiltCityConfig.
 //
 // Addons can define:
 //   id, title, help/functionText/description, prebuilt, cost, unlock, statRequirements, statEffects,
@@ -37,6 +39,9 @@ export const CITY_BUILDING_GOLD_COST = 1000;
 // Use statRequirements on buildings/areas/addons, or unlock.statRequirements, with the same stat ids:
 //   statRequirements: { city_defence: 100, provision: 50 }
 // A requirement means "current calculated city stat must be at least this value".
+// Use areaRequirements or unlock.areaRequirements on buildings, addons, and building levels to require an owned area at a minimum level:
+//   areaRequirements: { town_center: 2 }
+//   areaRequirements: [{ id: "town_center", level: 2 }]
 // Building levels start at level 1 after first construction. Extra entries in levels define upgrades to higher levels.
 // A level entry can have cost, statEffects, statRequirements, and builtLayer.
 export const CITY_BUILDINGS = [
@@ -44,6 +49,7 @@ export const CITY_BUILDINGS = [
     id: "town_hall",
     title: "Town Hall",
     prebuilt: true,
+    ownedFromStart: true,
     help: "Controls everything related to inhabitants and civic growth.",
     functionText: "Resident management will live here: population, housing needs, assignments, and settlement-wide effects.",
     imageUrl: "/assets/generated/house/house_townhall.png",
@@ -53,6 +59,7 @@ export const CITY_BUILDINGS = [
         id: "civic_ledger",
         title: "Civic Ledger",
         prebuilt: true,
+        ownedFromStart: true,
         help: "Shows city overview, faction reputation, and civic status.",
         panel: "townHallCivic",
         inventoryType: { type: "none", slots: 0 },
@@ -61,6 +68,7 @@ export const CITY_BUILDINGS = [
         id: "town_hall_quest_board",
         title: "Quest Board",
         prebuilt: true,
+        ownedFromStart: true,
         help: "Lists settlement quests and requests.",
         panel: "townHallQuests",
         inventoryType: { type: "none", slots: 0 },
@@ -362,6 +370,7 @@ export const CITY_BUILDINGS = [
     id: "inn",
     title: "Inn",
     prebuilt: true,
+    ownedFromStart: true,
     help: "Controls sleeping places and rest capacity.",
     functionText: "Beds, rest bonuses, visitor capacity, and recovery systems will live here.",
     imageUrl: "/assets/generated/house/house_inn.png",
@@ -371,6 +380,7 @@ export const CITY_BUILDINGS = [
         id: "inn_quest_board",
         title: "Rumor Board",
         prebuilt: true,
+        ownedFromStart: true,
         help: "Lists inn rumors and local jobs.",
         panel: "innQuests",
         inventoryType: { type: "none", slots: 0 },
@@ -380,6 +390,7 @@ export const CITY_BUILDINGS = [
         id: "main_chest",
         title: "Main Chest",
         prebuilt: true,
+        ownedFromStart: true,
         help: "Adds 10 all-purpose inn storage slots.",
         panel: "storage",
         inventoryType: { type: "all", slots: 10 },
@@ -441,7 +452,7 @@ export const CITY_BUILDINGS = [
     help: "Trains the hero through class paths and combat specializations.",
     functionText: "Choose a class, unlock class nodes, and develop the hero through combat, magic, survival, and discipline upgrades.",
     imageUrl: "/assets/generated/house/house_sanctury.png",
-    cost: { gold: CITY_BUILDING_GOLD_COST },
+    cost: { gold: CITY_BUILDING_GOLD_COST, wood_plank: 50, stone_brick: 25, iron_bar: 10 },
     addons: [
       {
         id: "class_training",
@@ -449,6 +460,7 @@ export const CITY_BUILDINGS = [
         prebuilt: true,
         help: "Choose and develop a hero class.",
         panel: "classTraining",
+        cost: { gold: 1000},
         inventoryType: { type: "none", slots: 0 },
       },
       {
@@ -457,6 +469,7 @@ export const CITY_BUILDINGS = [
         prebuilt: true,
         help: "Spend hero skill points.",
         panel: "skillTree",
+        cost: { gold: 500},
         inventoryType: { type: "none", slots: 0 },
       },
       {
@@ -465,6 +478,7 @@ export const CITY_BUILDINGS = [
         prebuilt: true,
         help: "Donate gold bars or food barrels for one chosen city benefit.",
         panel: "sanctuaryDonation",
+        cost: { gold: 2500},
         inventoryType: { type: "none", slots: 0 },
       },
     ],

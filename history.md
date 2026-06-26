@@ -18,6 +18,9 @@ kun en farm, resten er bare areas der hedder farm!
 - magic slot i charater sheet now shows magic info in hover
 - active magic can now be selected instead of a cycle
 - added icons to magic slot
+- city mobs can now occupied buildings if city wall is down or not yet build
+- city areas, building and addons can now be build fra complete quest
+- some city areas shall now be cleared before player can build lvl 1 and get access to build buildings.
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water

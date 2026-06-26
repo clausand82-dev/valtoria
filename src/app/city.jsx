@@ -19,6 +19,7 @@ import { READABLE_DEF_BY_ID, READABLE_ITEM_DEFS } from "../game/config/readable-
 import { READABLE_SALVAGE_CONFIG, canSalvageReadable, getReadablePaperValue, questReadableIds } from "../game/config/readable-salvage-config.js";
 import { CITY_AREAS, CITY_AREA_LABEL_OPTIONS, CITY_MAP_IMAGE, CITY_NPC_AREA, CITY_NPC_POINTS } from "../game/config/city-areas-config.js";
 import { CITY_BUILDINGS } from "../game/config/city-buildings-config.js";
+import { cityConfigEntryOwnedFromStart } from "../game/config/city-state-helpers.js";
 import { setArtifactBuiltFlags, syncArtifactBuiltFlags } from "../game/config/city-artifact-config.js";
 import { armyTrainingRecipesForAddon } from "../game/config/city-army-recipe-config.js";
 import { CITY_ARMY_UNIT_DEFS, normalizeArmyUnits } from "../game/config/city-army-unit-config.js";
@@ -127,6 +128,7 @@ import {
   getRegionCorruptionLevel,
   setRegionCorruptionLevel,
   cityAreaActiveStatEffects,
+  cityAreaForBuilding,
   cityAreaBuildingRefs,
   cityAreaCanUnlock,
   cityAreaCenter,
@@ -147,9 +149,11 @@ import {
   cityAreaGateEntries,
   cityAreaGeometry,
   cityAreaLayerUrls,
+  cityAreaLockedLayerUrls,
+  cityAreaUnlockCostEntries,
   cityAreaNextLevel,
+  cityAreaNextPreviewLayerUrls,
   cityAreaPathD,
-  cityAreaPreviewLayerUrls,
   isCityBuildingOwned,
   imageSourceWidth,
   imageSourceHeight,
@@ -298,27 +302,33 @@ function CityPage({
     () => CITY_BUILDINGS.find((building) => building.id === hoveredBuildingId) ?? null,
     [hoveredBuildingId],
   );
-  const unlockedLayerUrls = useMemo(() => (
-    interactiveAreas
-      .filter((area) => isCityAreaUnlocked(cityProgress, area))
-      .flatMap((area) => cityAreaLayerUrls(area, cityProgress))
-      .concat(cityBuildingLayerUrls(cityProgress))
-  ), [cityProgress, interactiveAreas]);
-  const previewLayerUrls = useMemo(() => {
-    const previewAreas = [hoveredArea, clickedArea]
+  const previewAreas = useMemo(() => (
+    [hoveredArea, clickedArea]
       .filter(Boolean)
       .filter((area, index, list) => list.findIndex((candidate) => candidate.id === area.id) === index)
-      .filter((area) => !isCityAreaUnlocked(cityProgress, area));
-    return previewAreas.flatMap((area) => cityAreaPreviewLayerUrls(area));
-  }, [hoveredArea, clickedArea, cityProgress]);
+  ), [hoveredArea, clickedArea]);
+  const previewAreaIds = useMemo(() => new Set(previewAreas.map((area) => area.id)), [previewAreas]);
+  const unlockedLayerUrls = useMemo(() => {
+    const lockedAreaLayers = interactiveAreas
+      .filter((area) => !isCityAreaUnlocked(cityProgress, area))
+      .filter((area) => !(previewAreaIds.has(area.id) && cityAreaLockedLayerUrls(area).length > 0))
+      .flatMap((area) => cityAreaLockedLayerUrls(area));
+    const activeCityLayers = interactiveAreas
+      .filter((area) => isCityAreaUnlocked(cityProgress, area))
+      .flatMap((area) => cityAreaLayerUrls(area, cityProgress));
+    return [...lockedAreaLayers, ...activeCityLayers, ...cityBuildingLayerUrls(cityProgress)];
+  }, [cityProgress, interactiveAreas, previewAreaIds]);
+  const previewLayerUrls = useMemo(() => {
+    return previewAreas.flatMap((area) => cityAreaNextPreviewLayerUrls(area, cityProgress));
+  }, [previewAreas, cityProgress]);
   const hoverAreaBuildings = useMemo(() => (
-    hoveredArea && isCityAreaUnlocked(cityProgress, hoveredArea)
+    hoveredArea && getCityAreaState(cityProgress, hoveredArea).level > 0
       ? cityAreaBuildingRefs(hoveredArea)
       : []
   ), [hoveredArea, cityProgress]);
   const visibleAreaBuildingGroups = useMemo(() => {
     return interactiveAreas
-      .filter((area) => isCityAreaUnlocked(cityProgress, area))
+      .filter((area) => getCityAreaState(cityProgress, area).level > 0)
       .map((area) => ({
         area,
         buildingRefs: cityAreaBuildingRefs(area),
@@ -364,7 +374,7 @@ function CityPage({
   const panelStat = panelInfo?.type === "stat" ? panelInfo.value : null;
   const panelBuilding = panelInfo?.type === "building" ? panelInfo.value : null;
   const panelAreaBuildings = useMemo(() => (
-    panelArea && isCityAreaUnlocked(cityProgress, panelArea)
+    panelArea && getCityAreaState(cityProgress, panelArea).level > 0
       ? cityAreaBuildingRefs(panelArea)
       : []
   ), [panelArea, cityProgress]);
@@ -512,13 +522,18 @@ function CityPage({
     if (!area || isCityAreaUnlocked(cityProgressRef.current, area)) return;
     const stats = calculateCityStats(cityProgressRef.current, snapshotRef.current, regionCorruption);
     if (!cityAreaCanUnlock(area, snapshotRef.current, stats, cityProgressRef.current)) return;
-    const paid = payCityEntries(cityAreaCostEntries(area));
+    const paid = payCityEntries(cityAreaUnlockCostEntries(area));
     if (!paid) return;
     setCityProgress((current) => ({
       ...current,
       areas: {
         ...(current.areas ?? {}),
-        [area.id]: { unlocked: true, level: 1, unlockedAt: Date.now(), durability: DURABILITY_DEFAULT },
+        [area.id]: {
+          unlocked: true,
+          level: cityAreaLockedLayerUrls(area).length > 0 ? 0 : 1,
+          unlockedAt: Date.now(),
+          durability: DURABILITY_DEFAULT,
+        },
       },
     }));
   };
@@ -548,7 +563,7 @@ function CityPage({
   const repairArea = (area, percent = null) => {
     if (!area) return;
     const progressState = cityProgressRef.current ?? {};
-    const areaState = (progressState.areas ?? {})[area.id] ?? (area.prebuilt ? { unlocked: true, level: 1, durability: DURABILITY_DEFAULT } : null);
+    const areaState = (progressState.areas ?? {})[area.id] ?? (cityConfigEntryOwnedFromStart(area) ? { unlocked: true, level: 1, durability: DURABILITY_DEFAULT } : null);
     if (!areaState) return;
     const currentDur = Math.max(0, Math.min(100, Number(areaState.durability ?? DURABILITY_DEFAULT)));
     const missing = Math.max(0, Math.ceil((percent === null ? 100 - currentDur : percent)));
@@ -1151,6 +1166,16 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
   const unlocked = isCityAreaUnlocked(progress, area);
   const areaState = getCityAreaState(progress, area);
   const nextLevel = unlocked ? cityAreaNextLevel(area, areaState.level) : null;
+  const cleared = unlocked && (areaState.level ?? 0) <= 0;
+  const statusLabel = cleared ? "Cleared" : unlocked ? `Level ${areaState.level}` : "Locked";
+  const nextLevelLabel = nextLevel
+    ? cleared && nextLevel.level === 1
+      ? nextLevel.title ? `Restore area - ${nextLevel.title}` : "Restore area"
+      : `Level ${nextLevel.level}${nextLevel.title ? ` - ${nextLevel.title}` : ""}`
+    : "";
+  const nextLevelButtonLabel = cleared && nextLevel?.level === 1 ? "Build area" : "Upgrade area";
+  const clearAreaLabel = cityAreaLockedLayerUrls(area).length > 0 ? "Clear area" : "Unlock area";
+  const clearAreaTargetLabel = cityAreaLockedLayerUrls(area).length > 0 ? "Cleared" : "Level 1";
   const nextLevelCostEntries = cityLevelCostEntries(nextLevel);
   const nextLevelRequirementEntries = cityStatRequirementEntries(nextLevel?.statRequirements ?? nextLevel?.unlock?.statRequirements, cityStats);
   const canUpgrade = Boolean(nextLevel)
@@ -1158,7 +1183,7 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
     && nextLevelCostEntries.every(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) >= amount);
   const canUnlock = cityAreaCanUnlock(area, snapshot, cityStats, progress);
   const gates = cityAreaGateEntries(area, snapshot, cityStats);
-  const costEntries = cityAreaCostEntries(area);
+  const costEntries = cityAreaUnlockCostEntries(area);
   const activeEffects = cityAreaActiveStatEffects(area, areaState.level);
   const occupation = cityMobOccupationForArea(progress, area.id);
   const panelImageUrl = buildingRefs[0]?.building
@@ -1175,7 +1200,7 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
         <div className="city-area-panel-heading">
           <div className="city-area-panel-titleline">
             <b>{area.title}</b>
-            <span>{unlocked ? `Level ${areaState.level}` : "Locked"}</span>
+            <span>{statusLabel}</span>
           </div>
           <p>{area.description ?? "No area description configured yet."}</p>
         </div>
@@ -1232,9 +1257,9 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
               <div className="city-area-work-card no-top-border">
                 <div className="city-area-work-head">
                   <div>
-                    <span>Level {nextLevel.level}{nextLevel.title ? ` - ${nextLevel.title}` : ""}</span>
+                    <span>{nextLevelLabel}</span>
                   </div>
-                  <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>Upgrade area</button>
+                  <button type="button" disabled={!canUpgrade} onClick={onUpgrade}>{nextLevelButtonLabel}</button>
                 </div>
                 <CityStatEffectsSummary effects={nextLevel.statEffects} />
                 <CityRequirementGrid entries={nextLevelRequirementEntries} />
@@ -1256,9 +1281,9 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
           <CityPanelSection title="Unlock">
             <div className="city-area-work-card no-top-border">
               <div className="city-area-work-head">
-                <span>Level 1</span>
+                <span>{clearAreaTargetLabel}</span>
                 <button type="button" disabled={!canUnlock} onClick={onUnlock}>
-                  Unlock area
+                  {clearAreaLabel}
                 </button>
               </div>
               <CityRequirementGrid entries={gates} />
@@ -1292,7 +1317,7 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
         <div className="city-area-panel-heading">
           <div className="city-area-panel-titleline">
             <b>{building.title}</b>
-            <span>{summary.owned ? `${building.prebuilt ? "Prebuilt" : "Built"} | Level ${summary.state.level}` : "Locked"}</span>
+            <span>{summary.owned ? `${cityConfigEntryOwnedFromStart(building) ? "Owned from start" : "Built"} | Level ${summary.state.level}` : "Locked"}</span>
           </div>
           <p>{building.help ?? building.functionText ?? "No building description configured yet."}</p>
           {building.functionText && <p>{building.functionText}</p>}
@@ -1317,7 +1342,7 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
           <div className="city-area-work-card no-top-border">
             <div className="city-area-work-head">
               <span>{summary.owned ? `Durability ${durabilityValue.toFixed(2)}%` : "Not owned"}</span>
-              <span>{building.prebuilt ? "Prebuilt building" : "Buildable building"}</span>
+              <span>{cityConfigEntryOwnedFromStart(building) ? "Starting building" : "Buildable building"}</span>
             </div>
             {!summary.owned && <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />}
             {!summary.owned && statRequirementEntries.length > 0 && <CityRequirementGrid entries={statRequirementEntries} />}
@@ -1578,10 +1603,11 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
       {buildingRefs.map(({ building, x, y }) => {
         const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
         const questStatus = cityBuildingQuestStatus(building?.id, quests);
+        const owned = isCityBuildingOwned(progress, building);
         return (
           <button
             type="button"
-            className={`city-map-action-icon building ${questStatus.hasOffer ? "offer" : questStatus.hasComplete ? "complete" : questStatus.hasActive ? "active-quest" : ""}`}
+            className={`city-map-action-icon building ${owned ? "owned" : "locked"} ${questStatus.hasOffer ? "offer" : questStatus.hasComplete ? "complete" : questStatus.hasActive ? "active-quest" : ""}`}
             style={cityMapPositionStyle(x, y)}
             title={building.title}
             aria-label={building.title}
@@ -2622,7 +2648,7 @@ function normalizeCityBuildingAddons(building) {
 
 function cityBuildingAddonOwned(progress, building, addon) {
   if (!addon?.id) return false;
-  if (addon.prebuilt) return true;
+  if (cityConfigEntryOwnedFromStart(addon)) return true;
   const state = getCityBuildingState(progress, building);
   return new Set(state.addons ?? []).has(addon.id);
 }
@@ -2668,15 +2694,53 @@ function cityBuildingAddonCostEntries(addon) {
   return Object.entries(addon?.cost ?? {}).filter(([, amount]) => Math.max(0, Math.floor(Number(amount) || 0)) > 0);
 }
 
+function cityAreaRequirementEntries(source = {}, progress = {}) {
+  const requirements = source?.areaRequirements
+    ?? source?.unlock?.areaRequirements
+    ?? source?.unlock?.areas
+    ?? source?.requiresAreas
+    ?? source?.requiresArea
+    ?? null;
+  if (!requirements) return [];
+  const entries = Array.isArray(requirements)
+    ? requirements
+    : typeof requirements === "object"
+      ? Object.entries(requirements).map(([id, level]) => ({ id, level }))
+      : [{ id: requirements, level: 1 }];
+  return entries.flatMap((entry) => {
+    const id = String(typeof entry === "string" ? entry : entry?.id ?? entry?.areaId ?? "");
+    if (!id) return [];
+    const area = CITY_AREAS.find((candidate) => candidate.id === id);
+    if (!area) {
+      console.warn?.(`[city] Unknown area requirement "${id}"`, { source, entry });
+      return [];
+    }
+    const needed = Math.max(1, Math.floor(Number(typeof entry === "object" ? entry.level ?? entry.minLevel : entry) || 1));
+    const state = getCityAreaState(progress, area);
+    const current = state.unlocked ? Math.max(0, Math.floor(Number(state.level) || 0)) : 0;
+    return [{
+      key: `area:${area.id}:${needed}`,
+      type: "area",
+      areaId: area.id,
+      current,
+      needed,
+      met: state.unlocked && current >= needed,
+      label: `${area.title ?? area.id} L${current}/${needed}`,
+    }];
+  });
+}
+
 function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats = {}) {
   if (!addon?.id) return { canBuy: false, reasons: ["Missing addon id"] };
   if (!isCityBuildingOwned(progress, building)) return { canBuy: false, reasons: ["Build the building first."] };
   if (cityBuildingAddonOwned(progress, building, addon)) return { canBuy: false, reasons: ["Already owned."] };
   if (!cityAddonIsUnlocked(addon, snapshot, cityStats)) return { canBuy: false, reasons: [cityAddonLockText(addon, snapshot, cityStats)] };
   const requirementEntries = cityStatRequirementEntries(addon.statRequirements ?? addon.unlock?.statRequirements ?? addon.unlock?.stats, cityStats);
+  const areaRequirementEntries = cityAreaRequirementEntries(addon, progress);
   const costEntries = cityBuildingAddonCostEntries(addon);
   const reasons = [
     ...requirementEntries.filter((entry) => !entry.met).map((entry) => entry.label),
+    ...areaRequirementEntries.filter((entry) => !entry.met).map((entry) => entry.label),
     ...costEntries
       .filter(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) < amount)
       .map(([resourceId, amount]) => `${cityCostLabel(resourceId)} ${cityCostAvailable(snapshot, resourceId, progress)}/${amount}`),
@@ -2767,7 +2831,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const buildingState = getCityBuildingState(progress, building);
   const owned = buildingState.level > 0;
-  const prebuilt = Boolean(building.prebuilt);
+  const ownedFromStart = cityConfigEntryOwnedFromStart(building);
+  const parentArea = cityAreaForBuilding(building.id);
+  const parentAreaUnlocked = !parentArea || isCityAreaUnlocked(progress, parentArea);
+  const parentAreaLockText = parentArea ? `Unlock ${parentArea.title} first.` : "";
   const occupation = cityMobOccupationForBuilding(progress, building.id);
   const occupationConsequences = occupation ? cityMobOccupationConsequences(occupation.mob) : [];
   const payBuildingEntries = (entries, progressOverride = progress) => (
@@ -2813,8 +2880,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const nextBuildingLevel = owned ? cityBuildingNextLevel(building, buildingState.level) : null;
   const nextBuildingLevelCostEntries = cityLevelCostEntries(nextBuildingLevel);
   const nextBuildingLevelRequirementEntries = cityStatRequirementEntries(nextBuildingLevel?.statRequirements ?? nextBuildingLevel?.unlock?.statRequirements, cityStats);
+  const nextBuildingLevelAreaRequirementEntries = cityAreaRequirementEntries(nextBuildingLevel, progress);
   const canUpgradeBuilding = Boolean(nextBuildingLevel)
     && nextBuildingLevelRequirementEntries.every((entry) => entry.met)
+    && nextBuildingLevelAreaRequirementEntries.every((entry) => entry.met)
     && nextBuildingLevelCostEntries.every(([resourceId, amount]) => buildingResourceAvailable(resourceId) >= amount);
   const costEntries = Object.entries(building.cost ?? {});
   const remainingCostEntries = costEntries.map(([resourceId, needed]) => {
@@ -2823,16 +2892,18 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   });
   const buildingStatRequirements = building.statRequirements ?? building.unlock?.statRequirements ?? building.unlock?.stats;
   const statRequirementEntries = cityStatRequirementEntries(buildingStatRequirements, cityStats);
+  const areaRequirementEntries = cityAreaRequirementEntries(building, progress);
   const statRequirementsMet = cityStatsMeetRequirements(buildingStatRequirements, cityStats);
+  const areaRequirementsMet = areaRequirementEntries.every((entry) => entry.met);
   const canBuyBuilding = remainingCostEntries.every(([resourceId, remaining]) => (
     remaining <= 0 || buildingResourceAvailable(resourceId) >= remaining
-  )) && statRequirementsMet;
+  )) && statRequirementsMet && parentAreaUnlocked && areaRequirementsMet;
   const sprite = cityImageForBuilding(houseImages, building, progress);
   const buildingImageSrc = cityImageElementSrc(sprite, building.imageUrl);
   const featureAddons = normalizeCityBuildingAddons(building);
   const purchasedAddons = new Set([
     ...(buildingState.addons ?? []),
-    ...featureAddons.filter((addon) => addon.prebuilt).map((addon) => addon.id),
+    ...featureAddons.filter((addon) => cityConfigEntryOwnedFromStart(addon)).map((addon) => addon.id),
   ]);
   const savedPurchasedAddons = new Set(buildingState.purchasedAddons ?? []);
   const activeAddon = featureAddons.find((addon) => addon.id === activeAddonId) ?? null;
@@ -2852,9 +2923,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       ? QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? activeAddon?.help ?? "Available local quests and rumors."
       : activeAddon?.help ?? activeAddon?.functionText ?? "";
   const headerStatus = activeAddon
-    ? `${activeAddon.prebuilt ? "Prebuilt addon" : savedPurchasedAddons.has(activeAddon.id) ? "Built addon" : "Available addon"} | ${building.title}`
+    ? `${cityConfigEntryOwnedFromStart(activeAddon) ? "Starting addon" : savedPurchasedAddons.has(activeAddon.id) ? "Built addon" : "Available addon"} | ${building.title}`
     : owned
-          ? `${prebuilt ? "Prebuilt | " : ""}Lvl ${buildingState.level}`
+          ? `${ownedFromStart ? "Owned from start | " : ""}Lvl ${buildingState.level}`
           : "Not owned";
   const storageSections = cityInventorySections(building, buildingState, owned);
   const activeAddonStorageSection = activeAddon
@@ -2901,7 +2972,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const applyBuildResource = (resourceId, amount) => {
     if (owned) return;
+    if (!parentAreaUnlocked) {
+      engineRef.current?.addToast?.(parentAreaLockText);
+      return;
+    }
     if (!statRequirementsMet) return;
+    if (!areaRequirementsMet) return;
     const paid = Math.max(0, buildingState.paid?.[resourceId] ?? 0);
     const needed = Math.max(0, (building.cost?.[resourceId] ?? 0) - paid);
     const available = buildingResourceAvailable(resourceId);
@@ -2925,7 +3001,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const finishBuild = () => {
     if (owned) return;
+    if (!parentAreaUnlocked) {
+      engineRef.current?.addToast?.(parentAreaLockText);
+      return;
+    }
     if (!statRequirementsMet) return;
+    if (!areaRequirementsMet) return;
     if (!remainingCostEntries.every(([, remaining]) => remaining <= 0)) return;
     onChangeProgress((current) => ({
       ...current,
@@ -3982,7 +4063,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             return (
               <button
                 type="button"
-                className={`city-building-rail-tab ${bought ? "bought" : "unowned"} ${!bought && !addon.prebuilt ? "not-built" : ""} ${!bought && !buyCheck.canBuy ? "unaffordable" : ""} ${activeAddonId === addon.id ? "active" : ""} ${!unlocked ? "locked" : ""}`}
+                className={`city-building-rail-tab ${bought ? "bought" : "unowned"} ${!bought && !cityConfigEntryOwnedFromStart(addon) ? "not-built" : ""} ${!bought && !buyCheck.canBuy ? "unaffordable" : ""} ${activeAddonId === addon.id ? "active" : ""} ${!unlocked ? "locked" : ""}`}
                 key={addon.id}
                 disabled={!owned || !unlocked}
                 onClick={() => {
@@ -4054,6 +4135,13 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                     ))}
                   </div>
                 )}
+                {nextBuildingLevelAreaRequirementEntries.length > 0 && (
+                  <div className="city-area-requirements city-building-requirements">
+                    {nextBuildingLevelAreaRequirementEntries.map((entry) => (
+                      <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
+                    ))}
+                  </div>
+                )}
                 {nextBuildingLevelCostEntries.length > 0 && (
                   <div className="city-area-costs">
                     {nextBuildingLevelCostEntries.map(([resourceId, amount]) => (
@@ -4075,9 +4163,23 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 ))}
               </div>
             )}
+            {!owned && areaRequirementEntries.length > 0 && (
+              <div className="city-area-requirements city-building-requirements">
+                {areaRequirementEntries.map((entry) => (
+                  <span className={entry.met ? "met" : "missing"} key={entry.key}>
+                    {entry.label}
+                  </span>
+                ))}
+              </div>
+            )}
+            {!owned && !parentAreaUnlocked && (
+              <div className="city-area-requirements city-building-requirements">
+                <span className="missing">{parentAreaLockText}</span>
+              </div>
+            )}
             {!owned && costEntries.length > 0 && <CityCostSummary costEntries={costEntries} buildingState={buildingState} snapshot={snapshot} progress={progress} />}
             <div className="city-popup-actions">
-              <button type="button" onClick={() => setBuildPaymentOpen(true)} disabled={owned || !statRequirementsMet}>
+              <button type="button" onClick={() => setBuildPaymentOpen(true)} disabled={owned || !statRequirementsMet || !areaRequirementsMet || !parentAreaUnlocked}>
                 Buy
               </button>
               <button type="button" onClick={upgradeBuilding} disabled={!owned || !nextBuildingLevel || !canUpgradeBuilding}>
@@ -4104,6 +4206,15 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                         <h4>{activeAddon.title}</h4>
                         <span>{activeAddon.help}</span>
                       </header>
+                      {cityAreaRequirementEntries(activeAddon, progress).length > 0 && (
+                        <div className="city-area-requirements city-building-requirements">
+                          {cityAreaRequirementEntries(activeAddon, progress).map((entry) => (
+                            <span className={entry.met ? "met" : "missing"} key={entry.key}>
+                              {entry.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="city-addon-purchase-row">
                         <b>Cost</b>
                         <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText="Free" />
@@ -4157,6 +4268,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           canFinish={remainingCostEntries.every(([, remaining]) => remaining <= 0)}
           canPayAll={canBuyBuilding}
           statRequirementsMet={statRequirementsMet}
+          areaRequirementsMet={areaRequirementsMet}
+          areaRequirementEntries={areaRequirementEntries}
+          parentAreaUnlocked={parentAreaUnlocked}
+          parentAreaLockText={parentAreaLockText}
           onApplyResource={applyBuildResource}
           onPayAll={() => {
             for (const [resourceId, remaining] of remainingCostEntries) {
@@ -4193,7 +4308,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 }
 
 function cityAddonIsUnlocked(addon, snapshot, cityStats = {}) {
-  if (addon?.prebuilt) return true;
+  if (cityConfigEntryOwnedFromStart(addon)) return true;
   const required = addon?.unlock?.completedQuests ?? [];
   const statRequirements = addon?.statRequirements ?? addon?.unlock?.statRequirements ?? addon?.unlock?.stats;
   if (!cityStatsMeetRequirements(statRequirements, cityStats)) return false;
@@ -4911,7 +5026,8 @@ function CityFactionPanel({ factionRep }) {
   );
 }
 
-function CityBuildPaymentModal({ building, buildingState, snapshot, progress, costEntries, canFinish, canPayAll, statRequirementsMet = true, onApplyResource, onPayAll, onFinish, onClose }) {
+function CityBuildPaymentModal({ building, buildingState, snapshot, progress, costEntries, canFinish, canPayAll, statRequirementsMet = true, areaRequirementsMet = true, areaRequirementEntries = [], parentAreaUnlocked = true, parentAreaLockText = "", onApplyResource, onPayAll, onFinish, onClose }) {
+  const canApplyPayment = statRequirementsMet && areaRequirementsMet && parentAreaUnlocked;
   return (
     <div className="city-build-payment-backdrop" role="presentation">
       <section className="city-build-payment-modal" role="dialog" aria-modal="true" aria-label={`Build ${building.title}`}>
@@ -4922,6 +5038,14 @@ function CityBuildPaymentModal({ building, buildingState, snapshot, progress, co
           </div>
           <button type="button" onClick={onClose}>X</button>
         </header>
+        {!parentAreaUnlocked && <p className="city-building-base-note">{parentAreaLockText}</p>}
+        {!areaRequirementsMet && areaRequirementEntries.length > 0 && (
+          <div className="city-area-requirements city-building-requirements">
+            {areaRequirementEntries.map((entry) => (
+              <span className={entry.met ? "met" : "missing"} key={entry.key}>{entry.label}</span>
+            ))}
+          </div>
+        )}
         <div className="city-cost-list">
           {costEntries.length === 0 && <span>No cost configured yet.</span>}
           {costEntries.map(([resourceId, needed]) => {
@@ -4935,17 +5059,17 @@ function CityBuildPaymentModal({ building, buildingState, snapshot, progress, co
                 <span>{label}</span>
                 <b>{paid} / {needed}</b>
                 <em>Available {available}</em>
-                <button type="button" disabled={!statRequirementsMet || !remaining || !available} onClick={() => onApplyResource(resourceId, 1)}>+1</button>
-                <button type="button" disabled={!statRequirementsMet || !remaining || !available} onClick={() => onApplyResource(resourceId, Math.min(10, remaining))}>+10</button>
-                <button type="button" disabled={!statRequirementsMet || !remaining || !available} onClick={() => onApplyResource(resourceId, remaining)}>Max</button>
+                <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, 1)}>+1</button>
+                <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, Math.min(10, remaining))}>+10</button>
+                <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, remaining)}>Max</button>
               </div>
             );
           })}
         </div>
         <footer>
           <button type="button" onClick={onClose}>Close</button>
-          <button type="button" disabled={!canPayAll} onClick={onPayAll}>Pay all</button>
-          <button type="button" disabled={!statRequirementsMet || !canFinish} onClick={onFinish}>Build</button>
+          <button type="button" disabled={!canApplyPayment || !canPayAll} onClick={onPayAll}>Pay all</button>
+          <button type="button" disabled={!canApplyPayment || !canFinish} onClick={onFinish}>Build</button>
         </footer>
       </section>
     </div>

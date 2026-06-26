@@ -49,6 +49,7 @@ import {
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
 import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-config.js";
+import { applyCityProgressEffects, normalizeCityProgressEffect } from "../../config/city-state-helpers.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
 
 function questStepCompletedFlag(questId, stepId) {
@@ -167,6 +168,18 @@ export const questsMethods = {
     if (effects.worldEnergy) {
       applyWorldEnergy(this, effects.worldEnergy);
       changed = true;
+    }
+    const cityProgressEffect = normalizeCityProgressEffect(effects);
+    if (cityProgressEffect) {
+      const result = applyCityProgressEffects(this, cityProgressEffect);
+      if (result.changed) {
+        changed = true;
+        if (effects.message) {
+          // The explicit message above is the authored quest feedback.
+        } else {
+          for (const entry of result.summary ?? []) this.addToast?.(entry.message);
+        }
+      }
     }
     const removeNpcIds = new Set(
       (Array.isArray(effects.removeNpcIds)
@@ -1444,6 +1457,7 @@ export const questsMethods = {
       netdra: 0,
       resources: [],
       items: [],
+      cityProgress: [],
     };
     if (rewards.lydra || rewards.netdra) {
       applyWorldEnergy(this, { lydra: rewards.lydra, netdra: rewards.netdra });
@@ -1503,6 +1517,11 @@ export const questsMethods = {
           }
         }
       }
+    }
+    const cityProgressEffect = normalizeCityProgressEffect(rewards);
+    if (cityProgressEffect) {
+      const result = applyCityProgressEffects(this, cityProgressEffect);
+      summary.cityProgress = result.summary ?? [];
     }
     return summary;
   },

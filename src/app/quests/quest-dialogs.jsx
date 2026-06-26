@@ -169,6 +169,11 @@ function QuestRewardList({ quest }) {
       {(rewards.items ?? []).map((item, index) => (
         <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
       ))}
+      {(Array.isArray(rewards.cityProgress) ? rewards.cityProgress : []).map((entry, index) => (
+        <span className="diff-good" key={`reward-city-${entry.type ?? "city"}-${entry.id ?? index}`}>
+          + {entry.message ?? entry.label ?? "City progress"}
+        </span>
+      ))}
       {(rewards.namedItems ?? []).map((item, index) => (
         <span className="diff-good" key={`reward-named-item-${item.namedId ?? index}`}>
           + {NAMED_ITEM_TEMPLATES.find((entry) => entry.id === item.namedId)?.name ?? item.namedId}

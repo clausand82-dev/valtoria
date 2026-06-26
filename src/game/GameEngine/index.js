@@ -31,6 +31,10 @@ export class GameEngine {
     this.onSnapshot = onSnapshot;
     this.saveStorageKey = options.saveStorageKey;
     this.onSave = typeof options.onSave === "function" ? options.onSave : null;
+    this.cityStorageKey = options.cityStorageKey ?? null;
+    this.cityProgressLoader = typeof options.loadCityProgress === "function" ? options.loadCityProgress : null;
+    this.cityProgressSaver = typeof options.saveCityProgress === "function" ? options.saveCityProgress : null;
+    this.onCityProgressChange = typeof options.onCityProgressChange === "function" ? options.onCityProgressChange : null;
     this.newGame = Boolean(options.newGame);
     this.deferAssetLoad = Boolean(options.deferAssetLoad);
     const performanceProfile = resolvePerformanceProfile(options.performanceMode);

@@ -18,6 +18,9 @@ export const CHEAT_SETTINGS = {
   commandName: "valtoriaCheat",
   exposeAlias: "vc",
   defaultDurability: 100,
+  // Test-only city bootstrap. When false, config `prebuilt` is ignored and only
+  // entries marked `ownedFromStart: true` are treated as owned at game start.
+  respectPrebuiltCityConfig: false,
   questResetFlags: {
     check_inn_infestation: [
       "inn_crack_found",
@@ -63,10 +66,15 @@ function commandHelp() {
     'valtoriaCheat("clearCity allareas")',
     'valtoriaCheat("clearCity all")',
     'valtoriaCheat("clearCity <buildingId|areaId|addonId>")',
+    'valtoriaCheat("prebuilt on|off|status")',
     'valtoriaCheat("repairCityBuildings")',
     'valtoriaCheat("repairCityAreas")',
     'Alias: vc("help")',
   ].join("\n");
+}
+
+export function shouldRespectPrebuiltCityConfig() {
+  return Boolean(CHEAT_SETTINGS.respectPrebuiltCityConfig);
 }
 
 function normalizeGiveType(type) {
@@ -581,7 +589,23 @@ function clearCityProgressTarget(api, rawTarget = "all") {
   commitCityProgress(api, next, `Cheat: city progress ryddet (${target})`);
   return result(true, `City progress cleared: ${target}`, {
     removed,
-    note: "Config prebuilt buildings/addons still apply at runtime.",
+    note: shouldRespectPrebuiltCityConfig()
+      ? "Test prebuilt city config still applies at runtime."
+      : "Only ownedFromStart city entries still apply at runtime.",
+  });
+}
+
+function togglePrebuiltCityConfig(api, rawMode = "status") {
+  const mode = String(rawMode ?? "status").trim().toLowerCase();
+  if (["on", "true", "1", "yes"].includes(mode)) CHEAT_SETTINGS.respectPrebuiltCityConfig = true;
+  else if (["off", "false", "0", "no"].includes(mode)) CHEAT_SETTINGS.respectPrebuiltCityConfig = false;
+  else if (!["status", ""].includes(mode)) return result(false, `Unknown prebuilt mode: ${rawMode}`, { examples: ["prebuilt on", "prebuilt off", "prebuilt status"] });
+  const engine = api.getEngine?.();
+  engine?.addToast?.(`Cheat: prebuilt ${CHEAT_SETTINGS.respectPrebuiltCityConfig ? "on" : "off"}`);
+  engine?.publishSnapshot?.();
+  api.refreshCity?.();
+  return result(true, `Prebuilt city config ${CHEAT_SETTINGS.respectPrebuiltCityConfig ? "enabled" : "disabled"}.`, {
+    respectPrebuiltCityConfig: CHEAT_SETTINGS.respectPrebuiltCityConfig,
   });
 }
 
@@ -638,6 +662,7 @@ export function installValtoriaCheats(api = {}) {
     if (command === "clearbestiary" || command === "resetbestiary") return clearBestiary(api);
     if (command === "clearcitymobs" || command === "citymobsclear") return clearCityMobs(api);
     if (command === "clearcity" || command === "resetcity" || command === "cityclear") return clearCityProgressTarget(api, parts[0] ?? "all");
+    if (command === "prebuilt" || command === "cityprebuilt" || command === "respectprebuilt") return togglePrebuiltCityConfig(api, parts[0] ?? "status");
     if (command === "repaircitybuildings" || command === "repairbuildings") return repairCityBuildings(api);
     if (command === "repaircityareas" || command === "repairareas") return repairCityAreas(api);
     return result(false, `Unknown cheat command: ${command}`, { help: commandHelp() });

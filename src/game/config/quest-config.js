@@ -203,6 +203,16 @@ Rewards:
 - rewards.randomItem: Gives a random equipment item. Current support uses { minRarity: "upgraded" } as a hint.
 - rewards.namedItems: Gives named equipment rewards, for example [{ namedId: "devils_judge" }].
 - rewards.xpPerKill / rewards.goldPerKill: Used by kill quests to scale reward from target.count.
+- rewards.cityProgress or rewards.cityRewards: Applies city progress without paying normal city UI costs.
+  The same cityProgress/cityRewards shape also works on quest.onComplete, step.onComplete, and step.rewards.
+  Example:
+    rewards: {
+      cityProgress: {
+        buildings: [{ id: "barracks", level: 1 }],
+        areas: [{ id: "city_wall", level: 1, unlocked: true }],
+        addons: [{ buildingId: "barracks", id: "melee_training" }]
+      }
+    }
 
 World energy conditions:
 - requires / blockedBy can use worldBalanceLydra and worldBalanceNetdra as percentage checks.
@@ -224,6 +234,29 @@ import { TOWN_HALL_QUESTS } from "./quest-townhall-config.js";
 import { INN_QUESTS } from "./quest-inn-config.js";
 
 export const QUEST_DEFS = {
+  /*
+  test_restore_barracks: {
+    id: "test_restore_barracks",
+    enabled: false,
+    title: "Test: Restore the Barracks",
+    source: "npc",
+    startNpcIds: ["mayor"],
+    turnInNpcIds: ["mayor"],
+    regionIds: ["city"],
+    type: "talk_to_npc",
+    target: { targetNpcId: "mayor", text: "Return to the mayor to restore the barracks." },
+    story: "Developer-only example for quest-driven city progress.",
+    acceptText: "Use this disabled quest as a config reference.",
+    turnInText: "The barracks has been restored.",
+    onComplete: {
+      message: "The barracks has been restored.",
+      cityProgress: {
+        buildings: [{ id: "barracks", level: 1, durability: 100 }],
+        addons: [{ buildingId: "barracks", id: "melee_training" }]
+      }
+    }
+  },
+  */
   ...NPC_QUESTS,
   ...TOWN_HALL_QUESTS,
   ...INN_QUESTS,
