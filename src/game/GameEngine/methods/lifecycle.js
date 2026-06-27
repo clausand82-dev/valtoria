@@ -408,6 +408,20 @@ export const lifecycleMethods = {
     return this.isWorldPointNearViewport(x, y, Number(effect.z) || 0, margin);
   },
 
+  effectCategory(effect, emitter = null) {
+    const config = emitter?.config ?? effect?.config ?? {};
+    const explicit = effect?.effectCategory ?? config.effectCategory;
+    if (explicit) return String(explicit);
+    if (effect?.spellInstanceId || config.spellInstanceId) return "spell-effects";
+    if (effect?.weatherParticle || config.weatherParticle || config.layer === "weatherOverlay" || config.layer === "screenOverlay") return "weather-particles";
+    if (effect?.attachedEffectId || config.attachedEffectId || config.attachTo === "object") return "attached-particles";
+    const ownerScope = emitter?.owner?.scope;
+    if (ownerScope === "ambient") return "ambient-particles";
+    if (ownerScope === "weather") return "weather-particles";
+    if (effect?.effectParticle || config.oneShot || config.burst) return "combat-particles";
+    return "ambient-particles";
+  },
+
   effectVisibilityStats() {
     if (this.effectVisibilityStatsFrame === this.frame && this.cachedEffectVisibilityStats) return this.cachedEffectVisibilityStats;
     const stats = {
@@ -416,16 +430,22 @@ export const lifecycleMethods = {
       visibleEmitters: 0,
       activeSpellParticles: 0,
       activeSpellEmitters: 0,
+      visibleEffectCategories: {},
+    };
+    const addCategory = (category) => {
+      stats.visibleEffectCategories[category] = (stats.visibleEffectCategories[category] ?? 0) + 1;
     };
     for (const particle of this.particleEngine?.particles ?? []) {
       if ((Number(particle.lifetime) || 0) <= (Number(particle.age) || 0) || !this.effectPointVisible(particle)) continue;
       stats.visibleEngineParticles += 1;
       if (particle.spellInstanceId) stats.activeSpellParticles += 1;
+      addCategory(this.effectCategory(particle, this.particleEngine?.emitters?.get?.(particle.emitterId)));
     }
     for (const particle of this.particles ?? []) {
       if ((Number(particle.life) || 0) <= 0 || !this.effectPointVisible(particle)) continue;
       stats.visibleLegacyParticles += 1;
       if (particle.spellInstanceId) stats.activeSpellParticles += 1;
+      addCategory(this.effectCategory(particle));
     }
     for (const emitter of this.particleEngine?.emitters?.values?.() ?? []) {
       if (emitter?.dead) continue;
@@ -439,6 +459,7 @@ export const lifecycleMethods = {
       if (!visible) continue;
       stats.visibleEmitters += 1;
       if (config.spellInstanceId) stats.activeSpellEmitters += 1;
+      addCategory(this.effectCategory(null, emitter));
     }
     this.effectVisibilityStatsFrame = this.frame;
     this.cachedEffectVisibilityStats = stats;
@@ -446,6 +467,7 @@ export const lifecycleMethods = {
       ...(this.effectDebugCounts ?? {}),
       activeSpellParticles: stats.activeSpellParticles,
       activeSpellEmitters: stats.activeSpellEmitters,
+      visibleEffectCategories: { ...stats.visibleEffectCategories },
       cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
       expiredEffectsRemoved: (this.particleEngine?.expiredRemoved ?? 0)
         + (this.legacyExpiredEffectsRemoved ?? 0)
@@ -485,34 +507,64 @@ export const lifecycleMethods = {
     ) activeReasons.push("camera-interpolation");
 
     let visibleMovingMonsters = 0;
+    let visiblePassiveMovingMonsters = 0;
+    let visibleCombatMovingMonsters = 0;
     let offscreenMovingMonstersIgnored = 0;
+    const activeMonsterMotionReasons = [];
+    const ambientMonsterMotionReasons = [];
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead) continue;
       const moving = monster.moving || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002;
-      const nearPlayer = distance(player, monster) <= CHUNK_SIZE * 2.25;
+      const playerDistance = distance(player, monster);
+      const nearPlayer = playerDistance <= CHUNK_SIZE * 2.25;
       const visible = (nearPlayer || this.isWorldPointNearViewport(monster.x, monster.y, 0, 220)) && this.isPointVisible(monster);
       if (moving && visible) {
         visibleMovingMonsters += 1;
-        activeReasons.push("monster-moving");
+        const aggroed = playerDistance < Math.max(0, Number(monster.aggro) || 0);
+        const immediateCombat = playerDistance <= Math.max(3.5, (Number(monster.range) || 0) + (Number(player?.radius) || 0) + 1.5);
+        if (aggroed || immediateCombat) {
+          visibleCombatMovingMonsters += 1;
+          activeReasons.push("monster-combat-motion");
+          activeMonsterMotionReasons.push(aggroed ? "aggro-pathing" : "immediate-combat-radius");
+        } else {
+          visiblePassiveMovingMonsters += 1;
+          ambientReasons.push("monster-passive-motion");
+          ambientMonsterMotionReasons.push("passive-wander");
+        }
       } else if (moving) {
         offscreenMovingMonstersIgnored += 1;
       }
       if (!visible) continue;
-      if (monster.attackAnim > 0) activeReasons.push("monster-attack");
-      if (monster.hurt > 0) activeReasons.push("monster-hurt");
-      if (monster.castAnim > 0) activeReasons.push("monster-cast");
+      if (monster.attackAnim > 0) {
+        activeReasons.push("monster-attack");
+        activeMonsterMotionReasons.push("attack-animation");
+      }
+      if (monster.hurt > 0) {
+        activeReasons.push("monster-hurt");
+        activeMonsterMotionReasons.push("hurt-animation");
+      }
+      if (monster.castAnim > 0) {
+        activeReasons.push("monster-cast");
+        activeMonsterMotionReasons.push("cast-animation");
+      }
     }
     this.monsterActivityDebug = {
       ...(this.monsterActivityDebug ?? {}),
       totalMonsters: this.monsters?.size ?? 0,
       visibleMovingMonsters,
+      visiblePassiveMovingMonsters,
+      visibleCombatMovingMonsters,
       offscreenMovingMonstersIgnored,
+      activeMonsterMotionReasons: [...new Set(activeMonsterMotionReasons)],
+      ambientMonsterMotionReasons: [...new Set(ambientMonsterMotionReasons)],
     };
 
     if ((this.projectiles ?? []).some((entry) => this.effectPointVisible(entry, 220))) activeReasons.push("projectiles");
     if (this.hasVisibleGroundHazard()) activeReasons.push("visible-ground-hazard");
     else if ((this.groundHazards?.length ?? 0) > 0) debugReasons.push("hidden-ground-hazard");
     if (this.hasVisibleSpellVisuals()) activeReasons.push("spell-visuals");
+    const effectStats = this.effectVisibilityStats();
+    if ((effectStats.visibleEffectCategories?.["combat-particles"] ?? 0) > 0) activeReasons.push("combat-particles");
     if ((this.spellVisualCleanups?.length ?? 0) > 0) debugReasons.push("spell-cleanup-queue");
     if (this.hasVisibleFloater()) activeReasons.push("visible-floaters");
     if (this.weatherFlash) activeReasons.push("screen-weather-flash");
@@ -521,10 +573,9 @@ export const lifecycleMethods = {
     if (activeReasons.length) return this.recordVisualActivity("active", activeReasons, debugReasons);
 
     if (this.visibleLootHasAmbientHover()) ambientReasons.push("visible-loot-hover");
-    const effectStats = this.effectVisibilityStats();
-    if (effectStats.visibleEngineParticles > 0) ambientReasons.push("particles");
-    if (effectStats.visibleEmitters > 0) ambientReasons.push("particle-emitters");
-    if (effectStats.visibleLegacyParticles > 0) ambientReasons.push("legacy-particles");
+    for (const category of ["ambient-particles", "attached-particles", "weather-particles"]) {
+      if ((effectStats.visibleEffectCategories?.[category] ?? 0) > 0) ambientReasons.push(category);
+    }
     if ((this.toasts?.length ?? 0) > 0) ambientReasons.push("toasts");
     if (this.pendingThunder) ambientReasons.push("pending-weather-audio");
     if (this.exitPromptOpen) ambientReasons.push("exit-prompt");

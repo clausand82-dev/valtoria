@@ -106,6 +106,10 @@ function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
     ["Fog", ms(liveStats?.render?.fogMs)],
     ["Particle ms", ms(liveStats?.render?.particlesMs)],
     ["Minimap", ms(liveStats?.render?.minimapMs)],
+    ["Minimap cache", `${liveStats?.render?.minimapCacheHit ? "hit" : "rebuild"}${liveStats?.render?.minimapRebuildReason ? ` (${liveStats.render.minimapRebuildReason})` : ""}`],
+    ["Minimap clear/blit/fog", `${ms(liveStats?.render?.minimapClearMs)} / ${ms(liveStats?.render?.minimapBlitStaticMs)} / ${ms(liveStats?.render?.minimapFogOverlayMs)}`],
+    ["Minimap markers/draw", `${ms(liveStats?.render?.minimapDynamicMarkersMs)} / ${ms(liveStats?.render?.minimapTotalDrawMs)}`],
+    ["Monster motion", `${liveStats?.counts?.visibleCombatMovingMonsters ?? 0} combat / ${liveStats?.counts?.visiblePassiveMovingMonsters ?? 0} passive`],
     ["Objects", liveStats?.counts?.objects ?? 0],
     ["Monsters", liveStats?.counts?.monsters ?? 0],
     ["Effects", liveStats?.counts?.particles ?? 0],
@@ -168,7 +172,7 @@ function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
           <div className="region-debug-summary">
             <span>Summary <b>{recordingSummary.profileId}</b>, {recordingSummary.durationSeconds}s, samples {recordingSummary.sampleCount}</span>
             <span>FPS update/render <b>{recordingSummary.avgUpdateFps}</b> / <b>{recordingSummary.avgRenderFps}</b>, min/max render <b>{recordingSummary.minRenderFps}</b> / <b>{recordingSummary.maxRenderFps}</b></span>
-            <span>Render ms avg/max <b>{recordingSummary.avgRenderTotalMs}</b> / <b>{recordingSummary.maxRenderTotalMs}</b>, fog max <b>{recordingSummary.maxFogMs}</b>, particles max <b>{recordingSummary.maxParticlesMs}</b>, objects max <b>{recordingSummary.maxObjectsMs}</b></span>
+            <span>Render FPS avg/median <b>{recordingSummary.avgRenderFps}</b> / <b>{recordingSummary.medianRenderFps}</b>, minimap ms median/p90/max <b>{recordingSummary.medianMinimapMs}</b> / <b>{recordingSummary.p90MinimapMs}</b> / <b>{recordingSummary.maxMinimapMs}</b></span>
             <span>Split idle/ambient/active <b>{summaryPercent(recordingSummary, "idle")}</b> / <b>{summaryPercent(recordingSummary, "ambient")}</b> / <b>{summaryPercent(recordingSummary, "active")}</b></span>
             <span>Activity <b>{compactReasons(recordingSummary.topActivityReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
             <span>Debug <b>{compactReasons(recordingSummary.topVisualDebugReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
@@ -470,6 +474,7 @@ export function GameHud({
   hpPct,
   manaPct,
   minimapRef,
+  minimapDynamicRef,
   monsterHpPct,
   openWorldMapFromCity,
   player,
@@ -581,7 +586,12 @@ export function GameHud({
             </span>
           )}
         </div>
-        {!cityOpen && <canvas ref={minimapRef} className="minimap" width="154" height="154" aria-label="Minimap" />}
+        {!cityOpen && (
+          <div className="minimap" role="img" aria-label="Minimap">
+            <canvas ref={minimapRef} className="minimap-layer minimap-static" width="154" height="154" aria-hidden="true" />
+            <canvas ref={minimapDynamicRef} className="minimap-layer minimap-dynamic" width="154" height="154" aria-hidden="true" />
+          </div>
+        )}
       </section>
 
       {hoverMonster && (

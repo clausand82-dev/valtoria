@@ -548,9 +548,9 @@ priest_rebuild_sanctuary: {
     demands: { completedQuests: ["mayor_cleanse_village"] },
     spawnChance: 1,
     type: "collect_quest_item",
-    target: { resources: [{ resource: "wood_plank", count: 25 }, { resource: "stone_brick", count: 12 }, { resource: "iron_bar", count: 5 }] },
+    target: { resources: [{ resource: "wood_plank", count: 25 }, { resource: "stone_brick", count: 12 }] },
     story: "Iolan vil give byen et roligt sted igen, men Sanctuary maa rejses foerst.",
-    acceptText: "Skaff 25 wood planks, 12 stone bricks og 5 iron bars til Sanctuary.",
+    acceptText: "Skaff 25 wood planks, 12 stone bricks til Sanctuary.",
     turnInText: "Sanctuary staar igen i Mystic Quarter. Byen har faaet et sted at samle mod.",
     rewards: {
       xp: 600,

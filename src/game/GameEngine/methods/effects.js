@@ -343,10 +343,17 @@ export const effectsMethods = {
     this.publishSnapshot();
   },
 
+  markEffectDirtyCategory(reason) {
+    const category = String(reason || "combat-particles");
+    this.effectDirtyCategoryCounts ??= {};
+    this.effectDirtyCategoryCounts[category] = (this.effectDirtyCategoryCounts[category] ?? 0) + 1;
+    this.markRenderDirty?.(category);
+  },
+
   updateEffects(dt) {
-    const beforeLegacyParticles = this.particles.length;
-    const beforeEngineParticles = this.particleEngine?.particles?.length ?? 0;
-    const beforeFloaters = this.floaters.length;
+    const beforeVisibleFloaters = this.floaters.reduce((count, floater) => (
+      count + (this.effectPointVisible?.(floater, 80) ? 1 : 0)
+    ), 0);
     const beforeToasts = this.toasts.length;
     let expiredLegacyRemoved = 0;
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
@@ -405,13 +412,21 @@ export const effectsMethods = {
     this.particleEngine?.update(dt, particleContext(this));
     this.legacyExpiredEffectsRemoved = (this.legacyExpiredEffectsRemoved ?? 0) + expiredLegacyRemoved;
     this.effectVisibilityStatsFrame = -1;
-    if ((
-      beforeLegacyParticles !== this.particles.length
-      || beforeEngineParticles !== (this.particleEngine?.particles?.length ?? 0)
-      || beforeFloaters !== this.floaters.length
-      || beforeToasts !== this.toasts.length
-    ) && this.hasVisibleActiveEffects?.()) {
-      this.markRenderDirty?.("effects");
+    const visibility = this.effectVisibilityStats?.() ?? { visibleEffectCategories: {} };
+    const currentCategories = visibility.visibleEffectCategories ?? {};
+    const previousCategories = this.lastVisibleEffectCategoryCounts ?? {};
+    for (const category of ["spell-effects", "combat-particles"]) {
+      if ((currentCategories[category] ?? 0) !== (previousCategories[category] ?? 0)) {
+        this.markEffectDirtyCategory(category);
+      }
+    }
+    const afterVisibleFloaters = this.floaters.reduce((count, floater) => (
+      count + (this.effectPointVisible?.(floater, 80) ? 1 : 0)
+    ), 0);
+    if (beforeVisibleFloaters !== afterVisibleFloaters) this.markEffectDirtyCategory("floaters");
+    this.lastVisibleEffectCategoryCounts = { ...currentCategories };
+    if (beforeToasts !== this.toasts.length) {
+      this.markRenderDirty?.("toasts");
     }
   },
 
@@ -503,13 +518,13 @@ export const effectsMethods = {
       const density = Math.max(0.01, Number(config.density) || 0.08);
       const emitterId = this.particleEngine?.addEmitter({
         ...config,
+        effectCategory: "ambient-particles",
         area: config.area === "screen" ? "screen" : "map",
         layer: config.layer ?? config.renderLayer ?? "aboveGround",
         intensity: config.intensity ?? Math.max(0.25, density / 0.14),
         maxParticles: config.maxParticles ?? Math.max(8, Math.min(80, Math.round(density * 150))),
       }, { id: key, scope: "ambient" });
       if (emitterId) this.__ambientParticleEmitters.set(key, emitterId);
-      if (emitterId) this.markRenderDirty?.("ambient-particles");
     }
   },
 
@@ -526,13 +541,13 @@ export const effectsMethods = {
       const layer = config.layer === "world" ? "aboveGround" : (config.layer ?? "weatherOverlay");
       const emitterId = this.particleEngine?.addEmitter({
         ...config,
+        effectCategory: "weather-particles",
         area: layer === "aboveGround" ? "map" : "screen",
         layer,
         intensity: config.intensity ?? Math.max(0.25, density / 0.35),
         maxParticles: config.maxParticles ?? Math.max(12, Math.min(WEATHER_PARTICLE_MAX, Math.round(density * WEATHER_PARTICLE_MAX))),
       }, { id: key, scope: "weather" });
       if (emitterId) this.__weatherParticleEmitters.set(key, emitterId);
-      if (emitterId) this.markRenderDirty?.("weather-particles");
     }
   },
 
@@ -553,6 +568,7 @@ export const effectsMethods = {
           const emitterConfig = refinedAttachedParticleConfig(this, object, config);
           object.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
             ...emitterConfig,
+            effectCategory: "attached-particles",
             x: object.x,
             y: object.y,
             followTarget: object.id,
@@ -560,7 +576,6 @@ export const effectsMethods = {
             layer: emitterConfig.layer ?? emitterConfig.renderLayer ?? "aboveObjects",
             maxParticles: emitterConfig.maxParticles ?? Math.max(4, randomIntInRange(emitterConfig.count) || 8),
           }, object);
-          if (object.__particleEmitterIds[key]) this.markRenderDirty?.("attached-particles");
         }
       }
 
@@ -575,6 +590,7 @@ export const effectsMethods = {
           if (decal.__particleEmitterIds[key] && this.particleEngine?.emitters.has(decal.__particleEmitterIds[key])) continue;
           decal.__particleEmitterIds[key] = this.particleEngine?.addEmitter({
             ...config,
+            effectCategory: "attached-particles",
             x: decal.x,
             y: decal.y,
             followTarget: decal.id,
@@ -582,7 +598,6 @@ export const effectsMethods = {
             layer: config.layer ?? config.renderLayer ?? "aboveGround",
             maxParticles: config.maxParticles ?? Math.max(4, randomIntInRange(config.count) || 8),
           }, decal);
-          if (decal.__particleEmitterIds[key]) this.markRenderDirty?.("attached-particles");
         }
       }
     }
@@ -712,6 +727,7 @@ export const effectsMethods = {
     if (particleCount <= 0) return;
     this.particleEngine?.emitOneShot("hit_sparks", x, y, {
       spellInstanceId: options.spellInstanceId ?? null,
+      effectCategory: options.spellInstanceId ? "spell-effects" : "combat-particles",
       colors: [color],
       oneShotCount: particleCount,
       speed: [24, 120],
@@ -720,7 +736,7 @@ export const effectsMethods = {
       layer: "effects",
       gravity: upward > 0.12 ? -8 : 0,
     });
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("particles");
+    if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.(options.spellInstanceId ? "spell-effects" : "combat-particles");
   },
 
   addDust(x, y, count = 1) {
@@ -728,17 +744,18 @@ export const effectsMethods = {
     const configuredCount = dustConfig.oneShotCount ?? randomIntInRange(dustConfig.count ?? [count, count]);
     this.particleEngine?.emitOneShot(dustConfig.type ?? "dust_motes", x, y, {
       ...dustConfig,
+      effectCategory: "ambient-particles",
       oneShotCount: Math.max(1, Math.floor(Number(configuredCount) || count || 1)),
       layer: dustConfig.layer ?? dustConfig.renderLayer ?? "belowUnits",
       lifetime: dustConfig.lifetime ?? [0.32, 0.7],
       size: dustConfig.size ?? [2, 6],
       alpha: dustConfig.alpha ?? [0.12, 0.35],
     });
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("dust");
   },
 
   spawnHeroHealingEffect() {
     this.particleEngine?.emitOneShot("hero_healing_beam", this.player.x, this.player.y, {
+      effectCategory: "combat-particles",
       oneShotCount: 1,
       layer: "belowUnits",
       radius: 2,
@@ -754,11 +771,12 @@ export const effectsMethods = {
       rotationSpeed: [-0.35, 0.35],
       blendMode: "lighter",
     });
-    this.markRenderDirty?.("healing-effect");
+    this.markEffectDirtyCategory?.("combat-particles");
   },
 
   spawnObjectBreakDustEffect(x, y) {
     this.particleEngine?.emitOneShot("object_break_cold_mist", x, y, {
+      effectCategory: "combat-particles",
       oneShotCount: 2,
       layer: "effects",
       radius: 18,
@@ -769,7 +787,7 @@ export const effectsMethods = {
       blendMode: "source-over",
       glow: false,
     });
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("object-break-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.("combat-particles");
   },
 
   footstepDustChance(fallback = 0.18) {
@@ -782,6 +800,8 @@ export const effectsMethods = {
     const duration = Math.max(0.05, (Number(options.durationMs) || 350) / 1000);
     this.particles.push({
       effectParticle: true,
+      effectCategory: options.spellInstanceId ? "spell-effects" : "combat-particles",
+      spellInstanceId: options.spellInstanceId ?? null,
       visual: "expandingEnergyRing",
       renderLayer: "aboveEntities",
       x,
@@ -793,12 +813,13 @@ export const effectsMethods = {
       life: duration,
       maxLife: duration,
     });
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.(options.spellInstanceId ? "spell-effects" : "combat-particles");
   },
 
   spawnGroundCloudEffect(x, y, radius, color, duration, options = {}) {
     const particle = {
       effectParticle: true,
+      effectCategory: options.spellInstanceId ? "spell-effects" : "combat-particles",
       id: options.id ?? createId(),
       ownerId: options.ownerId ?? null,
       spellInstanceId: options.spellInstanceId ?? null,
@@ -814,13 +835,15 @@ export const effectsMethods = {
       maxLife: Math.max(0.2, Number(duration) || 1),
     };
     this.particles.push(particle);
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.(options.spellInstanceId ? "spell-effects" : "combat-particles");
     return particle;
   },
 
   spawnGroundPulseEffect(x, y, radius, options = {}) {
     this.particles.push({
       effectParticle: true,
+      effectCategory: options.spellInstanceId ? "spell-effects" : "combat-particles",
+      spellInstanceId: options.spellInstanceId ?? null,
       visual: "groundPulse",
       renderLayer: "belowEntities",
       x,
@@ -833,12 +856,12 @@ export const effectsMethods = {
       maxLife: Math.max(0.05, (Number(options.durationMs) || 350) / 1000),
     });
     this.camera.shake = Math.max(this.camera.shake, Number(options.shake) || 0);
-    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.(options.spellInstanceId ? "spell-effects" : "combat-particles");
   },
 
   addFloater(x, y, text, color, life = 0.85) {
     this.floaters.push({ x, y, z: 68, text, color, life, maxLife: life });
-    if (this.effectPointVisible?.({ x, y, z: 68 }, 80)) this.markRenderDirty?.("floater");
+    if (this.effectPointVisible?.({ x, y, z: 68 }, 80)) this.markEffectDirtyCategory?.("floaters");
   },
 
   addToast(text, options = {}) {

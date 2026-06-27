@@ -377,6 +377,13 @@ export const renderingMethods = {
       minimapRebuildReason: this.renderTimings?.minimapRebuildReason ?? null,
       minimapStaticMs: this.renderTimings?.minimapStaticMs ?? null,
       minimapDynamicMs: this.renderTimings?.minimapDynamicMs ?? null,
+      minimapClearMs: this.renderTimings?.minimapClearMs ?? null,
+      minimapBlitStaticMs: this.renderTimings?.minimapBlitStaticMs ?? null,
+      minimapFogOverlayMs: this.renderTimings?.minimapFogOverlayMs ?? null,
+      minimapDynamicMarkersMs: this.renderTimings?.minimapDynamicMarkersMs ?? null,
+      minimapScaleCopyMs: this.renderTimings?.minimapScaleCopyMs ?? null,
+      minimapTotalDrawMs: this.renderTimings?.minimapTotalDrawMs ?? null,
+      minimapBudgetBackoff: this.renderTimings?.minimapBudgetBackoff ?? false,
     };
     this.renderDebugCounts = {
       drawables: 0,
@@ -1029,26 +1036,31 @@ export const renderingMethods = {
     this.minimapStaticRebuildReason = String(reason || "data-change");
   },
 
-  minimapDynamicSignature(size, scale) {
-    const parts = [
-      Math.round((Number(this.player?.x) || 0) * 20),
-      Math.round((Number(this.player?.y) || 0) * 20),
-    ];
+  minimapDynamicSignature(size, scale, includeLoot = true) {
+    let hash = 2166136261;
+    const mix = (value) => {
+      hash ^= Number(value) | 0;
+      hash = Math.imul(hash, 16777619);
+    };
+    mix(Math.round((Number(this.player?.x) || 0) * 4));
+    mix(Math.round((Number(this.player?.y) || 0) * 4));
     const radius = size / (2 * scale) + 2;
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead || Math.abs(monster.x - this.player.x) > radius || Math.abs(monster.y - this.player.y) > radius) continue;
-      if (!this.isPointVisible(monster)) continue;
-      parts.push(monster.id, Math.round(monster.x * 10), Math.round(monster.y * 10));
+      mix(Math.round(monster.x * 4));
+      mix(Math.round(monster.y * 4));
     }
-    for (const loot of this.loots ?? []) {
-      if (Math.abs(loot.x - this.player.x) > radius || Math.abs(loot.y - this.player.y) > radius) continue;
-      if (!this.isPointVisible(loot)) continue;
-      parts.push(loot.id, Math.round(loot.x * 10), Math.round(loot.y * 10));
+    if (includeLoot) {
+      for (const loot of this.loots ?? []) {
+        if (Math.abs(loot.x - this.player.x) > radius || Math.abs(loot.y - this.player.y) > radius) continue;
+        mix(Math.round(loot.x * 4));
+        mix(Math.round(loot.y * 4));
+      }
     }
-    return parts.join(":");
+    return hash >>> 0;
   },
 
-  renderMinimap(canvas) {
+  renderMinimap(canvas, dynamicCanvas = null) {
     if (!canvas || !this.player) return false;
     const startedAt = performance.now();
     const ctx = canvas.getContext("2d");
@@ -1057,30 +1069,31 @@ export const renderingMethods = {
     const now = performance.now();
     this.minimapCanvasStates ??= new WeakMap();
     const state = this.minimapCanvasStates.get(canvas) ?? {};
-    const interval = this.minimapIntervalMs ?? 250;
-    if (state.lastRenderAt && now - state.lastRenderAt < interval) {
+    const budgetBackoff = (state.slowUntil ?? 0) > now;
+    const interval = budgetBackoff ? 500 : (this.minimapIntervalMs ?? 200);
+    const emptyTimings = (reason) => {
       this.renderTimings = {
         ...(this.renderTimings ?? {}),
         minimapMs: performance.now() - startedAt,
         minimapCacheHit: true,
-        minimapRebuildReason: "throttled",
+        minimapRebuildReason: reason,
         minimapStaticMs: 0,
         minimapDynamicMs: 0,
+        minimapClearMs: 0,
+        minimapBlitStaticMs: 0,
+        minimapFogOverlayMs: 0,
+        minimapDynamicMarkersMs: 0,
+        minimapScaleCopyMs: 0,
+        minimapTotalDrawMs: 0,
+        minimapBudgetBackoff: budgetBackoff,
       };
+    };
+    if (state.lastCheckAt && now - state.lastCheckAt < interval) {
+      emptyTimings("throttled");
       return false;
     }
+    state.lastCheckAt = now;
 
-    const actionTargets = (this.minimapActionTargets?.(3, { loadedOnly: true }) ?? []).filter((target) => this.isPointExplored(target));
-    const exploredPoints = this.fogExploredPoints ?? [];
-    const lastExplored = exploredPoints[exploredPoints.length - 1];
-    const staticDataSignature = [
-      this.minimapStaticRevision ?? 0,
-      this.region?.mapRegion?.id ?? this.region?.id ?? "region",
-      exploredPoints.length,
-      lastExplored ? `${Math.round(lastExplored.x * 10)},${Math.round(lastExplored.y * 10)}` : "none",
-      actionTargets.map((target) => `${target.id ?? "point"}:${Math.round(target.x * 10)},${Math.round(target.y * 10)}`).join("|"),
-    ].join(";");
-    const dynamicSignature = this.minimapDynamicSignature(size, scale);
     const staticSize = Math.max(size, Math.ceil(size * 3));
     const maxAnchorDrift = Math.max(8, (staticSize - size) / (2 * scale) * 0.78);
     const anchorDrifted = state.anchorX === undefined
@@ -1088,28 +1101,30 @@ export const renderingMethods = {
       || Math.abs(this.player.y - state.anchorY) > maxAnchorDrift;
     const needsStaticRebuild = !state.staticCanvas
       || state.staticCanvas.width !== staticSize
-      || state.staticDataSignature !== staticDataSignature
+      || state.staticRevision !== (this.minimapStaticRevision ?? 0)
       || anchorDrifted;
+    const viewSignature = `${Math.round(this.player.x * 4)},${Math.round(this.player.y * 4)}`;
+    const dynamicSignature = this.minimapDynamicSignature(size, scale, !budgetBackoff);
+    const viewChanged = state.lastViewSignature !== viewSignature;
+    const markersChanged = state.lastDynamicSignature !== dynamicSignature;
 
-    if (!needsStaticRebuild && state.lastDynamicSignature === dynamicSignature) {
-      state.lastRenderAt = now;
+    if (!needsStaticRebuild && !viewChanged && !markersChanged) {
       this.minimapCanvasStates.set(canvas, state);
-      this.renderTimings = {
-        ...(this.renderTimings ?? {}),
-        minimapMs: performance.now() - startedAt,
-        minimapCacheHit: true,
-        minimapRebuildReason: "unchanged",
-        minimapStaticMs: 0,
-        minimapDynamicMs: 0,
-      };
+      emptyTimings("unchanged");
       return false;
     }
 
+    const totalDrawStartedAt = performance.now();
     let staticMs = 0;
+    let clearMs = 0;
+    let blitStaticMs = 0;
+    let fogOverlayMs = 0;
+    let scaleCopyMs = 0;
     let rebuildReason = null;
     if (needsStaticRebuild) {
       const staticStartedAt = performance.now();
       const hadStaticCanvas = Boolean(state.staticCanvas);
+      const actionTargets = (this.minimapActionTargets?.(3, { loadedOnly: true }) ?? []).filter((target) => this.isPointExplored(target));
       state.staticCanvas ??= document.createElement("canvas");
       state.staticCanvas.width = staticSize;
       state.staticCanvas.height = staticSize;
@@ -1117,7 +1132,9 @@ export const renderingMethods = {
       state.anchorY = this.player.y;
       const staticCtx = state.staticCanvas.getContext("2d");
       const staticCenter = staticSize / 2;
+      let operationStartedAt = performance.now();
       staticCtx.clearRect(0, 0, staticSize, staticSize);
+      clearMs += performance.now() - operationStartedAt;
       staticCtx.fillStyle = "rgba(8,10,12,0.92)";
       staticCtx.fillRect(0, 0, staticSize, staticSize);
       for (const chunk of this.chunks?.values?.() ?? []) {
@@ -1131,59 +1148,89 @@ export const renderingMethods = {
           staticCtx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale) + 1, Math.ceil(scale) + 1);
         }
       }
+      operationStartedAt = performance.now();
       this.drawMinimapFog(staticCtx, staticCenter, scale, { x: state.anchorX, y: state.anchorY });
+      fogOverlayMs += performance.now() - operationStartedAt;
       staticCtx.globalAlpha = 1;
       const origin = { x: state.anchorX, y: state.anchorY };
       if (this.isPointExplored(this.region.start)) this.drawMinimapPoint(staticCtx, this.region.start, staticCenter, scale, "#8bdfff", 3, origin);
       if (this.isPointExplored(this.region.end)) this.drawMinimapPoint(staticCtx, this.region.end, staticCenter, scale, "#f4da96", 3.4, origin);
       for (const target of actionTargets) this.drawMinimapActionPoint(staticCtx, target, staticCenter, scale, origin);
-      state.staticDataSignature = staticDataSignature;
+      state.staticRevision = this.minimapStaticRevision ?? 0;
       rebuildReason = anchorDrifted && hadStaticCanvas ? "map-window" : (this.minimapStaticRebuildReason ?? "data-change");
       staticMs = performance.now() - staticStartedAt;
     }
 
-    const staticDrawStartedAt = performance.now();
-    const sourceX = state.staticCanvas.width / 2 + (this.player.x - state.anchorX) * scale - size / 2;
-    const sourceY = state.staticCanvas.height / 2 + (this.player.y - state.anchorY) * scale - size / 2;
-    ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(state.staticCanvas, sourceX, sourceY, size, size, 0, 0, size, size);
-    staticMs += performance.now() - staticDrawStartedAt;
+    const separateDynamicLayer = dynamicCanvas && dynamicCanvas !== canvas;
+    if (needsStaticRebuild || viewChanged || !separateDynamicLayer) {
+      const sourceX = state.staticCanvas.width / 2 + (this.player.x - state.anchorX) * scale - size / 2;
+      const sourceY = state.staticCanvas.height / 2 + (this.player.y - state.anchorY) * scale - size / 2;
+      let operationStartedAt = performance.now();
+      ctx.clearRect(0, 0, size, size);
+      clearMs += performance.now() - operationStartedAt;
+      operationStartedAt = performance.now();
+      ctx.drawImage(state.staticCanvas, sourceX, sourceY, size, size, 0, 0, size, size);
+      blitStaticMs += performance.now() - operationStartedAt;
+      staticMs += blitStaticMs;
+    }
 
     const dynamicStartedAt = performance.now();
+    const markerCanvas = separateDynamicLayer ? dynamicCanvas : canvas;
+    const markerCtx = markerCanvas.getContext("2d");
+    if (separateDynamicLayer) {
+      const clearStartedAt = performance.now();
+      markerCtx.clearRect(0, 0, markerCanvas.width, markerCanvas.height);
+      clearMs += performance.now() - clearStartedAt;
+    }
+    const markerStartedAt = performance.now();
     const center = size / 2;
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead || !this.isPointVisible(monster)) continue;
       const x = center + (monster.x - this.player.x) * scale;
       const y = center + (monster.y - this.player.y) * scale;
       if (x >= 0 && y >= 0 && x <= size && y <= size) {
-        ctx.fillStyle = "#d8313d";
-        ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+        markerCtx.fillStyle = "#d8313d";
+        markerCtx.fillRect(x - 1.5, y - 1.5, 3, 3);
       }
     }
-    for (const loot of this.loots ?? []) {
-      if (!this.isPointVisible(loot)) continue;
-      const x = center + (loot.x - this.player.x) * scale;
-      const y = center + (loot.y - this.player.y) * scale;
-      if (x >= 0 && y >= 0 && x <= size && y <= size) {
-        ctx.fillStyle = loot.type === "gold" ? "#f1c657" : (loot.item?.rarityColor ?? "#f5f3ea");
-        ctx.fillRect(x - 1, y - 1, 2, 2);
+    if (!budgetBackoff) {
+      for (const loot of this.loots ?? []) {
+        if (!this.isPointVisible(loot)) continue;
+        const x = center + (loot.x - this.player.x) * scale;
+        const y = center + (loot.y - this.player.y) * scale;
+        if (x >= 0 && y >= 0 && x <= size && y <= size) {
+          markerCtx.fillStyle = loot.type === "gold" ? "#f1c657" : (loot.item?.rarityColor ?? "#f5f3ea");
+          markerCtx.fillRect(x - 1, y - 1, 2, 2);
+        }
       }
     }
-    ctx.fillStyle = "#f5f3ea";
-    ctx.beginPath();
-    ctx.arc(center, center, 4, 0, Math.PI * 2);
-    ctx.fill();
+    markerCtx.fillStyle = "#f5f3ea";
+    markerCtx.beginPath();
+    markerCtx.arc(center, center, 4, 0, Math.PI * 2);
+    markerCtx.fill();
+    const dynamicMarkersMs = performance.now() - markerStartedAt;
     const dynamicMs = performance.now() - dynamicStartedAt;
+    const totalDrawMs = performance.now() - totalDrawStartedAt;
+    const totalMs = performance.now() - startedAt;
+    if (totalMs > 6) state.slowUntil = now + 3000;
     state.lastRenderAt = now;
+    state.lastViewSignature = viewSignature;
     state.lastDynamicSignature = dynamicSignature;
     this.minimapCanvasStates.set(canvas, state);
     this.renderTimings = {
       ...(this.renderTimings ?? {}),
-      minimapMs: performance.now() - startedAt,
+      minimapMs: totalMs,
       minimapCacheHit: !needsStaticRebuild,
       minimapRebuildReason: rebuildReason,
       minimapStaticMs: staticMs,
       minimapDynamicMs: dynamicMs,
+      minimapClearMs: clearMs,
+      minimapBlitStaticMs: blitStaticMs,
+      minimapFogOverlayMs: fogOverlayMs,
+      minimapDynamicMarkersMs: dynamicMarkersMs,
+      minimapScaleCopyMs: scaleCopyMs,
+      minimapTotalDrawMs: totalDrawMs,
+      minimapBudgetBackoff: budgetBackoff || totalMs > 6,
     };
     return true;
   },

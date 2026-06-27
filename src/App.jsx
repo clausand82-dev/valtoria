@@ -170,6 +170,7 @@ function cityAddonIds() {
 export default function App() {
   const canvasRef = useRef(null);
   const minimapRef = useRef(null);
+  const minimapDynamicRef = useRef(null);
   const engineRef = useRef(null);
   const [gameSession, setGameSession] = useState(null);
   const [menuView, setMenuView] = useState("main");
@@ -612,7 +613,7 @@ export default function App() {
     if (cityOpen) {
       return;
     }
-    engineRef.current?.renderMinimap(minimapRef.current);
+    engineRef.current?.renderMinimap(minimapRef.current, minimapDynamicRef.current);
   }, [snapshot, cityOpen, cityMinimapHero]);
 
   useEffect(() => {
@@ -940,6 +941,7 @@ export default function App() {
         hpPct={hpPct}
         manaPct={manaPct}
         minimapRef={minimapRef}
+        minimapDynamicRef={minimapDynamicRef}
         monsterHpPct={monsterHpPct}
         openWorldMapFromCity={openWorldMapFromCity}
         player={player}

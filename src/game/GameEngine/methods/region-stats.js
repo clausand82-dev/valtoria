@@ -48,6 +48,13 @@ function minValue(samples, getter) {
   return round(Math.min(...samples.map((sample) => Number(getter(sample)) || 0)), 2);
 }
 
+function percentileValue(samples, getter, percentile = 0.5) {
+  if (!samples.length) return 0;
+  const values = samples.map((sample) => Number(getter(sample)) || 0).sort((a, b) => a - b);
+  const index = Math.max(0, Math.min(values.length - 1, Math.ceil(percentile * values.length) - 1));
+  return round(values[index], 2);
+}
+
 function activitySplit(samples, durationSeconds) {
   const counts = { idle: 0, ambient: 0, active: 0 };
   for (const sample of samples) {
@@ -88,6 +95,7 @@ function summarizeSamples(samples) {
     sampleCount: samples.length,
     avgUpdateFps: average(samples, (sample) => sample.updateFps),
     avgRenderFps: average(samples, (sample) => sample.renderFps),
+    medianRenderFps: percentileValue(samples, (sample) => sample.renderFps, 0.5),
     minRenderFps: minValue(samples, (sample) => sample.renderFps),
     maxRenderFps: maxValue(samples, (sample) => sample.renderFps),
     avgRenderTotalMs: average(samples, (sample) => sample.render?.totalMs),
@@ -98,6 +106,14 @@ function summarizeSamples(samples) {
     maxParticlesMs: maxValue(samples, (sample) => sample.render?.particlesMs),
     avgObjectsMs: average(samples, (sample) => sample.render?.objectsMs),
     maxObjectsMs: maxValue(samples, (sample) => sample.render?.objectsMs),
+    avgMinimapMs: average(samples, (sample) => sample.render?.minimapMs),
+    medianMinimapMs: percentileValue(samples, (sample) => sample.render?.minimapMs, 0.5),
+    p90MinimapMs: percentileValue(samples, (sample) => sample.render?.minimapMs, 0.9),
+    maxMinimapMs: maxValue(samples, (sample) => sample.render?.minimapMs),
+    avgVisiblePassiveMovingMonsters: average(samples, (sample) => sample.counts?.visiblePassiveMovingMonsters),
+    maxVisiblePassiveMovingMonsters: maxValue(samples, (sample) => sample.counts?.visiblePassiveMovingMonsters),
+    avgVisibleCombatMovingMonsters: average(samples, (sample) => sample.counts?.visibleCombatMovingMonsters),
+    maxVisibleCombatMovingMonsters: maxValue(samples, (sample) => sample.counts?.visibleCombatMovingMonsters),
     avgCanvasMegapixels: average(samples, (sample) => sample.canvasMegapixels),
     activitySplit: activitySplit(samples, durationSeconds || samples.length),
     topActivityReasons: summarizeReasonCounts(samples, "activityReasons"),
@@ -189,6 +205,13 @@ export const regionStatsMethods = {
         minimapRebuildReason: timings.minimapRebuildReason ?? null,
         minimapStaticMs: formatMs(timings.minimapStaticMs),
         minimapDynamicMs: formatMs(timings.minimapDynamicMs),
+        minimapClearMs: formatMs(timings.minimapClearMs),
+        minimapBlitStaticMs: formatMs(timings.minimapBlitStaticMs),
+        minimapFogOverlayMs: formatMs(timings.minimapFogOverlayMs),
+        minimapDynamicMarkersMs: formatMs(timings.minimapDynamicMarkersMs),
+        minimapScaleCopyMs: formatMs(timings.minimapScaleCopyMs),
+        minimapTotalDrawMs: formatMs(timings.minimapTotalDrawMs),
+        minimapBudgetBackoff: Boolean(timings.minimapBudgetBackoff),
         uiMs: formatMs(timings.uiMs),
         overlayMs: formatMs(timings.overlayMs),
       },
@@ -204,11 +227,17 @@ export const regionStatsMethods = {
         totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
         nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
         visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
+        visiblePassiveMovingMonsters: this.monsterActivityDebug?.visiblePassiveMovingMonsters ?? 0,
+        visibleCombatMovingMonsters: this.monsterActivityDebug?.visibleCombatMovingMonsters ?? 0,
         offscreenMovingMonstersIgnored: this.monsterActivityDebug?.offscreenMovingMonstersIgnored ?? 0,
+        activeMonsterMotionReasons: [...(this.monsterActivityDebug?.activeMonsterMotionReasons ?? [])],
+        ambientMonsterMotionReasons: [...(this.monsterActivityDebug?.ambientMonsterMotionReasons ?? [])],
         activeSpellParticles: this.effectDebugCounts?.activeSpellParticles ?? 0,
         activeSpellEmitters: this.effectDebugCounts?.activeSpellEmitters ?? 0,
         cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
         expiredEffectsRemoved: this.effectDebugCounts?.expiredEffectsRemoved ?? 0,
+        visibleEffectCategories: { ...(this.effectDebugCounts?.visibleEffectCategories ?? {}) },
+        effectDirtyCategoryCounts: { ...(this.effectDirtyCategoryCounts ?? {}) },
       },
       regionId,
       subregionId: currentInstance?.subregionId ?? null,
@@ -422,6 +451,13 @@ export const regionStatsMethods = {
         minimapRebuildReason: timings.minimapRebuildReason ?? null,
         minimapStaticMs: formatMs(timings.minimapStaticMs),
         minimapDynamicMs: formatMs(timings.minimapDynamicMs),
+        minimapClearMs: formatMs(timings.minimapClearMs),
+        minimapBlitStaticMs: formatMs(timings.minimapBlitStaticMs),
+        minimapFogOverlayMs: formatMs(timings.minimapFogOverlayMs),
+        minimapDynamicMarkersMs: formatMs(timings.minimapDynamicMarkersMs),
+        minimapScaleCopyMs: formatMs(timings.minimapScaleCopyMs),
+        minimapTotalDrawMs: formatMs(timings.minimapTotalDrawMs),
+        minimapBudgetBackoff: Boolean(timings.minimapBudgetBackoff),
       },
       counts: {
         drawables: counts.drawables ?? 0,
@@ -433,11 +469,17 @@ export const regionStatsMethods = {
         totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
         nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
         visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
+        visiblePassiveMovingMonsters: this.monsterActivityDebug?.visiblePassiveMovingMonsters ?? 0,
+        visibleCombatMovingMonsters: this.monsterActivityDebug?.visibleCombatMovingMonsters ?? 0,
         offscreenMovingMonstersIgnored: this.monsterActivityDebug?.offscreenMovingMonstersIgnored ?? 0,
+        activeMonsterMotionReasons: [...(this.monsterActivityDebug?.activeMonsterMotionReasons ?? [])],
+        ambientMonsterMotionReasons: [...(this.monsterActivityDebug?.ambientMonsterMotionReasons ?? [])],
         activeSpellParticles: this.effectDebugCounts?.activeSpellParticles ?? 0,
         activeSpellEmitters: this.effectDebugCounts?.activeSpellEmitters ?? 0,
         cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
         expiredEffectsRemoved: this.effectDebugCounts?.expiredEffectsRemoved ?? 0,
+        visibleEffectCategories: { ...(this.effectDebugCounts?.visibleEffectCategories ?? {}) },
+        effectDirtyCategoryCounts: { ...(this.effectDirtyCategoryCounts ?? {}) },
       },
       save: this.lastSaveInfo ? { ...this.lastSaveInfo } : null,
       particles: {

@@ -212,6 +212,7 @@ export class ParticleEngine {
     return {
       emitterId: emitter.id,
       spellInstanceId: c.spellInstanceId ?? emitter.owner?.spellInstanceId ?? null,
+      effectCategory: c.effectCategory ?? null,
       layer: c.layer,
       movement: c.movement,
       visual: c.visual,

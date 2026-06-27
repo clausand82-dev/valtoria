@@ -91,12 +91,18 @@ export class GameEngine {
       activeSpellEmitters: 0,
       cleanupQueueLength: 0,
       expiredEffectsRemoved: 0,
+      visibleEffectCategories: {},
     };
+    this.effectDirtyCategoryCounts = {};
     this.monsterActivityDebug = {
       totalMonsters: 0,
       nearbyUpdatedMonsters: 0,
       visibleMovingMonsters: 0,
+      visiblePassiveMovingMonsters: 0,
+      visibleCombatMovingMonsters: 0,
       offscreenMovingMonstersIgnored: 0,
+      activeMonsterMotionReasons: [],
+      ambientMonsterMotionReasons: [],
     };
     this.adaptivePerformanceTier = 0;
     this.adaptiveLowFpsSamples = 0;

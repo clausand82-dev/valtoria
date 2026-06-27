@@ -1291,11 +1291,27 @@ button {
 }
 
 .minimap {
+  position: relative;
   width: 154px;
   height: 154px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #090b0d;
+  overflow: hidden;
+}
+
+.minimap-layer {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 154px;
+  height: 154px;
+  border: 0;
+  pointer-events: none;
+}
+
+.minimap-dynamic {
+  z-index: 1;
 }
 
 .combat-card {

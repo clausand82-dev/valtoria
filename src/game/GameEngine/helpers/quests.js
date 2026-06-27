@@ -5,6 +5,7 @@ import {
   QUEST_DEFS,
   QUEST_ITEM_DEFS,
   QUEST_NPCS,
+  RESOURCE_DEFS,
   withItemFlags,
   withItemIcon
 } from "../dependencies.js";
@@ -605,7 +606,11 @@ export function questProgressText(quest, inventory = []) {
     }
     // resources
     if (Array.isArray(quest.target?.resources) && quest.target.resources.length > 0) {
-      parts.push(...quest.target.resources.map((r) => `${resourceCount(inventory, r.resource)} / ${r.count ?? 1} ${r.resource}`));
+      parts.push(...quest.target.resources.map((r) => {
+        const resourceId = String(r.resource ?? r.resourceId ?? "");
+        const resourceName = RESOURCE_DEFS[resourceId]?.name ?? resourceId;
+        return `${resourceCount(inventory, resourceId)} / ${r.count ?? 1} ${resourceName}`;
+      }));
     }
     // specific items
     if (Array.isArray(quest.target?.items) && quest.target.items.length > 0) {
