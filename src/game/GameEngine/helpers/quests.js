@@ -48,6 +48,24 @@ export function resolveQuestDefById(questId) {
   return QUEST_DEF_BY_ID.get(id) ?? QUEST_DEFS[id] ?? null;
 }
 
+export function resolveQuestRewards(quest = {}, def = resolveQuestDefById(quest?.questId)) {
+  const configured = def?.rewards && typeof def.rewards === "object" ? def.rewards : {};
+  const saved = quest?.rewards && typeof quest.rewards === "object" ? quest.rewards : {};
+  const configuredCityProgress = configured.cityProgress && typeof configured.cityProgress === "object"
+    ? configured.cityProgress
+    : null;
+  const savedCityProgress = saved.cityProgress && typeof saved.cityProgress === "object"
+    ? saved.cityProgress
+    : null;
+  const cityProgress = def ? configuredCityProgress : savedCityProgress;
+  return {
+    ...configured,
+    ...saved,
+    ...(cityProgress ? { cityProgress: { ...cityProgress } } : {}),
+    ...(!cityProgress && def ? { cityProgress: undefined } : {}),
+  };
+}
+
 function normalizeNpcIdList(value) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (value === null || value === undefined) return [];
@@ -398,8 +416,8 @@ export function makeQuestInstance(def, npcId, context = {}) {
 }
 
 export function isQuestComplete(quest, inventory = []) {
+  if (quest?.progress?.complete === true) return true;
   if (Array.isArray(quest.steps) && quest.steps.length > 0) {
-    if (quest.progress?.complete === true) return true;
     const step = currentQuestStep(quest);
     if (!step) return false;
     const currentStepId = String(step.id ?? "");
@@ -647,7 +665,7 @@ export function normalizeSavedQuestState(saved) {
           turnInText: String(def?.turnInText ?? quest.turnInText ?? ""),
           target: { ...(quest.target ?? {}) },
           progress: { ...(quest.progress ?? {}) },
-          rewards: { ...(quest.rewards ?? {}) },
+          rewards: resolveQuestRewards(quest, def),
           steps: Array.isArray(def?.steps)
             ? def.steps.map((step) => ({ ...step }))
             : Array.isArray(quest.steps)

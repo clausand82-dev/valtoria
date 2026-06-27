@@ -21,6 +21,14 @@ kun en farm, resten er bare areas der hedder farm!
 - city mobs can now occupied buildings if city wall is down or not yet build
 - city areas, building and addons can now be build fra complete quest
 - some city areas shall now be cleared before player can build lvl 1 and get access to build buildings.
+- fixed an error in check_inn_infestation quest, where when entered crack and back again before crack cleared, crack coun't be revisited
+- added color frames to quest list
+- added new condition (eliteSpawns) witch can be use to blocked elites in special cases (region based)
+- at NPC questlist will only be showed if there is a list, otherwise quest vil come straight up
+- adjusted some startup quests
+- removed quest finish modal
+- changed how toastlog counter works - it now only count importent messenges
+- toast log counter resets when log have been opened
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water

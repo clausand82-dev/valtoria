@@ -277,6 +277,10 @@ region({
     monsters: { min: 8, max: 12 },                          // Monster count range.
   },
 
+  eliteSpawns: {                                            // Optional conditions for elite conversion in this region.
+    blockedBy: { questActive: "quest_id" },                  // Ordinary mobs still spawn while elite conversion is blocked.
+  },
+
   antiDrops: {                                              // Region drop blacklist.
     resources: ["magic_essence"],                           // Blocks resource ids.
     categories: ["weapon"],                                 // Blocks loot categories.
@@ -312,6 +316,7 @@ Shorthand conditions:
 - tileset strings are still valid. Object-form tilesets can use id (preferred) or fileName, plus weight and shorthand conditions.
 - rareMobs supports the same value/variants pattern as mobs when you need region-wide conditional rare encounter lists.
 - rareMobs entries and nested rare loot lines both support shorthand conditions plus requires/conditions/blockedBy.
+- eliteSpawns supports the same requires/conditions/blockedBy syntax and controls elite conversion without removing ordinary mobs.
 - rareMobs is a lightweight instance layer, not a full monster definition. Allowed instance overrides include displayName, namePrefix, nameSuffix, levelOffset, scale, and tint.
 - combat-stat changes should be made in monster-config.js by creating a dedicated monster type and referencing it via rareMobs.type.
 - rare loot mode "add" keeps normal monster loot and appends rare loot. "override" skips normal monster loot entirely.
@@ -1176,4 +1181,3 @@ export const MAP_REGION_SETS = {
     }),
   ],
 };
-

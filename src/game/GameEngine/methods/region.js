@@ -19,6 +19,7 @@ import {
   setWorldFlag,
   withRegionVisitWorldState,
   regionWorldStateKey,
+  worldEntryAllowed,
 } from "../../world-state.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
 
@@ -570,6 +571,16 @@ export const regionMethods = {
 
   assignEliteVariant(monster) {
     if (monster.allowElite === false || monster.isBoss || monster.isMinion) return;
+    const eliteSpawns = this.region?.mapRegion?.eliteSpawns;
+    if (eliteSpawns && !worldEntryAllowed(
+      eliteSpawns,
+      this.worldState,
+      this.questConditionContext?.({
+        source: "elite_spawn",
+        sourceRegionId: this.region?.mapRegion?.id,
+        monster,
+      }) ?? {},
+    )) return;
     if (this.eliteMonsterCount >= MAX_ELITE_MONSTERS_PER_REGION) return;
     const variant = rollEliteVariant();
     if (!variant) return;

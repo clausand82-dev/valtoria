@@ -191,7 +191,10 @@ export const MAP_PREFABS = {
           },
           {
             actionId: "enter_inn_crack_cave",
-            questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" },
+            any: [
+              { questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" } },
+              { questStepActive: { questId: "check_inn_infestation", stepId: "clear_crack_cave" } },
+            ],
             notFlag: "inn_crack_cave_cleared",
           },
           {

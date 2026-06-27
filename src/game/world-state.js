@@ -35,6 +35,14 @@ const CONDITION_KEYS = new Set([
   "questCurrentStep",
   "inventory",
   "cityStat",
+  "cityArea",
+  "cityAreas",
+  "cityAreaLevel",
+  "cityAreaLevels",
+  "cityBuilding",
+  "cityBuildings",
+  "cityAddon",
+  "cityAddons",
   "cityStorage",
   "cityInventory",
   "player",
@@ -548,6 +556,30 @@ function statMapMatches(stats, requirements) {
   });
 }
 
+function cityRequirementMet(expected, context, checkerName) {
+  const check = context?.[checkerName];
+  if (typeof check !== "function") return false;
+  if (typeof expected === "string") return check(expected);
+  if (Array.isArray(expected)) return expected.every((entry) => cityRequirementMet(entry, context, checkerName));
+  if (!expected || typeof expected !== "object") return false;
+  return Object.entries(expected).every(([id, required]) => (
+    required === false ? !check(id) : check(id)
+  ));
+}
+
+function cityAreaLevelRequirementMet(expected, context) {
+  const getLevel = context?.cityAreaLevel;
+  if (typeof getLevel !== "function") return false;
+  if (typeof expected === "string") return getLevel(expected) !== null;
+  if (Array.isArray(expected)) return expected.every((entry) => cityAreaLevelRequirementMet(entry, context));
+  if (!expected || typeof expected !== "object") return false;
+  return Object.entries(expected).every(([id, condition]) => {
+    const level = getLevel(id);
+    if (level === null || level === undefined) return false;
+    return compareNumber(level, typeof condition === "number" ? { min: condition } : condition);
+  });
+}
+
 function shorthandConditionMet(key, expected, worldState, context) {
   const normalized = normalizeWorldState(worldState);
   switch (key) {
@@ -600,6 +632,18 @@ function shorthandConditionMet(key, expected, worldState, context) {
       return inventoryRequirementMet(expected, context, key);
     case "cityStat":
       return statMapMatches(context.cityStats, expected);
+    case "cityArea":
+    case "cityAreas":
+      return cityRequirementMet(expected, context, "hasArea");
+    case "cityAreaLevel":
+    case "cityAreaLevels":
+      return cityAreaLevelRequirementMet(expected, context);
+    case "cityBuilding":
+    case "cityBuildings":
+      return cityRequirementMet(expected, context, "hasBuilding");
+    case "cityAddon":
+    case "cityAddons":
+      return cityRequirementMet(expected, context, "hasAddon");
     case "player":
       return statMapMatches(context.player, expected);
     case "playerStat":

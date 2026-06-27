@@ -379,6 +379,7 @@ export const CITY_AREAS = [
     category: "district",
     showLabel: true,
     prebuilt: true,
+    level0Layer: `${CITY_LAYER_BASE}/city_craftingquarter_lvl0.png`, clearCost: { gold: 100 },
     points: "951,488 1070,487 1079,501 1062,568 1024,629 1007,629 926,552 946,520 946,520",
     builtLayer: `${CITY_LAYER_BASE}/city_blacksmith.png`,
     buildings: [

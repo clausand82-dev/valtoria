@@ -73,6 +73,11 @@ export function hasCityArea(progress = {}, areaId) {
   return getCityAreaStateForId(progress, areaId).unlocked;
 }
 
+export function cityAreaLevel(progress = {}, areaId) {
+  const state = getCityAreaStateForId(progress, areaId);
+  return state.unlocked ? Math.max(0, Math.floor(Number(state.level) || 0)) : null;
+}
+
 export function hasCityAddon(progress = {}, addonId) {
   const id = String(addonId ?? "");
   if (!id) return false;
@@ -134,6 +139,7 @@ function summaryEntry(type, id, label, action) {
     upgraded: "upgraded",
     repaired: "repaired",
     unlocked: "unlocked",
+    promised: "promised",
   }[action] ?? "updated";
   return { type, id, label, action, message: `${label} ${suffix}` };
 }
@@ -260,6 +266,7 @@ export function applyCityProgressEffects(engineOrState, cityProgressEffect, opti
     }
     if ((state.addons ?? []).map(String).includes(String(addon.id))) continue;
     const rawState = progress?.[building.id] && typeof progress[building.id] === "object" ? progress[building.id] : {};
+    const shouldBuildParent = entry?.buildParent !== false && entry?.pendingUntilBuilding !== true;
     const purchasedAddons = [...new Set([
       ...(Array.isArray(rawState.purchasedAddons) ? rawState.purchasedAddons : []),
       ...(Array.isArray(rawState.addons) ? rawState.addons : []),
@@ -269,13 +276,14 @@ export function applyCityProgressEffects(engineOrState, cityProgressEffect, opti
       ...progress,
       [building.id]: {
         ...rawState,
-        level: Math.max(1, Math.floor(Number(state.level) || 0)),
+        level: shouldBuildParent ? Math.max(1, Math.floor(Number(state.level) || 0)) : Math.max(0, Math.floor(Number(state.level) || 0)),
         durability: clampPct(state.durability, DURABILITY_DEFAULT),
         purchasedAddons,
       },
     };
     changed = true;
-    summary.push(summaryEntry("addon", addon.id, addon.title ?? addon.id, "unlocked"));
+    const pending = (state.level ?? 0) <= 0 && !shouldBuildParent;
+    summary.push(summaryEntry("addon", addon.id, addon.title ?? addon.id, pending ? "promised" : "unlocked"));
   }
 
   if (changed) {
@@ -295,6 +303,7 @@ export function cityRequirementContext(progress = {}) {
     hasBuilding: (buildingId) => hasCityBuilding(progress, buildingId),
     hasAddon: (addonId) => hasCityAddon(progress, addonId),
     hasArea: (areaId) => hasCityArea(progress, areaId),
+    cityAreaLevel: (areaId) => cityAreaLevel(progress, areaId),
     buildingName: (buildingId) => cityBuildingName(buildingId),
     addonName: (addonId) => cityAddonName(addonId),
   };

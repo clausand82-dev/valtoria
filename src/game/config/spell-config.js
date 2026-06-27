@@ -13,7 +13,7 @@ export const SPELL_DEFS = {
     starter: true,
     manaCost: 14,
     cooldown: 1.2,
-    range: 5.2,
+    range: 6.2, // changed for 5.2
     speed: 8.4,
     element: "arcane",
     hitDamage: 7,

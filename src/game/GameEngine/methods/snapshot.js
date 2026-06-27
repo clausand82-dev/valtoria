@@ -408,12 +408,13 @@ export const snapshotMethods = {
           };
         }),
       },
-      toasts: this.toasts.map((toast) => ({ id: toast.id, text: toast.text, title: toast.title ?? "", kind: toast.kind ?? "info" })),
+      toasts: this.toasts.map((toast) => ({ id: toast.id, text: toast.text, title: toast.title ?? "", kind: toast.kind ?? "info", important: Boolean(toast.important) })),
       toastLog: (this.toastLog ?? []).map((toast) => ({
         id: toast.id,
         text: toast.text,
         title: toast.title ?? "",
         kind: toast.kind ?? "info",
+        important: Boolean(toast.important),
         createdAt: toast.createdAt ?? null,
       })),
     });

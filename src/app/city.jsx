@@ -2276,9 +2276,15 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       : "";
   const lastPointerActionRef = useRef(0);
   const [actionMessage, setActionMessage] = useState("");
-  const [selectedQuest, setSelectedQuest] = useState(null);
+  const singleQuestSelection = npcOffers.length + npcQuests.length === 1
+    ? (npcOffers.length === 1
+      ? { mode: "offer", quest: npcOffers[0] }
+      : { mode: "active", quest: npcQuests[0] })
+    : null;
+  const [selectedQuest, setSelectedQuest] = useState(() => singleQuestSelection);
   const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const [questCompletionResult, setQuestCompletionResult] = useState(null);
+  const skipQuestList = Boolean(singleQuestSelection);
   if (!npc) return null;
 
   const questResourceEntries = (quest) => (
@@ -2386,10 +2392,16 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     || Boolean(selectedQuest?.quest && isQuestComplete(selectedQuest.quest, cityQuestCompletionInventory(selectedQuest.quest)));
   const selectedQuestCanTurnInAtNpc = selectedQuestCanTurnIn
     && (selectedTurnInNpcIds.length <= 0 || selectedTurnInNpcIds.includes(String(npcId)));
+  const questIsReadyForTurnIn = (quest) => Boolean(quest?.complete)
+    || Boolean(quest && isQuestComplete(quest, cityQuestCompletionInventory(quest)));
+  const closeSelectedQuest = () => {
+    if (skipQuestList) onClose?.();
+    else setSelectedQuest(null);
+  };
 
   return (
     <div className="city-popup-backdrop" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-      <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
+      {!skipQuestList && <section className="city-popup quest-popup" role="dialog" aria-modal="true" aria-label={npc.name} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
         <header className="city-popup-header">
           <div>
             <h3>{npc.name}</h3>
@@ -2404,7 +2416,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
         <main className="quest-list">
           {actionMessage && <p className="quest-action-message">{actionMessage}</p>}
           {npcOffers.map((quest) => (
-            <article className="quest-card" key={`offer-${quest.id}`}>
+            <article className="quest-card quest-status-offer" key={`offer-${quest.id}`}>
               <header>
                 <b>{quest.title}</b>
                 <span>Ny quest</span>
@@ -2420,13 +2432,15 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
               </button>
             </article>
           ))}
-          {npcQuests.map((quest) => (
-            <article className={`quest-card ${quest.complete ? "complete" : ""}`} key={quest.id}>
+          {npcQuests.map((quest) => {
+            const ready = questIsReadyForTurnIn(quest);
+            return (
+            <article className={`quest-card ${ready ? "complete quest-status-ready" : "quest-status-active"}`} key={quest.id}>
               <header>
                 <b>{quest.title}</b>
                 <span>{quest.progressText}</span>
               </header>
-              <p>{quest.complete ? quest.turnInText : quest.story}</p>
+              <p>{ready ? quest.turnInText : quest.story}</p>
               <QuestObjectiveMeta quest={quest} compact />
               <button
                 type="button"
@@ -2436,18 +2450,19 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
                 Aaben quest
               </button>
             </article>
-          ))}
+            );
+          })}
           {!npcOffers.length && !npcQuests.length && <p>{npcDialogue || "Ingen quests tilgaengelige lige nu."}</p>}
         </main>
-      </section>
+      </section>}
       {selectedQuest && (
         <QuestDetailCard
           quest={selectedQuest.quest}
           npc={npc}
-          onClose={() => setSelectedQuest(null)}
+          onClose={closeSelectedQuest}
           footer={(
             <>
-              <button type="button" onClick={() => setSelectedQuest(null)}>Tilbage</button>
+              <button type="button" onClick={closeSelectedQuest}>{skipQuestList ? "Luk" : "Tilbage"}</button>
               {selectedQuest.mode === "offer" ? (
                 <button type="button" onClick={() => acceptQuest(selectedQuest.quest)}>Tag quest</button>
               ) : (
@@ -2527,7 +2542,7 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAccep
       </header>
       <div className="quest-list">
         {offers.map((quest) => (
-          <article className="quest-card" key={`board-${quest.questId}`}>
+          <article className="quest-card quest-status-offer" key={`board-${quest.questId}`}>
             <header>
               <b>{quest.title}</b>
               <span>{quest.kind ?? quest.category ?? "Quest"}</span>
@@ -2542,7 +2557,7 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAccep
           <>
             <p>Aktive quests:</p>
             {activeQuests.map((quest) => (
-              <article className={`quest-card ${quest.complete ? "complete" : ""}`} key={`board-active-${quest.id}`}>
+              <article className={`quest-card ${quest.complete ? "complete quest-status-ready" : "quest-status-active"}`} key={`board-active-${quest.id}`}>
                 <header>
                   <b>{quest.title}</b>
                   <span>{quest.progressText}</span>

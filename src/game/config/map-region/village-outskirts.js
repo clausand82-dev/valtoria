@@ -436,6 +436,7 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       labelX: 60,
       labelY: 31,
+      eliteSpawns: {  blockedBy: { any: [ { questActive: "clear_the_inn" }, { questActive: "check_inn_infestation" } ] } },
       mobs: [
         { type: "Rat", weight: 5, questCompleted: "check_inn_infestation"  },
         { type: "SickRat", weight: 2, questActive: "clear_the_inn", blockedBy: {questCompleted: "check_inn_infestation", }, },

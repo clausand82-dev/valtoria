@@ -107,6 +107,7 @@ export const LOOT_TABLES = {
     { type: "equipment", rarity: "legendary", chance: 0.0012, tries: 120 }
   ],
   object_container_common: [
+    { type: "potionPool", category: "health", chance: 0.2 },
     { type: "resource", id: "wood_piece", min: 2, max: 6, chance: 0.45 },
     { type: "resource", id: "wood_plank", min: 1, max: 2, chance: 0.02 },
     { type: "resource", id: "coal", min: 1, max: 2, chance: 0.01 },
@@ -115,7 +116,11 @@ export const LOOT_TABLES = {
     { type: "resource", id: "coal", min: 1, max: 2, chance: 0.1 },
     { type: "resource", id: "stone_brick", min: 1, max: 1, chance: 0.04 },
     { type: "resource", id: "diamond", min: 1, max: 1, chance: 0.001 },
-    { type: "resource", id: "junk", min: 1, max: 3, chance: 0.33 }
+    { type: "resource", id: "junk", min: 1, max: 3, chance: 0.33 },
+    { type: "equipment", category: "weapon", minRarity: "poor", chance: 0.01, tries: 120 },
+    { type: "equipment", category: "armor", minRarity: "poor", chance: 0.01, tries: 120 },
+    { type: "unique", source: "monster", chance: 0.0015, magicFind: true },
+    { type: "named", source: "monster", chanceMult: "monster" }
   ],
   object_shelfs_loot: [
     { type: "potionPool", category: "health", chance: 0.1 },

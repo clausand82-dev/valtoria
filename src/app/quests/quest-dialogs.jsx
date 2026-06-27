@@ -268,14 +268,19 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
 }
 
 export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurnInQuest, onAbandonQuest }) {
-  const [selectedQuest, setSelectedQuest] = useState(null);
-  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const npc = QUEST_NPCS[interaction.npcId];
   const offers = interaction.offers ?? [];
   const active = interaction.active ?? [];
+  const singleQuest = offers.length + active.length === 1 ? (offers[0] ?? active[0]) : null;
+  const [selectedQuest, setSelectedQuest] = useState(() => singleQuest);
+  const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const completeActive = active.filter((quest) => quest.complete);
   const inProgress = active.filter((quest) => !quest.complete);
-  const closeSelectedQuest = () => setSelectedQuest(null);
+  const skipQuestList = Boolean(singleQuest);
+  const closeSelectedQuest = () => {
+    if (skipQuestList) onDecline?.();
+    else setSelectedQuest(null);
+  };
   const acceptSelectedQuest = () => {
     if (!selectedQuest) return;
     onAcceptQuest?.(selectedQuest);
@@ -298,7 +303,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
     : false;
   return (
     <div className="confirm-backdrop" role="presentation">
-      <section className="confirm-dialog quest-offer-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-offer-title">
+      {!skipQuestList && <section className="confirm-dialog quest-offer-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-offer-title">
         <div className="quest-offer-header">
           {npc?.imageUrl && <img src={npc.imageUrl} alt="" />}
           <div>
@@ -311,7 +316,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
             <p>Ferdige quests:</p>
             <div className="quest-list">
               {completeActive.map((quest) => (
-                <article className="quest-card complete" key={quest.id}>
+                <article className="quest-card complete quest-status-ready" key={quest.id}>
                   <header>
                     <b>{quest.title}</b>
                     <span>{quest.progressText}</span>
@@ -329,7 +334,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
             <p>Tilgaengelige quests:</p>
             <div className="quest-list">
               {offers.map((quest) => (
-                <article className="quest-card" key={quest.id}>
+                <article className="quest-card quest-status-offer" key={quest.id}>
                   <header>
                     <b>{quest.title}</b>
                     <span>{quest.progressText}</span>
@@ -348,7 +353,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
             <p>Aktive quests:</p>
             <div className="quest-list">
               {inProgress.map((quest) => (
-                <article className="quest-card" key={quest.id}>
+                <article className="quest-card quest-status-active" key={quest.id}>
                   <header>
                     <b>{quest.title}</b>
                     <span>{quest.progressText}</span>
@@ -367,7 +372,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
         <div>
           <button type="button" onClick={onDecline}>Luk</button>
         </div>
-      </section>
+      </section>}
       {selectedQuest && (
         <QuestDetailCard
           quest={selectedQuest}
@@ -375,7 +380,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
           onClose={closeSelectedQuest}
           footer={(
             <>
-              <button type="button" onClick={closeSelectedQuest}>Tilbage</button>
+              <button type="button" onClick={closeSelectedQuest}>{skipQuestList ? "Luk" : "Tilbage"}</button>
               {selectedQuestIsActive && (
                 <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>Opgiv quest</button>
               )}

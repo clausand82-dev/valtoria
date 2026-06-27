@@ -189,7 +189,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_container_common", "material_gemstones"] },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_container_common", "material_gemstones", "material_humanoid", ] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_woodboxes_ground.png",
     depthMode: "dynamic",

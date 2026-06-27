@@ -42,6 +42,7 @@ import {
   isQuestComplete,
   questSnapshot,
   resolveQuestDefById,
+  resolveQuestRewards,
   normalizeQuestBoards,
   currentQuestStep,
   questHasSteps,
@@ -49,7 +50,7 @@ import {
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
 import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-config.js";
-import { applyCityProgressEffects, normalizeCityProgressEffect } from "../../config/city-state-helpers.js";
+import { applyCityProgressEffects, cityRequirementContext, normalizeCityProgressEffect } from "../../config/city-state-helpers.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
 
 function questStepCompletedFlag(questId, stepId) {
@@ -503,6 +504,7 @@ export const questsMethods = {
   },
 
   questConditionContext(overrides = {}) {
+    const cityProgress = this.cityProgress ?? this.cityInventory ?? this.cityStorage ?? {};
     return {
       regionId: this.region?.mapRegion?.id,
       regionConfig: this.region?.mapRegion,
@@ -514,8 +516,10 @@ export const questsMethods = {
       potions: this.player?.potions,
       equipment: this.player?.equipment,
       cityStats: this.cityStats,
+      cityProgress,
       cityInventory: this.cityInventory,
       cityStorage: this.cityStorage ?? this.cityInventory,
+      ...cityRequirementContext(cityProgress),
       activeMapRegion: this.activeMapRegion,
       mapReturn: this.mapReturn,
       stats: {
@@ -1332,6 +1336,7 @@ export const questsMethods = {
   },
 
   completeQuest(instanceId, npcId = null, options = {}) {
+    this.refreshQuestStepProgress?.();
     let index = this.questState.active.findIndex((quest) => quest.id === instanceId);
     if (index < 0) {
       index = this.questState.active.findIndex((quest) => String(quest.questId) === String(instanceId));
@@ -1445,7 +1450,7 @@ export const questsMethods = {
   },
 
   grantQuestRewards(quest) {
-    const rewards = quest.rewards ?? {};
+    const rewards = resolveQuestRewards(quest);
     const baseXp = Math.max(0, Math.floor(Number(rewards.xp) || ((rewards.xpPerKill ?? 0) * (quest.target?.count ?? 0))));
     const xp = this.modifiedXp?.(baseXp) ?? baseXp;
     const baseGold = Math.max(0, Math.floor(Number(rewards.gold) || ((rewards.goldPerKill ?? 0) * (quest.target?.count ?? 0))));

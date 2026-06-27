@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_INVENTORY } from "./game/data.js";
 import { GameEngine } from "./game/GameEngine.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
@@ -190,7 +190,7 @@ export default function App() {
   const [viewedQuest, setViewedQuest] = useState(null);
   const [questOverviewOpen, setQuestOverviewOpen] = useState(false);
   const [toastLogOpen, setToastLogOpen] = useState(false);
-  const [questToastModal, setQuestToastModal] = useState(null);
+  const [lastReadImportantToastId, setLastReadImportantToastId] = useState(null);
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
   const [cityStorageOpen, setCityStorageOpen] = useState(false);
   const [selectedCityStatId, setSelectedCityStatId] = useState(null);
@@ -215,7 +215,6 @@ export default function App() {
   const gameSessionRef = useRef(null);
   const lastMapReturnIdRef = useRef(null);
   const lastDeathIdRef = useRef(null);
-  const lastQuestToastModalIdRef = useRef(null);
   const lastCityOpenRef = useRef(false);
   const lastCityRollSessionRef = useRef(null);
   const preloadedGameAssetsRef = useRef({ atlas: null, animationSheets: null });
@@ -228,6 +227,21 @@ export default function App() {
     detail: "",
     error: "",
   });
+
+  const syncCityProgress = useCallback((progress, options = {}) => {
+    if (engineRef.current) {
+      engineRef.current.cityProgress = progress;
+      engineRef.current.cityInventory = progress;
+      engineRef.current.cityStorage = progress;
+      engineRef.current.cityStats = calculateCityStats(progress, snapshotRef.current, regionCorruptionRef.current);
+      if (engineRef.current.refreshQuestStepProgress?.()) {
+        engineRef.current.publishSnapshot?.();
+        engineRef.current.saveProgress?.({ force: true });
+      }
+    }
+    setCityProgressHud(progress);
+    if (options.refreshCityPage) setCityProgressRefreshToken((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -376,14 +390,7 @@ export default function App() {
       loadCityProgress,
       saveCityProgress,
       onCityProgressChange: (progress) => {
-        if (engineRef.current) {
-          engineRef.current.cityProgress = progress;
-          engineRef.current.cityInventory = progress;
-          engineRef.current.cityStorage = progress;
-          engineRef.current.cityStats = calculateCityStats(progress, snapshotRef.current, regionCorruptionRef.current);
-        }
-        setCityProgressHud(progress);
-        setCityProgressRefreshToken((value) => value + 1);
+        syncCityProgress(progress, { refreshCityPage: true });
       },
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
@@ -612,19 +619,22 @@ export default function App() {
     }
   }, [inventoryOpen]);
 
-  useEffect(() => {
-    const newestQuestToast = (snapshot.toastLog ?? []).find((toast) => String(toast?.kind ?? "").startsWith("quest"));
-    if (cityOpen) {
-      if (newestQuestToast?.id) lastQuestToastModalIdRef.current = newestQuestToast.id;
-      return;
-    }
-    if (questToastModal) return;
-    if (!newestQuestToast?.id || lastQuestToastModalIdRef.current === newestQuestToast.id) return;
-    lastQuestToastModalIdRef.current = newestQuestToast.id;
-    setQuestToastModal(newestQuestToast);
-  }, [cityOpen, questToastModal, snapshot.toastLog]);
-
   const player = snapshot.player;
+  const importantToastLog = (snapshot.toastLog ?? []).filter((toast) => toast?.important);
+  const lastReadImportantToastIndex = lastReadImportantToastId
+    ? importantToastLog.findIndex((toast) => toast.id === lastReadImportantToastId)
+    : -1;
+  const toastLogUnreadCount = lastReadImportantToastId
+    ? (lastReadImportantToastIndex >= 0 ? lastReadImportantToastIndex : importantToastLog.length)
+    : importantToastLog.length;
+  const openToastLog = () => {
+    setLastReadImportantToastId(importantToastLog[0]?.id ?? null);
+    setToastLogOpen(true);
+  };
+  useEffect(() => {
+    if (!toastLogOpen) return;
+    setLastReadImportantToastId(importantToastLog[0]?.id ?? null);
+  }, [toastLogOpen, importantToastLog[0]?.id]);
   const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
   const manaPct = Math.max(0, Math.min(100, (player.mana / player.maxMana) * 100));
   const xpPct = Math.max(0, Math.min(100, (player.xp / player.nextXp) * 100));
@@ -785,7 +795,7 @@ export default function App() {
   const clearToastLogForModeSwitch = () => {
     engineRef.current?.clearToastLog?.();
     setToastLogOpen(false);
-    setQuestToastModal(null);
+    setLastReadImportantToastId(null);
   };
 
   const startPlayableMapRegion = async (areaMapId, region) => {
@@ -939,9 +949,10 @@ export default function App() {
         setInventoryOpen={setInventoryOpen}
         setMapOpen={setMapOpen}
         setQuestOverviewOpen={setQuestOverviewOpen}
-        setToastLogOpen={setToastLogOpen}
+        onOpenToastLog={openToastLog}
         setViewedQuest={setViewedQuest}
         snapshot={snapshot}
+        toastLogUnreadCount={toastLogUnreadCount}
         trackedQuests={trackedQuests}
         xpPct={xpPct}
       />
@@ -1303,27 +1314,6 @@ export default function App() {
         ))}
       </div>
 
-      {questToastModal && !cityOpen && (
-        <div className="confirm-backdrop" role="presentation">
-          <section className="confirm-dialog quest-toast-dialog quest-parchment-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-toast-title">
-            <h2 id="quest-toast-title">{questToastModal.title || "Quest besked"}</h2>
-            <p>{questToastModal.text}</p>
-            <div>
-              <button type="button" onClick={() => setQuestToastModal(null)}>OK</button>
-              <button
-                type="button"
-                onClick={() => {
-                  setQuestToastModal(null);
-                  setToastLogOpen(true);
-                }}
-              >
-                Aaben log
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
       {mergeChoice && (
         <MergeChoiceDialog
           choice={mergeChoice}
@@ -1514,7 +1504,7 @@ export default function App() {
           hoveredCityStat={hoveredCityStat}
           selectedCityStat={selectedCityStat}
           onClearSelectedCityStat={() => setSelectedCityStatId(null)}
-          onProgressChange={setCityProgressHud}
+          onProgressChange={syncCityProgress}
           onStartCityMobBattle={startCityMobBattle}
           skipMobProgressForVisit={skipCityMobProgressReturnId === snapshot.mapReturn?.id}
           onMobProgressSkipConsumed={() => setSkipCityMobProgressReturnId(null)}

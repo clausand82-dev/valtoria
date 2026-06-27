@@ -835,11 +835,15 @@ export const effectsMethods = {
     const isQuestToast = requestedKind.startsWith("quest")
       || /\bquest\b/i.test(textValue)
       || [...questTitles].some((title) => textValue.includes(title));
+    const important = opts.important !== undefined
+      ? Boolean(opts.important)
+      : isQuestToast || requestedKind === "action";
     const toast = {
       id,
       text: textValue,
       title: opts.title ? String(opts.title) : "",
       kind: isQuestToast ? (requestedKind || "quest") : (requestedKind || "info"),
+      important,
       life,
       createdAt,
       expiresAt: createdAt + (life * 1000),

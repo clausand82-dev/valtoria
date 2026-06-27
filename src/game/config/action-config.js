@@ -354,7 +354,10 @@ export const ACTION_CONFIG = {
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
     requires: {
-      questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" },
+      any: [
+        { questStepActive: { questId: "check_inn_infestation", stepId: "enter_crack" } },
+        { questStepActive: { questId: "check_inn_infestation", stepId: "clear_crack_cave" } },
+      ],
       notFlag: "inn_crack_cave_cleared",
     },
     setFlags: ["inn_crack_entered"],

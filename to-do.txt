@@ -1,5 +1,7 @@
 STATUS:
-har fået fikset ruin til cleared til lvl 1 i AREA. Mangler at blive færdige med quests med bygninger - se CITY QUEST og så få dem implemteret.
+Små rettelse observeret igennem spil test:
+vitlias_kings_relics sender en til laden, der ikek er låst op endnu.
+der går for lang tid inden mayor kommer med ny quest pga rep krav på 35
 
 
 IMPORTENT:
@@ -21,26 +23,11 @@ Voldgravenes Hersker: bygget alle voldgravene i byen - bonus: +25 defence
 Hero of the City: Bekæmpet 10 city monster grupper med hero, bekæmpet 25 city monster gruppe med hero, bekæmpet 50 monster grupper med hero - bonus: +50 defence
 
 CITY QUESTS:
-MAYOR ønsker man rydder Market Area (dvs køber det) - tilgængelig når mayor_cleanse_village er completed. Når det er gjort bliver følgende quest tilgængelig: MAYOR ønsker man bygger BANK ved at finde (wood_plank: 50, stone_brick: 20, iron_bar: 10) - når man har fundet det og indleverer bygges bank. Bankens to addon bygges ikke. 
-
-Nuværende blacksmith_repair_smithy giver blacksmith's addon: repair_station
-
-BLACKSMITH kræver crafting_quarter area ryddet (køber det)
-
-BLACKSMITH giver questen rebuild_blacksmith som kræver (wood_plank: 50, stone_brick: 20, iron_bar: 10, green_gemstone: 1) og at mayor_repair_village_houses er completed. lost_anvil og lost_hammer skal først være tilgængelig når rebuild_blacksmith er completed. Når både lost_anvil og lost_hammer er lavet, gives blacksmith addon weapon_anvil.
-
-MERCHANT giver en quest, hvor man skal samle (wood_plank: 50, stone_brick: 20, iron_bar: 10). Når det er samlet får man bygning merchant og dens addon trade_counter. Questen er først tilgængelig efter mayor_repair_village_houses er completed og mayoers quest med at rydde market area er completed.
-
-PRIEST giver en quest, hvor man skal samle (wood_plank: 25, stone_brick: 12, iron_bar: 5) for at genopbygge sanctuary. reward er bygningen sanctuary
-
 
 
 
 
 ARTIFACTS:
-
-
-
 
 
 

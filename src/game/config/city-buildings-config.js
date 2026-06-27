@@ -164,8 +164,7 @@ export const CITY_BUILDINGS = [
         config: { station: "weapon" },
         inventoryType: { type: "none", slots: 0 },
         cost: { gold: 1000 },
-        imageUrl: "/assets/generated/addon/addon_weapon_anvil.png",        
-        unlock: { completedQuests: ["lost_anvil"], text: "Requires Den forsvundne anvil." },
+        imageUrl: "/assets/generated/addon/addon_weapon_anvil.png",
       },
       {
         id: "armor_anvil",

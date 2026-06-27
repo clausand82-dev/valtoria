@@ -2532,8 +2532,36 @@ function addCityStatAdjustment(progress = {}, statId, amount) {
   };
 }
 
+function preserveInactiveCityInventories(progress = {}, storedProgress = {}) {
+  let next = progress;
+  for (const building of CITY_BUILDINGS) {
+    if (isCityBuildingOwned(progress, building)) continue;
+    const storedState = storedProgress?.[building.id];
+    if (!storedState || typeof storedState !== "object" || Array.isArray(storedState)) continue;
+    const hasInventories = storedState.inventories
+      && typeof storedState.inventories === "object"
+      && !Array.isArray(storedState.inventories);
+    const hasLegacyItems = Array.isArray(storedState.items);
+    if (!hasInventories && !hasLegacyItems) continue;
+    const currentState = progress?.[building.id];
+    const nextState = currentState && typeof currentState === "object" && !Array.isArray(currentState)
+      ? { ...currentState }
+      : {};
+    if (hasInventories) nextState.inventories = storedState.inventories;
+    if (hasLegacyItems) nextState.items = storedState.items;
+    next = {
+      ...next,
+      [building.id]: nextState,
+    };
+  }
+  return next;
+}
+
 function saveCityProgress(progress, storageKey = CITY_STORAGE_KEY) {
-  saveRepository.saveCityProgressSync(storageKey, serializeCityProgress(progress));
+  const normalized = normalizeCityProgress(progress);
+  const stored = normalizeCityProgress(saveRepository.loadCityProgressSync(storageKey));
+  const guarded = preserveInactiveCityInventories(normalized, stored);
+  saveRepository.saveCityProgressSync(storageKey, serializeCityProgress(guarded));
 }
 
 function normalizeCityStatBonuses(statBonuses = {}) {

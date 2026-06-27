@@ -25,6 +25,7 @@ mage_sunforged: {
     kind: "rumor",
     category: "rumor",
     title: "Sunforged Sword",
+    demands: { completedQuests: ["check_inn_infestation"] },
     repeatable: false,
     regionIds: ["city"],
     npcIds: ["mage"],
@@ -43,6 +44,7 @@ sam_tylion_lion_gold_idols: {
     kind: "rumor",
     category: "mystery",
     title: "Sam Tylions forsvundne idols",
+    demands: { completedQuests: ["mayor_repair_village_houses"] },
     repeatable: false,
         npcIds: ["soldier"],
     regionIds: ["city"],
@@ -51,6 +53,6 @@ sam_tylion_lion_gold_idols: {
     story: "Noten beskriver Sam Tylions forsvundne kasse med sjældne lion gold idols. Væsner har spredt dem over alle regioner, og Himus kan hjælpe med at sende dem tilbage til familien.",
     acceptText: "Find alle 24 lion gold idols, som væsnerne har spredt, og aflever dem til Himus i byen.",
     turnInText: "Det er alle 24. Sam skylder dig mere end en tak, og jeg skal nok få dem sikkert tilbage til ham.",
-    rewards: { xp: 900, gold: 240, lydra: 5, factionRep: { village_outskirt: 3 } },
+    rewards: { xp: 900, gold: 240, lydra: 5, factionRep: { village_outskirt: 5 } },
   },
 };

@@ -826,6 +826,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         water: normalizedSpawnCounts.water,
         monsters: { ...normalizedSpawnCounts.monsters },
       },
+      eliteSpawns: regionConfig.eliteSpawns ?? null,
       antiDrops: {
         items: [...(regionConfig.antiDrops?.items ?? [])],
         resources: [...(regionConfig.antiDrops?.resources ?? [])],
