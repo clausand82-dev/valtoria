@@ -348,18 +348,30 @@ export const effectsMethods = {
     const beforeEngineParticles = this.particleEngine?.particles?.length ?? 0;
     const beforeFloaters = this.floaters.length;
     const beforeToasts = this.toasts.length;
+    let expiredLegacyRemoved = 0;
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
+      if (!Number.isFinite(Number(p.x)) || !Number.isFinite(Number(p.y)) || !Number.isFinite(Number(p.life))) {
+        this.particles.splice(i, 1);
+        expiredLegacyRemoved += 1;
+        continue;
+      }
       if (p.effectParticle) {
         p.age += dt;
         p.life -= dt;
-        if (p.life <= 0) this.particles.splice(i, 1);
+        if (p.life <= 0) {
+          this.particles.splice(i, 1);
+          expiredLegacyRemoved += 1;
+        }
         continue;
       }
       if (p.configParticle) {
         updateConfiguredParticle(p, dt);
         p.life -= dt;
-        if (p.life <= 0) this.particles.splice(i, 1);
+        if (p.life <= 0) {
+          this.particles.splice(i, 1);
+          expiredLegacyRemoved += 1;
+        }
         continue;
       }
       p.x += p.vx * dt;
@@ -369,7 +381,10 @@ export const effectsMethods = {
       p.vy *= Math.pow(0.04, dt);
       p.vz -= 2.8 * dt;
       p.life -= dt;
-      if (p.life <= 0) this.particles.splice(i, 1);
+      if (p.life <= 0) {
+        this.particles.splice(i, 1);
+        expiredLegacyRemoved += 1;
+      }
     }
 
     for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
@@ -388,12 +403,14 @@ export const effectsMethods = {
       }
     }
     this.particleEngine?.update(dt, particleContext(this));
-    if (
+    this.legacyExpiredEffectsRemoved = (this.legacyExpiredEffectsRemoved ?? 0) + expiredLegacyRemoved;
+    this.effectVisibilityStatsFrame = -1;
+    if ((
       beforeLegacyParticles !== this.particles.length
       || beforeEngineParticles !== (this.particleEngine?.particles?.length ?? 0)
       || beforeFloaters !== this.floaters.length
       || beforeToasts !== this.toasts.length
-    ) {
+    ) && this.hasVisibleActiveEffects?.()) {
       this.markRenderDirty?.("effects");
     }
   },
@@ -703,7 +720,7 @@ export const effectsMethods = {
       layer: "effects",
       gravity: upward > 0.12 ? -8 : 0,
     });
-    this.markRenderDirty?.("particles");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("particles");
   },
 
   addDust(x, y, count = 1) {
@@ -717,7 +734,7 @@ export const effectsMethods = {
       size: dustConfig.size ?? [2, 6],
       alpha: dustConfig.alpha ?? [0.12, 0.35],
     });
-    this.markRenderDirty?.("dust");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("dust");
   },
 
   spawnHeroHealingEffect() {
@@ -752,7 +769,7 @@ export const effectsMethods = {
       blendMode: "source-over",
       glow: false,
     });
-    this.markRenderDirty?.("object-break-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("object-break-effect");
   },
 
   footstepDustChance(fallback = 0.18) {
@@ -776,7 +793,7 @@ export const effectsMethods = {
       life: duration,
       maxLife: duration,
     });
-    this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
   },
 
   spawnGroundCloudEffect(x, y, radius, color, duration, options = {}) {
@@ -797,7 +814,7 @@ export const effectsMethods = {
       maxLife: Math.max(0.2, Number(duration) || 1),
     };
     this.particles.push(particle);
-    this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
     return particle;
   },
 
@@ -816,12 +833,12 @@ export const effectsMethods = {
       maxLife: Math.max(0.05, (Number(options.durationMs) || 350) / 1000),
     });
     this.camera.shake = Math.max(this.camera.shake, Number(options.shake) || 0);
-    this.markRenderDirty?.("spell-effect");
+    if (this.effectPointVisible?.({ x, y })) this.markRenderDirty?.("spell-effect");
   },
 
   addFloater(x, y, text, color, life = 0.85) {
     this.floaters.push({ x, y, z: 68, text, color, life, maxLife: life });
-    this.markRenderDirty?.("floater");
+    if (this.effectPointVisible?.({ x, y, z: 68 }, 80)) this.markRenderDirty?.("floater");
   },
 
   addToast(text, options = {}) {

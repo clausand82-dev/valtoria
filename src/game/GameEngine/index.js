@@ -41,6 +41,7 @@ export class GameEngine {
     this.performanceMode = performanceProfile.id;
     this.lowPowerMode = Boolean(options.lowPowerMode ?? performanceProfile.lowPowerMode);
     this.disableAmbientCritters = Boolean(options.disableAmbientCritters || performanceProfile.disableAmbientCritters);
+    this.adaptivePerformanceEnabled = Boolean(performanceProfile.adaptive) && !options.useCustomPerformanceProfile;
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
@@ -61,6 +62,11 @@ export class GameEngine {
     this.lastRenderTime = 0;
     this.ambientRenderFps = Math.max(1, Math.min(30, Number(options.ambientRenderFps) || performanceProfile.ambientRenderFps || 12));
     this.ambientRenderIntervalMs = 1000 / this.ambientRenderFps;
+    this.minimapFps = Math.max(1, Math.min(10, Number(options.minimapFps) || performanceProfile.minimapFps || 5));
+    this.minimapIntervalMs = 1000 / this.minimapFps;
+    this.minimapStaticRevision = 1;
+    this.minimapStaticRebuildReason = "init";
+    this.minimapCanvasStates = new WeakMap();
     this.maxIdleRenderIntervalMs = Math.max(250, Number(options.maxIdleRenderIntervalMs) || 1000);
     this.visualActivityLevel = "idle";
     this.visualActivityReasons = [];
@@ -80,6 +86,20 @@ export class GameEngine {
     this.lastPerformanceRecordingSummary = null;
     this.renderTimings = null;
     this.renderDebugCounts = null;
+    this.effectDebugCounts = {
+      activeSpellParticles: 0,
+      activeSpellEmitters: 0,
+      cleanupQueueLength: 0,
+      expiredEffectsRemoved: 0,
+    };
+    this.monsterActivityDebug = {
+      totalMonsters: 0,
+      nearbyUpdatedMonsters: 0,
+      visibleMovingMonsters: 0,
+      offscreenMovingMonstersIgnored: 0,
+    };
+    this.adaptivePerformanceTier = 0;
+    this.adaptiveLowFpsSamples = 0;
     this.terrainLayersCleared = 0;
     this.lastSaveInfo = null;
     this.time = 0;

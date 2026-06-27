@@ -73,7 +73,7 @@ function clampNumber(value, min, max, fallback) {
 }
 
 function normalizePerformanceSettings(input = {}) {
-  const profile = resolvePerformanceProfile(input.mode ?? "balanced");
+  const profile = resolvePerformanceProfile(input.mode ?? "auto");
   const custom = input.custom && typeof input.custom === "object" ? input.custom : {};
   return {
     mode: profile.id,
@@ -81,6 +81,7 @@ function normalizePerformanceSettings(input = {}) {
     custom: {
       targetFps: clampNumber(custom.targetFps, 30, 60, profile.targetFps),
       ambientRenderFps: clampNumber(custom.ambientRenderFps, 4, 20, profile.ambientRenderFps ?? 12),
+      minimapFps: clampNumber(custom.minimapFps, 1, 10, profile.minimapFps ?? 5),
       maxDpr: clampNumber(custom.maxDpr, 1, 2, profile.maxDpr),
       fogRenderScale: clampNumber(custom.fogRenderScale, 0.3, 1, profile.fogRenderScale),
       particleQuality: ["low", "medium", "high"].includes(custom.particleQuality) ? custom.particleQuality : profile.particleQuality,
@@ -100,6 +101,7 @@ function resolveRuntimePerformanceSettings(settings) {
       mode: profile.id,
       targetFps: profile.targetFps,
       ambientRenderFps: profile.ambientRenderFps ?? 12,
+      minimapFps: profile.minimapFps ?? 5,
       maxDpr: profile.maxDpr,
       fogRenderScale: profile.fogRenderScale,
       particleQuality: profile.particleQuality,
@@ -118,8 +120,8 @@ function resolveRuntimePerformanceSettings(settings) {
 }
 
 function readPerformanceSettings() {
-  if (typeof window === "undefined") return normalizePerformanceSettings({ mode: "balanced", useCustom: false });
-  const mode = window.localStorage?.getItem?.(PERFORMANCE_MODE_STORAGE_KEY) || "balanced";
+  if (typeof window === "undefined") return normalizePerformanceSettings({ mode: "auto", useCustom: false });
+  const mode = window.localStorage?.getItem?.(PERFORMANCE_MODE_STORAGE_KEY) || "auto";
   try {
     const rawCustom = window.localStorage?.getItem?.(PERFORMANCE_CUSTOM_STORAGE_KEY);
     if (!rawCustom) return normalizePerformanceSettings({ mode, useCustom: false });
@@ -381,6 +383,7 @@ export default function App() {
       maxDpr: runtimePerformance.maxDpr,
       targetFps: runtimePerformance.targetFps,
       ambientRenderFps: runtimePerformance.ambientRenderFps,
+      minimapFps: runtimePerformance.minimapFps,
       fogRenderScale: runtimePerformance.fogRenderScale,
       particleQuality: runtimePerformance.particleQuality,
       maxParticles: runtimePerformance.maxParticles,
@@ -756,6 +759,8 @@ export default function App() {
     engine.targetFps = clampNumber(resolved.targetFps, 30, 60, engine.targetFps ?? 50);
     engine.ambientRenderFps = clampNumber(resolved.ambientRenderFps, 4, 20, engine.ambientRenderFps ?? 12);
     engine.ambientRenderIntervalMs = 1000 / engine.ambientRenderFps;
+    engine.minimapFps = clampNumber(resolved.minimapFps, 1, 10, engine.minimapFps ?? 5);
+    engine.minimapIntervalMs = 1000 / engine.minimapFps;
     engine.maxDpr = clampNumber(resolved.maxDpr, 1, 2, engine.maxDpr ?? 1.25);
     engine.fogRenderScale = clampNumber(resolved.fogRenderScale, 0.3, 1, engine.fogRenderScale ?? 0.45);
     engine.setParticleQuality?.(resolved.particleQuality);
@@ -1048,6 +1053,20 @@ export default function App() {
                     onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
                       ...current,
                       custom: { ...current.custom, ambientRenderFps: Number(event.target.value) },
+                    }))}
+                  />
+                </label>
+                <label>
+                  Minimap FPS
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    step="1"
+                    value={resolvedDraft.minimapFps}
+                    onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
+                      ...current,
+                      custom: { ...current.custom, minimapFps: Number(event.target.value) },
                     }))}
                   />
                 </label>

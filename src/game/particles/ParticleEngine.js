@@ -141,13 +141,24 @@ export class ParticleEngine {
 
   update(dt, context = {}) {
     if (!this.enabled) return;
+    this.lastExpiredRemoved = 0;
     for (const emitter of this.emitters.values()) emitter.update(dt, this, context);
     for (const [id, emitter] of this.emitters) {
       if (!emitter.dead) continue;
       this.emitters.delete(id);
+      this.lastExpiredRemoved += 1;
     }
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const particle = this.particles[i];
+      const invalidPosition = particle.screenSpace
+        ? !Number.isFinite(Number(particle.screenX)) || !Number.isFinite(Number(particle.screenY))
+        : !Number.isFinite(Number(particle.x)) || !Number.isFinite(Number(particle.y));
+      if (invalidPosition || !Number.isFinite(Number(particle.age)) || !Number.isFinite(Number(particle.lifetime))) {
+        this.particles.splice(i, 1);
+        this.pool.release(particle);
+        this.lastExpiredRemoved += 1;
+        continue;
+      }
       particle.age += dt;
       particle.rotation += particle.rotationSpeed * dt;
       particle.sizeNow = particle.startSize + (particle.endSize - particle.startSize) * clamp(particle.age / particle.lifetime, 0, 1);
@@ -155,8 +166,10 @@ export class ParticleEngine {
       if (particle.age >= particle.lifetime || this.isScreenParticleOut(particle, context)) {
         this.particles.splice(i, 1);
         this.pool.release(particle);
+        this.lastExpiredRemoved += 1;
       }
     }
+    this.expiredRemoved = (this.expiredRemoved ?? 0) + this.lastExpiredRemoved;
   }
 
   render(ctx, layer, context = {}) {

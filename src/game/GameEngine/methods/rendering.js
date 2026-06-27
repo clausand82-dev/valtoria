@@ -373,6 +373,10 @@ export const renderingMethods = {
       particlesMs: 0,
       fogMs: 0,
       minimapMs: this.renderTimings?.minimapMs ?? null,
+      minimapCacheHit: this.renderTimings?.minimapCacheHit ?? null,
+      minimapRebuildReason: this.renderTimings?.minimapRebuildReason ?? null,
+      minimapStaticMs: this.renderTimings?.minimapStaticMs ?? null,
+      minimapDynamicMs: this.renderTimings?.minimapDynamicMs ?? null,
     };
     this.renderDebugCounts = {
       drawables: 0,
@@ -1020,40 +1024,135 @@ export const renderingMethods = {
     ctx.drawImage(canvas, 0, 0);
   },
 
+  invalidateMinimapStatic(reason = "data-change") {
+    this.minimapStaticRevision = (this.minimapStaticRevision ?? 0) + 1;
+    this.minimapStaticRebuildReason = String(reason || "data-change");
+  },
+
+  minimapDynamicSignature(size, scale) {
+    const parts = [
+      Math.round((Number(this.player?.x) || 0) * 20),
+      Math.round((Number(this.player?.y) || 0) * 20),
+    ];
+    const radius = size / (2 * scale) + 2;
+    for (const monster of this.monsters?.values?.() ?? []) {
+      if (monster.dead || Math.abs(monster.x - this.player.x) > radius || Math.abs(monster.y - this.player.y) > radius) continue;
+      if (!this.isPointVisible(monster)) continue;
+      parts.push(monster.id, Math.round(monster.x * 10), Math.round(monster.y * 10));
+    }
+    for (const loot of this.loots ?? []) {
+      if (Math.abs(loot.x - this.player.x) > radius || Math.abs(loot.y - this.player.y) > radius) continue;
+      if (!this.isPointVisible(loot)) continue;
+      parts.push(loot.id, Math.round(loot.x * 10), Math.round(loot.y * 10));
+    }
+    return parts.join(":");
+  },
+
   renderMinimap(canvas) {
-    if (!canvas) return;
+    if (!canvas || !this.player) return false;
     const startedAt = performance.now();
     const ctx = canvas.getContext("2d");
     const size = canvas.width;
-    const center = size / 2;
     const scale = 5.2;
-    ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = "rgba(8,10,12,0.92)";
-    ctx.fillRect(0, 0, size, size);
-    const { cx, cy } = chunkCoords(this.player.x, this.player.y);
-    for (let yy = cy - 3; yy <= cy + 3; yy += 1) {
-      for (let xx = cx - 3; xx <= cx + 3; xx += 1) {
-        const chunk = this.getChunk(xx, yy);
-        for (const tile of chunk.tiles) {
-          const px = center + (tile.x - this.player.x) * scale;
-          const py = center + (tile.y - this.player.y) * scale;
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = tile.edgeMask
+    const now = performance.now();
+    this.minimapCanvasStates ??= new WeakMap();
+    const state = this.minimapCanvasStates.get(canvas) ?? {};
+    const interval = this.minimapIntervalMs ?? 250;
+    if (state.lastRenderAt && now - state.lastRenderAt < interval) {
+      this.renderTimings = {
+        ...(this.renderTimings ?? {}),
+        minimapMs: performance.now() - startedAt,
+        minimapCacheHit: true,
+        minimapRebuildReason: "throttled",
+        minimapStaticMs: 0,
+        minimapDynamicMs: 0,
+      };
+      return false;
+    }
+
+    const actionTargets = (this.minimapActionTargets?.(3, { loadedOnly: true }) ?? []).filter((target) => this.isPointExplored(target));
+    const exploredPoints = this.fogExploredPoints ?? [];
+    const lastExplored = exploredPoints[exploredPoints.length - 1];
+    const staticDataSignature = [
+      this.minimapStaticRevision ?? 0,
+      this.region?.mapRegion?.id ?? this.region?.id ?? "region",
+      exploredPoints.length,
+      lastExplored ? `${Math.round(lastExplored.x * 10)},${Math.round(lastExplored.y * 10)}` : "none",
+      actionTargets.map((target) => `${target.id ?? "point"}:${Math.round(target.x * 10)},${Math.round(target.y * 10)}`).join("|"),
+    ].join(";");
+    const dynamicSignature = this.minimapDynamicSignature(size, scale);
+    const staticSize = Math.max(size, Math.ceil(size * 3));
+    const maxAnchorDrift = Math.max(8, (staticSize - size) / (2 * scale) * 0.78);
+    const anchorDrifted = state.anchorX === undefined
+      || Math.abs(this.player.x - state.anchorX) > maxAnchorDrift
+      || Math.abs(this.player.y - state.anchorY) > maxAnchorDrift;
+    const needsStaticRebuild = !state.staticCanvas
+      || state.staticCanvas.width !== staticSize
+      || state.staticDataSignature !== staticDataSignature
+      || anchorDrifted;
+
+    if (!needsStaticRebuild && state.lastDynamicSignature === dynamicSignature) {
+      state.lastRenderAt = now;
+      this.minimapCanvasStates.set(canvas, state);
+      this.renderTimings = {
+        ...(this.renderTimings ?? {}),
+        minimapMs: performance.now() - startedAt,
+        minimapCacheHit: true,
+        minimapRebuildReason: "unchanged",
+        minimapStaticMs: 0,
+        minimapDynamicMs: 0,
+      };
+      return false;
+    }
+
+    let staticMs = 0;
+    let rebuildReason = null;
+    if (needsStaticRebuild) {
+      const staticStartedAt = performance.now();
+      const hadStaticCanvas = Boolean(state.staticCanvas);
+      state.staticCanvas ??= document.createElement("canvas");
+      state.staticCanvas.width = staticSize;
+      state.staticCanvas.height = staticSize;
+      state.anchorX = this.player.x;
+      state.anchorY = this.player.y;
+      const staticCtx = state.staticCanvas.getContext("2d");
+      const staticCenter = staticSize / 2;
+      staticCtx.clearRect(0, 0, staticSize, staticSize);
+      staticCtx.fillStyle = "rgba(8,10,12,0.92)";
+      staticCtx.fillRect(0, 0, staticSize, staticSize);
+      for (const chunk of this.chunks?.values?.() ?? []) {
+        for (const tile of chunk.tiles ?? []) {
+          const px = staticCenter + (tile.x - state.anchorX) * scale;
+          const py = staticCenter + (tile.y - state.anchorY) * scale;
+          if (px < -scale || py < -scale || px > staticSize || py > staticSize) continue;
+          staticCtx.fillStyle = tile.edgeMask
             ? "rgba(245, 239, 227, 0.22)"
-            : tile.water
-              ? TERRAIN_WATER_COLOR
-              : TERRAIN_GROUND_COLOR;
-          ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale) + 1, Math.ceil(scale) + 1);
+            : tile.water ? TERRAIN_WATER_COLOR : TERRAIN_GROUND_COLOR;
+          staticCtx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale) + 1, Math.ceil(scale) + 1);
         }
       }
+      this.drawMinimapFog(staticCtx, staticCenter, scale, { x: state.anchorX, y: state.anchorY });
+      staticCtx.globalAlpha = 1;
+      const origin = { x: state.anchorX, y: state.anchorY };
+      if (this.isPointExplored(this.region.start)) this.drawMinimapPoint(staticCtx, this.region.start, staticCenter, scale, "#8bdfff", 3, origin);
+      if (this.isPointExplored(this.region.end)) this.drawMinimapPoint(staticCtx, this.region.end, staticCenter, scale, "#f4da96", 3.4, origin);
+      for (const target of actionTargets) this.drawMinimapActionPoint(staticCtx, target, staticCenter, scale, origin);
+      state.staticDataSignature = staticDataSignature;
+      rebuildReason = anchorDrifted && hadStaticCanvas ? "map-window" : (this.minimapStaticRebuildReason ?? "data-change");
+      staticMs = performance.now() - staticStartedAt;
     }
-    this.drawMinimapFog(ctx, center, scale);
-    ctx.globalAlpha = 1;
-    if (this.isPointExplored(this.region.start)) this.drawMinimapPoint(ctx, this.region.start, center, scale, "#8bdfff", 3);
-    if (this.isPointExplored(this.region.end)) this.drawMinimapPoint(ctx, this.region.end, center, scale, "#f4da96", 3.4);
-    for (const monster of this.monsters.values()) {
-      if (monster.dead) continue;
-      if (!this.isPointVisible(monster)) continue;
+
+    const staticDrawStartedAt = performance.now();
+    const sourceX = state.staticCanvas.width / 2 + (this.player.x - state.anchorX) * scale - size / 2;
+    const sourceY = state.staticCanvas.height / 2 + (this.player.y - state.anchorY) * scale - size / 2;
+    ctx.clearRect(0, 0, size, size);
+    ctx.drawImage(state.staticCanvas, sourceX, sourceY, size, size, 0, 0, size, size);
+    staticMs += performance.now() - staticDrawStartedAt;
+
+    const dynamicStartedAt = performance.now();
+    const center = size / 2;
+    for (const monster of this.monsters?.values?.() ?? []) {
+      if (monster.dead || !this.isPointVisible(monster)) continue;
       const x = center + (monster.x - this.player.x) * scale;
       const y = center + (monster.y - this.player.y) * scale;
       if (x >= 0 && y >= 0 && x <= size && y <= size) {
@@ -1061,30 +1160,35 @@ export const renderingMethods = {
         ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
       }
     }
-    for (const loot of this.loots) {
+    for (const loot of this.loots ?? []) {
       if (!this.isPointVisible(loot)) continue;
       const x = center + (loot.x - this.player.x) * scale;
       const y = center + (loot.y - this.player.y) * scale;
       if (x >= 0 && y >= 0 && x <= size && y <= size) {
-        ctx.fillStyle = loot.type === "gold" ? "#f1c657" : loot.item.rarityColor;
+        ctx.fillStyle = loot.type === "gold" ? "#f1c657" : (loot.item?.rarityColor ?? "#f5f3ea");
         ctx.fillRect(x - 1, y - 1, 2, 2);
       }
-    }
-    for (const target of this.minimapActionTargets?.(3) ?? []) {
-      if (!this.isPointExplored(target)) continue;
-      this.drawMinimapActionPoint(ctx, target, center, scale);
     }
     ctx.fillStyle = "#f5f3ea";
     ctx.beginPath();
     ctx.arc(center, center, 4, 0, Math.PI * 2);
     ctx.fill();
+    const dynamicMs = performance.now() - dynamicStartedAt;
+    state.lastRenderAt = now;
+    state.lastDynamicSignature = dynamicSignature;
+    this.minimapCanvasStates.set(canvas, state);
     this.renderTimings = {
       ...(this.renderTimings ?? {}),
       minimapMs: performance.now() - startedAt,
+      minimapCacheHit: !needsStaticRebuild,
+      minimapRebuildReason: rebuildReason,
+      minimapStaticMs: staticMs,
+      minimapDynamicMs: dynamicMs,
     };
+    return true;
   },
 
-  drawMinimapFog(ctx, center, scale) {
+  drawMinimapFog(ctx, center, scale, origin = this.player) {
     if (!this.fogOfWarActive) return;
     const unexploredAlpha = clamp(Number(FOG_OF_WAR_CONFIG.unexploredOverlayAlpha) || 0.96, 0, 1);
     const exploredCutAlpha = unexploredAlpha;
@@ -1107,8 +1211,8 @@ export const renderingMethods = {
     fogCtx.fillRect(0, 0, overlay.width, overlay.height);
     fogCtx.globalCompositeOperation = "destination-out";
     for (const point of this.fogExploredPoints ?? []) {
-      const x = center + (point.x - this.player.x) * scale;
-      const y = center + (point.y - this.player.y) * scale;
+      const x = center + (point.x - origin.x) * scale;
+      const y = center + (point.y - origin.y) * scale;
       const radius = Math.max(2, (point.radius ?? FOG_OF_WAR_CONFIG.revealRadiusTiles) * scale);
       this.drawMinimapRevealGradient(fogCtx, x, y, radius, exploredCutAlpha, fogEdgeFade);
     }
@@ -1128,9 +1232,9 @@ export const renderingMethods = {
     ctx.fill();
   },
 
-  drawMinimapPoint(ctx, point, center, scale, color, radius) {
-    const x = center + (point.x - this.player.x) * scale;
-    const y = center + (point.y - this.player.y) * scale;
+  drawMinimapPoint(ctx, point, center, scale, color, radius, origin = this.player) {
+    const x = center + (point.x - origin.x) * scale;
+    const y = center + (point.y - origin.y) * scale;
     if (x < 0 || y < 0 || x > ctx.canvas.width || y > ctx.canvas.height) return;
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -1138,9 +1242,9 @@ export const renderingMethods = {
     ctx.fill();
   },
 
-  drawMinimapActionPoint(ctx, point, center, scale) {
-    const x = center + (point.x - this.player.x) * scale;
-    const y = center + (point.y - this.player.y) * scale;
+  drawMinimapActionPoint(ctx, point, center, scale, origin = this.player) {
+    const x = center + (point.x - origin.x) * scale;
+    const y = center + (point.y - origin.y) * scale;
     if (x < 0 || y < 0 || x > ctx.canvas.width || y > ctx.canvas.height) return;
     ctx.save();
     ctx.translate(x, y);

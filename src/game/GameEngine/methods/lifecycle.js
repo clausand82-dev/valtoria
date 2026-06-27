@@ -15,6 +15,7 @@ import {
   visibleScreenPoint,
   worldToIso,
   worldToScreen,
+  CHUNK_SIZE,
   AUTOSAVE_INTERVAL_SECONDS,
   DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
   normalizeQuickSlots
@@ -240,10 +241,15 @@ export const lifecycleMethods = {
     this.targetFps = profile.targetFps;
     this.ambientRenderFps = Math.max(1, Math.min(30, Number(profile.ambientRenderFps) || 12));
     this.ambientRenderIntervalMs = 1000 / this.ambientRenderFps;
+    this.minimapFps = Math.max(1, Math.min(10, Number(profile.minimapFps) || 5));
+    this.minimapIntervalMs = 1000 / this.minimapFps;
     this.maxDpr = profile.maxDpr;
     this.fogRenderScale = profile.fogRenderScale;
     this.lowPowerMode = Boolean(profile.lowPowerMode);
     this.disableAmbientCritters = Boolean(profile.disableAmbientCritters);
+    this.adaptivePerformanceEnabled = Boolean(profile.adaptive);
+    this.adaptivePerformanceTier = 0;
+    this.adaptiveLowFpsSamples = 0;
     if (this.particleEngine) {
       this.particleEngine.quality = profile.particleQuality;
       this.particleEngine.maxParticles = profile.maxParticles;
@@ -327,11 +333,21 @@ export const lifecycleMethods = {
 
   markRenderDirty(reason = "unknown") {
     this.renderDirty = true;
-    if (this.renderDirtyReasons) this.renderDirtyReasons.add(String(reason || "unknown"));
+    const normalizedReason = String(reason || "unknown");
+    if (this.renderDirtyReasons) this.renderDirtyReasons.add(normalizedReason);
+    this.renderDirtyReasonTimes ??= new Map();
+    this.renderDirtyReasonTimes.set(normalizedReason, performance.now());
+    if (/fog|map|region|chunk|object|city|explor|start/i.test(normalizedReason)) {
+      this.invalidateMinimapStatic?.(normalizedReason);
+    }
   },
 
   clearRenderDirty() {
     this.lastRenderDirtyReasons = this.renderDirtyReasons ? [...this.renderDirtyReasons] : [];
+    this.lastRenderDirtyReasonDetails = this.lastRenderDirtyReasons.map((reason) => ({
+      reason,
+      ageMs: Math.max(0, Math.round(performance.now() - (this.renderDirtyReasonTimes?.get(reason) ?? performance.now()))),
+    }));
     this.renderDirty = false;
     this.renderDirtyReasons?.clear();
   },
@@ -372,27 +388,79 @@ export const lifecycleMethods = {
       if (this.floaters.length !== before) this.markRenderDirty?.("floater-expired");
     }
     for (const floater of this.floaters ?? []) {
+      if (!Number.isFinite(Number(floater.x)) || !Number.isFinite(Number(floater.y))) continue;
       if (this.isWorldPointNearViewport(floater.x, floater.y, floater.z ?? 0, 80)) return true;
     }
     return false;
   },
 
   hasVisibleSpellVisuals() {
-    const particleVisible = (particle) => {
-      if (!particle?.spellInstanceId || (Number(particle.life) || 0) <= 0) return false;
-      if (!Number.isFinite(Number(particle.x)) || !Number.isFinite(Number(particle.y))) return true;
-      return this.isWorldPointNearViewport(particle.x, particle.y, particle.z ?? 0, 220);
+    const stats = this.effectVisibilityStats();
+    return stats.activeSpellParticles > 0 || stats.activeSpellEmitters > 0;
+  },
+
+  effectPointVisible(effect, margin = 220) {
+    if (!effect) return false;
+    if (effect.screenSpace || effect.config?.area === "screen" || effect.config?.layer === "screenOverlay") return true;
+    const x = Number(effect.x ?? effect.config?.x ?? effect.owner?.x);
+    const y = Number(effect.y ?? effect.config?.y ?? effect.owner?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    return this.isWorldPointNearViewport(x, y, Number(effect.z) || 0, margin);
+  },
+
+  effectVisibilityStats() {
+    if (this.effectVisibilityStatsFrame === this.frame && this.cachedEffectVisibilityStats) return this.cachedEffectVisibilityStats;
+    const stats = {
+      visibleEngineParticles: 0,
+      visibleLegacyParticles: 0,
+      visibleEmitters: 0,
+      activeSpellParticles: 0,
+      activeSpellEmitters: 0,
     };
-    if ((this.particleEngine?.particles ?? []).some(particleVisible)) return true;
-    if ((this.particles ?? []).some(particleVisible)) return true;
-    for (const emitter of this.particleEngine?.emitters?.values?.() ?? []) {
-      const config = emitter?.config ?? {};
-      if (!config.spellInstanceId) continue;
-      if (Number.isFinite(Number(config.duration)) && Number(config.duration) <= 0) continue;
-      if (!Number.isFinite(Number(config.x)) || !Number.isFinite(Number(config.y))) return true;
-      if (this.isWorldPointNearViewport(config.x, config.y, 0, 220)) return true;
+    for (const particle of this.particleEngine?.particles ?? []) {
+      if ((Number(particle.lifetime) || 0) <= (Number(particle.age) || 0) || !this.effectPointVisible(particle)) continue;
+      stats.visibleEngineParticles += 1;
+      if (particle.spellInstanceId) stats.activeSpellParticles += 1;
     }
-    return false;
+    for (const particle of this.particles ?? []) {
+      if ((Number(particle.life) || 0) <= 0 || !this.effectPointVisible(particle)) continue;
+      stats.visibleLegacyParticles += 1;
+      if (particle.spellInstanceId) stats.activeSpellParticles += 1;
+    }
+    for (const emitter of this.particleEngine?.emitters?.values?.() ?? []) {
+      if (emitter?.dead) continue;
+      const config = emitter?.config ?? {};
+      let anchor = emitter.owner ?? null;
+      if (config.followTarget === this.player?.id) anchor = this.player;
+      else if (config.followTarget) anchor = this.monsters?.get?.(config.followTarget)
+        ?? (this.projectiles ?? []).find((entry) => entry.id === config.followTarget)
+        ?? anchor;
+      const visible = config.area === "map" || this.effectPointVisible(anchor ? { ...anchor, config } : emitter);
+      if (!visible) continue;
+      stats.visibleEmitters += 1;
+      if (config.spellInstanceId) stats.activeSpellEmitters += 1;
+    }
+    this.effectVisibilityStatsFrame = this.frame;
+    this.cachedEffectVisibilityStats = stats;
+    this.effectDebugCounts = {
+      ...(this.effectDebugCounts ?? {}),
+      activeSpellParticles: stats.activeSpellParticles,
+      activeSpellEmitters: stats.activeSpellEmitters,
+      cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
+      expiredEffectsRemoved: (this.particleEngine?.expiredRemoved ?? 0)
+        + (this.legacyExpiredEffectsRemoved ?? 0)
+        + (this.cleanupExpiredEffectsRemoved ?? 0),
+    };
+    return stats;
+  },
+
+  hasVisibleActiveEffects() {
+    const stats = this.effectVisibilityStats();
+    return stats.visibleEngineParticles > 0
+      || stats.visibleLegacyParticles > 0
+      || stats.visibleEmitters > 0
+      || this.hasVisibleGroundHazard()
+      || this.hasVisibleFloater();
   },
 
   getVisualActivityLevel() {
@@ -416,16 +484,32 @@ export const lifecycleMethods = {
       || Math.abs((camera.offsetY ?? 0) - (camera.targetOffsetY ?? 0)) > 0.5
     ) activeReasons.push("camera-interpolation");
 
+    let visibleMovingMonsters = 0;
+    let offscreenMovingMonstersIgnored = 0;
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead) continue;
-      if (monster.moving || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002) activeReasons.push("monster-moving");
+      const moving = monster.moving || Math.hypot(monster.vx ?? 0, monster.vy ?? 0) > 0.002;
+      const nearPlayer = distance(player, monster) <= CHUNK_SIZE * 2.25;
+      const visible = (nearPlayer || this.isWorldPointNearViewport(monster.x, monster.y, 0, 220)) && this.isPointVisible(monster);
+      if (moving && visible) {
+        visibleMovingMonsters += 1;
+        activeReasons.push("monster-moving");
+      } else if (moving) {
+        offscreenMovingMonstersIgnored += 1;
+      }
+      if (!visible) continue;
       if (monster.attackAnim > 0) activeReasons.push("monster-attack");
       if (monster.hurt > 0) activeReasons.push("monster-hurt");
       if (monster.castAnim > 0) activeReasons.push("monster-cast");
-      if (activeReasons.length) break;
     }
+    this.monsterActivityDebug = {
+      ...(this.monsterActivityDebug ?? {}),
+      totalMonsters: this.monsters?.size ?? 0,
+      visibleMovingMonsters,
+      offscreenMovingMonstersIgnored,
+    };
 
-    if ((this.projectiles?.length ?? 0) > 0) activeReasons.push("projectiles");
+    if ((this.projectiles ?? []).some((entry) => this.effectPointVisible(entry, 220))) activeReasons.push("projectiles");
     if (this.hasVisibleGroundHazard()) activeReasons.push("visible-ground-hazard");
     else if ((this.groundHazards?.length ?? 0) > 0) debugReasons.push("hidden-ground-hazard");
     if (this.hasVisibleSpellVisuals()) activeReasons.push("spell-visuals");
@@ -437,9 +521,10 @@ export const lifecycleMethods = {
     if (activeReasons.length) return this.recordVisualActivity("active", activeReasons, debugReasons);
 
     if (this.visibleLootHasAmbientHover()) ambientReasons.push("visible-loot-hover");
-    if ((this.particleEngine?.particles?.length ?? 0) > 0) ambientReasons.push("particles");
-    if ((this.particleEngine?.emitters?.size ?? 0) > 0) ambientReasons.push("particle-emitters");
-    if ((this.particles?.length ?? 0) > 0) ambientReasons.push("legacy-particles");
+    const effectStats = this.effectVisibilityStats();
+    if (effectStats.visibleEngineParticles > 0) ambientReasons.push("particles");
+    if (effectStats.visibleEmitters > 0) ambientReasons.push("particle-emitters");
+    if (effectStats.visibleLegacyParticles > 0) ambientReasons.push("legacy-particles");
     if ((this.toasts?.length ?? 0) > 0) ambientReasons.push("toasts");
     if (this.pendingThunder) ambientReasons.push("pending-weather-audio");
     if (this.exitPromptOpen) ambientReasons.push("exit-prompt");

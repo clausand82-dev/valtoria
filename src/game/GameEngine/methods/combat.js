@@ -141,7 +141,9 @@ export const combatMethods = {
 
   updateMonsters(dt) {
     this.processStatusEffects(this.player, dt, true);
-    for (const monster of this.nearbyMonsters(2)) {
+    const nearby = this.nearbyMonsters(2);
+    const nearbyIds = new Set(nearby.map((monster) => monster.id));
+    for (const monster of nearby) {
       if (monster.dead) continue;
       if (!monster.bestiarySeenRecorded && this.isPointVisible(monster)) {
         monster.bestiarySeenRecorded = this.recordBestiarySeen?.(monster) || true;
@@ -198,6 +200,22 @@ export const combatMethods = {
       if (monster.moveSpeed > 0.02) monster.gait += dt * (6.4 + monster.moveSpeed * 2.1);
       if (monster.moving && Math.random() < (this.footstepDustChance?.(0.035) ?? 0.035)) this.addDust(monster.x, monster.y, 1);
     }
+    for (const monster of this.monsters?.values?.() ?? []) {
+      if (monster.dead || nearbyIds.has(monster.id)) continue;
+      monster.moving = false;
+      monster.vx = Math.abs(Number(monster.vx) || 0) < 0.002
+        ? 0
+        : (Number(monster.vx) || 0) * Math.pow(0.002, dt);
+      monster.vy = Math.abs(Number(monster.vy) || 0) < 0.002
+        ? 0
+        : (Number(monster.vy) || 0) * Math.pow(0.002, dt);
+      monster.moveSpeed = Math.max(0, (Number(monster.moveSpeed) || 0) * Math.pow(0.01, dt));
+    }
+    this.monsterActivityDebug = {
+      ...(this.monsterActivityDebug ?? {}),
+      totalMonsters: this.monsters?.size ?? 0,
+      nearbyUpdatedMonsters: nearby.length,
+    };
   },
 
   rollMonsterAttackCooldown(monster) {
@@ -1189,7 +1207,7 @@ export const combatMethods = {
     };
     this.groundHazards ??= [];
     this.groundHazards.push(hazard);
-    this.markRenderDirty?.("hazard-spawn");
+    if (this.isWorldPointNearViewport?.(x, y, 0, Math.max(180, radius * 96))) this.markRenderDirty?.("hazard-spawn");
     const cloud = this.spawnGroundCloudEffect(x, y, radius, hazard.color, hazard.life, { ownerId: hazard.id, spellInstanceId: hazard.spellInstanceId });
     hazard.groundCloudParticleId = cloud?.id ?? null;
     const area = projectile.particleVisuals?.area;
@@ -1217,13 +1235,14 @@ export const combatMethods = {
         this.applyGroundHazardTick(hazard);
       }
       if (hazard.life <= 0) {
+        const wasVisible = this.isWorldPointNearViewport?.(hazard.x, hazard.y, 0, Math.max(180, (Number(hazard.radius) || 0) * 96));
         if (hazard.particleEmitterId) {
           this.particleEngine?.removeEmitter(hazard.particleEmitterId);
         }
         this.removeHazardLegacyParticles(hazard);
         this.removeHazardAreaParticles(hazard);
         this.groundHazards.splice(i, 1);
-        this.markRenderDirty?.("hazard-remove");
+        if (wasVisible) this.markRenderDirty?.("hazard-remove");
       }
     }
   },
@@ -1232,11 +1251,27 @@ export const combatMethods = {
     if (!Array.isArray(this.spellVisualCleanups) || this.spellVisualCleanups.length === 0) return;
     for (let i = this.spellVisualCleanups.length - 1; i >= 0; i -= 1) {
       const cleanup = this.spellVisualCleanups[i];
+      cleanup.elapsed = (Number(cleanup.elapsed) || 0) + dt;
       cleanup.life -= dt;
-      if (cleanup.life > 0) continue;
+      const visualsRemain = this.hasSpellVisualInstance?.(cleanup.spellInstanceId);
+      if (cleanup.life > 0 && (cleanup.elapsed < 0.25 || visualsRemain)) continue;
       this.cleanupSpellVisuals(cleanup.spellInstanceId, cleanup.spellId);
       this.spellVisualCleanups.splice(i, 1);
+      this.cleanupExpiredEffectsRemoved = (this.cleanupExpiredEffectsRemoved ?? 0) + 1;
     }
+    if (this.effectDebugCounts) this.effectDebugCounts.cleanupQueueLength = this.spellVisualCleanups.length;
+  },
+
+  hasSpellVisualInstance(spellInstanceId) {
+    if (!spellInstanceId) return false;
+    if ((this.projectiles ?? []).some((entry) => entry?.spellInstanceId === spellInstanceId)) return true;
+    if ((this.groundHazards ?? []).some((entry) => entry?.spellInstanceId === spellInstanceId && (Number(entry.life) || 0) > 0)) return true;
+    if ((this.particles ?? []).some((entry) => entry?.spellInstanceId === spellInstanceId && (Number(entry.life) || 0) > 0)) return true;
+    if ((this.particleEngine?.particles ?? []).some((entry) => entry?.spellInstanceId === spellInstanceId && (Number(entry.lifetime) || 0) > (Number(entry.age) || 0))) return true;
+    for (const emitter of this.particleEngine?.emitters?.values?.() ?? []) {
+      if (!emitter?.dead && emitter.config?.spellInstanceId === spellInstanceId) return true;
+    }
+    return false;
   },
 
   cleanupSpellVisuals(spellInstanceId, spellId = null) {

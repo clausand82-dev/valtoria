@@ -126,6 +126,7 @@ export const regionStatsMethods = {
     return {
       targetFps: Math.max(0, Math.round(Number(this.targetFps) || 0)),
       ambientRenderFps: Math.max(0, Math.round(Number(this.ambientRenderFps) || 0)),
+      minimapFps: Math.max(0, Math.round(Number(this.minimapFps) || 0)),
       maxDpr: round(this.maxDpr ?? 1, 2),
       fogRenderScale: round(this.fogRenderScale ?? 1, 2),
       particleQuality: this.particleEngine?.quality ?? "unknown",
@@ -133,6 +134,8 @@ export const regionStatsMethods = {
       particlesEnabled: this.particleEngine?.enabled ?? false,
       disableAmbientCritters: Boolean(this.disableAmbientCritters),
       lowPowerMode: Boolean(this.lowPowerMode),
+      adaptiveEnabled: Boolean(this.adaptivePerformanceEnabled),
+      adaptiveTier: Math.max(0, Math.floor(Number(this.adaptivePerformanceTier) || 0)),
     };
   },
 
@@ -141,9 +144,7 @@ export const regionStatsMethods = {
     const timings = this.renderTimings ?? {};
     const counts = this.renderDebugCounts ?? {};
     const visualActivityLevel = this.getVisualActivityLevel?.() ?? "idle";
-    const dirtyReasons = this.renderDirtyReasons?.size
-      ? [...this.renderDirtyReasons]
-      : [...(this.lastRenderDirtyReasons ?? [])];
+    const dirtyReasons = this.renderDirtyReasons?.size ? [...this.renderDirtyReasons] : [];
     const loadedNpcCount = [...(this.chunks?.values?.() ?? [])]
       .reduce((sum, chunk) => sum + (chunk.npcs?.length ?? 0), 0);
     const regionId = this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId ?? this.region?.id ?? null;
@@ -165,6 +166,12 @@ export const regionStatsMethods = {
       visualDebugReasons: [...(this.visualDebugReasons ?? [])],
       renderDirty: Boolean(this.renderDirty),
       dirtyReasons,
+      dirtyReasonDetails: dirtyReasons.map((reason) => ({
+        reason,
+        ageMs: Math.max(0, Math.round(now - (this.renderDirtyReasonTimes?.get(reason) ?? now))),
+      })),
+      lastRenderedDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+      lastRenderedDirtyReasonDetails: [...(this.lastRenderDirtyReasonDetails ?? [])],
       canvas: {
         width: Math.max(0, Math.floor(Number(this.canvas?.width) || 0)),
         height: Math.max(0, Math.floor(Number(this.canvas?.height) || 0)),
@@ -178,6 +185,10 @@ export const regionStatsMethods = {
         particlesMs: formatMs(timings.particlesMs),
         fogMs: formatMs(timings.fogMs),
         minimapMs: formatMs(timings.minimapMs),
+        minimapCacheHit: timings.minimapCacheHit ?? null,
+        minimapRebuildReason: timings.minimapRebuildReason ?? null,
+        minimapStaticMs: formatMs(timings.minimapStaticMs),
+        minimapDynamicMs: formatMs(timings.minimapDynamicMs),
         uiMs: formatMs(timings.uiMs),
         overlayMs: formatMs(timings.overlayMs),
       },
@@ -190,6 +201,14 @@ export const regionStatsMethods = {
         npcs: loadedNpcCount,
         loot: this.loots?.length ?? 0,
         projectiles: this.projectiles?.length ?? 0,
+        totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
+        nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
+        visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
+        offscreenMovingMonstersIgnored: this.monsterActivityDebug?.offscreenMovingMonstersIgnored ?? 0,
+        activeSpellParticles: this.effectDebugCounts?.activeSpellParticles ?? 0,
+        activeSpellEmitters: this.effectDebugCounts?.activeSpellEmitters ?? 0,
+        cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
+        expiredEffectsRemoved: this.effectDebugCounts?.expiredEffectsRemoved ?? 0,
       },
       regionId,
       subregionId: currentInstance?.subregionId ?? null,
@@ -211,6 +230,7 @@ export const regionStatsMethods = {
     this.performanceHistory.push(sample);
     const maxSamples = Math.max(1, Math.floor(Number(this.performanceHistoryMaxSamples) || PERFORMANCE_HISTORY_MAX_SAMPLES));
     while (this.performanceHistory.length > maxSamples) this.performanceHistory.shift();
+    this.updateAdaptivePerformance?.(sample);
 
     if (this.performanceRecording?.active) {
       this.performanceRecording.samples.push(sample);
@@ -218,6 +238,47 @@ export const regionStatsMethods = {
       this.performanceRecording.remainingSeconds = Math.max(0, this.performanceRecording.durationSeconds - elapsedSeconds);
       if (elapsedSeconds >= this.performanceRecording.durationSeconds) this.stopPerformanceRecording();
     }
+  },
+
+  updateAdaptivePerformance(sample) {
+    if (!this.adaptivePerformanceEnabled || this.isCustomPerformanceProfile || sample?.activityLevel !== "active") {
+      this.adaptiveLowFpsSamples = 0;
+      return;
+    }
+    const target = Math.max(30, Number(this.targetFps) || 50);
+    const renderFps = Math.max(0, Number(sample?.renderFps) || 0);
+    if (renderFps >= target * 0.8) {
+      this.adaptiveLowFpsSamples = 0;
+      return;
+    }
+    this.adaptiveLowFpsSamples = (this.adaptiveLowFpsSamples ?? 0) + 1;
+    if (this.adaptiveLowFpsSamples < 5 || (this.adaptivePerformanceTier ?? 0) >= 2) return;
+    this.adaptiveLowFpsSamples = 0;
+    this.adaptivePerformanceTier = (this.adaptivePerformanceTier ?? 0) + 1;
+    if (this.adaptivePerformanceTier === 1) {
+      this.maxDpr = Math.min(this.maxDpr ?? 1.25, 1.1);
+      this.fogRenderScale = Math.min(this.fogRenderScale ?? 0.45, 0.4);
+      this.setParticleQuality?.("medium");
+      if (this.particleEngine) this.particleEngine.maxParticles = Math.min(this.particleEngine.maxParticles, 400);
+      this.disableAmbientCritters = true;
+      this.resetCritterRuntime?.();
+    } else {
+      this.targetFps = Math.min(this.targetFps ?? 50, 40);
+      this.maxDpr = 1;
+      this.fogRenderScale = Math.min(this.fogRenderScale ?? 0.4, 0.35);
+      this.setParticleQuality?.("low");
+      if (this.particleEngine) this.particleEngine.maxParticles = Math.min(this.particleEngine.maxParticles, 300);
+    }
+    if (this.particleEngine) {
+      this.particleEngine.pool.max = this.particleEngine.maxParticles;
+      while (this.particleEngine.particles.length > this.particleEngine.maxParticles) {
+        const particle = this.particleEngine.particles.pop();
+        if (particle) this.particleEngine.pool.release(particle);
+      }
+    }
+    this.fogOverlayCanvas = null;
+    this.resize?.();
+    this.markRenderDirty?.(`adaptive-performance-tier-${this.adaptivePerformanceTier}`);
   },
 
   startPerformanceRecording(durationSeconds = 60) {
@@ -342,6 +403,7 @@ export const regionStatsMethods = {
       visualDebugReasons: [...(this.visualDebugReasons ?? [])],
       ambientRenderFps: Math.max(0, Math.round(Number(this.ambientRenderFps) || 0)),
       lastRenderDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+      lastRenderDirtyReasonDetails: [...(this.lastRenderDirtyReasonDetails ?? [])],
       canvasMegapixels: Math.round((((this.canvas?.width ?? 0) * (this.canvas?.height ?? 0)) / 1000000) * 100) / 100,
       updateFrameCount: Math.max(0, Math.floor(Number(this.updateFrameCount) || 0)),
       renderFrameCount: Math.max(0, Math.floor(Number(this.renderFrameCount) || 0)),
@@ -356,6 +418,10 @@ export const regionStatsMethods = {
         particlesMs: formatMs(timings.particlesMs),
         fogMs: formatMs(timings.fogMs),
         minimapMs: formatMs(timings.minimapMs),
+        minimapCacheHit: timings.minimapCacheHit ?? null,
+        minimapRebuildReason: timings.minimapRebuildReason ?? null,
+        minimapStaticMs: formatMs(timings.minimapStaticMs),
+        minimapDynamicMs: formatMs(timings.minimapDynamicMs),
       },
       counts: {
         drawables: counts.drawables ?? 0,
@@ -364,6 +430,14 @@ export const regionStatsMethods = {
         particles: counts.particles ?? ((particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0)),
         cachedTerrainLayers: counts.cachedTerrainLayers ?? this.countCachedTerrainLayers?.() ?? 0,
         terrainLayersCleared: this.terrainLayersCleared ?? counts.terrainLayersCleared ?? 0,
+        totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
+        nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
+        visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
+        offscreenMovingMonstersIgnored: this.monsterActivityDebug?.offscreenMovingMonstersIgnored ?? 0,
+        activeSpellParticles: this.effectDebugCounts?.activeSpellParticles ?? 0,
+        activeSpellEmitters: this.effectDebugCounts?.activeSpellEmitters ?? 0,
+        cleanupQueueLength: this.spellVisualCleanups?.length ?? 0,
+        expiredEffectsRemoved: this.effectDebugCounts?.expiredEffectsRemoved ?? 0,
       },
       save: this.lastSaveInfo ? { ...this.lastSaveInfo } : null,
       particles: {

@@ -202,9 +202,22 @@ export const actionsMethods = {
     return this.actionTargetsInRange(maxRange)[0]?.target ?? null;
   },
 
-  minimapActionTargets(chunkRange = 3) {
+  minimapActionTargets(chunkRange = 3, options = {}) {
     const targets = [];
-    for (const chunk of this.nearbyChunks(chunkRange)) {
+    const chunks = [];
+    if (options.loadedOnly) {
+      const centerX = Math.floor(this.player.x / CHUNK_SIZE);
+      const centerY = Math.floor(this.player.y / CHUNK_SIZE);
+      for (let cy = centerY - chunkRange; cy <= centerY + chunkRange; cy += 1) {
+        for (let cx = centerX - chunkRange; cx <= centerX + chunkRange; cx += 1) {
+          const chunk = this.chunks?.get?.(`${cx},${cy}`);
+          if (chunk) chunks.push(chunk);
+        }
+      }
+    } else {
+      chunks.push(...this.nearbyChunks(chunkRange));
+    }
+    for (const chunk of chunks) {
       for (const object of chunk.objects) {
         if (!object || object.removed || object.actionRemoved) continue;
         if (!targetActionId(this, object)) continue;
