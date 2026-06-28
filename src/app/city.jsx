@@ -10,7 +10,7 @@ import {
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue, makePotion } from "../game/world.js";
-import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, resourceStackMax } from "../game/GameEngine/helpers.js";
+import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, questProgressText, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
@@ -878,7 +878,10 @@ function CityPage({
     const mob = cityMobs.find((entry) => entry.id === mobId);
     if (!mob) return;
     const levelDef = CITY_MOB_LEVELS[Math.max(1, Math.min(CITY_MOB_MAX_LEVEL, mob.level))] ?? CITY_MOB_LEVELS[1];
-    const target = pickCityBattleRegion(mob.mobType, levelDef.mapSize, mob.areaId);
+    const target = pickCityBattleRegion(mob.mobType, levelDef.mapSize, mob.areaId, {
+      occupiedAreaId: mob.occupiedAreaId,
+      occupiedBuildingId: mob.occupiedBuildingId,
+    });
     if (!target) {
       engineRef.current?.addToast?.("Kunne ikke finde et egnet map til city-kamp.");
       return;
@@ -1727,13 +1730,15 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack, onHover }) {
     <div className="city-map-hover-icons city-map-mob-icons" aria-label="City mobs">
       {mobRefs.map((mob) => {
         const attackable = attackableMobIds.has(mob.id);
+        const occupationStatus = mob.breachState === "inside" ? cityMobOccupationStatusText(mob) : "";
+        const markerStatus = occupationStatus ? ` - ${occupationStatus}` : "";
         return (
           <button
             type="button"
             className={`city-map-mob-mini ${attackable ? "attackable" : "blocked"}`}
-            style={cityMapPositionStyle(mob.x, mob.y)}
-            title={`${mob.mobType} Lv.${mob.level}${attackable ? " - attackable" : " - clear closer threats before attacking"}`}
-            aria-label={`${mob.mobType} level ${mob.level}${attackable ? ", attackable" : ", clear closer threats before attacking"}`}
+            style={cityMapPositionStyle(mob.x, mob.y, 27)}
+            title={`${mob.mobType} Lv.${mob.level}${markerStatus}${attackable ? " - attackable" : " - clear closer threats before attacking"}`}
+            aria-label={`${mob.mobType} level ${mob.level}${occupationStatus ? `, ${occupationStatus}` : ""}${attackable ? ", attackable" : ", clear closer threats before attacking"}`}
             onMouseEnter={() => onHover?.(mob.id)}
             onMouseLeave={() => onHover?.(null)}
             onFocus={() => onHover?.(mob.id)}
@@ -2311,6 +2316,16 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     return inventory;
   };
 
+  const cityQuestDisplay = (quest) => {
+    if (!quest) return quest;
+    const inventory = cityQuestCompletionInventory(quest);
+    return {
+      ...quest,
+      complete: Boolean(quest.complete) || isQuestComplete(quest, inventory),
+      progressText: questProgressText(quest, inventory),
+    };
+  };
+
   const turnIn = (quest) => {
     const engine = engineRef.current;
     const completionInventory = cityQuestCompletionInventory(quest);
@@ -2394,6 +2409,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     && (selectedTurnInNpcIds.length <= 0 || selectedTurnInNpcIds.includes(String(npcId)));
   const questIsReadyForTurnIn = (quest) => Boolean(quest?.complete)
     || Boolean(quest && isQuestComplete(quest, cityQuestCompletionInventory(quest)));
+  const selectedQuestDisplay = selectedQuest?.quest ? cityQuestDisplay(selectedQuest.quest) : null;
   const closeSelectedQuest = () => {
     if (skipQuestList) onClose?.();
     else setSelectedQuest(null);
@@ -2433,15 +2449,16 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
             </article>
           ))}
           {npcQuests.map((quest) => {
-            const ready = questIsReadyForTurnIn(quest);
+            const displayQuest = cityQuestDisplay(quest);
+            const ready = questIsReadyForTurnIn(displayQuest);
             return (
             <article className={`quest-card ${ready ? "complete quest-status-ready" : "quest-status-active"}`} key={quest.id}>
               <header>
-                <b>{quest.title}</b>
-                <span>{quest.progressText}</span>
+                <b>{displayQuest.title}</b>
+                <span>{displayQuest.progressText}</span>
               </header>
-              <p>{ready ? quest.turnInText : quest.story}</p>
-              <QuestObjectiveMeta quest={quest} compact />
+              <p>{ready ? displayQuest.turnInText : displayQuest.story}</p>
+              <QuestObjectiveMeta quest={displayQuest} compact />
               <button
                 type="button"
                 onPointerUp={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "active", quest }), true)}
@@ -2457,7 +2474,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       </section>}
       {selectedQuest && (
         <QuestDetailCard
-          quest={selectedQuest.quest}
+          quest={selectedQuestDisplay}
           npc={npc}
           onClose={closeSelectedQuest}
           footer={(
@@ -2510,7 +2527,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
   );
 }
 
-function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAcceptQuest, onAbandonQuest }) {
+function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disabled = false, disabledText = "", onAcceptQuest, onAbandonQuest }) {
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const offers = board?.offers ?? [];
@@ -2540,6 +2557,14 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAccep
         <h4>{title}</h4>
         {subtitle && <span>{subtitle}</span>}
       </header>
+      {disabled && (
+        <div className="city-occupation-lock-note">
+          <b>Rumor Board disabled</b>
+          <span>{disabledText || "Clear the mob occupying the Inn to use the board again."}</span>
+        </div>
+      )}
+      {!disabled && (
+        <>
       <div className="quest-list">
         {offers.map((quest) => (
           <article className="quest-card quest-status-offer" key={`board-${quest.questId}`}>
@@ -2599,6 +2624,8 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], onAccep
             </div>
           </section>
         </div>
+      )}
+        </>
       )}
     </section>
   );
@@ -2947,6 +2974,26 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
     : null;
   const activeStorageSection = activeQuestBoard ? null : activeAddonStorageSection;
+  const innRumorBoardDisabled = questBoardId === "inn" && cityEventModifiers.innRumorBoardDisabled === true;
+  const innMainChestDisabled = building.id === "inn"
+    && activeAddon?.id === "main_chest"
+    && activeStorageSection?.key === "base"
+    && cityEventModifiers.innMainChestDisabled === true;
+  const occupiedBuildingStorageDisabled = occupation?.profile?.runtimeModifiers?.buildingStorageDisabled === true;
+  const activeStorageDisabled = Boolean(activeStorageSection) && (
+    innMainChestDisabled || occupiedBuildingStorageDisabled
+  );
+  const activeStorageDisabledText = occupiedBuildingStorageDisabled
+    ? `The occupying mob blocks all deposits and withdrawals from ${building.title} storage.`
+    : "The occupying mob blocks all deposits and withdrawals from the Main Chest.";
+  const storageSectionDisabled = (sectionKey) => (
+    occupiedBuildingStorageDisabled
+    || (
+      building.id === "inn"
+      && sectionKey === "base"
+      && cityEventModifiers.innMainChestDisabled === true
+    )
+  );
 
   useEffect(() => {
     if (!owned || !questBoardId) {
@@ -2978,7 +3025,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const acceptBoardQuest = (quest) => {
-    if (!questBoardId) return false;
+    if (!questBoardId || innRumorBoardDisabled) return false;
     const accepted = engineRef.current?.acceptBoardQuest?.(questBoardId, quest, { cityStats, cityProgress: progress });
     if (accepted) refreshQuestBoard();
     else engineRef.current?.addToast?.("Quest kunne ikke tages");
@@ -3134,7 +3181,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const depositInventoryItem = (inventoryIndex, sectionKey, slotIndex, confirmed = false) => {
-    if (!owned) return;
+    if (!owned || storageSectionDisabled(sectionKey)) return;
     const item = snapshot.inventory?.[inventoryIndex];
     const liveItem = engineRef.current?.player?.inventory?.[inventoryIndex] ?? item;
     if (!cityInventoryItemsSameTransferIdentity(item, liveItem)) {
@@ -3195,7 +3242,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const withdrawStoredItem = (sectionKey, slotIndex) => {
-    if (!owned) return;
+    if (!owned || storageSectionDisabled(sectionKey)) return;
     const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
     if (section?.fixedDefs?.[slotIndex]) return;
     const inventories = normalizeCityInventories(buildingState, building);
@@ -3222,7 +3269,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const transferAllResources = (sectionKey) => {
-    if (!owned) return;
+    if (!owned || storageSectionDisabled(sectionKey)) return;
     const section = cityInventorySections(building, buildingState, owned).find((entry) => entry.key === sectionKey);
     if (!section || section.fixedDefs?.length) return; // Don't transfer if section has fixed slots
     const nextInventories = normalizeCityInventories(buildingState, building);
@@ -3283,6 +3330,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const sortStoredItems = (sectionKey, sortId) => {
+    if (storageSectionDisabled(sectionKey)) return;
     onChangeProgress((current) => sortCityStorageSection(current, building.id, sectionKey, sortId));
   };
 
@@ -3331,7 +3379,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const moveStoredItem = (fromSectionKey, fromSlotIndex, toSectionKey, toSlotIndex) => {
-    if (!owned) return;
+    if (!owned || storageSectionDisabled(fromSectionKey) || storageSectionDisabled(toSectionKey)) return;
     const sections = cityInventorySections(building, buildingState, owned);
     const toSection = sections.find((section) => section.key === toSectionKey);
     const fromSection = sections.find((section) => section.key === fromSectionKey);
@@ -3838,6 +3886,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             board={questBoard}
             fallbackConfig={QUEST_BOARD_CONFIG[activeAddon.config?.boardId]}
             activeQuests={(snapshot.quests?.active ?? []).filter((quest) => String(quest.source ?? "") === String(questBoard?.source ?? QUEST_BOARD_CONFIG[activeAddon.config?.boardId]?.source ?? ""))}
+            disabled={innRumorBoardDisabled}
+            disabledText="Clear the mob occupying the Inn to restore rumors and local jobs."
             onAcceptQuest={acceptBoardQuest}
             onAbandonQuest={(quest) => engineRef.current?.abandonQuest?.(quest.id)}
           />
@@ -4093,7 +4143,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             );
           })}
         </nav>
-      <section className={`city-popup city-building-modal ${activeBaseTab ? "base-tab" : "function-tab"}`} role="dialog" aria-modal="true" aria-label={building.title}>
+      <section className={`city-popup city-building-modal ${activeBaseTab ? "base-tab" : "function-tab"} ${occupation ? "has-occupation" : ""}`} role="dialog" aria-modal="true" aria-label={building.title}>
         <header className="city-popup-header">
           <div>
             <h3>{functionModalTitle}</h3>
@@ -4254,6 +4304,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                       equipment={snapshot.equipment}
                       backpackUnlockedSlots={backpackCapacity}
                       activeSectionKey={activeStorageSection.key}
+                      disabled={activeStorageDisabled}
+                      disabledText={activeStorageDisabledText}
                       draggedCityItem={draggedCityItem}
                       onDragCityItem={setDraggedCityItem}
                       onDepositInventoryItem={depositInventoryItem}
@@ -5287,6 +5339,8 @@ function CityStoragePanel({
   equipment,
   backpackUnlockedSlots,
   activeSectionKey,
+  disabled = false,
+  disabledText = "",
   draggedCityItem,
   onDragCityItem,
   onDepositInventoryItem,
@@ -5313,13 +5367,14 @@ function CityStoragePanel({
   if (!activeSection) return null;
 
   return (
-    <section className="city-bank-panel">
+    <section className={`city-bank-panel ${disabled ? "occupation-disabled" : ""}`}>
       <div className="city-bank-column">
         <div className="city-inventory-heading">
           <h4>Backpack <span>{inventory.filter(Boolean).length} / {backpackUnlockedSlots}</span></h4>
           <InventorySortSelect onSort={onSortBackpack} />
           <button 
             type="button" 
+            disabled={disabled}
             onClick={() => onTransferAllResources?.(activeSection.key)}
             style={{ padding: "4px 8px", fontSize: "12px" }}
           >
@@ -5328,9 +5383,12 @@ function CityStoragePanel({
         </div>
         <div
           className="city-bank-grid backpack-drop"
-          onDragOver={(event) => event.preventDefault()}
+          onDragOver={(event) => {
+            if (!disabled) event.preventDefault();
+          }}
           onDrop={(event) => {
             event.preventDefault();
+            if (disabled) return;
             if (draggedCityItem?.source === "storage") onWithdrawStoredItem(draggedCityItem.sectionKey, draggedCityItem.slotIndex);
             onDragCityItem(null);
           }}
@@ -5357,14 +5415,16 @@ function CityStoragePanel({
               item={item}
               equipment={equipment}
               locked={false}
-              draggable={Boolean(item) && canEnter}
-              accepted={Boolean(item) && canEnter}
+              draggable={!disabled && Boolean(item) && canEnter}
+              accepted={!disabled && Boolean(item) && canEnter}
               muted={Boolean(item) && !canEnter}
               onDoubleClick={() => {
+                if (disabled) return;
                 const slotIndex = firstCityInventorySlotForItem(item, activeSection, storedItems);
                 if (slotIndex >= 0) onDepositInventoryItem(index, activeSection.key, slotIndex);
               }}
               onDragStart={(event) => {
+                if (disabled) return;
                 event.dataTransfer.setData("application/x-city-item", JSON.stringify({ source: "inventory", index }));
                 event.dataTransfer.effectAllowed = "move";
               }}
@@ -5376,7 +5436,11 @@ function CityStoragePanel({
       <div className="city-bank-column">
         <div className="city-inventory-heading">
           <h4>{activeSection.label} <span>{activeSection.typeLabel}</span></h4>
-          {!activeSection.fixedDefs?.length && <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(activeSection.key, sortId)} />}
+          {disabled ? (
+            <span className="city-storage-disabled-badge" title={disabledText || "Clear the occupying mob to use this storage again."}>Occupied · Locked</span>
+          ) : !activeSection.fixedDefs?.length ? (
+            <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(activeSection.key, sortId)} />
+          ) : null}
         </div>
         <div className="city-bank-grid">
           {Array.from({ length: activeSection.slots }, (_, index) => {
@@ -5388,14 +5452,16 @@ function CityStoragePanel({
                 equipment={equipment}
                 placeholder={activeSection.fixedDefs?.[index]}
                 locked={locked}
-                draggable={owned && Boolean(storedItems[index]) && !activeSection.fixedDefs?.[index]}
+                draggable={!disabled && owned && Boolean(storedItems[index]) && !activeSection.fixedDefs?.[index]}
                 onClick={() => {
                   if (storedItems[index] && isReadableItem(storedItems[index])) onReadStoredItem(storedItems[index]);
                 }}
                 onDoubleClick={() => {
+                  if (disabled) return;
                   if (storedItems[index] && !activeSection.fixedDefs?.[index]) onWithdrawStoredItem(activeSection.key, index);
                 }}
                 onDragStart={(event) => {
+                  if (disabled) return;
                   if (activeSection.fixedDefs?.[index]) return;
                   onDragCityItem({ source: "storage", sectionKey: activeSection.key, slotIndex: index });
                   event.dataTransfer.setData("application/x-city-item", JSON.stringify({ source: "storage", sectionKey: activeSection.key, slotIndex: index }));
@@ -5403,7 +5469,7 @@ function CityStoragePanel({
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
-                  if (locked) return;
+                  if (locked || disabled) return;
                   const payload = parseCityDragPayload(event);
                   if (payload?.source === "inventory") onDepositInventoryItem(payload.index, activeSection.key, index);
                   if (payload?.source === "storage") onMoveStoredItem(payload.sectionKey, payload.slotIndex, activeSection.key, index);

@@ -34,6 +34,7 @@ export const RESOURCE_DEFS = {
   ale: { name: "Ale", stackMax: 1000, value: 150, color: "#dca64f", iconUrl: "/assets/generated/item/item_quest_barrel.png" },
   hide: { name: "Skind", stackMax: 100, value: 4, color: "#a87a50", iconUrl: "/assets/generated/item/item_res_hide.png" },
   bonedust: { name: "Bone Dust", stackMax: 100, value: 3, color: "#c9c0a6", iconUrl: "/assets/generated/item/item_res_bonedust.png" },
+  gold_nugget: { name: "Gold Nugget", stackMax: 10, value: 10, color: "#ffbf00", iconUrl: "/assets/generated/item/item_quest_goldnugget.png" },
   
   // Plants / forageables
   red_rose: { name: "Rød rose", stackMax: 100, value: 1, color: "#ff6b8a", iconUrl: "/assets/generated/item/item_plant_redrose.png" },

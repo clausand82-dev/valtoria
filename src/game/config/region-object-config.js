@@ -600,6 +600,12 @@ function normalizeOptionalRadius(value) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+function normalizeFixedVariant(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.max(0, Math.floor(parsed)) : null;
+}
+
 function normalizeForegroundFade(value, fallback = false) {
   if (typeof value === "boolean") return value;
   if (value && typeof value === "object") return true;
@@ -680,7 +686,7 @@ export function normalizeObjectSpawnDamage(value) {
   return null;
 }
 
-function buildObjectEntry(objectId, weight, destructible = null, scale = null, spawnDamage = null) {
+function buildObjectEntry(objectId, weight, destructible = null, scale = null, spawnDamage = null, variant = null) {
   const def = REGION_OBJECT_DEFS[objectId];
   if (!def) return null;
   const resolvedWeight = parseWeight(weight);
@@ -701,6 +707,8 @@ function buildObjectEntry(objectId, weight, destructible = null, scale = null, s
     sortAnchor: normalizeSortAnchor(def.sortAnchor),
     depthOffset: Number.isFinite(Number(def.depthOffset)) ? Number(def.depthOffset) : 0,
     scale: normalizeScale(scale),
+    // A configured variant is a zero-based fixed spritesheet cell. Null keeps random selection.
+    variant: normalizeFixedVariant(variant),
     variantCount: objectVariantCountFromDef(def),
     spawnDamage: normalizeObjectSpawnDamage(spawnDamage),
     spawnTags: normalizeStringList(def.spawnTags),
@@ -801,7 +809,7 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
   const entries = [];
   for (const entry of raw) {
     if (typeof entry === "string") {
-      const normalized = buildObjectEntry(entry, 1, null, null, null);
+      const normalized = buildObjectEntry(entry, 1, null, null, null, null);
       if (normalized) entries.push(normalized);
       continue;
     }
@@ -810,7 +818,14 @@ export function normalizeRegionObjects(regionConfig = {}, biomeId = "mainland") 
     if (!objectId) continue;
     const destructible = typeof entry.destructible === "boolean" ? entry.destructible : null;
     const weight = parseWeight(entry.weight) || 1;
-    const normalized = buildObjectEntry(objectId, weight, destructible, entry.scale, entry.spawnDamage ?? entry.damageState ?? entry.damageSpawn);
+    const normalized = buildObjectEntry(
+      objectId,
+      weight,
+      destructible,
+      entry.scale,
+      entry.spawnDamage ?? entry.damageState ?? entry.damageSpawn,
+      entry.variant,
+    );
     if (normalized && entry.particles) {
       normalized.particles = normalizeParticleConfigs(entry.particles);
     }

@@ -12,6 +12,17 @@ Asset fields use the same formats as map-region-config.js:
 - decay
 - weights
 - antiDrops
+
+Target fields:
+- buildingIds: exact occupiedBuildingId matches (highest priority)
+- areaIds: exact occupiedAreaId matches
+- spawnZoneIds: original outer/spawn areaId fallback
+
+Entry conditions inside array-form tileset/foliageSet/objects/decay/mobs use the
+normal map-region resolver, including requires/conditions/blockedBy and direct
+shorthand tags. Conditional whole-field { value, variants } configs are passed
+through for visual asset fields; city battle mobs/spawnCounts are builder-owned.
+Top-level profile conditions are not used when selecting a battle profile.
 */
 
 export const CITY_MOB_BATTLE_PROFILES = [
@@ -24,15 +35,15 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "tileset/tileset_bricktiles.png" },
     ],
     foliageSet: [
-      { fileName: "foilage/foilage_deadvillages.png", scale: 0.65 },
+      { fileName: "foilage/foilage_deadvillages.png", scale: 1.5 },
       { fileName: "foilage/foilage_boneparts.png", scale: 0.45 },
-      { fileName: "foilage/foilage_garbage_001.png", scale: 0.55 },
+      { fileName: "foilage/foilage_garbage_001.png", scale: 0.75 },
     ],
     objects: [
       { id: "object_woodboxes_ground", weight: 6, destructible: true },
       { id: "object_barrels_ground", weight: 4, destructible: true },
       { id: "object_chests_ground", weight: 1, destructible: true },
-      { id: "object_statue_mixed", weight: 1, destructible: false },
+      { id: "object_pillar_stone", weight: 1, destructible: false },
     ],
     decay: [
       { id: "decay_blood", weight: 8 },
@@ -54,7 +65,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
     foliageSet: [
       { fileName: "foilage/foilage_field.png" },
       { fileName: "foilage/foilage_bones.png", scale: 0.5 },
-      { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.45 },
+      { fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
     ],
     objects: [
       { id: "object_field", weight: 8, destructible: true },
@@ -85,7 +96,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
     objects: [
       { id: "object_tree_lava", weight: 5, destructible: true },
       { id: "object_caves", weight: 1, destructible: false },
-      { id: "object_wheelbarrel", weight: 2, destructible: true },
+      { id: "object_wagons", weight: 2, destructible: true },
       { id: "object_barrels_ground", weight: 3, destructible: true },
     ],
     decay: [
@@ -112,7 +123,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
     objects: [
       { id: "object_stone_cluster", weight: 8, destructible: true },
       { id: "object_pillar_stone", weight: 2, destructible: true },
-      { id: "object_statue_troll", weight: 1, destructible: false },
+      { id: "object_pillar_stone", weight: 1, destructible: false },
       { id: "object_woodboxes_ground", weight: 2, destructible: true },
     ],
     decay: [
@@ -122,6 +133,207 @@ export const CITY_MOB_BATTLE_PROFILES = [
     ],
     weights: { foilage: 7 },
     mobs: ["Demon", "Skeleton", "Scorpion"],
+  },
+  {
+    id: "city-bank-vault",
+    label: "Occupied Bank Vault",
+    buildingIds: ["bank"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", x: 1, y: 1, weight: 3}],
+    foliageSet: [
+      { fileName: "foilage/foilage_basement.png", weight: 2, scale: 0.8 },
+      //{ fileName: "foilage/foilage_metalchains.png", weight: 5, scale: 0.7 },
+      //{ fileName: "foilage/foilage_metalparts.png", weight: 3, scale: 0.65 },
+      { fileName: "foilage/foilage_bank_money.png", weight: 12, scale: 0.75, lootTables: ["gold_bank"] },
+      { fileName: "foilage/foilage_bank_crystal.png", weight: 8, scale: 0.75, lootTables: ["material_gemstones"] },
+      { fileName: "foilage/foilage_shattered_paper.png", weight: 20, scale: 0.75, lootTables: ["material_paper"] },
+    ],
+    objects: [
+      //{ id: "object_metalchest", weight: 12, destructible: true },
+      { id: "object_chests_ground", weight: 8, destructible: true },
+      { id: "object_shelfs", weight: 7, destructible: true },
+      { id: "object_woodboxes_ground", weight: 4, destructible: true },
+      { id: "object_sacks_ground", variant: 2, weight: 3, destructible: true },
+    ],
+    decay: [{ id: "decay_dust", weight: 10 }, { id: "decay_cracks", weight: 6 }, { id: "decay_spiderweb", weight: 3 }],
+    spawnCounts: { objects: 24, foliage: 78, decals: 18 },
+    mobs: ["Knight", "Skeleton", "Spider"],
+  },
+  {
+    id: "city-inn-taproom",
+    label: "Occupied Inn",
+    buildingIds: ["inn"],
+    tileset: [{ fileName: "tileset/tileset_woodplank.png", weight: 4 }, { fileName: "tileset/tileset_bricktiles.png", weight: 1 }],
+    foliageSet: [
+      { fileName: "foilage/foilage_barnitems.png", weight: 9, scale: 0.8 },
+      { fileName: "foilage/foilage_food.png", weight: 6, scale: 0.7 },
+      { fileName: "foilage/foilage_garbage_001.png", weight: 3, scale: 0.65 },
+    ],
+    objects: [
+      { id: "object_barrels_ground", weight: 12, destructible: true },
+      { id: "object_shelfs", weight: 8, destructible: true },
+      { id: "object_sacks_ground", weight: 6, destructible: true },
+      { id: "object_fireplace_mainland", weight: 3, destructible: false },
+      { id: "object_woodboxes_ground", weight: 3, destructible: true },
+    ],
+    decay: [{ id: "decay_food", weight: 9 }, { id: "decay_dust", weight: 7 }, { id: "decay_blood", weight: 3 }, { id: "decay_spiderweb", weight: 2 }],
+    spawnCounts: { objects: 22, foliage: 18, decals: 18 },
+    mobs: ["Peasant", "Skeleton", "Wolf"],
+  },
+  {
+    id: "city-merchant-shop",
+    label: "Occupied Merchant Shop",
+    buildingIds: ["merchant"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_food.png", weight: 6, scale: 0.7 }, { fileName: "foilage/foilage_village_items_broken.png", weight: 5, scale: 0.7 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
+    objects: [{ id: "object_marketstalls", weight: 10, destructible: true }, { id: "object_fruitbaskets", weight: 8, destructible: true }, { id: "object_sacks_ground", weight: 6, destructible: true }, { id: "object_woodboxes_ground", weight: 5, destructible: true }, { id: "object_barrels_ground", weight: 3, destructible: true }],
+    decay: [{ id: "decay_food", weight: 8 }, { id: "decay_dust", weight: 5 }, { id: "decay_cracks", weight: 3 }],
+    spawnCounts: { objects: 24, foliage: 18, decals: 16 },
+    mobs: ["Peasant", "Knight", "Wolf"],
+  },
+  {
+    id: "city-blacksmith-forge",
+    label: "Occupied Blacksmith",
+    buildingIds: ["blacksmith"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
+    foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 9, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 7, scale: 0.7 }, { fileName: "foilage/foilage_metalparts.png", weight: 6, scale: 0.65 }],
+    objects: [{ id: "object_fireplace_mainland", weight: 5, destructible: false }, { id: "object_metalchest", weight: 5, destructible: true }, { id: "object_woodboxes_ground", weight: 5, destructible: true }, { id: "object_barrels_ground", weight: 4, destructible: true }, { id: "object_pillar_stone", weight: 2, destructible: true }],
+    decay: [{ id: "decay_dust", weight: 9 }, { id: "decay_cracks", weight: 8 }, { id: "decay_blood", weight: 3 }],
+    spawnCounts: { objects: 22, foliage: 22, decals: 18 },
+    mobs: ["Knight", "Demon", "Skeleton"],
+  },
+  {
+    id: "city-town-hall-chambers",
+    label: "Occupied Town Hall",
+    buildingIds: ["town_hall"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 7, scale: 0.75 }, { fileName: "foilage/foilage_cityplant.png", weight: 3, scale: 0.7 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
+    objects: [{ id: "object_pillar_stone", weight: 10, destructible: true }, { id: "object_shelfs", weight: 5, destructible: true }, { id: "object_woodboxes_ground", weight: 3, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 8 }, { id: "decay_dust", weight: 7 }, { id: "decay_blood", weight: 2 }],
+    spawnCounts: { objects: 20, foliage: 16, decals: 18 },
+    mobs: ["Peasant", "Knight", "Skeleton"],
+  },
+  {
+    id: "city-sanctuary-nave",
+    label: "Occupied Sanctuary",
+    buildingIds: ["sanctuary"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }, { fileName: "tileset/tileset_rock.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_boneparts.png", weight: 6, scale: 0.55 }, { fileName: "foilage/foilage_bones.png", weight: 4, scale: 0.55 }, { fileName: "foilage/foilage_cityplant.png", weight: 2, scale: 0.7 }],
+    objects: [{ id: "object_pillar_stone", weight: 10, destructible: true }, { id: "object_bones", weight: 3, destructible: true }, { id: "object_shelfs", weight: 2, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 8 }, { id: "decay_blood", weight: 6 }, { id: "decay_dust", weight: 4 }],
+    spawnCounts: { objects: 20, foliage: 18, decals: 20 },
+    mobs: ["Demon", "Skeleton", "Ghost"],
+  },
+  {
+    id: "city-barracks-yard",
+    label: "Occupied Barracks",
+    buildingIds: ["barracks"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
+    foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 7, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 6, scale: 0.7 }, { fileName: "foilage/foilage_village_debris.png", weight: 3, scale: 0.7 }],
+    objects: [{ id: "object_metalchest", weight: 7, destructible: true }, { id: "object_woodboxes_ground", weight: 6, destructible: true }, { id: "object_barrels_ground", weight: 5, destructible: true }, { id: "object_pillar_stone", weight: 3, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 8 }, { id: "decay_dust", weight: 6 }, { id: "decay_blood", weight: 5 }],
+    spawnCounts: { objects: 23, foliage: 20, decals: 18 },
+    mobs: ["Knight", "Peasant", "Skeleton"],
+  },
+  {
+    id: "city-armory-store",
+    label: "Occupied Armory",
+    buildingIds: ["armory"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 10, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 8, scale: 0.7 }, { fileName: "foilage/foilage_metalparts.png", weight: 7, scale: 0.65 }],
+    objects: [{ id: "object_metalchest", weight: 10, destructible: true }, { id: "object_shelfs", weight: 8, destructible: true }, { id: "object_woodboxes_ground", weight: 4, destructible: true }, { id: "object_barrels_ground", weight: 2, destructible: true }],
+    decay: [{ id: "decay_dust", weight: 8 }, { id: "decay_cracks", weight: 6 }, { id: "decay_blood", weight: 3 }],
+    spawnCounts: { objects: 24, foliage: 22, decals: 16 },
+    mobs: ["Knight", "Skeleton", "Demon"],
+  },
+  {
+    id: "city-area-market",
+    label: "Raided Market Area",
+    areaIds: ["market"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_food.png", weight: 7 }, { fileName: "foilage/foilage_cityplant.png", weight: 3 }, { fileName: "foilage/foilage_village_debris.png", weight: 4 }],
+    objects: [{ id: "object_marketstalls", weight: 9, destructible: true }, { id: "object_destroyed_marketstalls", weight: 5, destructible: true }, { id: "object_fruitbaskets", weight: 6, destructible: true }, { id: "object_wagons", weight: 3, destructible: true }],
+    decay: [{ id: "decay_food", weight: 8 }, { id: "decay_cracks", weight: 5 }, { id: "decay_dust", weight: 4 }],
+    mobs: ["Peasant", "Wolf", "Knight"],
+  },
+  {
+    id: "city-area-mystic-quarter",
+    label: "Raided Mystic Quarter",
+    areaIds: ["mystic_quarter"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_rock.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 5 }, { fileName: "foilage/foilage_roots.png", weight: 4 }, { fileName: "foilage/foilage_boneparts.png", weight: 3, scale: 0.5 }],
+    objects: [{ id: "object_pillar_stone", weight: 9, destructible: true }, { id: "object_caves", weight: 1, destructible: false }],
+    decay: [{ id: "decay_cracks", weight: 8 }, { id: "decay_blood", weight: 4 }, { id: "decay_spiderweb", weight: 3 }],
+    mobs: ["Demon", "Ghost", "Skeleton"],
+  },
+  {
+    id: "city-area-crafting-quarter",
+    label: "Raided Crafting Quarter",
+    areaIds: ["crafting_quarter"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
+    foliageSet: [{ fileName: "foilage/foilage_metalparts.png", weight: 8 }, { fileName: "foilage/foilage_metalplates.png", weight: 7 }, { fileName: "foilage/foilage_metalchains.png", weight: 5 }],
+    objects: [{ id: "object_fireplace_mainland", weight: 4, destructible: false }, { id: "object_woodboxes_ground", weight: 6, destructible: true }, { id: "object_barrels_ground", weight: 5, destructible: true }, { id: "object_metalchest", weight: 3, destructible: true }],
+    decay: [{ id: "decay_dust", weight: 9 }, { id: "decay_cracks", weight: 7 }, { id: "decay_blood", weight: 3 }],
+    mobs: ["Knight", "Skeleton", "Demon"],
+  },
+  {
+    id: "city-area-town-center",
+    label: "Raided Town Center",
+    areaIds: ["town_center"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }],
+    foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 5 }, { fileName: "foilage/foilage_village_items_broken.png", weight: 4 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
+    objects: [{ id: "object_pillar_stone", weight: 9, destructible: true }, { id: "object_wagons", weight: 2, destructible: true }, { id: "object_woodboxes_ground", weight: 3, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 8 }, { id: "decay_dust", weight: 5 }, { id: "decay_blood", weight: 3 }],
+    mobs: ["Peasant", "Knight", "Skeleton"],
+  },
+  {
+    id: "city-area-training-grounds",
+    label: "Raided Training Grounds",
+    areaIds: ["training_grounds"],
+    tileset: [{ fileName: "tileset/tileset_debris.png", weight: 2 }, { fileName: "tileset/tileset_bricktiles.png", weight: 2 }],
+    foliageSet: [{ fileName: "foilage/foilage_metalparts.png", weight: 6 }, { fileName: "foilage/foilage_metalplates.png", weight: 5 }, { fileName: "foilage/foilage_village_debris.png", weight: 3 }],
+    objects: [{ id: "object_woodboxes_ground", weight: 7, destructible: true }, { id: "object_barrels_ground", weight: 6, destructible: true }, { id: "object_metalchest", weight: 4, destructible: true }, { id: "object_pillar_stone", weight: 2, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 7 }, { id: "decay_dust", weight: 5 }, { id: "decay_blood", weight: 5 }],
+    mobs: ["Knight", "Peasant", "Skeleton"],
+  },
+  {
+    id: "city-area-housing",
+    label: "Raided Housing Area",
+    areaIds: ["housing_area"],
+    tileset: [{ fileName: "tileset/tileset_woodplank.png", weight: 2 }, { fileName: "tileset/tileset_bricktiles.png", weight: 2 }],
+    foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 7 }, { fileName: "foilage/foilage_food.png", weight: 4 }, { fileName: "foilage/foilage_garbage_001.png", weight: 3 }],
+    objects: [{ id: "object_house_mainland", weight: 4, destructible: false }, { id: "object_shelfs", weight: 4, destructible: true }, { id: "object_barrels_ground", weight: 4, destructible: true }, { id: "object_woodboxes_ground", weight: 4, destructible: true }],
+    decay: [{ id: "decay_dust", weight: 7 }, { id: "decay_food", weight: 4 }, { id: "decay_blood", weight: 3 }],
+    mobs: ["Peasant", "Wolf", "Skeleton"],
+  },
+  {
+    id: "city-area-park",
+    label: "Raided Park",
+    areaIds: ["park"],
+    tileset: [{ fileName: "tileset/tileset_grass.png", weight: 3 }, { fileName: "tileset/tileset_bricktiles.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 8 }, { fileName: "foilage/foilage_plants_mainland.png", weight: 6 }, { fileName: "foilage/foilage_roots.png", weight: 3 }],
+    objects: [{ id: "object_tree_mainland", weight: 7, destructible: true }, { id: "object_well", weight: 2, destructible: false }, { id: "object_pillar_stone", weight: 2, destructible: false }, { id: "object_barrels_ground", weight: 2, destructible: true }],
+    decay: [{ id: "decay_field", weight: 7 }, { id: "decay_cracks", weight: 4 }, { id: "decay_blood", weight: 3 }],
+    mobs: ["Wolf", "Spider", "Skeleton"],
+  },
+  {
+    id: "city-area-education",
+    label: "Raided Education Area",
+    areaIds: ["education_area"],
+    tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 6 }, { fileName: "foilage/foilage_cityplant.png", weight: 3 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
+    objects: [{ id: "object_shelfs", weight: 10, destructible: true }, { id: "object_pillar_stone", weight: 5, destructible: true }, { id: "object_woodboxes_ground", weight: 4, destructible: true }],
+    decay: [{ id: "decay_dust", weight: 9 }, { id: "decay_cracks", weight: 5 }, { id: "decay_spiderweb", weight: 3 }],
+    mobs: ["Skeleton", "Ghost", "Demon"],
+  },
+  {
+    id: "city-area-empty-district",
+    label: "Raided Empty District",
+    areaIds: ["empty_district_1"],
+    tileset: [{ fileName: "tileset/tileset_debris.png", weight: 3 }, { fileName: "tileset/tileset_bricktiles.png", weight: 1 }],
+    foliageSet: [{ fileName: "foilage/foilage_deadvillages.png", weight: 7, scale: 1.2 }, { fileName: "foilage/foilage_village_debris.png", weight: 5 }, { fileName: "foilage/foilage_garbage_001.png", weight: 3 }],
+    objects: [{ id: "object_ruin_normal", weight: 7, destructible: true }, { id: "object_woodboxes_ground", weight: 5, destructible: true }, { id: "object_barrels_ground", weight: 4, destructible: true }, { id: "object_pillar_stone", weight: 3, destructible: true }],
+    decay: [{ id: "decay_cracks", weight: 10 }, { id: "decay_dust", weight: 7 }, { id: "decay_blood", weight: 3 }],
+    mobs: ["Skeleton", "Spider", "Demon"],
   },
 ];
 
@@ -166,7 +378,11 @@ function normalizeMobEntries(mobs = []) {
     .map((mob) => (
       typeof mob === "string"
         ? { type: mob, weight: 1 }
-        : { type: String(mob?.type ?? "").trim(), weight: Math.max(0, Number(mob?.weight) || 1) }
+        : {
+          ...mob,
+          type: String(mob?.type ?? "").trim(),
+          weight: Math.max(0, Number(mob?.weight) || 1),
+        }
     ))
     .filter((mob) => mob.type);
 }
@@ -184,14 +400,28 @@ export function cityMobBattleProfilesForArea(areaId) {
   return CITY_MOB_BATTLE_PROFILES.filter((profile) => profileMatchesCitySpawnZone(profile, areaId));
 }
 
-export function buildCityMobBattleRegion(profile, { areaId, mobType, mapSize }) {
+function profileMatchesTargetIds(profile, key, targetId) {
+  if (!targetId) return false;
+  const ids = Array.isArray(profile?.[key]) ? profile[key] : [];
+  return ids.map(String).includes(String(targetId));
+}
+
+export function cityMobBattleProfilesForTarget({ buildingId = null, areaId = null, spawnZoneId = null } = {}) {
+  const buildingProfiles = CITY_MOB_BATTLE_PROFILES.filter((profile) => profileMatchesTargetIds(profile, "buildingIds", buildingId));
+  if (buildingProfiles.length > 0) return buildingProfiles;
+  const areaProfiles = CITY_MOB_BATTLE_PROFILES.filter((profile) => profileMatchesTargetIds(profile, "areaIds", areaId));
+  if (areaProfiles.length > 0) return areaProfiles;
+  return cityMobBattleProfilesForArea(spawnZoneId);
+}
+
+export function buildCityMobBattleRegion(profile, { areaId, mobType, mapSize, occupiedAreaId = null, occupiedBuildingId = null }) {
   if (!profile?.id || !mobType) return null;
   const spawnCounts = buildCityMobSpawnCounts(profile, mapSize);
   const extraMobs = normalizeMobEntries(profile.mobs)
     .filter((mob) => mob.type.toLowerCase() !== String(mobType).toLowerCase());
   const extraTotal = extraMobs.reduce((sum, mob) => sum + mob.weight, 0);
   const weightedExtraMobs = extraTotal > 0
-    ? extraMobs.map((mob) => ({ type: mob.type, weight: (mob.weight / extraTotal) * 10 }))
+    ? extraMobs.map((mob) => ({ ...mob, weight: (mob.weight / extraTotal) * 10 }))
     : [];
 
   return {
@@ -199,6 +429,8 @@ export function buildCityMobBattleRegion(profile, { areaId, mobType, mapSize }) 
     id: `citymob:${profile.id}`,
     label: profile.label ?? profile.id,
     citySpawnZoneId: areaId,
+    cityOccupiedAreaId: occupiedAreaId,
+    cityOccupiedBuildingId: occupiedBuildingId,
     mapSize,
     spawnCounts,
     mobs: [

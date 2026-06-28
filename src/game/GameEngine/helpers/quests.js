@@ -745,7 +745,7 @@ export function normalizeSavedQuestState(saved) {
           const defTarget = def.target;
           const mergedTarget = { ...savedTarget };
 
-          const scalarKeys = ["questItemId", "count", "source", "dropChance", "dropRegionIds", "sourceObjectId", "sourceObjectIds", "sourceTags", "sourceObjectTags"];
+          const scalarKeys = ["questItemId", "count", "source", "dropChance", "regionId", "dropRegionIds", "sourceObjectId", "sourceObjectIds", "sourceTags", "sourceObjectTags"];
           for (const key of scalarKeys) {
             if (mergedTarget[key] === undefined && defTarget[key] !== undefined) {
               mergedTarget[key] = defTarget[key];
@@ -756,6 +756,12 @@ export function normalizeSavedQuestState(saved) {
             mergedTarget.dropRegionIds = Array.isArray(defTarget.dropRegionIds)
               ? defTarget.dropRegionIds.map(String)
               : defTarget.dropRegionIds;
+          }
+
+          if (mergedTarget.regionIds === undefined && defTarget.regionIds !== undefined) {
+            mergedTarget.regionIds = Array.isArray(defTarget.regionIds)
+              ? defTarget.regionIds.map(String)
+              : defTarget.regionIds;
           }
 
           if (!Array.isArray(mergedTarget.questItems) && Array.isArray(defTarget.questItems)) {

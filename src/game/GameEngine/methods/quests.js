@@ -747,6 +747,10 @@ export const questsMethods = {
   rollQuestBoard(boardId, contextOverrides = {}) {
     const config = this.questBoardDef(boardId);
     if (!config) return null;
+    const modifiers = cityRuntimeModifiers(contextOverrides?.cityStats ?? this.cityStats ?? {});
+    if (boardId === "inn" && modifiers.innRumorBoardDisabled) {
+      return this.questBoardSnapshot(boardId, contextOverrides);
+    }
     const boardState = this.questBoardState(boardId);
     const beforeIds = (boardState.availableQuestIds ?? []).map(String);
     boardState.availableQuestIds = beforeIds.filter((questId) => {
@@ -756,7 +760,6 @@ export const questsMethods = {
       if (!def.repeatable && this.questState.completed.includes(String(questId))) return false;
       return this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides);
     });
-    const modifiers = cityRuntimeModifiers(contextOverrides?.cityStats ?? this.cityStats ?? {});
     const boardMultiplier = boardId === "inn"
       ? modifiers.innRumorMultiplier ?? 1
       : boardId === "townHall"
@@ -814,6 +817,11 @@ export const questsMethods = {
   acceptBoardQuest(boardId, offer, contextOverrides = {}) {
     const config = this.questBoardDef(boardId);
     if (!config || !offer?.questId) return false;
+    const modifiers = cityRuntimeModifiers(contextOverrides?.cityStats ?? this.cityStats ?? {});
+    if (boardId === "inn" && modifiers.innRumorBoardDisabled) {
+      this.addToast("Rumor Board is disabled while the Inn is occupied");
+      return false;
+    }
     const boardState = this.questBoardState(boardId);
     const questId = String(offer.questId);
     if (!(boardState.availableQuestIds ?? []).map(String).includes(questId)) {

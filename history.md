@@ -18,7 +18,7 @@ kun en farm, resten er bare areas der hedder farm!
 - magic slot i charater sheet now shows magic info in hover
 - active magic can now be selected instead of a cycle
 - added icons to magic slot
-- city mobs can now occupied buildings if city wall is down or not yet build
+- city mobs can now occupied buildings if city wall is down or not yet build (and are visuel showned at area and building)
 - city areas, building and addons can now be build fra complete quest
 - some city areas shall now be cleared before player can build lvl 1 and get access to build buildings.
 - fixed an error in check_inn_infestation quest, where when entered crack and back again before crack cleared, crack coun't be revisited
@@ -29,6 +29,12 @@ kun en farm, resten er bare areas der hedder farm!
 - removed quest finish modal
 - changed how toastlog counter works - it now only count importent messenges
 - toast log counter resets when log have been opened
+- added more info on about region maps on region map (corruption, active mobs, map size and region active quests)
+- fixed so quest show material from bank also and can use both inventory and city inventory
+- when pickup ud quest relevant items a special floating text will show it
+- city mobs are now more easy to see om city map
+- inn and bank occupied by city mobs can't use main chest and vault
+
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water

@@ -1055,28 +1055,83 @@
   cursor: pointer;
   transform: translate(-50%, -50%);
   pointer-events: auto;
+  isolation: isolate;
+}
+
+.city-map-mob-mini::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border: 3px solid #ffb04f;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(15, 6, 3, 0.94) 52%, rgba(128, 27, 12, 0.82) 100%);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.9),
+    0 0 14px 4px rgba(255, 73, 35, 0.72);
+}
+
+.city-map-mob-mini::after {
+  content: "!";
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffd17a;
+  border-radius: 50%;
+  background: #9d1e12;
+  color: #fff4ce;
+  font: 900 11px/1 Georgia, serif;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.9);
 }
 
 .city-map-mob-mini img {
-  width: 100%;
-  height: 100%;
+  position: relative;
+  z-index: 1;
+  width: 34px;
+  height: 34px;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
 }
 
 .city-map-mob-mini:hover,
 .city-map-mob-mini:focus-visible {
   outline: none;
-  transform: translate(-50%, -50%) scale(1.08);
+  transform: translate(-50%, -50%) scale(1.14);
 }
 
 .city-map-mob-mini.blocked {
-  opacity: 0.58;
+  opacity: 0.9;
+}
+
+.city-map-mob-mini.blocked::before {
+  border-color: #8fa5b5;
+  background: radial-gradient(circle, rgba(10, 13, 17, 0.94) 52%, rgba(39, 58, 72, 0.86) 100%);
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.9),
+    0 0 11px 3px rgba(92, 137, 167, 0.58);
+}
+
+.city-map-mob-mini.blocked::after {
+  border-color: #c3d0d9;
+  background: #40596b;
+  color: #f0f6fa;
 }
 
 .city-map-mob-mini.blocked img {
-  filter: grayscale(0.7) brightness(0.8);
+  filter: grayscale(0.35) brightness(0.9) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
+}
+
+.city-map-mob-mini.attackable::before {
+  border-color: #ff7b5c;
+  box-shadow:
+    0 0 0 2px rgba(0, 0, 0, 0.92),
+    0 0 18px 6px rgba(255, 45, 24, 0.82);
 }
 
 .city-mob-action-popup {
@@ -1111,6 +1166,7 @@
 
 .city-building-occupation-warning {
   display: grid;
+  align-self: start;
   gap: 3px;
   margin: 10px 16px 0;
   padding: 9px 10px;
@@ -1131,6 +1187,21 @@
   color: rgba(229, 219, 190, 0.68);
   font-size: 11px;
   line-height: 1.3;
+}
+
+.city-occupation-lock-note {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 123, 92, 0.5);
+  border-radius: 6px;
+  background: rgba(70, 20, 14, 0.36);
+  color: rgba(244, 218, 150, 0.82);
+}
+
+.city-occupation-lock-note b {
+  color: #ff9f86;
 }
 
 .city-mob-info-panel header {

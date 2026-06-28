@@ -37,7 +37,7 @@ import {
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
 import {
   buildCityMobBattleRegion,
-  cityMobBattleProfilesForArea,
+  cityMobBattleProfilesForTarget,
 } from "../game/config/city-mobs-battle-config.js";
 import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../game/config/quest-config.js";
 import { QUEST_NPCS } from "../game/config/npc-config.js";
@@ -303,23 +303,118 @@ function normalizeCityMobs(cityMobs = []) {
       .map((entry) => entry.mob);
     capped.push(...kept);
   }
-  const areaTotals = new Map();
+  const visualTargets = new Map();
   for (const mob of capped) {
-    areaTotals.set(mob.areaId, (areaTotals.get(mob.areaId) ?? 0) + 1);
+    const target = cityMobVisualTarget(mob);
+    const list = visualTargets.get(target.key) ?? [];
+    list.push({ mob, target });
+    visualTargets.set(target.key, list);
   }
-  const areaIndexes = new Map();
-  return capped.map((mob) => {
-    const index = areaIndexes.get(mob.areaId) ?? 0;
-    areaIndexes.set(mob.areaId, index + 1);
-    const count = areaTotals.get(mob.areaId) ?? 1;
-    const area = CITY_AREAS.find((entry) => entry.id === mob.areaId);
-    const position = cityAreaIconFallbackPosition(area, index, count);
-    return { ...mob, x: position.x, y: position.y };
-  });
+  const positioned = new Map();
+  for (const entries of visualTargets.values()) {
+    const sorted = entries[0]?.target.occupied
+      ? [...entries].sort((a, b) => a.mob.id.localeCompare(b.mob.id))
+      : entries;
+    sorted.forEach(({ mob, target }, index) => {
+      const position = cityMobVisualOffsetPosition(target.position, index, sorted.length);
+      positioned.set(mob.id, {
+        ...mob,
+        visualAreaId: target.areaId,
+        visualTargetId: target.id,
+        visualTargetType: target.type,
+        visualTargetLabel: target.label,
+        x: position.x,
+        y: position.y,
+      });
+    });
+  }
+  return capped.map((mob) => positioned.get(mob.id) ?? mob);
 }
 
 function cityMapMobRefs(cityMobs = []) {
   return normalizeCityMobs(cityMobs);
+}
+
+function cityMobVisualTarget(mob) {
+  const fallbackArea = CITY_AREAS.find((entry) => entry.id === mob?.areaId);
+  const fallbackPosition = cityAreaCenter(fallbackArea);
+  const fallback = {
+    key: `source-area:${mob?.areaId ?? "unknown"}`,
+    id: String(mob?.areaId ?? "unknown"),
+    type: "area",
+    occupied: false,
+    areaId: fallbackArea?.id ?? String(mob?.areaId ?? ""),
+    label: fallbackArea?.title ?? String(mob?.areaId || "Unknown area"),
+    position: fallbackPosition,
+  };
+  if (mob?.breachState !== "inside") return fallback;
+
+  // An occupied target is where the mob is causing trouble; areaId remains its attack/spawn path.
+  if (mob.occupiedBuildingId) {
+    const building = CITY_BUILDINGS.find((entry) => entry.id === mob.occupiedBuildingId);
+    if (building) {
+      const area = CITY_AREAS.find((entry) => (entry.buildings ?? []).some((ref) => (
+        (typeof ref === "string" ? ref : ref?.id) === building.id
+      )));
+      const ref = area?.buildings?.find((entry) => (
+        (typeof entry === "string" ? entry : entry?.id) === building.id
+      ));
+      const position = typeof ref === "object" && Number.isFinite(ref?.x) && Number.isFinite(ref?.y)
+        ? { x: ref.x, y: ref.y }
+        : area ? cityAreaCenter(area) : null;
+      if (position) {
+        return {
+          key: `building:${building.id}`,
+          id: building.id,
+          type: "building",
+          occupied: true,
+          areaId: area?.id ?? null,
+          label: building.title ?? building.id,
+          position,
+        };
+      }
+    }
+  }
+
+  if (mob.occupiedAreaId) {
+    const area = CITY_AREAS.find((entry) => entry.id === mob.occupiedAreaId);
+    if (area) {
+      return {
+        key: `occupied-area:${area.id}`,
+        id: area.id,
+        type: "area",
+        occupied: true,
+        areaId: area.id,
+        label: area.title ?? area.id,
+        position: cityAreaCenter(area),
+      };
+    }
+  }
+  return fallback;
+}
+
+function cityMobVisualOffsetPosition(center, index, count) {
+  if (count <= 1) return center;
+  const radius = Math.min(30, 18 + count * 3);
+  const angle = ((Math.PI * 2) / count) * index - Math.PI / 2;
+  return {
+    x: center.x + Math.cos(angle) * radius,
+    y: center.y + Math.sin(angle) * radius,
+  };
+}
+
+function cityMobVisualDiagnostics(cityMobs = []) {
+  return cityMapMobRefs(cityMobs).map((mob) => ({
+    id: mob.id,
+    areaId: mob.areaId,
+    breachState: mob.breachState,
+    occupiedAreaId: mob.occupiedAreaId,
+    occupiedBuildingId: mob.occupiedBuildingId,
+    visualAreaId: mob.visualAreaId,
+    visualTargetId: mob.visualTargetId,
+    x: mob.x,
+    y: mob.y,
+  }));
 }
 
 function cityAttackableMobIds(cityMobs = []) {
@@ -577,16 +672,38 @@ function mergeRuntimeModifierValues(target, source = {}) {
 function cityMobOccupationStatusText(mob) {
   const occupation = cityMobOccupationEntry(mob);
   if (occupation) return `Occupying: ${occupation.targetLabel}`;
-  if (mob?.breachState === "inside") return "Inside the city";
+  if (mob?.breachState === "inside") {
+    const building = mob.occupiedBuildingId
+      ? CITY_BUILDINGS.find((entry) => entry.id === mob.occupiedBuildingId)
+      : null;
+    const area = mob.occupiedAreaId
+      ? CITY_AREAS.find((entry) => entry.id === mob.occupiedAreaId)
+      : null;
+    const targetLabel = building?.title ?? area?.title;
+    return targetLabel ? `Occupying: ${targetLabel}` : "Inside the city";
+  }
   return cityMobZoneKind(mob?.areaId) === "close" ? "At the city wall" : "Outside the city";
 }
 
-function pickCityBattleRegion(mobType, mapSize = "small", areaId = null) {
-  const cityProfiles = areaId ? cityMobBattleProfilesForArea(areaId) : [];
+function pickCityBattleRegion(mobType, mapSize = "small", areaId = null, target = {}) {
+  const occupiedBuildingId = target?.occupiedBuildingId ?? null;
+  const occupiedAreaId = target?.occupiedAreaId ?? null;
+  const cityProfiles = cityMobBattleProfilesForTarget({
+    buildingId: occupiedBuildingId,
+    areaId: occupiedAreaId,
+    spawnZoneId: areaId,
+  });
   if (cityProfiles.length > 0) {
     const profile = cityProfiles[Math.floor(Math.random() * cityProfiles.length)];
-    const region = buildCityMobBattleRegion(profile, { areaId, mobType, mapSize });
-    if (region) return { areaMapId: `citymob:${areaId}`, region };
+    const region = buildCityMobBattleRegion(profile, {
+      areaId,
+      mobType,
+      mapSize,
+      occupiedAreaId,
+      occupiedBuildingId,
+    });
+    const battleTargetId = occupiedBuildingId ?? occupiedAreaId ?? areaId;
+    if (region) return { areaMapId: `citymob:${battleTargetId}`, region };
   }
 
   const all = Object.entries(MAP_REGION_SETS)
@@ -1235,10 +1352,18 @@ function cityAreaIconFallbackPosition(area, index, count) {
   };
 }
 
-function cityMapPositionStyle(x, y) {
+function cityMapPositionStyle(x, y, edgeInset = 0) {
+  const left = `${(x / CITY_MAP_IMAGE.width) * 100}%`;
+  const top = `${(y / CITY_MAP_IMAGE.height) * 100}%`;
+  if (edgeInset > 0) {
+    return {
+      left: `clamp(${edgeInset}px, ${left}, calc(100% - ${edgeInset}px))`,
+      top: `clamp(${edgeInset}px, ${top}, calc(100% - ${edgeInset}px))`,
+    };
+  }
   return {
-    left: `${(x / CITY_MAP_IMAGE.width) * 100}%`,
-    top: `${(y / CITY_MAP_IMAGE.height) * 100}%`,
+    left,
+    top,
   };
 }
 
@@ -2950,6 +3075,7 @@ export {
   cityAreaLockedLayerUrls,
   normalizeCityMobs,
   cityMapMobRefs,
+  cityMobVisualDiagnostics,
   cityAttackableMobIds,
   cityMobAreaLabel,
   cityMobDisplayName,

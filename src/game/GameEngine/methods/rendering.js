@@ -901,14 +901,14 @@ export const renderingMethods = {
 
   drawFloaters(ctx) {
     ctx.save();
-    ctx.font = "700 13px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     for (const f of this.floaters) {
       const fogAlpha = this.fogPointAlpha(f);
       if (fogAlpha <= 0.02) continue;
       const screen = worldToScreen(f.x, f.y, f.z, this.camera);
-      ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1) * fogAlpha;
+      ctx.globalAlpha = clamp(f.life / Math.min(f.maxLife, f.fadeDuration ?? f.maxLife), 0, 1) * fogAlpha;
+      ctx.font = `${f.fontWeight ?? 700} ${f.fontSize ?? 13}px Inter, system-ui, sans-serif`;
       ctx.lineWidth = 3;
       ctx.strokeStyle = "rgba(0,0,0,0.75)";
       ctx.strokeText(f.text, screen.x, screen.y);

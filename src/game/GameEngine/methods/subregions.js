@@ -326,6 +326,13 @@ function makeRuntimeObject(region, entry, x, y, salt) {
   const tuning = OBJECT_SPAWN_TUNING[type]
     ?? OBJECT_SPAWN_TUNING[getRegionObjectFamily(type)]
     ?? OBJECT_SPAWN_TUNING.default;
+  const hasFixedVariant = entry.variant !== null
+    && entry.variant !== undefined
+    && String(entry.variant).trim() !== ""
+    && Number.isFinite(Number(entry.variant));
+  const treeVariant = hasFixedVariant
+    ? Math.max(0, Math.floor(Number(entry.variant)))
+    : Math.abs(salt) % resolveRegionObjectVariantCount(type);
   return {
     id: createId(),
     runtimeId: `${region.id}:subregion-role:${entry.placementRole ?? "object"}:${salt}:${objectDefId}`,
@@ -338,9 +345,8 @@ function makeRuntimeObject(region, entry, x, y, salt) {
     rotation: Number(entry.rotation) || 0,
     colorShift: 0,
     flip: false,
-    treeVariant: Number.isFinite(Number(entry.variant))
-      ? Math.max(0, Math.floor(Number(entry.variant)))
-      : Math.abs(salt) % resolveRegionObjectVariantCount(type),
+    variant: hasFixedVariant ? treeVariant : null,
+    treeVariant,
     animSeed: salt,
     visualScale: Number(entry.visualScale) || 1,
     blocking: entry.blocking ?? !entry.actionId,

@@ -396,7 +396,7 @@ export const effectsMethods = {
 
     for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
       const f = this.floaters[i];
-      f.z += 34 * dt;
+      f.z += (Number(f.riseSpeed) || 34) * dt;
       f.life -= dt;
       if (f.life <= 0) this.floaters.splice(i, 1);
     }
@@ -859,8 +859,21 @@ export const effectsMethods = {
     if (this.effectPointVisible?.({ x, y })) this.markEffectDirtyCategory?.(options.spellInstanceId ? "spell-effects" : "combat-particles");
   },
 
-  addFloater(x, y, text, color, life = 0.85) {
-    this.floaters.push({ x, y, z: 68, text, color, life, maxLife: life });
+  addFloater(x, y, text, color, life = 0.85, options = {}) {
+    const opts = options && typeof options === "object" ? options : {};
+    this.floaters.push({
+      x,
+      y,
+      z: 68,
+      text,
+      color,
+      life,
+      maxLife: life,
+      fontSize: Math.max(10, Number(opts.fontSize) || 13),
+      fontWeight: Math.max(400, Number(opts.fontWeight) || 700),
+      riseSpeed: Math.max(1, Number(opts.riseSpeed) || 34),
+      fadeDuration: Math.max(0.05, Number(opts.fadeDuration) || life),
+    });
     if (this.effectPointVisible?.({ x, y, z: 68 }, 80)) this.markEffectDirtyCategory?.("floaters");
   },
 

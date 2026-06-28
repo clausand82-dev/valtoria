@@ -778,6 +778,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         sortAnchor: entry.sortAnchor ? { ...entry.sortAnchor } : null,
         depthOffset: entry.depthOffset,
         scale: entry.scale ? { ...entry.scale } : null,
+        variant: entry.variant,
         variantCount: entry.variantCount,
         spawnDamage: entry.spawnDamage ?? null,
         spawnTags: [...(entry.spawnTags ?? [])],
@@ -1215,6 +1216,13 @@ function objectGraphicsVariantInfo(def, variant) {
   };
 }
 
+function hasFixedObjectVariant(value) {
+  return value !== null
+    && value !== undefined
+    && String(value).trim() !== ""
+    && Number.isFinite(Number(value));
+}
+
 function runtimeObjectParticles(def, runtimeObject, regionObjectConfig, rand) {
   const legacyParticles = rollParticleConfigs(
     normalizeParticleConfigs(regionObjectConfig?.particles ?? def?.particles),
@@ -1305,7 +1313,8 @@ function addPrefabObjects(chunk, instance) {
     if (item.factionId !== undefined) spawnMetadata.factionId = String(item.factionId ?? "").trim() || null;
     if (item.onDestroyed && typeof item.onDestroyed === "object") spawnMetadata.onDestroyed = { ...item.onDestroyed };
     if (item.questTargetKey !== undefined) spawnMetadata.questTargetKey = String(item.questTargetKey ?? "").trim() || null;
-    const treeVariant = Number.isFinite(Number(item.variant))
+    const hasFixedVariant = hasFixedObjectVariant(item.variant);
+    const treeVariant = hasFixedVariant
       ? Math.max(0, Math.floor(Number(item.variant)))
       : Math.floor(rand01(chunk.cx, chunk.cy, 7910 + i) * Math.max(1, Math.floor(Number(item.variantCount) || resolveRegionObjectVariantCount(type))));
     const variantInfo = objectGraphicsVariantInfo(def, treeVariant);
@@ -1321,6 +1330,7 @@ function addPrefabObjects(chunk, instance) {
       rotation: (Number(item.rotation) || 0) + (instance.rotation * Math.PI) / 180,
       colorShift: rand01(chunk.cx, chunk.cy, 7900 + i),
       flip: instance.mirrored,
+      variant: hasFixedVariant ? treeVariant : null,
       treeVariant,
       ...variantInfo,
       animSeed: rand01(chunk.cx, chunk.cy, 7920 + i) * Math.PI * 2,
@@ -1721,7 +1731,10 @@ function addObjects(chunk, safeChunk) {
       visualScale = 1; // Default: no variation, normal size
     }
     
-    const treeVariant = Math.floor(chunkRand01(chunk, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16)));
+    const hasFixedVariant = hasFixedObjectVariant(selectedEntry?.variant);
+    const treeVariant = hasFixedVariant
+      ? Math.max(0, Math.floor(Number(selectedEntry.variant)))
+      : Math.floor(chunkRand01(chunk, 545 + i) * Math.max(1, Math.floor(Number(selectedEntry?.variantCount) || 16)));
     const selectedDef = REGION_OBJECT_DEFS[selectedEntry?.id] ?? null;
     const variantInfo = objectGraphicsVariantInfo(selectedDef, treeVariant);
     const runtimeObject = {
@@ -1736,6 +1749,7 @@ function addObjects(chunk, safeChunk) {
       rotation: chunkRand01(chunk, 400 + i) * Math.PI * 2,
       colorShift: chunkRand01(chunk, 500 + i),
       flip: chunkRand01(chunk, 530 + i) > 0.5,
+      variant: hasFixedVariant ? treeVariant : null,
       treeVariant,
       ...variantInfo,
       animSeed: chunkRand01(chunk, 560 + i) * Math.PI * 2,

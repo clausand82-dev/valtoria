@@ -1,16 +1,11 @@
 STATUS:
 Små rettelse observeret igennem spil test:
-vitlias_kings_relics sender en til laden, der ikek er låst op endnu.
-der går for lang tid inden mayor kommer med ny quest pga rep krav på 35
+- cigar skal forsvinde på dura 0 - det gør den ikke!
+- måske en para ved bygninger, areas, addons, som bestemmer om de kan købes eller kun er quest rewards!
 
 
 IMPORTENT:
-- speedbuff potion skal have egne buff ikon og eget item ikon
-- tilføj nye quest og få færdiggjort nuværende åbne regions
-- få åbnet og tilføjet nye regioner
-- juster bygningspriser og lvl priser
 
-- Fortsæt render optimering
 
 
 ARCHIVEMENTS

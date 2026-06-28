@@ -89,6 +89,41 @@ function regionHoverCorruptionText(mapId, region, regionCorruption) {
   return `Corruption: ${level}/10`;
 }
 
+function regionMapSizeLabel(mapSize) {
+  const key = String(mapSize ?? "medium").trim().toLowerCase();
+  return ({ small: "Small", medium: "Medium", large: "Large", giga: "Giga" })[key] ?? key;
+}
+
+function regionMobTypes(region) {
+  const entries = [
+    ...(Array.isArray(region?.mobs) ? region.mobs : []),
+    ...(Array.isArray(region?.rareMobs) ? region.rareMobs : []),
+  ];
+  return [...new Set(entries
+    .filter((entry) => typeof entry === "string" || Number(entry?.weight ?? 1) > 0)
+    .map((entry) => String(typeof entry === "string" ? entry : entry?.displayName ?? entry?.type ?? "").trim())
+    .filter(Boolean))];
+}
+
+function regionQuestTitles(activeQuests, regionId) {
+  const targetId = String(regionId ?? "");
+  if (!targetId) return [];
+  return [...new Set((activeQuests ?? [])
+    .filter((quest) => {
+      const target = quest?.target ?? {};
+      const definitionTarget = QUEST_DEFS[quest?.questId]?.target ?? {};
+      const configuredRegionIds = target.regionIds ?? definitionTarget.regionIds;
+      const configuredRegionId = target.regionId ?? definitionTarget.regionId;
+      const regionIds = [
+        ...(Array.isArray(configuredRegionIds) ? configuredRegionIds : configuredRegionIds ? [configuredRegionIds] : []),
+        ...(configuredRegionId ? [configuredRegionId] : []),
+      ].map(String);
+      return regionIds.includes(targetId);
+    })
+    .map((quest) => String(quest?.title ?? QUEST_DEFS[quest?.questId]?.title ?? quest?.questId ?? "").trim())
+    .filter(Boolean))];
+}
+
 export function MinimapDialog({ engineRef, snapshot, cityOpen, cityMinimapHero, onClose }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -222,6 +257,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
   const statusRegion = hoveredRegionEntry?.region ?? selectedRegion;
   const statusTitle = statusRegion?.label ?? activeMap.title;
   const statusCorruptionText = hoveredCorruptionText || (statusRegion ? regionHoverCorruptionText(selectedMapId, statusRegion, regionCorruption) : mapCorruptionText);
+  const hoveredAreaRegion = !isWorldMap ? hoveredRegionEntry?.region ?? null : null;
+  const statusMobTypes = hoveredAreaRegion ? regionMobTypes(hoveredAreaRegion) : [];
+  const statusQuestTitles = hoveredAreaRegion ? regionQuestTitles(activeQuests, hoveredAreaRegion.id) : [];
   const activateRegion = (regionEntry) => {
     const region = regionEntry?.region ?? regionEntry;
     const rawRegion = regionEntry?.rawRegion ?? region;
@@ -256,11 +294,34 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
   return (
     <div className="confirm-backdrop" role="presentation">
       <section className="map-dialog world-map-dialog" role="dialog" aria-modal="true" aria-label="World map">
-        <header>
+        <header className={!isWorldMap ? "with-region-info" : undefined}>
           <div>
             <h2>{activeMap.title}</h2>
             <span>{isWorldMap ? activeMap.subtitle : `${activeMap.subtitle} | vaelg en region`}</span>
           </div>
+          {!isWorldMap && (
+            <section className={`map-region-header-info ${hoveredAreaRegion ? "active" : ""}`} aria-live="polite">
+              {hoveredAreaRegion ? (
+                <>
+                  <div className="map-region-header-info-title">
+                    <b>{hoveredAreaRegion.label}</b>
+                    <span>{regionMapSizeLabel(hoveredAreaRegion.mapSize)}</span>
+                    <span>Corruption {regionCorruptionLevel(regionCorruption, selectedMapId, hoveredAreaRegion)}/10</span>
+                  </div>
+                  <div className="map-region-header-info-line">
+                    <b>Mobs</b>
+                    <span>{statusMobTypes.length ? statusMobTypes.join(", ") : "None"}</span>
+                  </div>
+                  <div className="map-region-header-info-line">
+                    <b>Active quest objectives</b>
+                    <span>{statusQuestTitles.length ? statusQuestTitles.join(", ") : "None"}</span>
+                  </div>
+                </>
+              ) : (
+                <span className="map-region-header-info-empty">Hover over a region to see details</span>
+              )}
+            </section>
+          )}
           <div className="map-dialog-actions">
             {!isWorldMap && (
               <button type="button" className="map-back-button" onClick={selectWorldMap}>
@@ -309,7 +370,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       onFocus={() => setHoveredRegionId(region.id)}
                       onBlur={() => setHoveredRegionId(null)}
                     >
-                      <title>{locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${region.label} | ${hoverText}`}</title>
+                      {isWorldMap && (
+                        <title>{locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${region.label} | ${hoverText}`}</title>
+                      )}
                       <polygon points={region.points} />
                     </g>
                       );
@@ -332,7 +395,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       }}
                       key={`${region.id}-label`}
                       aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
-                      title={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${region.label}. ${hoverText}`}
+                      title={isWorldMap
+                        ? (locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${region.label}. ${hoverText}`)
+                        : undefined}
                       onClick={() => activateRegion(entry)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
                       onMouseLeave={() => setHoveredRegionId(null)}
@@ -354,10 +419,12 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
               </>
             )}
           </div>
-          <div className="map-hover-card" aria-live="polite">
-            <b>{statusTitle}</b>
-            <span>{statusCorruptionText}</span>
-          </div>
+          {isWorldMap && (
+            <div className="map-hover-card" aria-live="polite">
+              <b>{statusTitle}</b>
+              <span>{statusCorruptionText}</span>
+            </div>
+          )}
           <WorldEnergyBalanceBar state={worldEnergyState} />
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests) && (
             <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests)}</p>

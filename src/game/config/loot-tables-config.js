@@ -22,6 +22,8 @@ export const LOOT_TABLES = {
     { type: "resource", id: "diamond", min: 1, max: 1, chance: 0.001 }
   ],
   material_gemstones: [
+    { type: "resource", id: "crystal_piece", min: 1, max: 3, chance: 0.008 },
+    { type: "resource", id: "crystal", min: 1, max: 1, chance: 0.006 },
     { type: "resource", id: "red_gemstone", min: 1, max: 1, chance: 0.004 },
     { type: "resource", id: "yellow_gemstone", min: 1, max: 1, chance: 0.004 },
     { type: "resource", id: "green_gemstone", min: 1, max: 1, chance: 0.004 },
@@ -49,6 +51,11 @@ export const LOOT_TABLES = {
     { type: "resource", id: "fruit_orange", min: 1, max: 2, chance: 0.03 },
     { type: "resource", id: "fruit_banana", min: 1, max: 2, chance: 0.03 },
     { type: "resource", id: "fruit", min: 1, max: 2, chance: 0.1 }
+  ],
+  material_paper: [
+    { type: "resource", id: "paper", min: 1, max: 2, chance: 0.03 },
+    { type: "resource", id: "scroll", min: 1, max: 2, chance: 0.03 },
+    { type: "resource", id: "junk", min: 1, max: 2, chance: 0.1 }
   ],
   object_metal_scrap: [
     { type: "resource", id: "iron_piece", min: 1, max: 2, chance: 0.15 },
@@ -154,6 +161,10 @@ export const LOOT_TABLES = {
     { type: "gold", chance: 0.35, goldMult: 0.35 },
     { type: "gold", chance: 0.22, goldMult: 1.5 },
     { type: "gold", chance: 0.08, goldMult: 5 }
+  ],
+  gold_bank: [
+    { type: "resource", id: "gold_nugget", min: 1, max: 3, chance: 0.07 },
+    { type: "resource", id: "gold_bar", min: 1, max: 3, chance: 0.001 }
   ],
   // Monster weighted profiles
   monster_profile_humanoid: [

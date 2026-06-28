@@ -56,6 +56,7 @@ region({
 
   objects: [                                                // Object ids come from region-object-config.js.
     { id: "object_tree_mainland", weight: 8, destructible: true }, // weight is relative spawn chance.
+    { id: "object_house_mainland", weight: 2, variant: 5 }, // variant fixes the zero-based spritesheet cell; omit it for random selection.
     { id: "object_woodboxes_ground", weight: 2, scale: { min: 0.8, max: 1.2 } }, // scale supports number, fixed, min/max.
     // spawnDamage supports: "all", "damaged", "destroyed", "damaged_destroyed". Omit for undamaged.
     // spawnTags/spawnAvoidRadius mark an influence zone; avoidSpawnTags avoids matching zones; foregroundFade fades objects in front of player/mobs/loot.
@@ -177,7 +178,7 @@ Shorthand conditions:
 
 Recommended shorthand syntax:
 objects: [
-  { id: "object_tree", weight: 5 },
+  { id: "object_tree", weight: 5, variant: 5 }, // zero-based fixed spritesheet cell.
   { id: "object_cursed_tree", weight: 2, corruption: { min: 6 } },
   { id: "object_quest_note", weight: 1, quest: "quest_lord_kealand" },
 ]

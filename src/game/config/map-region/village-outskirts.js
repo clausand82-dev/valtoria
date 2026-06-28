@@ -462,10 +462,8 @@ export function createVillageOutskirtsMapRegions(region) {
       cityStats: { population: 5, provision: 50, trade: 5, wealth: 5 },
       unlock: {
       any: [
-        { questActive: "lost_anvil" },
-        { questCompleted: "lost_anvil" },
-        { questActive: "lost_hammer" },
-        { questCompleted: "lost_hammer" },
+        { questActive: "vitlias_kings_relics" },
+        { questCompleted: "vitlias_kings_relics" },
       ],
       },
       tileset: { fileName: "tileset/tileset_woodplank.png", x: 1, y: 1 },
@@ -488,7 +486,7 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       labelX: 58,
       labelY: 59,
-      mobs: [{ type: "Rat", weight: 4 }, { type: "SickRat", weight: 1.4 }, { type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden", { type: "Hellhound", weight: 0.85 }],
+      mobs: [{ type: "Rat", weight: 4 }, { type: "SickRat", weight: 1.4 }, { type: "Skeleton", weight: 5 }, "Spider", "Wolf",  ],
       antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: false },
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
@@ -629,7 +627,7 @@ export function createVillageOutskirtsMapRegions(region) {
       id: "village",
       label: "Landsbyen",
       color: "#d7a85b",
-      mapSize: "large",
+      mapSize: "medium",
       cityStats: { population: 50 },
       spawnCounts: {
         value: { objects: 15, foliage: 28, decals: 24, monsters: { min: 8, max: 12 }, water: 0 },

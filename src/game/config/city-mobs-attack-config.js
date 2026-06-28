@@ -195,10 +195,12 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
     allowedMobTags: ["humanoid", "raider", "beast", "undead"],
     cityStats: { popularity: -8, safety: -4, culture: -3 },
     runtimeModifiers: {
-      innRumorMultiplier: 0.5,
+      innRumorBoardDisabled: true,
+      innMainChestDisabled: true,
     },
     consequences: [
-      "Rumors and local jobs are disrupted",
+      "Rumor Board disabled",
+      "Main Chest transfers blocked",
       "Popularity pressure increased",
     ],
   },
@@ -249,8 +251,10 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
     cityStats: { safety: -6, trade: -4 },
     runtimeModifiers: {
       storageRaidEnabled: true,
+      buildingStorageDisabled: true,
     },
     consequences: [
+      "Occupied storage can be viewed but not used",
       "City storage can be raided each visit",
       "Stored quest and unique items are protected",
     ],
@@ -340,14 +344,13 @@ export const CITY_WALL_BUILDING_ID = "city_wall";
 // requiresMobsIn: hvilke andre spawn-areas der SKAL have mobs
 // alwaysAllowed: true = ingen betingelser overhovedet
 export const CITY_SPAWN_AREA_RULES = {
-  NW_SPAWN_BORDER:         { alwaysAllowed: true },
+  NW_SPAWN_CORNER:         { alwaysAllowed: true },
   SW_SPAWN_BORDER:         { alwaysAllowed: true },
   NE_SPAWN_BORDER_LOWER:   { alwaysAllowed: true },
   SE_SPAWN_BORDER:         { alwaysAllowed: true },
   W_SPAWN_EDGE:            { alwaysAllowed: true },
 
-  NW_SPAWN_CORNER:         { requiresMobsIn: ["NW_SPAWN_BORDER"] },
-
+  NW_SPAWN_BORDER:         { requiresMobsIn: ["NW_SPAWN_CORNER"] },
   NW_SPAWN_BRIDGE:         { requiresNoDefenceTower: "NW",   requiresMobsIn: ["NW_SPAWN_BORDER"] },
   NW_SPAWN_CLOSE:          { requiresNoDefenceTower: "NW",   requiresNoCityWall: true, requiresMobsIn: ["NW_SPAWN_BORDER", "NW_SPAWN_BRIDGE"] },
 
@@ -367,8 +370,7 @@ export const CITY_SPAWN_AREA_RULES = {
 // Ordre i hvert branch: yderst (entry) → inderst (close til by)
 // Angreb er kun muligt på det inderste felt i en branch, der har mobs.
 export const CITY_SPAWN_PATHS = [
-  ["NW_SPAWN_BORDER", "NW_SPAWN_CORNER"],
-  ["NW_SPAWN_BORDER", "NW_SPAWN_BRIDGE", "NW_SPAWN_CLOSE"],
+  ["NW_SPAWN_CORNER", "NW_SPAWN_BORDER", "NW_SPAWN_BRIDGE", "NW_SPAWN_CLOSE"],
   ["W_SPAWN_EDGE"],
   ["SW_SPAWN_BORDER", "SW_SPAWN_BRIDGE", "SW_SPAWN_CLOSE"],
   ["NE_SPAWN_BORDER_UPPER", "NE_SPAWN_BRIDGE", "NE_SPAWN_CLOSE"],
@@ -386,7 +388,8 @@ export const CITY_ATTACK_AREA_RULES = {
 // --- Sprednings-naboer: hvorfra kan en mob sprede sig hen? ---
 // Brugt til lvl 3+ spredning. Mobs spreder sig til relateret naboområde.
 export const CITY_SPAWN_SPREAD_TARGETS = {
-  NW_SPAWN_BORDER:       ["NW_SPAWN_CORNER", "NW_SPAWN_BRIDGE"],
+  NW_SPAWN_CORNER:       ["NW_SPAWN_BORDER"],
+  NW_SPAWN_BORDER:       ["NW_SPAWN_BRIDGE"],
   NW_SPAWN_BRIDGE:       ["NW_SPAWN_CLOSE"],
   SW_SPAWN_BORDER:       ["SW_SPAWN_BRIDGE"],
   SW_SPAWN_BRIDGE:       ["SW_SPAWN_CLOSE"],

@@ -53,12 +53,25 @@ export const PREFIXES = {
 // areaDamageBonus, dotDamageBonus, hazardDamageBonus.
 // Duration/status bonuses er decimaler: dotDurationBonus, statusDurationBonus.
 // slowImmune: ignores movement slow effects while the item is equipped.
+// Item levels:
+// level er det konkrete runtime item-level. For normalt gear styrer det stat-skalering, rarity-roll,
+// item value og socket chance. Named/unique items faar level fra loot/reward-kilden og skalerer kun
+// deres flade combat-tal med det, hvis scaleWithLevel er true.
+// levelMin er named/unique-definitionens minimum for generisk pool-drop og minimum for det genererede
+// item.level. Det er ikke et equip-krav.
+// levelReq er minimum player level for at equippe itemet. Det er uafhaengigt af item.level/levelMin.
+// scaleWithLevel: true skalerer flade combat-tal med item.level; procent-stats skaleres ikke.
+//
+// Drop-pool filtre for named/unique items:
+// sources: ["chest", "boss", "monster"] filtrerer hvilke items der kan vaelges, efter en loot table
+// har startet et generisk named/unique-roll. Et loot-table entry med et fast itemId omgaer poolfilteret.
+// biomes bliver stadig laest, men runtime sender aktuelt region id som biomeId. Gamle biome-navne som
+// "snow", "mainland" og "rock" matcher derfor ikke de nuvaerende region ids og boer betragtes som legacy.
+//
 // Requirements er optional:
 // classReq: ["warrior", "cleric"] kraever en af disse classes.
-// levelReq: 5 kraever player level 5.
 // requiresClassNode: "mage.frost_adept" kraever unlocked class node.
 // Brug maxHp/maxMana her, ikke ARMOR_BASES-felterne life/mana.
-// Hvis scaleWithLevel er true, skalerer de flade combat-tal med item level.
 // Named items skalerer de flade combat-tal med den rarity, der bliver rullet.
 // Procent-stats ovenfor skalerer ikke med level eller rarity.
 // Unique items kan bruge weight til relativ drop-vaegt blandt matchende uniques.
@@ -359,6 +372,7 @@ export const UNIQUE_ITEMS = [
     slot: "legs",
     mode: "armor",
     levelMin: 1,
+    levelReq: 15,
     sources: ["chest", "boss", "monster"],
     iconUrl: "/assets/generated/item/item_unique_ladylirien_legs.png",
     scaleWithLevel: true,

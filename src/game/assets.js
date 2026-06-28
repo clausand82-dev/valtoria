@@ -2457,6 +2457,19 @@ export function drawObject(ctx, object, screen, biome, atlas, time = 0) {
   }
 }
 
+export function resolveObjectSpriteFrameIndex(object, sheet, time = 0) {
+  const cellCount = Math.max(1, sheet?.cells?.length ?? 0);
+  const hasFixedVariant = object?.variant !== null
+    && object?.variant !== undefined
+    && String(object.variant).trim() !== ""
+    && Number.isFinite(Number(object.variant));
+  if (hasFixedVariant) return Math.max(0, Math.floor(Number(object.variant))) % cellCount;
+  if (sheet?.animated) {
+    return Math.abs(Math.floor(time * 6 + (object?.animSeed ?? 0))) % cellCount;
+  }
+  return Math.abs(Math.floor(object?.treeVariant ?? 0)) % cellCount;
+}
+
 function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const sheetsByBiome = atlas?.objectSheets?.[object.type];
   const sheet = sheetsByBiome?.[biome?.id]
@@ -2465,11 +2478,8 @@ function drawSheetObject(ctx, object, screen, biome, atlas, time = 0) {
   const cells = sheet?.cells;
   if (!cells?.length) return false;
 
-  const animFrame = time * 6 + (object.animSeed ?? 0);
-  const rawFrameIndex = Math.floor(animFrame);
-  const frameIndex = sheet.animated
-    ? rawFrameIndex % cells.length
-    : Math.abs(Math.floor(object.treeVariant ?? 0)) % cells.length;
+  // Explicit object.variant locks both static and normally animated sheets to one cell.
+  const frameIndex = resolveObjectSpriteFrameIndex(object, sheet, time);
   const renderSheet = objectDamageRenderSheet(sheet, object);
   const cell = renderSheet?.cells?.[frameIndex] ?? cells[frameIndex];
   const sprite = cell?.sprite;

@@ -35,6 +35,9 @@ import {
   makeQuestItem,
   inventoryCanAccept,
   pickupStatusText,
+  questItemCount,
+  questItemTargetsForQuest,
+  resourceCount,
   randomInt
 } from "../helpers.js";
 import { worldEntryAllowed } from "../../world-state.js";
@@ -224,6 +227,72 @@ function autoLootRarityFor(item, lootType) {
   return item?.rarity ? String(item.rarity) : null;
 }
 
+function questRequirementMatchesItem(requirement, item) {
+  if (![requirement?.templateId, requirement?.namePrefix, requirement?.baseName, requirement?.rarity].some(Boolean)) return false;
+  let matches = true;
+  if (requirement?.templateId) {
+    matches = matches && (
+      String(item?.uniqueId ?? "") === String(requirement.templateId)
+      || String(item?.namedId ?? "") === String(requirement.templateId)
+    );
+  }
+  if (requirement?.namePrefix) matches = matches && String(item?.name ?? "").startsWith(`${requirement.namePrefix} `);
+  if (requirement?.baseName) matches = matches && String(item?.baseName ?? "") === String(requirement.baseName);
+  if (requirement?.rarity) matches = matches && String(item?.rarity ?? "") === String(requirement.rarity);
+  return matches;
+}
+
+function questPickupProgress(engine, item, pickedCount = 1) {
+  const inventory = engine?.player?.inventory ?? [];
+  const picked = Math.max(1, Math.floor(Number(pickedCount) || 1));
+  for (const quest of engine?.questState?.active ?? []) {
+    if (quest?.type !== "collect_quest_item") continue;
+
+    for (const target of questItemTargetsForQuest(quest)) {
+      if (String(target?.questItemId ?? "") !== String(item?.questItemId ?? "")) continue;
+      if (item?.questInstanceId && String(item.questInstanceId) !== String(quest.id)) continue;
+      const needed = Math.max(1, Math.floor(Number(target.count) || 1));
+      const rawCurrent = questItemCount(inventory, quest.id, target.questItemId);
+      if (rawCurrent - picked >= needed) continue;
+      return `${item.name ?? target.questItemId}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+    }
+
+    if (isResourceItem(item)) {
+      const resourceId = String(item.resourceId ?? "");
+      const target = (quest.target?.resources ?? []).find((entry) => (
+        String(entry?.resource ?? entry?.resourceId ?? "") === resourceId
+      ));
+      if (target) {
+        const needed = Math.max(1, Math.floor(Number(target.count) || 1));
+        const rawCurrent = resourceCount(inventory, resourceId);
+        if (rawCurrent - picked < needed) return `${RESOURCE_DEFS[resourceId]?.name ?? item.name ?? resourceId}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+      }
+    }
+
+    const itemTarget = (quest.target?.items ?? []).find((entry) => questRequirementMatchesItem(entry, item));
+    if (itemTarget) {
+      const needed = Math.max(1, Math.floor(Number(itemTarget.count) || 1));
+      const rawCurrent = inventory.filter((entry) => questRequirementMatchesItem(itemTarget, entry)).length;
+      if (rawCurrent - 1 < needed) return `${item.name ?? itemTarget.templateId ?? itemTarget.baseName ?? "Quest item"}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+    }
+  }
+  return "";
+}
+
+function addPickupFloater(engine, x, y, item, pickedCount = 1) {
+  const questProgress = questPickupProgress(engine, item, pickedCount);
+  if (questProgress) {
+    engine.addFloater(x, y, questProgress, "#ffe08a", 2.05, {
+      fontSize: 17,
+      fontWeight: 800,
+      riseSpeed: 20,
+      fadeDuration: 0.55,
+    });
+    return;
+  }
+  engine.addFloater(x, y, item.name, item.rarityColor, 1.05);
+}
+
 export const lootMethods = {
   autoLootAllows(loot) {
     const rules = normalizeAutoLootRules(this.player.autoLoot);
@@ -266,7 +335,7 @@ export const lootMethods = {
             const after = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? before + 1;
             const picked = Math.max(1, after - before);
             this.trackItemPicked(loot.item);
-            this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
+            addPickupFloater(this, loot.x, loot.y, loot.item, picked);
             this.addToast(pickupStatusText(loot.item, picked));
             this.loots.splice(i, 1);
             this.markRenderDirty?.("loot-pickup");
@@ -279,7 +348,7 @@ export const lootMethods = {
           this.player.stats.itemsPicked += 1;
           this.trackItemPicked(loot.item);
           this.applyQuestItemPickup(loot.item);
-          this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
+          addPickupFloater(this, loot.x, loot.y, loot.item, 1);
           this.addToast(pickupStatusText(loot.item, 1));
           this.loots.splice(i, 1);
           this.markRenderDirty?.("loot-pickup");
@@ -291,7 +360,7 @@ export const lootMethods = {
             this.player.stats.itemsPicked += 1;
             this.trackItemPicked(loot.item);
           }
-          this.addFloater(loot.x, loot.y, loot.item.name, loot.item.rarityColor, 1.05);
+          addPickupFloater(this, loot.x, loot.y, loot.item, picked);
           this.addToast(pickupStatusText(loot.item, picked));
           this.loots.splice(i, 1);
           this.markRenderDirty?.("loot-pickup");
@@ -426,7 +495,9 @@ export const lootMethods = {
       : `+${total}x resources`;
     this.player.stats.resourcesPicked += total;
     this.addParticles(object.x, object.y, color, 10, 0.08);
-    this.addFloater(object.x, object.y, toast, first?.rarityColor ?? "#8be9ff", 1.05);
+    const questPickup = items.find((item) => questPickupProgress(this, item, Math.max(1, Math.floor(Number(item.count) || 1))));
+    if (questPickup) addPickupFloater(this, object.x, object.y, questPickup, Math.max(1, Math.floor(Number(questPickup.count) || 1)));
+    else this.addFloater(object.x, object.y, toast, first?.rarityColor ?? "#8be9ff", 1.05);
     this.addToast(toast);
     this.markRenderDirty?.("foliage-loot");
     this.publishSnapshot();
