@@ -72,6 +72,9 @@ export const PREFIXES = {
 // classReq: ["warrior", "cleric"] kraever en af disse classes.
 // requiresClassNode: "mage.frost_adept" kraever unlocked class node.
 // Brug maxHp/maxMana her, ikke ARMOR_BASES-felterne life/mana.
+// nonRepairable: true forhindrer reparation hos smeden.
+// destroyWhenDurabilityDepleted: true fjerner automatisk itemet fra equipment, naar durability rammer 0%.
+// durabilityLossOnEvents kan give ekstra durability-tab ved bestemte events, fx { criticalHit: 5 }.
 // Named items skalerer de flade combat-tal med den rarity, der bliver rullet.
 // Procent-stats ovenfor skalerer ikke med level eller rarity.
 // Unique items kan bruge weight til relativ drop-vaegt blandt matchende uniques.

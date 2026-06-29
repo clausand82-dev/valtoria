@@ -2736,6 +2736,13 @@ function cityBuildingAddonCostEntries(addon) {
   return Object.entries(addon?.cost ?? {}).filter(([, amount]) => Math.max(0, Math.floor(Number(amount) || 0)) > 0);
 }
 
+function cityManualPurchaseDisabledReason(entry, type = "building") {
+  if (entry?.manualPurchaseDisabled !== true) return "";
+  return type === "addon"
+    ? "Denne addon låses op gennem en quest og kan ikke købes manuelt."
+    : "Level 1 låses op gennem en quest og kan ikke købes manuelt. Senere levels kan opgraderes normalt.";
+}
+
 function cityAreaRequirementEntries(source = {}, progress = {}) {
   const requirements = source?.areaRequirements
     ?? source?.unlock?.areaRequirements
@@ -2776,6 +2783,8 @@ function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats 
   if (!addon?.id) return { canBuy: false, reasons: ["Missing addon id"] };
   if (!isCityBuildingOwned(progress, building)) return { canBuy: false, reasons: ["Build the building first."] };
   if (cityBuildingAddonOwned(progress, building, addon)) return { canBuy: false, reasons: ["Already owned."] };
+  const manualPurchaseDisabledReason = cityManualPurchaseDisabledReason(addon, "addon");
+  if (manualPurchaseDisabledReason) return { canBuy: false, reasons: [manualPurchaseDisabledReason] };
   if (!cityAddonIsUnlocked(addon, snapshot, cityStats)) return { canBuy: false, reasons: [cityAddonLockText(addon, snapshot, cityStats)] };
   const requirementEntries = cityStatRequirementEntries(addon.statRequirements ?? addon.unlock?.statRequirements ?? addon.unlock?.stats, cityStats);
   const areaRequirementEntries = cityAreaRequirementEntries(addon, progress);
@@ -2937,9 +2946,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const areaRequirementEntries = cityAreaRequirementEntries(building, progress);
   const statRequirementsMet = cityStatsMeetRequirements(buildingStatRequirements, cityStats);
   const areaRequirementsMet = areaRequirementEntries.every((entry) => entry.met);
+  const manualBuildingPurchaseDisabledReason = cityManualPurchaseDisabledReason(building);
   const canBuyBuilding = remainingCostEntries.every(([resourceId, remaining]) => (
     remaining <= 0 || buildingResourceAvailable(resourceId) >= remaining
-  )) && statRequirementsMet && parentAreaUnlocked && areaRequirementsMet;
+  )) && statRequirementsMet && parentAreaUnlocked && areaRequirementsMet && !manualBuildingPurchaseDisabledReason;
   const sprite = cityImageForBuilding(houseImages, building, progress);
   const buildingImageSrc = cityImageElementSrc(sprite, building.imageUrl);
   const featureAddons = normalizeCityBuildingAddons(building);
@@ -3034,6 +3044,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const applyBuildResource = (resourceId, amount) => {
     if (owned) return;
+    if (manualBuildingPurchaseDisabledReason) {
+      engineRef.current?.addToast?.(manualBuildingPurchaseDisabledReason);
+      return;
+    }
     if (!parentAreaUnlocked) {
       engineRef.current?.addToast?.(parentAreaLockText);
       return;
@@ -3063,6 +3077,10 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
 
   const finishBuild = () => {
     if (owned) return;
+    if (manualBuildingPurchaseDisabledReason) {
+      engineRef.current?.addToast?.(manualBuildingPurchaseDisabledReason);
+      return;
+    }
     if (!parentAreaUnlocked) {
       engineRef.current?.addToast?.(parentAreaLockText);
       return;
@@ -4242,9 +4260,17 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 <span className="missing">{parentAreaLockText}</span>
               </div>
             )}
+            {!owned && manualBuildingPurchaseDisabledReason && (
+              <p className="city-manual-purchase-disabled" role="note">{manualBuildingPurchaseDisabledReason}</p>
+            )}
             {!owned && costEntries.length > 0 && <CityCostSummary costEntries={costEntries} buildingState={buildingState} snapshot={snapshot} progress={progress} />}
             <div className="city-popup-actions">
-              <button type="button" onClick={() => setBuildPaymentOpen(true)} disabled={owned || !statRequirementsMet || !areaRequirementsMet || !parentAreaUnlocked}>
+              <button
+                type="button"
+                onClick={() => setBuildPaymentOpen(true)}
+                disabled={owned || Boolean(manualBuildingPurchaseDisabledReason) || !statRequirementsMet || !areaRequirementsMet || !parentAreaUnlocked}
+                title={!owned && manualBuildingPurchaseDisabledReason ? manualBuildingPurchaseDisabledReason : undefined}
+              >
                 Buy
               </button>
               <button type="button" onClick={upgradeBuilding} disabled={!owned || !nextBuildingLevel || !canUpgradeBuilding}>
@@ -4280,6 +4306,11 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                           ))}
                         </div>
                       )}
+                      {cityManualPurchaseDisabledReason(activeAddon, "addon") && (
+                        <p className="city-manual-purchase-disabled" role="note">
+                          {cityManualPurchaseDisabledReason(activeAddon, "addon")}
+                        </p>
+                      )}
                       <div className="city-addon-purchase-row">
                         <b>Cost</b>
                         <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText="Free" />
@@ -4287,6 +4318,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                           type="button"
                           disabled={!cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).canBuy}
                           onClick={() => buyAddon(activeAddon)}
+                          title={cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).reasons.join(" ") || undefined}
                         >
                           Buy addon
                         </button>
@@ -4325,7 +4357,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         </main>
       </section>
       </div>
-      {buildPaymentOpen && !owned && (
+      {buildPaymentOpen && !owned && !manualBuildingPurchaseDisabledReason && (
         <CityBuildPaymentModal
           building={building}
           buildingState={buildingState}

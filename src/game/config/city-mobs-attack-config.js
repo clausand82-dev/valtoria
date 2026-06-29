@@ -6,6 +6,9 @@ import { calculateCityStatNeeds, calculateCityStatRatios } from "./city-stats-ru
 // ============================================================
 
 // --- Threat meter stigning ved dødsfald (baseret på XP pct mod næste level) ---
+// Level 10 betyder, at dødsfald først giver threat fra player level 11.
+export const CITY_THREAT_RISE_ON_DEATH_STARTS_AFTER_LEVEL = 10;
+
 // Tjekkes nedefra: første bracket der matcher bruges.
 export const CITY_THREAT_RISE_ON_DEATH = [
   { maxXpPct: 0.25, min: 10, max: 15 }, // Under 25% af vejen til næste level
@@ -446,7 +449,9 @@ export function pickCityMobType(rng = Math.random) {
 }
 
 // --- Hjælpefunktion: beregn threat-stigning ved dødsfald ---
-export function calcThreatRiseOnDeath(xpPct, rng = Math.random) {
+export function calcThreatRiseOnDeath(xpPct, playerLevel, rng = Math.random) {
+  const level = Math.max(1, Math.floor(Number(playerLevel) || 1));
+  if (level <= CITY_THREAT_RISE_ON_DEATH_STARTS_AFTER_LEVEL) return 0;
   const bracket = CITY_THREAT_RISE_ON_DEATH.find((b) => b.default || xpPct < b.maxXpPct);
   const { min, max } = bracket ?? { min: 2, max: 5 };
   return Math.round(min + rng() * (max - min));

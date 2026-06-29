@@ -19,7 +19,8 @@ import {
   worldToScreen,
   monsterSpriteId,
   TERRAIN_LAYER_PAD_TOP,
-  TERRAIN_LAYER_PAD_BOTTOM
+  TERRAIN_LAYER_PAD_BOTTOM,
+  TILE_EDGE_WALLS
 } from "../dependencies.js";
 
 const TERRAIN_GROUND_COLOR = "#3f6f34";
@@ -31,10 +32,35 @@ import {
   drawRegionMarkerIfInChunk,
   drawQuestgiver,
   isDestructibleObject,
-  drawTerrainDecal
+  drawTerrainDecal,
+  drawTileEdgeWall,
+  getTileEdgeWallRenderHeight,
+  getTileWallEdges,
+  tileEdgeWallCacheKey,
+  tileEdgeWallDebugEnabled,
+  TILE_EDGE_WALL_SIDE_ORDER
 } from "../helpers.js";
 
 const DEFAULT_SORT_ANCHOR = { x: 0.5, y: 1 };
+const TILE_EDGE_WALL_SIDE_PRIORITY = new Map(TILE_EDGE_WALL_SIDE_ORDER.map((side, index) => [side, index]));
+
+function getTerrainLayerLayout(wallImage) {
+  const wallsEnabled = Boolean(TILE_EDGE_WALLS.enabled && wallImage);
+  const wallHeight = wallsEnabled ? getTileEdgeWallRenderHeight(wallImage, TILE_EDGE_WALLS) : 0;
+  // Extra top/side room keeps vertical faces and their deliberate overlap from
+  // being clipped at chunk canvas boundaries.
+  const sidePadding = wallsEnabled ? Math.ceil(Math.max(0, Number(TILE_EDGE_WALLS.overlapPx) || 0) + 2) : 0;
+  const topPadding = Math.max(
+    TERRAIN_LAYER_PAD_TOP,
+    wallHeight + Math.max(0, -Number(TILE_EDGE_WALLS.yOffset || 0)) + sidePadding,
+  );
+  return {
+    originX: (CHUNK_SIZE * TILE_W) / 2 + TILE_W / 2 + sidePadding,
+    originY: topPadding,
+    width: CHUNK_SIZE * TILE_W + TILE_W + sidePadding * 2,
+    height: CHUNK_SIZE * TILE_H + TILE_H + topPadding + TERRAIN_LAYER_PAD_BOTTOM,
+  };
+}
 
 function clampSortAnchor(anchor) {
   if (!anchor || typeof anchor !== "object") return DEFAULT_SORT_ANCHOR;
@@ -457,17 +483,14 @@ export const renderingMethods = {
 
   drawTiles(ctx) {
     const { cx, cy } = chunkCoords(this.player.x, this.player.y);
-    const originX = (CHUNK_SIZE * TILE_W) / 2 + TILE_W / 2;
-    const originY = TERRAIN_LAYER_PAD_TOP;
-    const layerWidth = CHUNK_SIZE * TILE_W + TILE_W;
-    const layerHeight = CHUNK_SIZE * TILE_H + TILE_H + TERRAIN_LAYER_PAD_TOP + TERRAIN_LAYER_PAD_BOTTOM;
+    const layout = getTerrainLayerLayout(this.tileEdgeWallImage);
     for (let yy = cy - 2; yy <= cy + 2; yy += 1) {
       for (let xx = cx - 2; xx <= cx + 2; xx += 1) {
         const chunk = this.getChunk(xx, yy);
         const origin = worldToScreen(chunk.x, chunk.y, 0, this.camera);
-        const x = origin.x - originX;
-        const y = origin.y - originY;
-        if (x > this.width + 160 || y > this.height + 160 || x + layerWidth < -160 || y + layerHeight < -160) continue;
+        const x = origin.x - layout.originX;
+        const y = origin.y - layout.originY;
+        if (x > this.width + 160 || y > this.height + 160 || x + layout.width < -160 || y + layout.height < -160) continue;
         const layer = this.getTerrainLayer(chunk);
         layer.lastUsedFrame = this.frame;
         layer.lastUsedAt = performance.now();
@@ -478,12 +501,12 @@ export const renderingMethods = {
   },
 
   getTerrainLayer(chunk) {
-    if (chunk.terrainLayer) return chunk.terrainLayer;
+    const wallDebug = tileEdgeWallDebugEnabled(TILE_EDGE_WALLS);
+    const wallCacheKey = tileEdgeWallCacheKey(this.tileEdgeWallImage, TILE_EDGE_WALLS, wallDebug);
+    if (chunk.terrainLayer?.tileEdgeWallCacheKey === wallCacheKey) return chunk.terrainLayer;
+    chunk.terrainLayer = null;
 
-    const originX = (CHUNK_SIZE * TILE_W) / 2 + TILE_W / 2;
-    const originY = TERRAIN_LAYER_PAD_TOP;
-    const width = CHUNK_SIZE * TILE_W + TILE_W;
-    const height = CHUNK_SIZE * TILE_H + TILE_H + TERRAIN_LAYER_PAD_TOP + TERRAIN_LAYER_PAD_BOTTOM;
+    const { originX, originY, width, height } = getTerrainLayerLayout(this.tileEdgeWallImage);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
@@ -505,6 +528,30 @@ export const renderingMethods = {
         path: !tile.water && tile.path,
         pathColor: TERRAIN_PATH_COLOR,
       });
+    }
+
+    if (TILE_EDGE_WALLS.enabled && this.tileEdgeWallImage && chunk.region) {
+      const wallEntries = [];
+      for (const tile of tiles) {
+        for (const side of getTileWallEdges(tile, chunk.region, TILE_EDGE_WALLS)) {
+          wallEntries.push({ tile, side });
+        }
+      }
+      wallEntries.sort((a, b) => (
+        (a.tile.x + a.tile.y) - (b.tile.x + b.tile.y)
+        || a.tile.x - b.tile.x
+        || (TILE_EDGE_WALL_SIDE_PRIORITY.get(a.side) ?? 0) - (TILE_EDGE_WALL_SIDE_PRIORITY.get(b.side) ?? 0)
+      ));
+
+      // Walls belong to the cached terrain pass, never object depth sorting.
+      // This pass stays outside the region clip so vertical faces remain intact.
+      for (const { tile, side } of wallEntries) {
+        const tx = tile.x - chunk.x;
+        const ty = tile.y - chunk.y;
+        const x = originX + (tx - ty) * (TILE_W / 2);
+        const y = originY + (tx + ty) * (TILE_H / 2);
+        drawTileEdgeWall(ctx, this.tileEdgeWallImage, side, x, y, TILE_EDGE_WALLS, wallDebug);
+      }
     }
 
     if (chunk.region && !this.isInSubregion?.()) {
@@ -544,7 +591,7 @@ export const renderingMethods = {
       ctx.restore();
     }
 
-    chunk.terrainLayer = { canvas, originX, originY, width, height };
+    chunk.terrainLayer = { canvas, originX, originY, width, height, tileEdgeWallCacheKey: wallCacheKey };
     this.markRenderDirty?.("terrain-layer");
     return chunk.terrainLayer;
   },

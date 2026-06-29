@@ -6,6 +6,8 @@ export const CITY_BUILDING_GOLD_COST = 1000;
 // - Use addons for compatibility, but treat each addon as a generic building feature.
 // - `ownedFromStart: true` means the city owns it from a real new game start.
 // - `prebuilt: true` is a test bootstrap flag controlled by CHEAT_SETTINGS.respectPrebuiltCityConfig.
+// - `manualPurchaseDisabled: true` means level 1/the addon must be granted by a quest or another city-progress effect.
+//   Building upgrades above level 1 remain available through their normal level config.
 //
 // Addons can define:
 //   id, title, help/functionText/description, prebuilt, cost, unlock, statRequirements, statEffects,
@@ -149,6 +151,7 @@ export const CITY_BUILDINGS = [
     id: "blacksmith",
     title: "Blacksmith",
     prebuilt: true,
+    manualPurchaseDisabled: true,
     help: "Builds components and gear elements from basic resources.",
     functionText: "Crafting stations for bars, fittings, weapon parts, and armor components will live here.",
     imageUrl: "/assets/generated/house/house_blacksmith.png",
@@ -159,6 +162,7 @@ export const CITY_BUILDINGS = [
         id: "weapon_anvil",
         title: "Weapon Anvil",
         prebuilt: true,
+        manualPurchaseDisabled: true,
         help: "Unlocks weapon merging at the blacksmith.",
         panel: "blacksmith",
         config: { station: "weapon" },
@@ -180,6 +184,7 @@ export const CITY_BUILDINGS = [
       {
         id: "repair_station",
         prebuilt: true,
+        manualPurchaseDisabled: true,
         title: "Repair Station",
         help: "Repairs equipped and carried gear with available resources.",
         panel: "blacksmith",
@@ -258,6 +263,7 @@ export const CITY_BUILDINGS = [
     id: "bank",
     title: "Bank",
     prebuilt: true,
+    manualPurchaseDisabled: true,
     help: "Stores items and resources in a 100-slot bank box.",
     functionText: "A 100-slot shared storage interface will live here.",
     imageUrl: "/assets/generated/house/house_bank.png",
@@ -267,6 +273,7 @@ export const CITY_BUILDINGS = [
         id: "main_vault",
         title: "Main Vault",
         prebuilt: true,
+        manualPurchaseDisabled: true,
         help: "Stores items and resources in a 100-slot bank box.",
         panel: "storage",
         inventoryType: { type: "all", slots: 100 },
@@ -296,6 +303,7 @@ export const CITY_BUILDINGS = [
     id: "merchant",
     title: "Merchant",
     prebuilt: true,
+    manualPurchaseDisabled: true,
     help: "Buys and sells normal goods. Prices follow popularity.",
     functionText: "Sell non-quest, non-unique items for gold, or buy overpriced emergency goods.",
     imageUrl: "/assets/generated/house/house_merchant.png",
@@ -305,6 +313,7 @@ export const CITY_BUILDINGS = [
         id: "trade_counter",
         title: "Trade Counter",
         prebuilt: true,
+        manualPurchaseDisabled: true,
         help: "Buys and sells normal goods. Prices follow popularity.",
         panel: "merchant",
         inventoryType: { type: "none", slots: 0 },
@@ -448,6 +457,7 @@ export const CITY_BUILDINGS = [
     id: "sanctuary",
     title: "Sanctuary",
     prebuilt: true,
+    manualPurchaseDisabled: true,
     help: "Trains the hero through class paths and combat specializations.",
     functionText: "Choose a class, unlock class nodes, and develop the hero through combat, magic, survival, and discipline upgrades.",
     imageUrl: "/assets/generated/house/house_sanctury.png",

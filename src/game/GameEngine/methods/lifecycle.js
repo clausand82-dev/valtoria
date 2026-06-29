@@ -1,6 +1,7 @@
 import {
   loadGeneratedAtlas,
   loadAnimationSheets,
+  loadTileEdgeWallImage,
   EQUIPMENT_SLOTS,
   UNIQUE_ITEMS,
   createEquipment,
@@ -18,6 +19,7 @@ import {
   CHUNK_SIZE,
   AUTOSAVE_INTERVAL_SECONDS,
   DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
+  TILE_EDGE_WALLS,
   normalizeQuickSlots
 } from "../dependencies.js";
 import {
@@ -125,6 +127,16 @@ export const lifecycleMethods = {
           this.markRenderDirty("animation-sheets-loaded");
         })
         .catch((error) => console.error("Animation sheet load failed", error));
+    }
+    if (TILE_EDGE_WALLS.enabled && !this.tileEdgeWallImage) {
+      loadTileEdgeWallImage(TILE_EDGE_WALLS.fileName).then((image) => {
+        if (!image) return;
+        this.tileEdgeWallImage = image;
+        for (const chunk of this.chunks.values()) {
+          chunk.terrainLayer = null;
+        }
+        this.markRenderDirty("tile-edge-walls-loaded");
+      });
     }
     this.nextFrameTime = performance.now();
     this.raf = requestAnimationFrame(this.loop);

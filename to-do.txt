@@ -1,8 +1,19 @@
 STATUS:
 Små rettelse observeret igennem spil test:
-- cigar skal forsvinde på dura 0 - det gør den ikke!
-- måske en para ved bygninger, areas, addons, som bestemmer om de kan købes eller kun er quest rewards!
 - noget betingelse på bank mobs map (måske forskellige mængde objekter udfra wealth)
+- skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
+
+
+HELP system
+Hjælpe systemet bliver to delt. De første 20 lvl er det en npc (npc_guide.png), der placeres midt i education området, der giver særlig adgang til systemet. Efterfølgende bliver systemet tilgængelig med et lille ? ikon nederst til venstre.
+
+Selve hjælpe systemet skal være et modal med en side menu der fylder 1/3 af modal og et indholds felt, der fylder de sidste 2/3.
+
+Menu delen er inddelt i passende overskrifter og passende underpunktet (overskift er collapsebe). Et klik på overskrifter/overpunkter åbner og lukker underpunkter. Et klik på et underpunkt åbner underpunktets indhold i indholdsfeltet.
+
+Hjælpesystemet skal være søgbart og guiderne skal benytte eksisterende billeder i sine forklaringer med mulighed for jeg kan bytte billederne ud. Alt skal matche systemets nuværende layout.
+
+
 
 
 IMPORTENT:
@@ -12,15 +23,8 @@ IMPORTENT:
 ARCHIVEMENTS
 (noget med at kende alle monstere): Set alle monster - bonus: +25 culture
 
-Farmer: alle field felter bygget lvl1, alle field felter bygget lvl2, alle field felter bygget lvl 3 - bonus: +100 provision
-
-Voldgravenes Hersker: bygget alle voldgravene i byen - bonus: +25 defence
-
-Hero of the City: Bekæmpet 10 city monster grupper med hero, bekæmpet 25 city monster gruppe med hero, bekæmpet 50 monster grupper med hero - bonus: +50 defence
 
 CITY QUESTS:
-
-
 
 
 ARTIFACTS:

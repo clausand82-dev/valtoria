@@ -6,6 +6,7 @@ import { CITY_AREAS } from "./game/config/city-areas-config.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
 import { WORLD_MAP } from "./game/config/map-region-config.js";
+import { incrementWorldCounter } from "./game/world-state.js";
 import { CHEAT_SETTINGS, cheatGiveOptions, installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
@@ -484,6 +485,15 @@ export default function App() {
       const filtered = normalizeCityMobs(nextProgress.cityMobs).filter((mob) => mob.id !== mapReturn.cityMobId);
       nextProgress = { ...nextProgress, cityMobs: filtered };
       cityProgressChanged = true;
+      if (engineRef.current) {
+        engineRef.current.worldState = incrementWorldCounter(
+          engineRef.current.worldState,
+          "cityMobGroupsDefeated.hero",
+          1,
+        );
+        engineRef.current.saveProgress?.({ force: true });
+        engineRef.current.publishSnapshot?.();
+      }
     }
 
     if (isCityMobBattle) {
@@ -531,7 +541,10 @@ export default function App() {
     lastDeathIdRef.current = lastDeath.id;
     const cityStorageKey = gameSessionRef.current?.slot?.cityStorageKey ?? CITY_STORAGE_KEY;
     const progress = loadCityProgress(cityStorageKey);
-    const rise = calcThreatRiseOnDeath(Math.max(0, Math.min(1, Number(lastDeath.xpPct) || 0)));
+    const rise = calcThreatRiseOnDeath(
+      Math.max(0, Math.min(1, Number(lastDeath.xpPct) || 0)),
+      snapshot.player?.level,
+    );
     if (rise <= 0) return;
     const prev = Math.max(0, Math.min(100, Number(progress.threatLevel) || 0));
     const next = Math.min(100, prev + rise);

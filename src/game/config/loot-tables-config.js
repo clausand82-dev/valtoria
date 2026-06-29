@@ -124,6 +124,7 @@ export const LOOT_TABLES = {
     { type: "resource", id: "stone_brick", min: 1, max: 1, chance: 0.04 },
     { type: "resource", id: "diamond", min: 1, max: 1, chance: 0.001 },
     { type: "resource", id: "junk", min: 1, max: 3, chance: 0.33 },
+    { type: "resource", id: "paper", min: 1, max: 4, chance: 0.1 },
     { type: "equipment", category: "weapon", minRarity: "poor", chance: 0.01, tries: 120 },
     { type: "equipment", category: "armor", minRarity: "poor", chance: 0.01, tries: 120 },
     { type: "unique", source: "monster", chance: 0.0015, magicFind: true },

@@ -36,6 +36,10 @@ kun en farm, resten er bare areas der hedder farm!
 - inn and bank occupied by city mobs can't use main chest and vault
 - tileset can transform into real isometrisk tile instead of just beeing a diamond mask
 - decay also use real isometrisk transformation now (when projection: "topdown" is set in decay config)
+- added some new object, foilage and decay sheets
+- startet to do some wall code, but deactivated for now as it's not finish
+- building you will get by quest can't be bought (bank, mechant, sanctury and blacksmith)
+- items can now get destroyWhenDurabilityDepleted - when set to true item will disaperar when reaching 0% durability
 
 
 *V. 0.84

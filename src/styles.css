@@ -4894,6 +4894,17 @@ button {
   cursor: default;
 }
 
+.city-manual-purchase-disabled {
+  margin: 8px 0;
+  padding: 9px 11px;
+  border: 1px solid rgba(232, 174, 82, 0.38);
+  border-radius: 6px;
+  background: rgba(101, 58, 19, 0.28);
+  color: #f2c77f;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .city-popup-main {
   overflow: auto;
   scrollbar-gutter: stable;

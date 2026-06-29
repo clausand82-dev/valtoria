@@ -1,5 +1,15 @@
+import { CITY_AREAS } from "./city-areas-config.js";
+
 // City achievements are Library Hall of Deeds entries.
 // Schema: id, title, description, category, imageUrl/iconUrl, levels[] { tier, condition, effects }, optional hidden.
+const FIELD_AREA_IDS = CITY_AREAS.filter((area) => area.category === "outer").map((area) => area.id);
+const MOAT_AREA_IDS = CITY_AREAS.filter((area) => area.category === "water").map((area) => area.id);
+
+const allAreasAtLevel = (areaIds, level, progressLabel) => ({
+  cityAreaLevels: Object.fromEntries(areaIds.map((areaId) => [areaId, { min: level }])),
+  progressLabel: `${progressLabel} på level ${level}`,
+});
+
 const VILLAGE_OUTSKIRT_REGION_IDS = [
   "path-to-hunter-hut",
   "lookout-post",
@@ -92,6 +102,37 @@ export const CITY_ACHIEVEMENTS = [
       { tier: "bronze", condition: { counter: { id: "questCompleted.faction.village_outskirt", min: 10 } } },
       { tier: "silver", condition: { counter: { id: "questCompleted.faction.village_outskirt", min: 25 } } },
       { tier: "gold", condition: { counter: { id: "questCompleted.faction.village_outskirt", min: 50 } } },
+    ],
+  },
+  {
+    id: "farmer",
+    title: "Farmer",
+    description: "Udbyg alle byens marker til deres højeste niveau.",
+    category: "city",
+    levels: [
+      { tier: "bronze", condition: allAreasAtLevel(FIELD_AREA_IDS, 1, "marker") },
+      { tier: "silver", condition: allAreasAtLevel(FIELD_AREA_IDS, 2, "marker") },
+      { tier: "gold", condition: allAreasAtLevel(FIELD_AREA_IDS, 3, "marker"), effects: { cityStats: { provision: 100 } } },
+    ],
+  },
+  {
+    id: "lord_of_the_moats",
+    title: "Voldgravenes Hersker",
+    description: "Byg alle voldgravene omkring byen.",
+    category: "city",
+    levels: [
+      { tier: "gold", condition: allAreasAtLevel(MOAT_AREA_IDS, 1, "voldgrave"), effects: { cityStats: { city_defence: 25 } } },
+    ],
+  },
+  {
+    id: "hero_of_the_city",
+    title: "Hero of the City",
+    description: "Bekæmp city monster-grupper med helten.",
+    category: "combat",
+    levels: [
+      { tier: "bronze", condition: { counter: { id: "cityMobGroupsDefeated.hero", min: 10 } } },
+      { tier: "silver", condition: { counter: { id: "cityMobGroupsDefeated.hero", min: 25 } } },
+      { tier: "gold", condition: { counter: { id: "cityMobGroupsDefeated.hero", min: 50 } }, effects: { cityStats: { city_defence: 50 } } },
     ],
   },
 ];

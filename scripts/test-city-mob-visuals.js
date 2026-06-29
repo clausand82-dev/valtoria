@@ -66,6 +66,8 @@ try {
   const innBattle = pickCityBattleRegion("Skeleton", "small", "NW_SPAWN_CLOSE", { occupiedBuildingId: "inn" });
   const marketBattle = pickCityBattleRegion("Peasant", "small", "NW_SPAWN_CLOSE", { occupiedAreaId: "market" });
   const outerBattle = pickCityBattleRegion("Skeleton", "small", "NW_SPAWN_CLOSE");
+  const lowWealthBankBattle = resolveMapRegionConfig(bankBattle.region, {}, { cityStats: { ratios: { wealth: 0.74 } } });
+  const sufficientWealthBankBattle = resolveMapRegionConfig(bankBattle.region, {}, { cityStats: { ratios: { wealth: 0.75 } } });
   const missingBattleObjectIds = [...new Set(CITY_MOB_BATTLE_PROFILES
     .flatMap((profile) => profile.objects ?? [])
     .map((entry) => String(entry?.id ?? entry))
@@ -132,6 +134,8 @@ try {
       && innBattle?.region?.id === "citymob:city-inn-taproom"
       && marketBattle?.region?.id === "citymob:city-area-market"
       && outerBattle?.region?.id === "citymob:city-nw-ruins",
+    bankVaultWealthGate: !lowWealthBankBattle.objects.some((entry) => entry.id === "object_vault")
+      && sufficientWealthBankBattle.objects.some((entry) => entry.id === "object_vault" && !entry.cityStat),
     battleObjectIdsValid: missingBattleObjectIds.length === 0,
     battleEntryConditions: conditionalBattleRegion.objects.length === 2
       && conditionalBattleRegion.objects.every((entry) => !entry.conditions && !entry.questActive && !entry.blockedBy)

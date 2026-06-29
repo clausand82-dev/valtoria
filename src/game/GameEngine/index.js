@@ -107,6 +107,7 @@ export class GameEngine {
     this.adaptivePerformanceTier = 0;
     this.adaptiveLowFpsSamples = 0;
     this.terrainLayersCleared = 0;
+    this.tileEdgeWallImage = null;
     this.lastSaveInfo = null;
     this.time = 0;
     this.frame = 0;

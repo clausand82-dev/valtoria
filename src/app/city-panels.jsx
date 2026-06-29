@@ -39,6 +39,7 @@ import {
   cityAddonName,
   cityBuildingName,
   cityRequirementContext,
+  getCityAreaStateForId,
   hasCityBuilding,
 } from "../game/config/city-state-helpers.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../game/config/map-region-config.js";
@@ -1116,7 +1117,7 @@ function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlocke
                 <p>{achievement.description}</p>
                 <div className="city-achievement-tiers">
                   {levels.map((level, index) => {
-                    const progressText = achievementLevelProgressText(level, snapshot);
+                    const progressText = achievementLevelProgressText(level, snapshot, progress);
                     return (
                       <span className={`${index < unlocked ? "met" : "missing"} tier-${achievementTierClass(level.tier, levels.length, index)}`} key={`${achievement.id}-${index}`}>
                         <b>{achievementTierLabel(level.tier, levels.length, index)}</b>
@@ -1135,16 +1136,16 @@ function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlocke
   );
 }
 
-function achievementLevelProgressText(level, snapshot = emptySnapshot) {
-  const progress = achievementConditionProgress(level?.condition ?? level?.conditions, snapshot);
-  if (!progress) return "0/1";
-  return `${formatCompactNumber(progress.current)}/${formatCompactNumber(progress.target)}${progress.label ? ` ${progress.label}` : ""}`;
+function achievementLevelProgressText(level, snapshot = emptySnapshot, cityProgress = {}) {
+  const conditionProgress = achievementConditionProgress(level?.condition ?? level?.conditions, snapshot, cityProgress);
+  if (!conditionProgress) return "0/1";
+  return `${formatCompactNumber(conditionProgress.current)}/${formatCompactNumber(conditionProgress.target)}${conditionProgress.label ? ` ${conditionProgress.label}` : ""}`;
 }
 
-function achievementConditionProgress(condition, snapshot = emptySnapshot) {
+function achievementConditionProgress(condition, snapshot = emptySnapshot, cityProgress = {}) {
   if (!condition || typeof condition !== "object" || Array.isArray(condition)) return null;
   if (Array.isArray(condition.all)) {
-    const entries = condition.all.map((entry) => achievementConditionProgress(entry, snapshot)).filter(Boolean);
+    const entries = condition.all.map((entry) => achievementConditionProgress(entry, snapshot, cityProgress)).filter(Boolean);
     if (entries.length === 0) return null;
     return {
       current: entries.filter((entry) => Number(entry.current) >= Number(entry.target)).length,
@@ -1153,7 +1154,7 @@ function achievementConditionProgress(condition, snapshot = emptySnapshot) {
     };
   }
   if (Array.isArray(condition.any)) {
-    const entries = condition.any.map((entry) => achievementConditionProgress(entry, snapshot)).filter(Boolean);
+    const entries = condition.any.map((entry) => achievementConditionProgress(entry, snapshot, cityProgress)).filter(Boolean);
     if (entries.length === 0) return null;
     return entries.reduce((best, entry) => {
       const bestRatio = Number(best.current) / Math.max(1, Number(best.target));
@@ -1179,6 +1180,18 @@ function achievementConditionProgress(condition, snapshot = emptySnapshot) {
       current: clampProgressNumber(snapshot?.worldState?.counters?.[String(counterId)] ?? 0, target),
       target,
       label: achievementConditionLabel(counterId),
+    };
+  }
+  if (condition.cityAreaLevels && typeof condition.cityAreaLevels === "object") {
+    const entries = Object.entries(condition.cityAreaLevels);
+    return {
+      current: entries.filter(([areaId, numberCondition]) => {
+        const areaState = getCityAreaStateForId(cityProgress, areaId);
+        const currentLevel = areaState.unlocked ? Math.max(0, Math.floor(Number(areaState.level) || 0)) : 0;
+        return currentLevel >= conditionTargetNumber(numberCondition);
+      }).length,
+      target: entries.length,
+      label: condition.progressLabel ?? "områder",
     };
   }
   if (condition.tagKills && typeof condition.tagKills === "object") {
@@ -1232,6 +1245,7 @@ function achievementConditionLabel(id) {
   if (key === "stats.killsTotal") return "kills";
   if (key === "resourceCollected.bonedust") return "bonedust";
   if (key === "questCompleted.faction.village_outskirt") return "quests";
+  if (key === "cityMobGroupsDefeated.hero") return "city monster-grupper";
   if (key.startsWith("region.") && key.endsWith(".unlocked")) return "regioner";
   return key.split(".").at(-1) ?? "";
 }
@@ -1260,6 +1274,9 @@ function achievementIconUrl(achievement) {
     fenris_bane: "/assets/generated/mini/mini_wolf.png",
     bone_collector: "/assets/generated/item/item_res_bonedust.png",
     savior_of_village_outskirt: "/assets/generated/map/map_villageoutskirts_v2.png",
+    farmer: "/assets/generated/house/house_farm.png",
+    lord_of_the_moats: "/assets/generated/city/city_water1.png",
+    hero_of_the_city: "/assets/generated/achievement/defenderofthecity.png",
   };
   return fallbacks[achievement?.id] ?? "/assets/generated/item/item_goldidol.png";
 }

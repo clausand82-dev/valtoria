@@ -208,8 +208,9 @@ export const REGION_OBJECT_DEFS = {
   },
   object_chests_ground: {
     spawnTypes: [{ type: "object_chests_ground", weight: 1 }],
-    defaultDestructible: false,
+    defaultDestructible: true,
     renderBiomeId: "mainland",
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ff9100", lootTables: ["object_container_common","material_gemstones"], },
     graphicsRef: "object/object_chests_ground.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },

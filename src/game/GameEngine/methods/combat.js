@@ -1973,13 +1973,23 @@ export const combatMethods = {
 
   // ─── Item durability helpers ─────────────────────────────────────────────────
 
+  destroyEquipmentAtZeroDurability(slotId, item) {
+    if (!slotId || !item?.destroyWhenDurabilityDepleted || Number(item.durability) > 0) return false;
+    if (this.player.equipment?.[slotId] !== item) return false;
+    this.player.equipment[slotId] = null;
+    this.addToast(`${item.name} forsvandt.`);
+    return true;
+  },
+
   drainWeaponDurability() {
     const weapon = this.player.equipment?.weapon;
     if (!weapon) return;
     const before = Number(weapon.durability ?? 100);
     weapon.durability = Math.max(0, parseFloat((before - ITEM_DURABILITY_WEAPON_PER_ATTACK).toFixed(2)));
     if (before > 0 && weapon.durability === 0) {
-      this.addToast(`${weapon.name} er brudt! Reparer det hos smeden.`);
+      if (!this.destroyEquipmentAtZeroDurability("weapon", weapon)) {
+        this.addToast(`${weapon.name} er brudt! Reparer det hos smeden.`);
+      }
       this.publishSnapshot();
     }
   },
@@ -1991,7 +2001,9 @@ export const combatMethods = {
       const before = Number(item.durability ?? 100);
       item.durability = Math.max(0, parseFloat((before - ITEM_DURABILITY_ARMOR_PER_HIT).toFixed(2)));
       if (before > 0 && item.durability === 0) {
-        this.addToast(`${item.name} er brudt! Reparer det hos smeden.`);
+        if (!this.destroyEquipmentAtZeroDurability(slotId, item)) {
+          this.addToast(`${item.name} er brudt! Reparer det hos smeden.`);
+        }
         changed = true;
       }
     }
@@ -2015,10 +2027,7 @@ export const combatMethods = {
       const before = Number(item.durability ?? 100);
       item.durability = Math.max(0, parseFloat((before - loss).toFixed(2)));
       changed = true;
-      if (item.durability <= 0 && item.destroyWhenDurabilityDepleted) {
-        this.player.equipment[slotId] = null;
-        this.addToast(`${item.name} forsvandt.`);
-      } else if (before > 0 && item.durability === 0) {
+      if (!this.destroyEquipmentAtZeroDurability(slotId, item) && before > 0 && item.durability === 0) {
         this.addToast(`${item.name} er brudt!`);
       }
     }
@@ -2032,12 +2041,13 @@ export const combatMethods = {
   applyDeathDurabilityLoss() {
     const lossMin = ITEM_DURABILITY_DEATH_MIN_PCT;
     const lossMax = ITEM_DURABILITY_DEATH_MAX_PCT;
-    for (const item of Object.values(this.player.equipment ?? {})) {
+    for (const [slotId, item] of Object.entries(this.player.equipment ?? {})) {
       if (!item) continue;
       const dur = Number(item.durability ?? 100);
       if (dur <= ITEM_DURABILITY_DEATH_THRESHOLD) continue; // already low
       const loss = lossMin + Math.random() * (lossMax - lossMin);
       item.durability = Math.max(0, parseFloat((dur - loss).toFixed(2)));
+      this.destroyEquipmentAtZeroDurability(slotId, item);
     }
     // Gold loss: 0–5% of current gold
     const goldLoss = Math.floor(this.player.gold * Math.random() * ITEM_GOLD_DEATH_LOSS_MAX);

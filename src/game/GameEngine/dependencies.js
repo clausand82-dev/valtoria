@@ -24,6 +24,7 @@ export {
   groundTopDownToIsometricTransform,
   loadAnimationSheets,
 } from "../assets.js";
+export { loadTileEdgeWallImage } from "../assets-wall.js";
 export { drawLoot, drawProjectile } from "../assets-items.js";
 export {
   chunkCoords,
@@ -111,3 +112,4 @@ export {
   DESTRUCTIBLE_OBJECT_ATTACK_RANGE,
   GROUND_LOOT_DESPAWN_SECONDS,
 } from "../config/game-engine-config.js";
+export { TILE_EDGE_WALLS } from "../config/tile-edge-wall-config.js";
