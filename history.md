@@ -34,6 +34,8 @@ kun en farm, resten er bare areas der hedder farm!
 - when pickup ud quest relevant items a special floating text will show it
 - city mobs are now more easy to see om city map
 - inn and bank occupied by city mobs can't use main chest and vault
+- tileset can transform into real isometrisk tile instead of just beeing a diamond mask
+- decay also use real isometrisk transformation now (when projection: "topdown" is set in decay config)
 
 
 *V. 0.84

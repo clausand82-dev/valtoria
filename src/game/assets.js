@@ -18,7 +18,13 @@ import { MAP_REGION_SETS } from "./config/map-region-config.js";
 import { MAP_PREFABS } from "./config/map-prefab-config.js";
 import { normalizePrefabContent } from "./world/map-prefab-placement.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
-import { collectRegionAssetOverrides, normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
+import {
+  collectRegionAssetOverrides,
+  DEFAULT_CUSTOM_GROUND_RENDER,
+  normalizeRegionFoliageSets,
+  normalizeRegionTileset,
+  normalizeRegionWaterSets,
+} from "./config/region-asset-config.js";
 import { RESOURCE_DEFS } from "./config/resource-config.js";
 import { normalizeShadowConfig } from "./config/shadow-config.js";
 
@@ -216,7 +222,7 @@ function buildFullRegionAssetManifest() {
         fileName: entry.fileName,
       }))),
     groundSpecs: Object.entries(GROUND_SHEETS).map(([biomeId, config]) => groundSpecFromConfig(biomeId, config))
-      .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName))),
+      .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry))),
     treeSpecs: Object.entries(TREE_SHEETS).map(([biomeId, fileName]) => ({ biomeId, fileName })),
     foliageSpecs: Object.entries(FOLIAGE_SHEETS).map(([id, config]) => normalizeFoliageSheetSpec(id, config, 8))
       .concat(regionAssetOverrides.foliageSheets.map((entry) => ({
@@ -230,14 +236,14 @@ function buildFullRegionAssetManifest() {
   };
 }
 
-function buildRegionAssetManifest(input) {
+export function buildRegionAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return buildFullRegionAssetManifest();
 
   const groundSpecs = [];
   const normalizedTileset = normalizeRegionTileset(regionConfig.tileset);
   const tilesets = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : []);
-  for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName));
+  for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName, tileset));
   if (!groundSpecs.length && GROUND_SHEETS.mainland) groundSpecs.push(groundSpecFromConfig("mainland", GROUND_SHEETS.mainland));
 
   const waterSpecs = normalizeRegionWaterSets(regionConfig).map((entry) => ({
@@ -430,15 +436,26 @@ function groundSpecFromConfig(biomeId, config) {
   };
 }
 
-function customGroundSpec(biomeId, fileName) {
+export function customGroundSpec(biomeId, fileName, overrides = {}) {
+  const renderSettings = {
+    sourceInset: overrides.sourceInset ?? DEFAULT_CUSTOM_GROUND_RENDER.sourceInset,
+    edgeFeather: overrides.edgeFeather ?? DEFAULT_CUSTOM_GROUND_RENDER.edgeFeather,
+    textureAlpha: overrides.textureAlpha ?? DEFAULT_CUSTOM_GROUND_RENDER.textureAlpha,
+    visualScale: overrides.visualScale ?? DEFAULT_CUSTOM_GROUND_RENDER.visualScale,
+    baseAlpha: overrides.baseAlpha ?? DEFAULT_CUSTOM_GROUND_RENDER.baseAlpha,
+  };
   return {
     biomeId,
     fileName,
-    sourceInset: 0.025,
-    edgeFeather: 0.12,
-    textureAlpha: 1,
-    visualScale: 1.18,
-    baseAlpha: 0.18,
+    ...renderSettings,
+    // Dev-safe metadata only; lockedVariant never changes the loaded 4x4 sheet.
+    selection: {
+      x: overrides.x ?? null,
+      y: overrides.y ?? null,
+      lockedVariant: overrides.lockedVariant ?? null,
+      variantCount: overrides.variantCount ?? 16,
+    },
+    renderSettings,
   };
 }
 
@@ -2293,10 +2310,25 @@ function drawGroundTexture(ctx, sheet, frame, x, centerY, halfW, halfH, options 
   ctx.restore();
 }
 
+export function groundTopDownToIsometricTransform(sourceW, sourceH, targetW, targetH) {
+  const safeSourceW = Math.max(1, Number(sourceW) || 1);
+  const safeSourceH = Math.max(1, Number(sourceH) || 1);
+  const safeTargetW = Math.max(1, Number(targetW) || 1);
+  const safeTargetH = Math.max(1, Number(targetH) || 1);
+  return {
+    a: safeTargetW / (2 * safeSourceW),
+    b: safeTargetH / (2 * safeSourceW),
+    c: -safeTargetW / (2 * safeSourceH),
+    d: safeTargetH / (2 * safeSourceH),
+    e: safeTargetW / 2,
+    f: safeTargetH / 2,
+  };
+}
+
 function getGroundTileSprite(sheet, frame, width, height, options = {}) {
   const feather = options.edgeFeather ?? sheet.edgeFeather ?? 0;
   const alpha = options.textureAlpha ?? sheet.textureAlpha ?? 1;
-  const cacheKey = `${frame.index ?? 0}:${width}x${height}:f${feather}:a${alpha}`;
+  const cacheKey = `iso-topdown:${frame.index ?? 0}:${width}x${height}:f${feather}:a${alpha}`;
   const cached = sheet.tileCache?.get(cacheKey);
   if (cached) return cached;
 
@@ -2310,7 +2342,23 @@ function getGroundTileSprite(sheet, frame, width, height, options = {}) {
   canvas.width = width;
   canvas.height = height;
   const tctx = canvas.getContext("2d", { willReadFrequently: true });
-  tctx.drawImage(sheet.canvas, sourceX, sourceY, sourceW, sourceH, 0, 0, width, height);
+  const transform = groundTopDownToIsometricTransform(sourceW, sourceH, width, height);
+  tctx.save();
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = "high";
+  tctx.transform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f);
+  tctx.drawImage(
+    sheet.canvas,
+    sourceX,
+    sourceY,
+    sourceW,
+    sourceH,
+    -sourceW / 2,
+    -sourceH / 2,
+    sourceW,
+    sourceH,
+  );
+  tctx.restore();
 
   if (feather > 0 || alpha < 1) {
     const imageData = tctx.getImageData(0, 0, width, height);

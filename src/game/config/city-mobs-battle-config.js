@@ -138,7 +138,16 @@ export const CITY_MOB_BATTLE_PROFILES = [
     id: "city-bank-vault",
     label: "Occupied Bank Vault",
     buildingIds: ["bank"],
-    tileset: [{ fileName: "tileset/tileset_bricktiles.png", x: 1, y: 1, weight: 3}],
+    tileset: [{
+      fileName: "tileset/tileset_bricktiles.png",
+      //x: 1,
+      //y: 1,
+      weight: 3,
+      //visualScale: 1,
+      //sourceInset: 0,
+      //edgeFeather: 0,
+      //baseAlpha: 0,
+    }],
     foliageSet: [
       { fileName: "foilage/foilage_basement.png", weight: 2, scale: 0.8 },
       //{ fileName: "foilage/foilage_metalchains.png", weight: 5, scale: 0.7 },

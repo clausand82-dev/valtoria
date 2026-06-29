@@ -2,6 +2,7 @@ STATUS:
 Små rettelse observeret igennem spil test:
 - cigar skal forsvinde på dura 0 - det gør den ikke!
 - måske en para ved bygninger, areas, addons, som bestemmer om de kan købes eller kun er quest rewards!
+- noget betingelse på bank mobs map (måske forskellige mængde objekter udfra wealth)
 
 
 IMPORTENT:

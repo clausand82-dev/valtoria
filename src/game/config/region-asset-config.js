@@ -4,6 +4,14 @@ const GENERATED_ASSET_PREFIX = "/assets/generated/";
 const DEFAULT_GROUND_GRID = 4;
 const DEFAULT_WATER_GRID = 4;
 
+export const DEFAULT_CUSTOM_GROUND_RENDER = Object.freeze({
+  sourceInset: 0.025,
+  edgeFeather: 0.12,
+  textureAlpha: 1,
+  visualScale: 1.18,
+  baseAlpha: 0.18,
+});
+
 const DEFAULT_FOLIAGE_GRID = 4;
 const LEGACY_FOLIAGE_GRID = 8;
 
@@ -57,8 +65,12 @@ function toSpecObject(value) {
   return null;
 }
 
-function buildGroundSheetId(fileName) {
-  return `ground-custom:${String(fileName).toLowerCase()}`;
+function buildGroundSheetId(fileName, renderConfig = DEFAULT_CUSTOM_GROUND_RENDER) {
+  const baseId = `ground-custom:${String(fileName).toLowerCase()}`;
+  const usesDefaults = Object.entries(DEFAULT_CUSTOM_GROUND_RENDER)
+    .every(([key, value]) => renderConfig[key] === value);
+  if (usesDefaults) return baseId;
+  return `${baseId}:si${renderConfig.sourceInset}:ef${renderConfig.edgeFeather}:ta${renderConfig.textureAlpha}:vs${renderConfig.visualScale}:ba${renderConfig.baseAlpha}`;
 }
 
 function buildWaterSheetId(fileName) {
@@ -69,12 +81,13 @@ function buildFoliageSheetId(fileName, rows, cols) {
   return `foliage-custom:${String(fileName).toLowerCase()}:${rows}x${cols}`;
 }
 
-function resolveLockedTileVariant(tileset, grid = DEFAULT_GROUND_GRID) {
-  if (!tileset) return null;
-  const x = clampInt(tileset.x, 1, grid);
-  const y = clampInt(tileset.y, 1, grid);
+export function resolveLockedTilesetVariant(tileset, cols = DEFAULT_GROUND_GRID, rows = cols) {
+  if (!tileset || tileset.x === null || tileset.x === undefined || tileset.y === null || tileset.y === undefined) return null;
+  if (String(tileset.x).trim() === "" || String(tileset.y).trim() === "") return null;
+  const x = clampInt(tileset.x, 1, cols);
+  const y = clampInt(tileset.y, 1, rows);
   if (!x || !y) return null;
-  return (y - 1) * grid + (x - 1);
+  return Math.min(cols * rows - 1, (y - 1) * cols + (x - 1));
 }
 
 function normalizeAxisSelection(value, grid = DEFAULT_WATER_GRID) {
@@ -101,16 +114,26 @@ function normalizeRegionTilesetEntry(tilesetInput) {
   if (!raw) return null;
   const fileName = normalizeFileName(raw.id ?? raw.fileName ?? raw.png ?? raw.src);
   if (!fileName) return null;
-  const lockedVariant = resolveLockedTileVariant(raw, DEFAULT_GROUND_GRID);
+  const lockedVariant = resolveLockedTilesetVariant(raw, DEFAULT_GROUND_GRID);
   const parsedWeight = Number(raw.weight);
+  // Natural terrain normally uses soft blending. Hard floors usually want
+  // visualScale: 1, sourceInset: 0, edgeFeather: 0, and baseAlpha: 0.
+  const renderConfig = {
+    sourceInset: clampNumber(raw.sourceInset, 0, 0.25) ?? DEFAULT_CUSTOM_GROUND_RENDER.sourceInset,
+    edgeFeather: clampNumber(raw.edgeFeather, 0, 0.5) ?? DEFAULT_CUSTOM_GROUND_RENDER.edgeFeather,
+    textureAlpha: clampNumber(raw.textureAlpha, 0, 1) ?? DEFAULT_CUSTOM_GROUND_RENDER.textureAlpha,
+    visualScale: clampNumber(raw.visualScale, 0.5, 1.5) ?? DEFAULT_CUSTOM_GROUND_RENDER.visualScale,
+    baseAlpha: clampNumber(raw.baseAlpha, 0, 1) ?? DEFAULT_CUSTOM_GROUND_RENDER.baseAlpha,
+  };
   return {
     fileName,
     weight: Number.isFinite(parsedWeight) ? Math.max(0, parsedWeight) : 1,
-    sheetId: buildGroundSheetId(fileName),
+    sheetId: buildGroundSheetId(fileName, renderConfig),
     x: clampInt(raw.x, 1, DEFAULT_GROUND_GRID),
     y: clampInt(raw.y, 1, DEFAULT_GROUND_GRID),
     lockedVariant,
     variantCount: DEFAULT_GROUND_GRID * DEFAULT_GROUND_GRID,
+    ...renderConfig,
   };
 }
 
@@ -121,6 +144,26 @@ export function normalizeRegionTileset(tilesetInput) {
     return entries.length ? entries : null;
   }
   return normalizeRegionTilesetEntry(tilesetInput);
+}
+
+export function groundTilesetDiagnostics(tilesetInput) {
+  const normalized = normalizeRegionTileset(tilesetInput);
+  const entries = Array.isArray(normalized) ? normalized : (normalized ? [normalized] : []);
+  return entries.map((entry) => ({
+    fileName: entry.fileName,
+    x: entry.x,
+    y: entry.y,
+    lockedVariant: entry.lockedVariant,
+    variantCount: entry.variantCount,
+    sheetId: entry.sheetId,
+    renderSettings: {
+      sourceInset: entry.sourceInset,
+      edgeFeather: entry.edgeFeather,
+      textureAlpha: entry.textureAlpha,
+      visualScale: entry.visualScale,
+      baseAlpha: entry.baseAlpha,
+    },
+  }));
 }
 
 function normalizeWaterEntry(entry) {
@@ -238,6 +281,11 @@ export function collectRegionAssetOverrides(mapRegionSets) {
         groundSheets.push({
           sheetId: t.sheetId,
           fileName: t.fileName,
+          sourceInset: t.sourceInset,
+          edgeFeather: t.edgeFeather,
+          textureAlpha: t.textureAlpha,
+          visualScale: t.visualScale,
+          baseAlpha: t.baseAlpha,
         });
       }
 

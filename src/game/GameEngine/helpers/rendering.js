@@ -3,6 +3,7 @@ import {
   TILE_H,
   TILE_W,
   drawShadow,
+  groundTopDownToIsometricTransform,
   QUEST_NPCS
 } from "../dependencies.js";
 
@@ -182,17 +183,36 @@ export function drawTerrainDecal(ctx, decal, x, y, atlas) {
       ctx.rotate(decal.rotation || 0);
       ctx.globalAlpha *= alpha;
       ctx.globalCompositeOperation = decalBlendMode(decal, sheet);
-      ctx.drawImage(
-        source,
-        cell.x,
-        cell.y,
-        cell.w,
-        cell.h,
-        offsetX - width * anchorX,
-        offsetY - height * anchorY,
-        width,
-        height,
-      );
+      const destX = offsetX - width * anchorX;
+      const destY = offsetY - height * anchorY;
+      if (projection === "topdown") {
+        const transform = groundTopDownToIsometricTransform(cell.w, cell.h, width, height);
+        ctx.translate(destX, destY);
+        ctx.transform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f);
+        ctx.drawImage(
+          source,
+          cell.x,
+          cell.y,
+          cell.w,
+          cell.h,
+          -cell.w / 2,
+          -cell.h / 2,
+          cell.w,
+          cell.h,
+        );
+      } else {
+        ctx.drawImage(
+          source,
+          cell.x,
+          cell.y,
+          cell.w,
+          cell.h,
+          destX,
+          destY,
+          width,
+          height,
+        );
+      }
       ctx.restore();
       return;
     }

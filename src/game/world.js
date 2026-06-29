@@ -222,6 +222,14 @@ function pickWeightedTileset(entries, roll = Math.random()) {
   return pickWeightedByWeight(entries, roll);
 }
 
+export function resolveGroundTileVariant(groundSpec, randomVariant, fallbackVariantCount = GROUND_VARIANT_COUNT) {
+  const variantCount = Math.max(1, Math.floor(Number(groundSpec?.variantCount) || fallbackVariantCount));
+  if (Number.isInteger(groundSpec?.lockedVariant)) {
+    return Math.min(variantCount - 1, Math.max(0, groundSpec.lockedVariant));
+  }
+  return Math.abs(Math.floor(Number(randomVariant) || 0)) % variantCount;
+}
+
 export function getRarity(level) {
   const shifted = RARITIES.map((rarity, index) => ({
     ...rarity,
@@ -737,6 +745,11 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
           y: normalizedTileset.y,
           lockedVariant: normalizedTileset.lockedVariant,
           variantCount: normalizedTileset.variantCount,
+          sourceInset: normalizedTileset.sourceInset,
+          edgeFeather: normalizedTileset.edgeFeather,
+          textureAlpha: normalizedTileset.textureAlpha,
+          visualScale: normalizedTileset.visualScale,
+          baseAlpha: normalizedTileset.baseAlpha,
         }))
         : null,
       waterSets: normalizedWaterSets.map((set) => ({
@@ -986,16 +999,14 @@ export function createChunk(cx, cy, region = null) {
         ? pickWeightedTileset(regionTileset, noise / 4294967295)
         : regionTileset;
       const groundSheetId = chosenTileset?.sheetId ?? DEFAULT_GROUND_SHEET_ID;
-      const lockedGroundVariant = Number.isInteger(chosenTileset?.lockedVariant)
-        ? chosenTileset.lockedVariant
-        : null;
       const edgeMask = region ? regionEdgeMask(region, worldX, worldY) : 0;
       const water = waterTiles.get(`${worldX},${worldY}`);
       chunk.tiles.push({
         x: worldX,
         y: worldY,
         groundSheetId,
-        variant: lockedGroundVariant ?? (noise % GROUND_VARIANT_COUNT),
+        // Lock only the late variant choice; sheet loading and rendering stay identical.
+        variant: resolveGroundTileVariant(chosenTileset, noise),
         water: water !== undefined,
         waterVariant: water?.variant,
         waterSheetId: water?.sheetId,

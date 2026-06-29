@@ -19,7 +19,11 @@ export { drawHero } from "../assets-hero.js";
 export { drawMonster } from "../assets-monster.js";
 export { drawFoliageObject } from "../assets-foliage.js";
 export { drawOverlayObject } from "../assets-overlay.js";
-export { loadAnimationSheets, drawObject } from "../assets.js";
+export {
+  drawObject,
+  groundTopDownToIsometricTransform,
+  loadAnimationSheets,
+} from "../assets.js";
 export { drawLoot, drawProjectile } from "../assets-items.js";
 export {
   chunkCoords,
