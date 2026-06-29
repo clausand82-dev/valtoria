@@ -30,6 +30,7 @@ export const DECAY_SET_DEFS = {
     cols: 4,
     renderScale: 1,
     projection: "topdown",
+    blendMode: "darken",
   },
   decay_dust: {
     fileName: "decay/decay_dust.png",
@@ -44,6 +45,7 @@ export const DECAY_SET_DEFS = {
     cols: 4,
     renderScale: 1,
     projection: "topdown",
+    blendMode: "darken",
   },
   decay_field: {
     fileName: "decay/decay_field.png",
@@ -66,6 +68,30 @@ export const DECAY_SET_DEFS = {
     renderScale: 1,
     projection: "iso",
     blendMode: "multiply",
+  },
+  decay_fluids: {
+    fileName: "decay/decay_fluids.png",
+    rows: 4,
+    cols: 4,
+    renderScale: 1,
+    projection: "topdown",
+    blendMode: "darken",
+  },
+  decay_oldfluidmarks: {
+    fileName: "decay/decay_oldfluidmarks.png",
+    rows: 4,
+    cols: 4,
+    renderScale: 1,
+    projection: "topdown",
+    blendMode: "darken",
+  },
+  decay_garbage: {
+    fileName: "decay/decay_garbage.png",
+    rows: 4,
+    cols: 4,
+    renderScale: 1,
+    projection: "topdown",
+    blendMode: "darken",
   },
 };
 

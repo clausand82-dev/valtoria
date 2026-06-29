@@ -470,7 +470,8 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: [{ fileName: "foilage/foilage_barn.png"},
         { fileName: "foilage/foilage_boneparts.png"},
         { fileName: "foilage/foilage_barnitems.png", scale: 0.5},
-        { fileName: "foilage/foilage_smashed_smallanimals.png", scale: 0.25, particles: { type: "flies", chance: 0.65, count: [3, 8], radius: 22, heightOffset: -10 } },],
+        { fileName: "foilage/foilage_smashed_smallanimals.png", scale: 0.25, particles: { type: "flies", chance: 0.65, count: [3, 8], radius: 22, heightOffset: -10 } },
+        ],
       objects: [
         //{ id: "object_tree_mainland", weight: 8 },
         //{ id: "object_barn", weight: 15, destructible: true },

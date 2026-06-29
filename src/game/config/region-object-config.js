@@ -415,6 +415,34 @@ export const REGION_OBJECT_DEFS = {
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 }
   },
+  object_vault: {
+    spawnTypes: [{ type: "object_vault", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "metal", "container"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_vault.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_woodlogs: {
+    spawnTypes: [{ type: "object_woodlogs", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood"],
+    destructible: { hp: 52, damageStages: 3, particleColor: "#b88454", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_woodlogs.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_lamps: {
+    spawnTypes: [{ type: "object_lamps", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "metal", "light"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_lamps.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
   object_furnace: {
     spawnTypes: [{ type: "object_furnace", weight: 1 }],
     defaultDestructible: false,

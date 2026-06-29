@@ -162,6 +162,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { id: "object_shelfs", weight: 7, destructible: true },
       { id: "object_woodboxes_ground", weight: 4, destructible: true },
       { id: "object_sacks_ground", variant: 2, weight: 3, destructible: true },
+      { id: "object_vault", weight: 3, destructible: false },
     ],
     decay: [{ id: "decay_dust", weight: 10 }, { id: "decay_cracks", weight: 6 }, { id: "decay_spiderweb", weight: 3 }],
     spawnCounts: { objects: 24, foliage: 78, decals: 18 },
