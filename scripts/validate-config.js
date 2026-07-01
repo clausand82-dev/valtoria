@@ -11,6 +11,7 @@ import { READABLE_ITEM_DEFS } from "../src/game/config/readable-config.js";
 import { RARITIES } from "../src/game/config/rarity-config.js";
 import { LOOT_TABLES } from "../src/game/config/loot-tables-config.js";
 import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
+import { validateBeastLocalization } from "../src/i18n/beast/monster-localization.js";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
 const RUNTIME_LOOT_TABLE_REFS = new Set([
@@ -213,6 +214,7 @@ function checkPrefabRefs(prefabIds) {
 }
 
 function main() {
+  validateBeastLocalization({ warn: addWarning });
   const actionIds = checkDuplicateIds("action", ACTION_CONFIG);
   const questIds = checkDuplicateIds("quest", QUEST_DEFS);
   const npcIds = checkDuplicateIds("NPC", QUEST_NPCS);

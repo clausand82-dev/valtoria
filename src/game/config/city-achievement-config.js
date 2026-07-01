@@ -39,7 +39,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "monster_slayer",
     title: "Monster Slayer",
     imageUrl: "/assets/generated/achievement/monsterslayer.png",
-    description: "Dræb monstre i Valtorias vildmarker.",
+    description: "Kill monsters in the wilderness of Valtoria.",
+    i18n: { da: { title: "Monsterdræber", description: "Dræb monstre i Valtorias vildmarker." } },
     category: "combat",
     levels: [
       { tier: "bronze", condition: { player: { "stats.killsTotal": { min: 100 } } } },
@@ -51,7 +52,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "defender_of_the_city",
     title: "Defender of the City",
     imageUrl: "/assets/generated/achievement/defenderofthecity.png",
-    description: "Rens landsbyen for borgmesteren.",
+    description: "Cleanse the village for the mayor.",
+    i18n: { da: { title: "Byens forsvarer", description: "Rens landsbyen for borgmesteren." } },
     category: "quests",
     levels: [{ tier: "gold", condition: { questCompleted: "mayor_cleanse_village" } }],
   },
@@ -59,7 +61,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "village_outskirt_defender",
     title: "Village Outskirt Defender",
     imageUrl: "/assets/generated/achievement/villageoutskirtdefender.png",
-    description: "Aabn alle regioner i Village Outskirt.",
+    description: "Unlock every region in Village Outskirt.",
+    i18n: { da: { title: "Village Outskirts forsvarer", description: "Åbn alle regioner i Village Outskirt." } },
     category: "exploration",
     levels: [{ tier: "gold", condition: allVillageOutskirtRegionsUnlocked, effects: { cityStats: { defense: 100, trade: 50 } } }],
   },
@@ -67,7 +70,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "spiders_bane",
     title: "Spider's Bane",
     imageUrl: "/assets/generated/achievement/spidersbane.png",
-    description: "Ryd edderkopperne ud af kroens kælder.",
+    description: "Clear the spiders from the inn cellar.",
+    i18n: { da: { title: "Edderkoppernes bane", description: "Ryd edderkopperne ud af kroens kælder." } },
     category: "bosses",
     levels: [{ tier: "gold", condition: { questCompleted: "clear_the_inn" } }],
   },
@@ -75,7 +79,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "fenris_bane",
     title: "Fenris Bane",
     imageUrl: "/assets/generated/achievement/fenrisbane.png",
-    description: "Fæld Fenris-ulven i Elvbaekken.",
+    description: "Slay the Fenris wolf in Elvbaekken.",
+    i18n: { da: { title: "Fenris' bane", description: "Fæld Fenris-ulven i Elvbækken." } },
     category: "bosses",
     levels: [{ tier: "gold", condition: { any: [{ questCompleted: "annelise_document_chain" }, { tagKills: { wolf: { min: 1 } } }] } }],
   },
@@ -83,7 +88,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "bone_collector",
     title: "Bone Collector",
     imageUrl: "/assets/generated/achievement/bonecollector.png",
-    description: "Saml bonedust gennem hele spillet.",
+    description: "Collect bonedust throughout the game.",
+    i18n: { da: { title: "Knoglesamler", description: "Saml bonedust gennem hele spillet." } },
     category: "collection",
     levels: [
       { tier: "bronze", condition: { counter: { id: "resourceCollected.bonedust", min: 100 } } },
@@ -95,7 +101,8 @@ export const CITY_ACHIEVEMENTS = [
     id: "savior_of_village_outskirt",
     title: "Savior of Village Outskirt",
     imageUrl: "/assets/generated/achievement/saviorofvillageoutskirt.png",
-    description: "Fuldfør opgaver for Village Outskirt.",
+    description: "Complete quests for Village Outskirt.",
+    i18n: { da: { title: "Village Outskirts frelser", description: "Fuldfør opgaver for Village Outskirt." } },
     category: "quests",
     levels: [
       // TODO: Add reputation effects here if/when city-stat achievements can safely target faction reputation.
@@ -107,7 +114,8 @@ export const CITY_ACHIEVEMENTS = [
   {
     id: "farmer",
     title: "Farmer",
-    description: "Udbyg alle byens marker til deres højeste niveau.",
+    description: "Upgrade every city field to its highest level.",
+    i18n: { da: { title: "Landmand", description: "Udbyg alle byens marker til deres højeste niveau." } },
     category: "city",
     levels: [
       { tier: "bronze", condition: allAreasAtLevel(FIELD_AREA_IDS, 1, "marker") },
@@ -117,8 +125,9 @@ export const CITY_ACHIEVEMENTS = [
   },
   {
     id: "lord_of_the_moats",
-    title: "Voldgravenes Hersker",
-    description: "Byg alle voldgravene omkring byen.",
+    title: "Lord of the Moats",
+    description: "Build every moat around the city.",
+    i18n: { da: { title: "Voldgravenes hersker", description: "Byg alle voldgravene omkring byen." } },
     category: "city",
     levels: [
       { tier: "gold", condition: allAreasAtLevel(MOAT_AREA_IDS, 1, "voldgrave"), effects: { cityStats: { city_defence: 25 } } },
@@ -127,7 +136,8 @@ export const CITY_ACHIEVEMENTS = [
   {
     id: "hero_of_the_city",
     title: "Hero of the City",
-    description: "Bekæmp city monster-grupper med helten.",
+    description: "Defeat city monster groups with the hero.",
+    i18n: { da: { title: "Byens helt", description: "Bekæmp city monster-grupper med helten." } },
     category: "combat",
     levels: [
       { tier: "bronze", condition: { counter: { id: "cityMobGroupsDefeated.hero", min: 10 } } },

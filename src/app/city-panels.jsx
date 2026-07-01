@@ -97,6 +97,7 @@ import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
+import { localizeItemField, useLocalization } from "../i18n/index.js";
 
 import {
   CityItemName,
@@ -122,6 +123,7 @@ import {
 } from "./city-panel-helpers.jsx";
 
 function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
+  const { localize } = useLocalization();
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
@@ -266,7 +268,7 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
       <div className="repair-slot-info">
         <div className="repair-slot-header">
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
-          <span className="repair-slot-name" style={{ color: item.rarityColor ?? "#f5f3ea" }}>{item.name}</span>
+          <span className="repair-slot-name" style={{ color: item.rarityColor ?? "#f5f3ea" }}>{localizeItemField(item, "name", localize)}</span>
           <span className={`repair-source-badge ${slot.source}`}>{slot.sourceLabel}</span>
           <span className="repair-slot-label" style={{ color: "#aaa" }}>{slot.label}</span>
         </div>
@@ -482,13 +484,14 @@ function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, blacksmi
 }
 
 function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarrel, onProduceProvision }) {
+  const { localize } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const foodBarrelRecipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
   const foodBarrelOutputId = String(foodBarrelRecipe.outputResourceId ?? "food");
   const foodBarrelOutputCount = Math.max(1, Math.floor(Number(foodBarrelRecipe.outputCount) || 1));
   const foodBarrelOptions = (foodBarrelRecipe.inputOptions ?? []).map((option) => ({
     id: String(option?.resourceId ?? ""),
-    label: option?.label ?? String(option?.resourceId ?? "Unknown"),
+    label: localize(option, "label") || String(option?.resourceId ?? "Unknown"),
     baseCost: option?.baseCost,
     minCost: option?.minCost,
   })).filter((option) => option.id);
@@ -507,7 +510,7 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
           <div className="blacksmith-row" key={`barrel-${option.id}`}>
             <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
             <div>
-              <b>{option.label}</b>
+              <b>{localize(option, "label")}</b>
               <span>{foodBarrelCostValue} needed | Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
             </div>
             <button
@@ -585,6 +588,7 @@ function sanctuaryDonationItem(trade) {
 }
 
 function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, effectMultiplier = 1, onDonate }) {
+  const { localize } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const countPotion = potionCount ?? (() => 0);
   const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
@@ -607,7 +611,7 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, eff
           <div className="blacksmith-row" key={trade.id ?? `${item.id}-${cityRuleEffectsText(trade.effects)}`}>
             <InventoryIcon iconUrl={iconUrl} />
             <div>
-              <b>{trade.label ?? item.def?.name ?? item.id}</b>
+              <b>{localize(trade, "label") || item.def?.name || item.id}</b>
               <span>{cost} {item.def?.name ?? item.id} {"->"} {cityRuleEffectsText(scaleCityRuleEffects(trade.effects, multiplier))} | Available: {available}</span>
             </div>
             <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>Donate</button>
@@ -651,6 +655,7 @@ function CityFarmAlePanel({ inventory, cityStats, resourceCount, onBrewAle }) {
 }
 
 function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
+  const { localize } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const trades = CITY_STATS_RULES.innAleTrades ?? [];
   return (
@@ -668,7 +673,7 @@ function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
           <div className="blacksmith-row" key={trade.id ?? resourceId}>
             <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
             <div>
-              <b>{trade.label ?? def?.name ?? resourceId}</b>
+              <b>{localize(trade, "label") || def?.name || resourceId}</b>
               <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
             </div>
             <button type="button" disabled={available < cost} onClick={() => onServeAle(trade)}>Sell</button>
@@ -822,6 +827,7 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
 }
 
 function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArtifact, onBuy }) {
+  const { localize } = useLocalization();
   const bought = new Set(progress?.artifacts?.boughtIds ?? []);
   const hoverState = useFloatingProgressionHover();
   return (
@@ -846,7 +852,7 @@ function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArti
               onBlur={hoverState.scheduleClose}
             >
               <div className="city-progression-image-frame">
-                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{artifact.title?.slice(0, 2) ?? "?"}</span>}
+                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{localize(artifact, "title")?.slice(0, 2) ?? "?"}</span>}
               </div>
             </article>
           );
@@ -859,10 +865,10 @@ function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArti
           return (
             <>
               <header>
-                <b>{artifact.title}</b>
+                <b>{localize(artifact, "title")}</b>
                 <span>{owned ? "Aktiv" : buyCheck.canBuy ? "Klar" : "Laast"}</span>
               </header>
-              <p>{artifact.description}</p>
+              <p>{localize(artifact, "description")}</p>
               <div className="city-effect-list">
                 <span>{cityRuleEffectsText(artifact.effects?.cityStats)}</span>
                 {artifact.effects?.worldEnergy && (
@@ -990,6 +996,7 @@ function FloatingProgressionHover({ hoverState, className = "", width = 320, est
 }
 
 function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, onToggle }) {
+  const { localize } = useLocalization();
   const active = new Set(progress?.policies?.activeIds ?? []);
   const hoverState = useFloatingProgressionHover();
   const grouped = CITY_POLICIES.reduce((map, policy) => {
@@ -1033,7 +1040,7 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
                     }}
                   >
                     <div className="city-progression-image-frame">
-                      {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{policy.title?.slice(0, 2) ?? "?"}</span>}
+                      {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{localize(policy, "title")?.slice(0, 2) ?? "?"}</span>}
                     </div>
                   </article>
                 );
@@ -1050,14 +1057,14 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
           return (
             <>
               <header>
-                <b>{policy.title}</b>
+                <b>{localize(policy, "title")}</b>
                 <span>{category} | {blocked ? "Blokeret" : locked ? "Krav mangler" : enabled ? "Aktiv" : "Inaktiv"}</span>
               </header>
-              <p>{policy.description}</p>
+              <p>{localize(policy, "description")}</p>
               {blocked && (
                 <div className="city-policy-requirements">
                   {exclusives.map((entry) => (
-                    <span className="missing" key={entry.key}>Blokeret af aktiv policy: {entry.label}</span>
+                    <span className="missing" key={entry.key}>Blokeret af aktiv policy: {localize(entry, "title") || entry.label}</span>
                   ))}
                 </div>
               )}
@@ -1074,7 +1081,7 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
                 </div>
               )}
               <CityEffectChips effects={policy.effects?.cityStats} />
-              <small>{blocked ? `Deaktiver ${exclusives.map((entry) => entry.label).join(", ")} for at aktivere denne policy.` : locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
+              <small>{blocked ? `Deaktiver ${exclusives.map((entry) => localize(entry, "title") || entry.label).join(", ")} for at aktivere denne policy.` : locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
             </>
           );
         }}
@@ -1092,6 +1099,7 @@ function policyIconUrl(policy) {
 }
 
 function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlockedLevels = {} }) {
+  const { localize } = useLocalization();
   return (
     <section className="blacksmith-station">
       <header>
@@ -1107,14 +1115,14 @@ function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlocke
           return (
             <article className={`city-progression-tile city-achievement-card ${unlocked > 0 ? "unlocked" : "locked"} achievement-tier-${achievedTier}`} tabIndex="0" key={achievement.id}>
               <div className="city-progression-image-frame">
-                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{achievement.title?.slice(0, 2) ?? "?"}</span>}
+                {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <span>{localize(achievement, "title")?.slice(0, 2) ?? "?"}</span>}
               </div>
               <div className="city-progression-hover">
                 <header>
-                  <b>{achievement.title}</b>
+                  <b>{localize(achievement, "title")}</b>
                   <span>{achievement.category} | {unlocked}/{levels.length}</span>
                 </header>
-                <p>{achievement.description}</p>
+                <p>{localize(achievement, "description")}</p>
                 <div className="city-achievement-tiers">
                   {levels.map((level, index) => {
                     const progressText = achievementLevelProgressText(level, snapshot, progress);
@@ -1346,6 +1354,7 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
 }
 
 function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifiers = {}, onSell, onBuy }) {
+  const { localize } = useLocalization();
   const [tradeDraft, setTradeDraft] = useState(null);
   const sellable = (inventory ?? []).filter(merchantItemCanTrade);
   const openTrade = (mode, item, index) => {
@@ -1403,7 +1412,7 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
       {tradeDraft && (
         <div className="confirm-backdrop" role="presentation" onClick={() => setTradeDraft(null)}>
           <section className="confirm-card merchant-trade-modal" role="dialog" aria-modal="true" aria-label="Confirm trade" onClick={(event) => event.stopPropagation()}>
-            <h3>{tradeDraft.mode === "buy" ? "Buy" : "Sell"} {tradeDraft.item.name}</h3>
+            <h3>{tradeDraft.mode === "buy" ? "Buy" : "Sell"} {localizeItemField(tradeDraft.item, "name", localize)}</h3>
             <p>{tradeDraft.unitPrice} G each | max {tradeDraft.max}</p>
             <label>
               Quantity
@@ -1462,39 +1471,42 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
 }
 
 function CitySkillTreePanel({ player, onBuyRank }) {
+  const { localize, t } = useLocalization();
   const tree = normalizeSkillTree(player?.skillTree);
   const points = skillTreeAvailablePoints(player?.level ?? 1, tree);
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Sanctuary Training</h4>
-        <span>{points} skill point{points === 1 ? "" : "s"} available</span>
+        <h4>{t("city.skillTree.panelTitle")}</h4>
+        <span>{points === 1 ? t("city.skillTree.pointsAvailable.one", { count: points }) : t("city.skillTree.pointsAvailable.many", { count: points })}</span>
       </header>
       {SKILL_TREE_BRANCHES.map((branch) => {
         const branchPoints = skillTreeBranchSpentPoints(tree, branch.id);
         return (
           <div className="skill-branch" key={branch.id}>
             <header>
-              <h5>{branch.title}</h5>
-              <span>{branchPoints} points</span>
+              <h5>{localize(branch, "title") || branch.title}</h5>
+              <span>{t("city.skillTree.branchPoints", { count: branchPoints })}</span>
             </header>
-            <p>{branch.description}</p>
+            <p>{localize(branch, "description") || branch.description}</p>
             {branch.nodes.map((node) => {
               const rank = tree[node.id] ?? 0;
               const locked = branchPoints < (node.requiresBranchPoints ?? 0);
               const capped = rank >= node.maxRank;
+              const nodeTitle = localize(node, "title") || node.title;
+              const nodeDescription = localize(node, "description") || node.description;
               return (
                 <div className={`blacksmith-row ${locked ? "locked" : ""}`} key={node.id}>
                   <div>
-                    <b>{node.title} {rank}/{node.maxRank}</b>
-                    <span>{locked ? `Requires ${node.requiresBranchPoints} points in ${branch.title}. ` : ""}{node.description}</span>
+                    <b>{nodeTitle} {rank}/{node.maxRank}</b>
+                    <span>{locked ? t("city.skillTree.requiresBranchPoints", { required: node.requiresBranchPoints, branch: localize(branch, "title") || branch.title }) : ""}{nodeDescription}</span>
                   </div>
                   <button
                     type="button"
                     disabled={points <= 0 || locked || capped}
                     onClick={() => onBuyRank(node.id)}
                   >
-                    Rank
+                    {t("city.skillTree.rankButton")}
                   </button>
                 </div>
               );
@@ -1514,22 +1526,51 @@ function formatClassBonusValue(key, value) {
   return `${amount > 0 ? "+" : ""}${Number.isInteger(amount) ? amount : amount.toFixed(2)} ${key}`;
 }
 
-function classNodeRequirementText(node) {
+function classNodeTitle(nodeId, localize) {
+  const node = CLASS_NODE_BY_ID[nodeId];
+  return localize(node, "title") || node?.title || nodeId;
+}
+
+function classNodeRequirementText(node, localize, t) {
   const entries = [];
   for (const nodeId of node?.requires ?? []) {
-    entries.push(`Requires ${CLASS_NODE_BY_ID[nodeId]?.title ?? nodeId}`);
+    entries.push(t("city.class.requirements.requires", { requirement: classNodeTitle(nodeId, localize) }));
   }
-  if (node?.requiresBuilding) entries.push(`Requires building: ${cityBuildingName(node.requiresBuilding)}`);
-  if (node?.requiresAddon) entries.push(`Requires addon: ${cityAddonName(node.requiresAddon)}`);
-  if (node?.requiresResearch) entries.push(`Requires research: ${node.requiresResearch}`);
-  return entries.length ? entries.join(" | ") : "No requirements";
+  if (node?.requiresBuilding) entries.push(t("city.class.requirements.building", { building: cityBuildingName(node.requiresBuilding) }));
+  if (node?.requiresAddon) entries.push(t("city.class.requirements.addon", { addon: cityAddonName(node.requiresAddon) }));
+  if (node?.requiresResearch) entries.push(t("city.class.requirements.research", { research: node.requiresResearch }));
+  return entries.length ? entries.join(" | ") : t("city.class.requirements.none");
+}
+
+function classUnlockReasonText(reason, t) {
+  const raw = String(reason ?? "").trim();
+  if (!raw) return "";
+  if (raw === "Unknown class node") return t("city.class.reason.unknownNode");
+  if (raw === "Wrong class") return t("city.class.reason.wrongClass");
+  if (raw === "Already unlocked") return t("city.class.reason.alreadyUnlocked");
+  if (raw === "No class points") return t("city.class.reason.noClassPoints");
+  if (raw.startsWith("Requires building: ")) {
+    return t("city.class.requirements.building", { building: raw.slice("Requires building: ".length) });
+  }
+  if (raw.startsWith("Requires addon: ")) {
+    return t("city.class.requirements.addon", { addon: raw.slice("Requires addon: ".length) });
+  }
+  if (raw.startsWith("Requires research: ")) {
+    return t("city.class.requirements.research", { research: raw.slice("Requires research: ".length) });
+  }
+  if (raw.startsWith("Requires ")) {
+    return t("city.class.requirements.requires", { requirement: raw.slice("Requires ".length) });
+  }
+  return raw;
 }
 
 function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnlockNode }) {
+  const { localize, t } = useLocalization();
   const sanctuaryBuilt = hasCityBuilding(progress, "sanctuary");
   const classId = normalizeClassId(player?.classId);
   const classChosen = classId !== DEFAULT_CLASS_ID;
   const classConfig = getClassConfig(classId);
+  const className = localize(classConfig, "name") || classConfig?.name || "Class";
   const classPoints = classPointsAvailable(player);
   const context = cityRequirementContext(progress);
   const baseNodeId = `${classId}.base`;
@@ -1538,12 +1579,12 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
 
   if (!sanctuaryBuilt && !classChosen) {
     return (
-      <section className="blacksmith-station class-panel" aria-label="Class training">
+      <section className="blacksmith-station class-panel" aria-label={t("city.class.aria.training")}>
         <header>
-          <h4>Class Training</h4>
-          <span>{classConfig?.name ?? "Adventurer"}</span>
+          <h4>{t("city.class.panelTitle")}</h4>
+          <span>{className}</span>
         </header>
-        <p>Build the Sanctuary to unlock class training.</p>
+        <p>{t("city.class.buildSanctuaryHint")}</p>
       </section>
     );
   }
@@ -1551,16 +1592,16 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
   if (!classChosen) {
     const classOptions = Object.values(CLASS_DEFS).filter((entry) => entry.id !== DEFAULT_CLASS_ID);
     return (
-      <section className="blacksmith-station class-panel" aria-label="Choose class">
+      <section className="blacksmith-station class-panel" aria-label={t("city.class.aria.choose")}>
         <header>
-          <h4>Choose Class</h4>
-          <span>Base training is unlocked for free.</span>
+          <h4>{t("city.class.chooseTitle")}</h4>
+          <span>{t("city.class.baseTrainingFree")}</span>
         </header>
         <div className="class-choice-grid">
           {classOptions.map((option) => (
             <button type="button" className="class-choice-card" key={option.id} onClick={() => onChooseClass?.(option.id)}>
-              <b>{option.name}</b>
-              <span>{option.description}</span>
+              <b>{localize(option, "name") || option.name}</b>
+              <span>{localize(option, "description") || option.description}</span>
             </button>
           ))}
         </div>
@@ -1571,35 +1612,36 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
   const classNodes = Object.values(classConfig?.nodes ?? {});
   const unlocked = new Set(player?.classNodes ?? []);
   return (
-    <section className="blacksmith-station class-panel" aria-label="Class progression">
+    <section className="blacksmith-station class-panel" aria-label={t("city.class.aria.progression")}>
       <header>
-        <h4>{player?.className ?? classConfig?.name ?? "Class"} Training</h4>
-        <span>{classPoints} class point{classPoints === 1 ? "" : "s"} available</span>
+        <h4>{t("city.class.progressTitle", { name: className })}</h4>
+        <span>{classPoints === 1 ? t("city.class.pointsAvailable.one", { count: classPoints }) : t("city.class.pointsAvailable.many", { count: classPoints })}</span>
       </header>
       {canResetClass && (
         <button
           type="button"
           className="class-reset-button"
-          title="Only available before unlocking class nodes beyond the free base node."
+          title={t("city.class.reset.title")}
           onClick={() => {
-            if (window.confirm("Reset class choice? You can choose another class afterwards.")) onResetClass?.();
+            if (window.confirm(t("city.class.reset.confirm"))) onResetClass?.();
           }}
         >
-          Reset class choice
+          {t("city.class.reset.button")}
         </button>
       )}
       <div className="class-node-list">
         {classNodes.length === 0 ? (
-          <span className="class-empty">No class nodes available.</span>
+          <span className="class-empty">{t("city.class.noNodes")}</span>
         ) : classNodes.map((node) => {
           const unlockedNode = unlocked.has(node.id);
           const unlockCheck = canUnlockClassNodeForPlayer(player, node.id, context);
           const bonuses = Object.entries(node.bonuses ?? {});
+          const lockReason = classUnlockReasonText(unlockCheck.reason, t);
           return (
             <article className={`class-node ${unlockedNode ? "unlocked" : ""}`} key={node.id}>
               <div>
-                <b>{node.title}</b>
-                <span>{classNodeRequirementText(node)}</span>
+                <b>{localize(node, "title") || node.title}</b>
+                <span>{classNodeRequirementText(node, localize, t)}</span>
               </div>
               <div className="class-node-bonuses">
                 {bonuses.map(([key, value]) => (
@@ -1609,17 +1651,17 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
               <button
                 type="button"
                 disabled={unlockedNode || !unlockCheck.ok}
-                title={unlockedNode ? "Unlocked" : unlockCheck.ok ? "Unlock node" : unlockCheck.reason}
+                title={unlockedNode ? t("city.class.unlockedButton") : unlockCheck.ok ? t("city.class.unlockNodeTitle") : lockReason}
                 onClick={() => onUnlockNode?.(node.id)}
               >
-                {unlockedNode ? "Unlocked" : "Unlock"}
+                {unlockedNode ? t("city.class.unlockedButton") : t("city.class.unlockButton")}
               </button>
             </article>
           );
         })}
       </div>
       <span className="class-unlocked">
-        Unlocked: {(player?.classNodes ?? []).map((nodeId) => CLASS_NODE_BY_ID[nodeId]?.title ?? nodeId).join(", ") || "None"}
+        {t("city.class.unlockedList", { nodes: (player?.classNodes ?? []).map((nodeId) => classNodeTitle(nodeId, localize)).join(", ") || t("city.class.none") })}
       </span>
     </section>
   );

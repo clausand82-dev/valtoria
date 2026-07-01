@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CITY_BUILDINGS } from "../../game/config/city-buildings-config.js";
 import { AREA_MAPS, MAP_REGION_SETS, WORLD_MAP } from "../../game/config/map-region-config.js";
 import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../../game/config/quest-config.js";
+import { useLocalization } from "../../i18n/index.js";
+import { localizeQuestField } from "../../i18n/quest-localization.js";
 import { QUEST_NPCS } from "../../game/config/npc-config.js";
 import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
@@ -105,7 +107,7 @@ function regionMobTypes(region) {
     .filter(Boolean))];
 }
 
-function regionQuestTitles(activeQuests, regionId) {
+function regionQuestTitles(activeQuests, regionId, localize, renderTemplate) {
   const targetId = String(regionId ?? "");
   if (!targetId) return [];
   return [...new Set((activeQuests ?? [])
@@ -120,11 +122,12 @@ function regionQuestTitles(activeQuests, regionId) {
       ].map(String);
       return regionIds.includes(targetId);
     })
-    .map((quest) => String(quest?.title ?? QUEST_DEFS[quest?.questId]?.title ?? quest?.questId ?? "").trim())
+    .map((quest) => String(localizeQuestField(quest, "title", localize, renderTemplate) || quest?.questId || "").trim())
     .filter(Boolean))];
 }
 
 export function MinimapDialog({ engineRef, snapshot, cityOpen, cityMinimapHero, onClose }) {
+  const { t } = useLocalization();
   const canvasRef = useRef(null);
   useEffect(() => {
     const onKey = (event) => {
@@ -145,15 +148,15 @@ export function MinimapDialog({ engineRef, snapshot, cityOpen, cityMinimapHero, 
   }, [engineRef, snapshot, cityOpen, cityMinimapHero]);
   return (
     <div className="confirm-backdrop" role="presentation">
-      <section className="map-dialog" role="dialog" aria-modal="true" aria-label="Map">
+      <section className="map-dialog" role="dialog" aria-modal="true" aria-label={t("panel.map.title")}>
         <header>
           <div>
-            <h2>Map</h2>
-            <span>{cityOpen ? "City" : `${snapshot.region.name} | Seed ${snapshot.region.seed}`}</span>
+            <h2>{t("panel.map.title")}</h2>
+            <span>{cityOpen ? t("hud.city") : `${snapshot.region.name} | Seed ${snapshot.region.seed}`}</span>
           </div>
-          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+          <button type="button" className="city-popup-close" aria-label={t("ui.close")} title={t("ui.close")} onClick={onClose}>X</button>
         </header>
-        <canvas ref={canvasRef} width="520" height="520" aria-label="Current minimap" />
+        <canvas ref={canvasRef} width="520" height="520" aria-label={t("map.currentMinimap")} />
       </section>
     </div>
   );
@@ -203,12 +206,15 @@ function renderCityMinimap(canvas, heroPosition) {
 }
 
 export function RegionMapDialog({ initialMapId, regionCorruption, worldState = null, worldEnergy = null, activeQuests = [], completedQuests = [], army = 0, onPlayableRegionSelected, onCityOpen, onMapNavigation, onClose }) {
+  const { localize, renderTemplate, t } = useLocalization();
   const [selectedMapId, setSelectedMapId] = useState(initialMapId ?? WORLD_MAP.id);
   const [hoveredRegionId, setHoveredRegionId] = useState(null);
   const [selectedRegion, setSelectedRegion] = useState(null);
   const [lockedRegion, setLockedRegion] = useState(null);
   const isWorldMap = selectedMapId === WORLD_MAP.id;
   const activeMap = isWorldMap ? WORLD_MAP : AREA_MAPS[selectedMapId] ?? WORLD_MAP;
+  const activeMapTitle = localize(activeMap, "title") || activeMap.title;
+  const activeMapSubtitle = localize(activeMap, "subtitle") || activeMap.subtitle;
   const activeRegions = useMemo(() => (
     (MAP_REGION_SETS[selectedMapId] ?? []).map((rawRegion) => ({
       rawRegion,
@@ -255,11 +261,11 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
     ? `World average corruption: ${worldAverageCorruptionLevel(regionCorruption).toFixed(1)}/10`
     : `Average corruption: ${(areaAverageCorruptionLevel(regionCorruption, selectedMapId) ?? 0).toFixed(1)}/10`;
   const statusRegion = hoveredRegionEntry?.region ?? selectedRegion;
-  const statusTitle = statusRegion?.label ?? activeMap.title;
+  const statusTitle = (statusRegion ? (localize(statusRegion, "label") || statusRegion.label) : "") || activeMapTitle;
   const statusCorruptionText = hoveredCorruptionText || (statusRegion ? regionHoverCorruptionText(selectedMapId, statusRegion, regionCorruption) : mapCorruptionText);
   const hoveredAreaRegion = !isWorldMap ? hoveredRegionEntry?.region ?? null : null;
   const statusMobTypes = hoveredAreaRegion ? regionMobTypes(hoveredAreaRegion) : [];
-  const statusQuestTitles = hoveredAreaRegion ? regionQuestTitles(activeQuests, hoveredAreaRegion.id) : [];
+  const statusQuestTitles = hoveredAreaRegion ? regionQuestTitles(activeQuests, hoveredAreaRegion.id, localize, renderTemplate) : [];
   const activateRegion = (regionEntry) => {
     const region = regionEntry?.region ?? regionEntry;
     const rawRegion = regionEntry?.rawRegion ?? region;
@@ -293,18 +299,18 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
 
   return (
     <div className="confirm-backdrop" role="presentation">
-      <section className="map-dialog world-map-dialog" role="dialog" aria-modal="true" aria-label="World map">
+      <section className="map-dialog world-map-dialog" role="dialog" aria-modal="true" aria-label={t("map.worldMap")}>
         <header className={!isWorldMap ? "with-region-info" : undefined}>
           <div>
-            <h2>{activeMap.title}</h2>
-            <span>{isWorldMap ? activeMap.subtitle : `${activeMap.subtitle} | vaelg en region`}</span>
+            <h2>{activeMapTitle}</h2>
+            <span>{isWorldMap ? activeMapSubtitle : `${activeMapSubtitle} | vaelg en region`}</span>
           </div>
           {!isWorldMap && (
             <section className={`map-region-header-info ${hoveredAreaRegion ? "active" : ""}`} aria-live="polite">
               {hoveredAreaRegion ? (
                 <>
                   <div className="map-region-header-info-title">
-                    <b>{hoveredAreaRegion.label}</b>
+                    <b>{localize(hoveredAreaRegion, "label") || hoveredAreaRegion.label}</b>
                     <span>{regionMapSizeLabel(hoveredAreaRegion.mapSize)}</span>
                     <span>Corruption {regionCorruptionLevel(regionCorruption, selectedMapId, hoveredAreaRegion)}/10</span>
                   </div>
@@ -325,12 +331,12 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
           <div className="map-dialog-actions">
             {!isWorldMap && (
               <button type="button" className="map-back-button" onClick={selectWorldMap}>
-                World map
+                {t("map.worldMap")}
               </button>
             )}
             {onCityOpen && (
               <button type="button" className="map-back-button" onClick={onCityOpen}>
-                By
+                {t("hud.city")}
               </button>
             )}
           </div>
@@ -344,17 +350,18 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
               "--map-aspect-value": mapAspectValue,
             }}
           >
-            <img src={activeMap.imageUrl} alt={activeMap.title} draggable="false" />
+            <img src={activeMap.imageUrl} alt={activeMapTitle} draggable="false" />
             {activeRegions.length > 0 && (
               <>
-                <svg className="world-map-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={`Klikbare omraader paa ${activeMap.title}`}>
+                <svg className="world-map-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-label={`Klikbare omraader paa ${activeMapTitle}`}>
                   {activeRegions.map((entry) => (
                     (() => {
                       const region = entry.region;
+                      const regionLabel = localize(region, "label") || region.label;
                       const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests);
                       const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                       const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
-                      const unlockText = locked ? regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests) : "";
+                      const unlockText = locked ? regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests, localize) : "";
                       return (
                     <g
                       className={`world-map-region ${locked ? "locked" : ""} ${hoveredRegionId === region.id || selectedRegion?.id === region.id ? "hovered" : ""}`}
@@ -362,7 +369,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       key={region.id}
                       role="button"
                       tabIndex={0}
-                      aria-label={locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
+                      aria-label={locked ? `${regionLabel} er laast. ${unlockText} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${regionLabel}. ${hoverText}`}
                       onClick={() => activateRegion(entry)}
                       onKeyDown={(event) => handleRegionKeyDown(event, region)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
@@ -371,7 +378,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                       onBlur={() => setHoveredRegionId(null)}
                     >
                       {isWorldMap && (
-                        <title>{locked ? `${region.label} er laast. ${unlockText} ${hoverText}` : `${region.label} | ${hoverText}`}</title>
+                        <title>{locked ? `${regionLabel} er laast. ${unlockText} ${hoverText}` : `${regionLabel} | ${hoverText}`}</title>
                       )}
                       <polygon points={region.points} />
                     </g>
@@ -381,6 +388,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                 </svg>
                 {activeRegions.map((entry) => {
                   const region = entry.region;
+                  const regionLabel = localize(region, "label") || region.label;
                   const locked = !regionIsUnlocked(region, completedQuestSet, currentArmy, worldState, activeQuests);
                   const regionColor = mapRegionColor(selectedMapId, region, regionCorruption);
                   const hoverText = regionHoverCorruptionText(selectedMapId, region, regionCorruption);
@@ -394,9 +402,9 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                         top: `${region.labelY}%`,
                       }}
                       key={`${region.id}-label`}
-                      aria-label={locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${region.label}. ${hoverText}`}
+                      aria-label={locked ? `${regionLabel} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests, localize)} ${hoverText}` : `${isWorldMap ? "Aaben" : "Vaelg"} ${regionLabel}. ${hoverText}`}
                       title={isWorldMap
-                        ? (locked ? `${region.label} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests)} ${hoverText}` : `${region.label}. ${hoverText}`)
+                        ? (locked ? `${regionLabel} er laast. ${regionUnlockText(region, completedQuestSet, currentArmy, worldState, activeQuests, localize)} ${hoverText}` : `${regionLabel}. ${hoverText}`)
                         : undefined}
                       onClick={() => activateRegion(entry)}
                       onMouseEnter={() => setHoveredRegionId(region.id)}
@@ -412,7 +420,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
                           aria-hidden="true"
                         />
                       )}
-                      {region.label}
+                      {regionLabel}
                     </button>
                   );
                 })}
@@ -427,7 +435,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
           )}
           <WorldEnergyBalanceBar state={worldEnergyState} />
           {isWorldMap && selectedRegion && !regionIsUnlocked(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests) && (
-            <p className="map-note">{selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests)}</p>
+            <p className="map-note">{localize(selectedRegion, "label") || selectedRegion.label} er laast. {regionUnlockText(selectedRegion, completedQuestSet, currentArmy, worldState, activeQuests, localize)}</p>
           )}
         </div>
         {lockedRegion && (
@@ -437,6 +445,7 @@ export function RegionMapDialog({ initialMapId, regionCorruption, worldState = n
             region={lockedRegion}
             worldState={worldState}
             activeQuests={activeQuests}
+            localize={localize}
             onClose={() => setLockedRegion(null)}
           />
         )}
@@ -544,8 +553,11 @@ function unmetWorldConditionText(condition, worldState, context) {
   return [`Kraever ${conditionRequirementLabel(condition)}.`];
 }
 
-function regionUnlockText(region, completedQuestSet, army = 0, worldState = null, activeQuests = []) {
-  if (region?.unlock?.text) return region.unlock.text;
+function regionUnlockText(region, completedQuestSet, army = 0, worldState = null, activeQuests = [], localizeEntity = null) {
+  if (region?.unlock?.text) {
+    const localizedText = localizeEntity ? localizeEntity(region.unlock, "text") : "";
+    return localizedText || region.unlock.text;
+  }
   const requiredArmy = Math.max(0, Math.floor(Number(region?.unlock?.army ?? region?.unlock?.requiredArmy) || 0));
   if (army < requiredArmy) return `Kraever ${requiredArmy} army. Du har ${Math.max(0, Math.floor(Number(army) || 0))}.`;
   const hasQuestCompletion = (questId) => {
@@ -563,7 +575,8 @@ function regionUnlockText(region, completedQuestSet, army = 0, worldState = null
   return "Ingen manglende krav.";
 }
 
-function LockedRegionDialog({ region, completedQuestSet, army = 0, worldState = null, activeQuests = [], onClose }) {
+function LockedRegionDialog({ region, completedQuestSet, army = 0, worldState = null, activeQuests = [], localize, onClose }) {
+  const { t } = useLocalization();
   const hasQuestCompletion = (questId) => {
     const raw = String(questId ?? "");
     if (!raw) return false;
@@ -572,19 +585,20 @@ function LockedRegionDialog({ region, completedQuestSet, army = 0, worldState = 
   };
   const missingQuestIds = (region?.unlock?.completedQuests ?? [])
     .filter((questId) => !hasQuestCompletion(questId));
-  const unlockText = regionUnlockText(region, completedQuestSet, army, worldState, activeQuests);
+  const regionLabel = localize(region, "label") || region.label;
+  const unlockText = regionUnlockText(region, completedQuestSet, army, worldState, activeQuests, localize);
   return (
     <div className="map-lock-modal-backdrop" role="presentation" onClick={onClose}>
-      <section className="map-lock-modal" role="dialog" aria-modal="true" aria-label={`${region.label} er laast`} onClick={(event) => event.stopPropagation()}>
+      <section className="map-lock-modal" role="dialog" aria-modal="true" aria-label={`${regionLabel} er laast`} onClick={(event) => event.stopPropagation()}>
         <header>
           <div className="map-lock-title">
             <img src="/assets/generated/minilock.png" alt="" aria-hidden="true" />
             <div>
               <span className="map-lock-kicker">Laast omraade</span>
-              <h3>{region.label}</h3>
+              <h3>{regionLabel}</h3>
             </div>
           </div>
-          <button type="button" onClick={onClose}>Luk</button>
+          <button type="button" onClick={onClose}>{t("ui.close")}</button>
         </header>
         {unlockText && <p>{unlockText}</p>}
         {missingQuestIds.length > 0 && (
@@ -600,6 +614,7 @@ function LockedRegionDialog({ region, completedQuestSet, army = 0, worldState = 
 }
 
 function LockedQuestRequirement({ questId }) {
+  const { localize, renderTemplate } = useLocalization();
   const quest = QUEST_DEFS[questId];
   const npcId = getQuestStartNpcIds(quest)?.[0];
   const npc = npcId ? QUEST_NPCS[npcId] : null;
@@ -608,13 +623,13 @@ function LockedQuestRequirement({ questId }) {
       <div className="map-lock-quest-head">
         {npc?.imageUrl && <img src={npc.imageUrl} alt={npc.name} />}
         <div>
-          <b>{quest?.title ?? questId}</b>
+          <b>{localizeQuestField(quest, "title", localize, renderTemplate) || questId}</b>
           <span>{npc ? `${npc.name} | ${npc.title}` : "Questgiver ikke sat"}</span>
         </div>
       </div>
-      {quest?.story && <p>{quest.story}</p>}
+      {quest?.story && <p>{localizeQuestField(quest, "story", localize, renderTemplate)}</p>}
       <div className="map-lock-requirements">
-        {questRequirementRows(quest).map((row) => (
+        {questRequirementRows(quest, localize).map((row) => (
           <span className="map-lock-requirement" key={row.key}>
             {row.iconUrl && <img src={row.iconUrl} alt="" aria-hidden="true" />}
             {row.label}
@@ -625,14 +640,14 @@ function LockedQuestRequirement({ questId }) {
   );
 }
 
-function questRequirementRows(quest) {
+function questRequirementRows(quest, localize) {
   const target = quest?.target ?? {};
   const rows = [];
   const addQuestItem = (entry) => {
     const def = QUEST_ITEM_DEFS[entry.questItemId];
     rows.push({
       key: `quest-${entry.questItemId}`,
-      label: `${entry.count ?? 1}x ${def?.name ?? entry.questItemId}`,
+      label: `${entry.count ?? 1}x ${localize(def, "name") || entry.questItemId}`,
       iconUrl: def?.iconUrl,
     });
   };

@@ -1,7 +1,9 @@
 import React, { useEffect } from "react";
+import { useLocalization } from "../../i18n/index.js";
 import "./readable-dialog.css";
 
 export function ReadableDialog({ entry, onClose }) {
+  const { t } = useLocalization();
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
@@ -27,7 +29,7 @@ export function ReadableDialog({ entry, onClose }) {
 
           <div className="readable-controls">
             <div />
-            <button type="button" onClick={onClose}>Close</button>
+            <button type="button" onClick={onClose}>{t("ui.close")}</button>
           </div>
         </div>
       </section>

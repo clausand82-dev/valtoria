@@ -4,83 +4,113 @@ export { QUEST_NPCS };
 
 export const QUEST_ITEM_DEFS = {
   note: {
-    name: "Forseglet note",
+    name: "Sealed Note",
     iconUrl: "/assets/generated/item/item_quest_document.png",
     placeholderColor: "#d7cfac",
+
+    i18n: { da: { name: "Forseglet note" } },
   },
   ring: {
-    name: "Signetring",
+    name: "Signet Ring",
     iconUrl: "/assets/generated/item/item_quest_silverring.png",
     placeholderColor: "#d8bb63",
+
+    i18n: { da: { name: "Signetring" } },
   },
   unsigned_document: {
-    name: "Ikke underskrevet dokument",
+    name: "Unsigned Document",
     iconUrl: "/assets/generated/item/item_quest_letter.png",
     placeholderColor: "#d5d1bd",
+
+    i18n: { da: { name: "Ikke underskrevet dokument" } },
   },
   signed_document: {
-    name: "Underskrevet dokument",
+    name: "Signed Document",
     iconUrl: "/assets/generated/item/item_quest_letter.png",
     placeholderColor: "#e3d4aa",
+
+    i18n: { da: { name: "Underskrevet dokument" } },
   },
   lost_mug: {
-    name: "Forsvundet krus",
+    name: "Lost Mug",
     iconUrl: "/assets/generated/item/item_quest_mug.png",
     placeholderColor: "#c4d9e0",
+
+    i18n: { da: { name: "Forsvundet krus" } },
   },
   lost_beer: {
-    name: "Forsvundet øl",
+    name: "Lost Ale",
     iconUrl: "/assets/generated/item/item_quest_barrel.png",
     placeholderColor: "#f2c94c",
     stackable: true,
     stackMax: 20,
-  }, 
+
+    i18n: { da: { name: "Forsvundet øl" } },
+  },
   lost_anvil: {
-    name: "Forsvunden anvil",
+    name: "Lost Anvil",
     iconUrl: "/assets/generated/item/item_quest_blacksmithanvil.png",
     placeholderColor: "#d0a05c",
+
+    i18n: { da: { name: "Forsvunden anvil" } },
   },
   lost_hammer: {
-    name: "Forsvunden hammer",
+    name: "Lost Hammer",
     iconUrl: "/assets/generated/item/item_quest_blacksmithhammer.png",
     placeholderColor: "#8f93a1",
+
+    i18n: { da: { name: "Forsvunden hammer" } },
   },
   mayor_chain: {
-    name: "Borgmesterkaede",
+    name: "Mayor's Chain",
     iconUrl: "/assets/generated/item/item_quest_silverring.png",
     placeholderColor: "#d7bd67",
+
+    i18n: { da: { name: "Borgmesterkaede" } },
   },
   noble_watch: {
-    name: "Turanios' forsvundne ur",
+    name: "Turanios' Lost Watch",
     iconUrl: "/assets/generated/item/item_quest_noblewatch.png",
     placeholderColor: "#d7bd67",
+
+    i18n: { da: { name: "Turanios' forsvundne ur" } },
   },
   tornvalhed_rudder: {
-    name: "Ror til Tornvalhed",
+    name: "Rudder for Tornvalhed",
     iconUrl: "/assets/generated/item/item_quest_rudder.png",
     placeholderColor: "#b88454",
+
+    i18n: { da: { name: "Ror til Tornvalhed" } },
   },
   tornvalhed_sail: {
-    name: "Sejl til Tornvalhed",
+    name: "Sail for Tornvalhed",
     iconUrl: "/assets/generated/item/item_quest_sail.png",
     placeholderColor: "#f3f4aa",
     stackable: true,
     stackMax: 10,
+
+    i18n: { da: { name: "Sejl til Tornvalhed" } },
   },
   king_crown: {
-    name: "Kongekrone",
+    name: "King's Crown",
     iconUrl: "/assets/generated/item/item_quest_kingscrone.png",
     placeholderColor: "#e6d8b0",
+
+    i18n: { da: { name: "Kongekrone" } },
   },
   king_scepter: {
-    name: "Kongescepter",
+    name: "King's Scepter",
     iconUrl: "/assets/generated/item/item_quest_kingsscepter.png",
     placeholderColor: "#d6b7ff",
+
+    i18n: { da: { name: "Kongescepter" } },
   },
   king_orb: {
-    name: "Konge Orb",
+    name: "King's Orb",
     iconUrl: "/assets/generated/item/item_quest_kingsorb.png",
     placeholderColor: "#cfe6ff",
+
+    i18n: { da: { name: "Konge Orb" } },
   },
   lion_gold_idol: {
     name: "Lion Gold Idol",
@@ -88,18 +118,24 @@ export const QUEST_ITEM_DEFS = {
     placeholderColor: "#d7bd67",
     stackable: true,
     stackMax: 50,
+
+    i18n: { da: { name: "Lion Gold Idol" } },
   },
   rusk_gold_nugget: {
-    name: "Guldklump",
+    name: "Gold Nugget",
     iconUrl: "/assets/generated/item/item_quest_goldnugget.png",
     placeholderColor: "#d7bd67",
     stackable: true,
     stackMax: 20,
+
+    i18n: { da: { name: "Guldklump" } },
   },
   veldors_secret_letter: {
-    name: "Veldors hemmelige brev",
+    name: "Veldor's Secret Letter",
     iconUrl: "/assets/generated/item/item_quest_letter.png",
     placeholderColor: "#d5d1bd",
+
+    i18n: { da: { name: "Veldors hemmelige brev" } },
   },
 };
 
@@ -273,18 +309,22 @@ export const QUEST_BOARD_CONFIG = {
     source: "townHall",
     title: "Town Hall Board",
     subtitle: "Official requests",
-    emptyText: "Ingen byopgaver er tilgaengelige lige nu.",
+    emptyText: "No city quests are available right now.",
     minAvailable: 3,
     maxAvailable: 5,
+
+    i18n: { da: { title: "Raadhusets opslagstavle", subtitle: "Officielle opgaver", emptyText: "Ingen byopgaver er tilgaengelige lige nu." } },
   },
   inn: {
     id: "inn",
     source: "inn",
-    title: "Kroens rygter",
-    subtitle: "Rygter og sladder",
-    emptyText: "Ingen rygter er klar til dig lige nu.",
+    title: "Inn Rumors",
+    subtitle: "Rumors and gossip",
+    emptyText: "No rumors are available for you right now.",
     minAvailable: 2,
     maxAvailable: 4,
+
+    i18n: { da: { title: "Kroens rygter", subtitle: "Rygter og sladder", emptyText: "Ingen rygter er klar til dig lige nu." } },
   },
 };
 

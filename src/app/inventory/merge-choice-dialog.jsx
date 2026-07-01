@@ -3,8 +3,10 @@ import { potionDefById } from "../../game/config/potion-config.js";
 import { READABLE_DEF_BY_ID } from "../../game/config/readable-config.js";
 import { RESOURCE_DEFS } from "../../game/config/resource-config.js";
 import { InventoryIcon } from "../ui/icons.jsx";
+import { useLocalization } from "../../i18n/index.js";
 
 export function MergeChoiceDialog({ choice, onCancel, onChoose }) {
+  const { t } = useLocalization();
   const mergeTitle = choice?.type === "readable-choice" ? "Choose assembled item" : "Choose merge result";
   const mergeBody = choice?.type === "readable-choice"
     ? "These fragments can assemble more than one item."
@@ -26,7 +28,7 @@ export function MergeChoiceDialog({ choice, onCancel, onChoose }) {
           ))}
         </div>
         <div>
-          <button type="button" onClick={onCancel}>Cancel</button>
+          <button type="button" onClick={onCancel}>{t("ui.cancel")}</button>
         </div>
       </section>
     </div>

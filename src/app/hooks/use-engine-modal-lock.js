@@ -6,6 +6,7 @@ export function useEngineModalLock({
   confirmMapAbandonOpen,
   engineRef,
   heroOpen,
+  helpOpen,
   mapOpen,
   questOffer,
   questOverviewOpen,
@@ -18,6 +19,7 @@ export function useEngineModalLock({
       || mapOpen
       || regionMapOpen
       || heroOpen
+      || helpOpen
       || questOverviewOpen
       || confirmMapAbandonOpen
       || Boolean(questOffer)
@@ -39,6 +41,7 @@ export function useEngineModalLock({
     confirmMapAbandonOpen,
     engineRef,
     heroOpen,
+    helpOpen,
     mapOpen,
     questOffer,
     questOverviewOpen,

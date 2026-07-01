@@ -1,14 +1,14 @@
 export const INVENTORY_FILTERS = [
-  { id: "all", label: "All", text: "*", color: "#f5f3ea" },
-  { id: "merge", label: "Can merge", text: "M", color: "#f1c657" },
-  { id: "resource", label: "Resources", text: "R", color: "#8be9ff" },
-  { id: "poor", label: "Poor", text: "P", color: "#9a9a9a" },
-  { id: "normal", label: "Normal", text: "N", color: "#f5f3ea" },
-  { id: "upgraded", label: "Upgraded", text: "U", color: "#58d96d" },
-  { id: "rare", label: "Rare", text: "G", color: "#ffd85d" },
-  { id: "epic", label: "Epic", text: "E", color: "#b579ff" },
-  { id: "legendary", label: "Legendary", text: "L", color: "#ff5757" },
-  { id: "unique", label: "Unique", text: "Q", color: "#f1c657" },
+  { id: "all", labelKey: "inventory.filter.all", text: "*", color: "#f5f3ea" },
+  { id: "merge", labelKey: "inventory.filter.merge", text: "M", color: "#f1c657" },
+  { id: "resource", labelKey: "inventory.filter.resource", text: "R", color: "#8be9ff" },
+  { id: "poor", labelKey: "inventory.filter.poor", text: "P", color: "#9a9a9a" },
+  { id: "normal", labelKey: "inventory.filter.normal", text: "N", color: "#f5f3ea" },
+  { id: "upgraded", labelKey: "inventory.filter.upgraded", text: "U", color: "#58d96d" },
+  { id: "rare", labelKey: "inventory.filter.rare", text: "G", color: "#ffd85d" },
+  { id: "epic", labelKey: "inventory.filter.epic", text: "E", color: "#b579ff" },
+  { id: "legendary", labelKey: "inventory.filter.legendary", text: "L", color: "#ff5757" },
+  { id: "unique", labelKey: "inventory.filter.unique", text: "Q", color: "#f1c657" },
 ];
 
 export function itemMatchesInventoryFilter(item, filter) {

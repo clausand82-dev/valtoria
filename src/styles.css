@@ -1338,6 +1338,41 @@ button {
   text-transform: capitalize;
 }
 
+.floating-help-button {
+  position: fixed;
+  z-index: 32;
+  bottom: 94px;
+  left: 18px;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(226, 174, 79, 0.72);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 40% 28%, rgba(255, 235, 172, 0.2), transparent 42%),
+    linear-gradient(180deg, #4a351c, #17110b);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.52),
+    inset 0 0 0 2px rgba(255, 222, 139, 0.08);
+  color: #f4da96;
+  font: 800 27px/1 Georgia, "Times New Roman", serif;
+  text-shadow: 0 2px 3px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+}
+
+.floating-help-button:hover,
+.floating-help-button:focus-visible {
+  border-color: #ffe09a;
+  color: #fff0bd;
+  transform: translateY(-1px);
+}
+
+.floating-help-button:focus-visible {
+  outline: 2px solid rgba(255, 224, 154, 0.72);
+  outline-offset: 3px;
+}
+
 .region-debug-panel {
   position: fixed;
   z-index: 32;
@@ -3444,6 +3479,14 @@ button {
 }
 
 .item-detail > span {
+  overflow-wrap: anywhere;
+}
+
+.item-detail-description {
+  margin: 2px 0 4px;
+  color: rgba(226, 211, 176, 0.76);
+  font-size: 10px;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -7439,6 +7482,14 @@ button {
 
   .skillbar {
     bottom: 12px;
+  }
+
+  .floating-help-button {
+    bottom: 82px;
+    left: 10px;
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
   }
 
   .region-debug-panel {

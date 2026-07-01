@@ -14,6 +14,7 @@ import { AtlasIcon, ImageIcon, InventoryIcon } from "../ui/icons.jsx";
 import { InventoryItemDetail } from "./inventory-item-detail.jsx";
 import { SPELL_DEFS } from "../../game/config/spell-config.js";
 import { InventorySortSelect } from "./inventory-sort-select.jsx";
+import { localizeItemField, useLocalization } from "../../i18n/index.js";
 
 function gearDurability(item) {
   if (!item || item.mode === "resource" || item.mode === "potion" || item.mode === "readable") return null;
@@ -22,11 +23,12 @@ function gearDurability(item) {
 }
 
 function DurabilityBar({ item, className = "" }) {
+  const { t } = useLocalization();
   const dp = gearDurability(item);
   if (dp === null) return null;
   const dc = dp >= 75 ? "#58d96d" : dp >= 40 ? "#ffd85d" : "#ff6b5f";
   return (
-    <span className={`item-card-dur-bar-wrap ${className}`} title={`Durability: ${Math.round(dp)}%`}>
+    <span className={`item-card-dur-bar-wrap ${className}`} title={`${t("inventory.durability")}: ${Math.round(dp)}%`}>
       <span className="item-card-dur-bar-fill" style={{ width: `${dp}%`, background: dc }} />
     </span>
   );
@@ -155,6 +157,7 @@ function SpellActionIcon({ entry, spell }) {
 }
 
 function SpellHoverDetail({ spell, spellEntry }) {
+  const { localize, t } = useLocalization();
   if (!spell) return null;
   const damageText = spellDamageText(spell);
   const range = formatSpellNumber(spell.range, 1);
@@ -170,51 +173,51 @@ function SpellHoverDetail({ spell, spellEntry }) {
           <SpellActionIcon entry={spellEntry} spell={spell} />
         </span>
         <div>
-          <b style={{ color: spell.color ?? undefined }}>{spell.title ?? spell.id}</b>
+          <b style={{ color: spell.color ?? undefined }}>{localize(spell, "title") || spell.id}</b>
           <em>{spell.element ?? "magic"}{spell.channeled ? " | channeled" : ""}</em>
         </div>
       </header>
-      {spell.description && <p>{spell.description}</p>}
+      {localize(spell, "description") && <p>{localize(spell, "description")}</p>}
       <dl>
         {manaCost && (
           <>
-            <dt>Mana</dt>
+            <dt>{t("inventory.stat.mana")}</dt>
             <dd>{spell.channeled && spell.channelManaCost ? `${manaCost} + ${formatSpellNumber(spell.channelManaCost)} / tick` : manaCost}</dd>
           </>
         )}
         {cooldown && (
           <>
-            <dt>Cooldown</dt>
+            <dt>{t("inventory.stat.cooldown")}</dt>
             <dd>{cooldown}s</dd>
           </>
         )}
         {range && (
           <>
-            <dt>Range</dt>
+            <dt>{t("inventory.stat.range")}</dt>
             <dd>{range}</dd>
           </>
         )}
         {damageText && (
           <>
-            <dt>Damage</dt>
+            <dt>{t("inventory.stat.damage")}</dt>
             <dd>{damageText}</dd>
           </>
         )}
         {radius && (
           <>
-            <dt>Area</dt>
+            <dt>{t("inventory.stat.area")}</dt>
             <dd>{radius}</dd>
           </>
         )}
         {slow && (
           <>
-            <dt>Slow</dt>
+            <dt>{t("inventory.stat.slow")}</dt>
             <dd>{slow}</dd>
           </>
         )}
         {stun && (
           <>
-            <dt>Stun</dt>
+            <dt>{t("inventory.stat.stun")}</dt>
             <dd>{stun}</dd>
           </>
         )}
@@ -232,6 +235,7 @@ function EquipmentSlotButton({
   onHoverMove,
   onHoverLeave,
 }) {
+  const { localize, t } = useLocalization();
   if (!slot) return <span aria-hidden="true" />;
   const acceptsDraggedItem = itemFitsEquipmentSlot(draggingItem, slot.id);
   const canDragFromSlot = Boolean(slot.item);
@@ -289,8 +293,8 @@ function EquipmentSlotButton({
           <i />
         )}
       </span>
-      <span className="equipment-label">{slot.label}</span>
-      <b className={slot.item?.rarity ?? ""}>{slot.item?.name ?? "Empty"}</b>
+      <span className="equipment-label">{t(`inventory.slot.${slot.id}`)}</span>
+      <b className={slot.item?.rarity ?? ""}>{slot.item ? localizeItemField(slot.item, "name", localize) : t("ui.empty")}</b>
     </button>
   );
 }
@@ -304,6 +308,7 @@ function MagicSlotButton({
   setPickerOpen,
   spellEntries,
 }) {
+  const { t } = useLocalization();
   const spellIds = (player?.unlockedSpells ?? []).filter((spellId) => SPELL_DEFS[spellId]);
   const activeSpellId = SPELL_DEFS[player?.activeSpellId] ? player.activeSpellId : spellIds[0] ?? "ember_spark";
   const spell = SPELL_DEFS[activeSpellId];
@@ -311,7 +316,7 @@ function MagicSlotButton({
   return (
     <div className="equipment-magic-picker" onMouseLeave={onHoverLeave}>
       {pickerOpen && spellIds.length > 0 && (
-        <div className="magic-spell-picker" role="listbox" aria-label="Vaelg aktiv magi">
+        <div className="magic-spell-picker" role="listbox" aria-label={t("inventory.chooseActiveMagic")}>
           {spellIds.map((spellId) => {
             const option = SPELL_DEFS[spellId];
             const optionEntry = spellActionEntryFor(spellId, spellEntries);
@@ -355,12 +360,12 @@ function MagicSlotButton({
         }}
       >
         <span className="equipment-slot-corners" aria-hidden="true" />
-        <span className="equipment-label">Magic</span>
+        <span className="equipment-label">{t("inventory.slot.magic")}</span>
         <span className="equipment-icon magic-equipment-icon" aria-hidden="true">
           <SpellActionIcon entry={activeSpellEntry} spell={spell} />
         </span>
         <b>{spell?.title ?? "No spell"}</b>
-        <span className="item-card-dur-bar-wrap equipment-durability" title={spell?.title ?? "No spell"}>
+        <span className="item-card-dur-bar-wrap equipment-durability" title={spell?.title ?? t("inventory.noSpell")}>
           <span className="item-card-dur-bar-fill" style={{ width: "100%", background: spell?.color ?? "#b8a4ff" }} />
         </span>
       </button>
@@ -381,6 +386,7 @@ export function InventoryPanel({
   setSelectedItem,
     snapshot,
 }) {
+  const { t } = useLocalization();
   const equipmentById = new Map(snapshot.equipment.map((slot) => [slot.id, slot]));
   const usedSlotCounts = new Map();
   const [autoLootOpen, setAutoLootOpen] = React.useState(false);
@@ -494,19 +500,19 @@ export function InventoryPanel({
         <header className="inventory-titlebar">
           <span className="inventory-title-flourish" aria-hidden="true" />
           <div>
-            <h1>Inventory</h1>
+            <h1>{t("panel.inventory.title")}</h1>
             <strong>Valtoria</strong>
           </div>
           <span className="inventory-capacity">
             {snapshot.inventory.length} / {unlockedInventorySlots}
           </span>
-          <button type="button" className="close-button" onClick={() => setInventoryOpen(false)} title="Luk">
+          <button type="button" className="close-button" onClick={() => setInventoryOpen(false)} title={t("ui.close")} aria-label={t("ui.close")}>
             x
           </button>
         </header>
 
         <div className="inventory-layout">
-          <section className="character-sheet" aria-label="Character equipment">
+          <section className="character-sheet" aria-label={t("inventory.characterEquipment")}>
             <div className="character-rune" aria-hidden="true" />
             <img className="character-figure" src="/assets/generated/ui_hero.png" alt="" />
             <div className="equipment-grid">
@@ -547,20 +553,20 @@ export function InventoryPanel({
             </div>
           </section>
 
-          <section className="backpack-sheet" aria-label="Backpack inventory">
-            <div className="inventory-section-title">Inventory</div>
-            <div className="inventory-filter-bar" aria-label="Backpack visual filters">
+          <section className="backpack-sheet" aria-label={t("inventory.backpack")}>
+            <div className="inventory-section-title">{t("panel.inventory.title")}</div>
+            <div className="inventory-filter-bar" aria-label={t("inventory.filters")}>
               {INVENTORY_FILTERS.map((filter) => (
                 <button
                   type="button"
                   className={`inventory-filter filter-${filter.id} ${inventoryFilter === filter.id ? "active" : ""}`}
                   style={{ "--filter-color": filter.color }}
                   key={filter.id}
-                  title={filter.label}
+                  title={t(filter.labelKey)}
                   onClick={() => setInventoryFilter(filter.id)}
                 >
                   <i aria-hidden="true" />
-                  <span>{filter.label}</span>
+                  <span>{t(filter.labelKey)}</span>
                 </button>
               ))}
             </div>
@@ -577,7 +583,7 @@ export function InventoryPanel({
                         className="item-card empty-slot locked-slot"
                         key={`locked-${slotIndex}`}
                         aria-hidden="true"
-                        title={`Laases op ved level ${requiredLevel ?? "?"}`}
+                        title={t("inventory.unlocksAtLevel", { level: requiredLevel ?? "?" })}
                       >
                         <span className="locked-slot-level">L{requiredLevel ?? "?"}</span>
                       </article>
@@ -653,7 +659,7 @@ export function InventoryPanel({
                     <button
                       type="button"
                       className="corner-action drop-action"
-                      title={cityOpen ? "Kan ikke droppe i byen" : isQuestItem(item) ? "Kan ikke droppe quest item" : "Drop"}
+                      title={cityOpen ? t("inventory.cannotDropInCity") : isQuestItem(item) ? t("inventory.cannotDropQuestItem") : t("inventory.drop")}
                       disabled={cityOpen || isQuestItem(item)}
                       onClick={(event) => {
                         event.stopPropagation();
@@ -674,7 +680,7 @@ export function InventoryPanel({
                       <button
                         type="button"
                         className="corner-action merge-action"
-                        title="Merge"
+                        title={t("inventory.merge")}
                         onClick={(event) => {
                           event.stopPropagation();
                           const result = engineRef.current?.mergeInventoryItem(item.index);
@@ -688,7 +694,7 @@ export function InventoryPanel({
                       <button
                         type="button"
                         className="corner-action merge-action"
-                        title="Read"
+                        title={t("action.read")}
                         onClick={(event) => {
                           event.stopPropagation();
                           const result = engineRef.current?.readInventoryItem?.(item.index);
@@ -702,7 +708,7 @@ export function InventoryPanel({
                       <button
                         type="button"
                         className="corner-action consume-action"
-                        title="Use"
+                        title={t("action.use")}
                         onClick={(event) => {
                           event.stopPropagation();
                           engineRef.current?.consumeInventoryItem?.(item.index);
@@ -718,28 +724,28 @@ export function InventoryPanel({
           </section>
         </div>
 
-        <aside className={`auto-loot-panel ${autoLootOpen ? "open" : ""}`} aria-label="Auto pickup filters">
+        <aside className={`auto-loot-panel ${autoLootOpen ? "open" : ""}`} aria-label={t("inventory.autoPickup")}>
           <button
             type="button"
             className="auto-loot-tab"
             onClick={() => setAutoLootOpen((value) => !value)}
-            title={autoLootOpen ? "Skjul auto pickup" : "Vis auto pickup"}
+            title={autoLootOpen ? t("inventory.hideAutoPickup") : t("inventory.showAutoPickup")}
           >
             {autoLootOpen ? ">" : "<"}
           </button>
           <div className="auto-loot-content">
             <header>
-              <b>Auto Pickup</b>
+              <b>{t("inventory.autoPickup")}</b>
               <div>
                 <button type="button" onClick={() => engineRef.current?.resetAutoLootRules?.()}>
-                  All
+                  {t("inventory.all")}
                 </button>
                 <button type="button" onClick={() => engineRef.current?.clearAutoLootRules?.()}>
-                  None
+                  {t("ui.none")}
                 </button>
               </div>
             </header>
-            <span>Types</span>
+            <span>{t("inventory.types")}</span>
             <div className="auto-loot-check-grid">
               {AUTO_LOOT_TYPE_OPTIONS.map((option) => (
                 <label className={autoLootEnabled(autoLoot, "types", option.id) ? "enabled" : ""} key={option.id}>
@@ -748,11 +754,11 @@ export function InventoryPanel({
                     checked={autoLootEnabled(autoLoot, "types", option.id)}
                     onChange={() => toggleAutoLoot("types", option.id)}
                   />
-                  {option.label}
+                  {t(`inventory.type.${option.id}`)}
                 </label>
               ))}
             </div>
-            <span>Rarity</span>
+            <span>{t("inventory.rarity")}</span>
             <div className="auto-loot-check-grid rarity-grid">
               {AUTO_LOOT_RARITY_OPTIONS.map((option) => (
                 <label
@@ -765,7 +771,7 @@ export function InventoryPanel({
                     checked={autoLootEnabled(autoLoot, "rarities", option.id)}
                     onChange={() => toggleAutoLoot("rarities", option.id)}
                   />
-                  {option.label}
+                  {t(`inventory.filter.${option.id}`)}
                 </label>
               ))}
             </div>
@@ -776,18 +782,18 @@ export function InventoryPanel({
         <aside className="item-hover-stack is-floating" style={hoverPanelStyle} aria-hidden="true">
           {hoveredSpell ? (
             <section className="item-hover-panel is-floating spell-hover-panel">
-              <span className="item-hover-panel-title">Aktiv magi</span>
+              <span className="item-hover-panel-title">{t("inventory.activeMagic")}</span>
               <SpellHoverDetail spell={hoveredSpell} spellEntry={hoveredSpellEntry} />
             </section>
           ) : (
             <>
               <section className="item-hover-panel is-floating">
-                <span className="item-hover-panel-title">Valgt item</span>
+                <span className="item-hover-panel-title">{t("inventory.selectedItem")}</span>
                 <InventoryItemDetail selectedItem={hoveredItem} equipment={snapshot.equipment} />
               </section>
               {showEquippedHover && hoveredEquippedItem && (
                 <section className="item-hover-panel is-floating equipped">
-                  <span className="item-hover-panel-title">Udstyret item</span>
+                  <span className="item-hover-panel-title">{t("inventory.equippedItem")}</span>
                   <InventoryItemDetail selectedItem={hoveredEquippedItem} equipment={snapshot.equipment} />
                 </section>
               )}

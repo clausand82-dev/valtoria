@@ -2,15 +2,17 @@ export const ACTION_CONFIG = {
   inspect_random_ruin: {
     id: "inspect_random_ruin",
     type: "inspect",
-    label: "Undersoeg ruin",
-    text: "Ruinen er aeldgammel og daekket af maerkelige tegn.",
+    label: "Inspect ruin",
+    text: "The ruin is ancient and covered in strange markings.",
+    i18n: { da: { label: "Undersøg ruin", text: "Ruinen er ældgammel og dækket af mærkelige tegn." } },
     once: false,
   },
 
   read_demon_notes: {
     id: "read_demon_notes",
     type: "read",
-    label: "Laes noter",
+    label: "Read notes",
+    i18n: { da: { label: "Læs noter" } },
     readableId: "demon_notes_compiled",
     once: true,
     setFlags: ["read.demon_notes_compiled"],
@@ -19,7 +21,8 @@ export const ACTION_CONFIG = {
   collect_sealed_note: {
     id: "collect_sealed_note",
     type: "collect",
-    label: "Tag note",
+    label: "Take note",
+    i18n: { da: { label: "Tag note" } },
     rewards: {
       items: { note: 1 },
     },
@@ -31,7 +34,8 @@ export const ACTION_CONFIG = {
   harvest_rare_pink_flower: {
     id: "harvest_rare_pink_flower",
     type: "harvest",
-    label: "Pluk blomst",
+    label: "Pick flower",
+    i18n: { da: { label: "Pluk blomst" } },
     rewards: {
       resources: { rare_pink_flower: 1 },
     },
@@ -42,7 +46,8 @@ export const ACTION_CONFIG = {
   clear_old_barrier: {
     id: "clear_old_barrier",
     type: "destroy",
-    label: "Ryd barriere",
+    label: "Clear barrier",
+    i18n: { da: { label: "Ryd barriere" } },
     costs: {
       resources: { wood_piece: 2 },
     },
@@ -54,7 +59,8 @@ export const ACTION_CONFIG = {
   open_weathered_chest: {
     id: "open_weathered_chest",
     type: "open",
-    label: "Aaben",
+    label: "Open",
+    i18n: { da: { label: "Åbn" } },
     setFlags: ["chest.weathered.opened"],
     once: true,
   },
@@ -62,7 +68,8 @@ export const ACTION_CONFIG = {
   open_map_chest: {
     id: "open_map_chest",
     type: "open",
-    label: "Aaben kiste",
+    label: "Open chest",
+    i18n: { da: { label: "Åbn kiste" } },
     prompt: "open chest",
     chestLoot: true,
   },
@@ -70,8 +77,9 @@ export const ACTION_CONFIG = {
   activate_old_rune: {
     id: "activate_old_rune",
     type: "activate",
-    label: "Aktiver",
-    text: "Runen summer kort og falmer derefter.",
+    label: "Activate",
+    text: "The rune hums briefly, then fades.",
+    i18n: { da: { label: "Aktivér", text: "Runen summer kort og falmer derefter." } },
     addCounters: { "rune.old.activations": 1 },
     setFlags: ["rune.old.activated"],
     once: true,
@@ -80,8 +88,9 @@ export const ACTION_CONFIG = {
   reveal_small_cache: {
     id: "reveal_small_cache",
     type: "reveal",
-    label: "Undersoeg",
-    text: "Du finder spor efter et skjult depot.",
+    label: "Inspect",
+    text: "You find signs of a hidden cache.",
+    i18n: { da: { label: "Undersøg", text: "Du finder spor efter et skjult depot." } },
     setFlags: ["cache.small.revealed"],
     once: true,
   },
@@ -89,7 +98,8 @@ export const ACTION_CONFIG = {
   cleanse_minor_shrine: {
     id: "cleanse_minor_shrine",
     type: "cleanse",
-    label: "Rens",
+    label: "Cleanse",
+    i18n: { da: { label: "Rens" } },
     costs: {
       resources: { rare_pink_flower: 1 },
     },
@@ -101,7 +111,8 @@ export const ACTION_CONFIG = {
   repair_old_planks: {
     id: "repair_old_planks",
     type: "repair",
-    label: "Reparer",
+    label: "Repair",
+    i18n: { da: { label: "Reparér" } },
     costs: {
       resources: { wood_piece: 2, rock_piece: 1 },
     },
@@ -112,7 +123,8 @@ export const ACTION_CONFIG = {
   repair_village_house: {
     id: "repair_village_house",
     type: "repair",
-    label: "Reparer hus",
+    label: "Repair house",
+    i18n: { da: { label: "Reparér hus" } },
     prompt: "Reparer huset",
     costs: {
       resources: { wood_piece: 2},
@@ -125,7 +137,8 @@ export const ACTION_CONFIG = {
   repair_smithy_furnace: {
     id: "repair_smithy_furnace",
     type: "repair",
-    label: "Reparer furnace",
+    label: "Repair furnace",
+    i18n: { da: { label: "Reparér furnace" } },
     prompt: "Reparer furnace",
     requires: { questActive: "blacksmith_repair_smithy" },
     costs: {
@@ -139,7 +152,8 @@ export const ACTION_CONFIG = {
   repair_smithy_anvil: {
     id: "repair_smithy_anvil",
     type: "repair",
-    label: "Reparer anvil",
+    label: "Repair anvil",
+    i18n: { da: { label: "Reparér anvil" } },
     prompt: "Reparer anvil",
     requires: { questActive: "blacksmith_repair_smithy" },
     costs: {
@@ -153,7 +167,8 @@ export const ACTION_CONFIG = {
   repair_smithy_bellow: {
     id: "repair_smithy_bellow",
     type: "repair",
-    label: "Reparer bellow",
+    label: "Repair bellows",
+    i18n: { da: { label: "Reparér blæsebælg" } },
     prompt: "Reparer bellow",
     requires: { questActive: "blacksmith_repair_smithy" },
     costs: {
@@ -167,8 +182,9 @@ export const ACTION_CONFIG = {
   inspect_blacksmith_wife: {
     id: "inspect_blacksmith_wife",
     type: "inspect",
-    label: "Undersoeg",
-    text: "Kvinden er doed. De dybe bidemaerker og oedelagte knogler peger ikke paa edderkopper eller ulve, men paa et enormt vildsvin.",
+    label: "Inspect",
+    text: "The woman is dead. The deep bite marks and shattered bones point not to spiders or wolves, but to an enormous boar.",
+    i18n: { da: { label: "Undersøg", text: "Kvinden er død. De dybe bidemærker og ødelagte knogler peger ikke på edderkopper eller ulve, men på et enormt vildsvin." } },
     requires: { questActive: "blacksmith_find_wife" },
     once: true,
   },
@@ -176,7 +192,8 @@ export const ACTION_CONFIG = {
   bury_village_dead: {
     id: "bury_village_dead",
     type: "cleanse",
-    label: "Begrav landsbyboer",
+    label: "Bury villager",
+    i18n: { da: { label: "Begrav landsbyboer" } },
     prompt: "Begrav den doede landsbyboer",
     requires: { questActive: "mayor_repair_village_houses" },    
     replaceFoliageWith: "object/object_gravestone.png",
@@ -187,7 +204,8 @@ export const ACTION_CONFIG = {
   offer_flower_to_shrine: {
     id: "offer_flower_to_shrine",
     type: "offer",
-    label: "Giv offer",
+    label: "Make offering",
+    i18n: { da: { label: "Giv offer" } },
     costs: {
       resources: { rare_pink_flower: 1 },
       gold: 10,
@@ -202,7 +220,8 @@ export const ACTION_CONFIG = {
   enter_generic_cave01: {
     id: "enter_generic_cave01",
     type: "enterSubregion",
-    label: "Gaa ind",
+    label: "Enter",
+    i18n: { da: { label: "Gå ind" } },
     targetSubregionId: "cave01_lvl1",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -211,7 +230,8 @@ export const ACTION_CONFIG = {
   enter_blacksmith_boar_cave_lvl1: {
     id: "enter_blacksmith_boar_cave_lvl1",
     type: "enterSubregion",
-    label: "Gaa ind i grotten",
+    label: "Enter cave",
+    i18n: { da: { label: "Gå ind i grotten" } },
     targetSubregionId: "blacksmith_boar_cave_lvl1",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -221,7 +241,8 @@ export const ACTION_CONFIG = {
   enter_blacksmith_boar_cave_lvl2: {
     id: "enter_blacksmith_boar_cave_lvl2",
     type: "enterSubregion",
-    label: "Gaa gennem revnen",
+    label: "Go through the crack",
+    i18n: { da: { label: "Gå gennem revnen" } },
     targetSubregionId: "blacksmith_boar_cave_lvl2",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -231,7 +252,8 @@ export const ACTION_CONFIG = {
   enter_blacksmith_boar_cave_lvl3: {
     id: "enter_blacksmith_boar_cave_lvl3",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "blacksmith_boar_cave_lvl3",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -241,7 +263,8 @@ export const ACTION_CONFIG = {
   enter_cave01_lvl2: {
     id: "enter_cave01_lvl2",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "cave01_lvl2",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -250,7 +273,8 @@ export const ACTION_CONFIG = {
   enter_the_mine_lvl1: {
     id: "enter_the_mine_lvl1",
     type: "enterSubregion",
-    label: "Gaa ned i minen",
+    label: "Enter the mine",
+    i18n: { da: { label: "Gå ned i minen" } },
     targetSubregionId: "the_mine_lvl1",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -271,7 +295,8 @@ export const ACTION_CONFIG = {
   enter_the_mine_lvl2: {
     id: "enter_the_mine_lvl2",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "the_mine_lvl2",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -280,7 +305,8 @@ export const ACTION_CONFIG = {
   enter_the_mine_lvl3: {
     id: "enter_the_mine_lvl3",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "the_mine_lvl3",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -289,7 +315,8 @@ export const ACTION_CONFIG = {
   enter_forest_mine_lvl1: {
     id: "enter_forest_mine_lvl1",
     type: "enterSubregion",
-    label: "Gaa ind i skovminen",
+    label: "Enter the forest mine",
+    i18n: { da: { label: "Gå ind i skovminen" } },
     targetSubregionId: "forest_mine_lvl1",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -299,7 +326,8 @@ export const ACTION_CONFIG = {
   enter_forest_mine_lvl2: {
     id: "enter_forest_mine_lvl2",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "forest_mine_lvl2",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -308,7 +336,8 @@ export const ACTION_CONFIG = {
   enter_forest_mine_lvl3: {
     id: "enter_forest_mine_lvl3",
     type: "enterSubregion",
-    label: "Gaa dybere",
+    label: "Go deeper",
+    i18n: { da: { label: "Gå dybere" } },
     targetSubregionId: "forest_mine_lvl3",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -317,8 +346,9 @@ export const ACTION_CONFIG = {
   inspect_veldors_wife_corpse: {
     id: "inspect_veldors_wife_corpse",
     type: "inspect",
-    label: "Undersoeg liget",
-    text: "Den doede kvinde baerer Veldors segl i en bristet kaede. Brevet gav navnet, og her ligger sandheden: Veldors kone blev efterladt i minen.",
+    label: "Inspect the body",
+    text: "The dead woman wears Veldor's seal on a broken chain. The letter supplied the name, and here lies the truth: Veldor's wife was abandoned in the mine.",
+    i18n: { da: { label: "Undersøg liget", text: "Den døde kvinde bærer Veldors segl i en bristet kæde. Brevet gav navnet, og her ligger sandheden: Veldors kone blev efterladt i minen." } },
     requires: { questActive: "find_veldors_wife", notFlag: "veldors_wife_found" },
     setFlags: ["veldors_wife_found"],
     removeTarget: true,
@@ -328,14 +358,18 @@ export const ACTION_CONFIG = {
   exit_subregion: {
     id: "exit_subregion",
     type: "exitSubregion",
-    label: "Gaa tilbage",
+    label: "Go back",
+  i18n: { da: { label: "Gå tilbage" } },
+  i18n: { da: { label: "Gå tilbage" } },
+  i18n: { da: { label: "Gå tilbage" } },
   },
 
   inspect_inn_crack: {
     id: "inspect_inn_crack",
     type: "inspect",
-    label: "Undersoeg revnen",
-    text: "Revnen er frisk, og spind traekker ned i moerket under kroen.",
+    label: "Inspect the crack",
+    text: "The crack is fresh, and webs lead down into the darkness beneath the inn.",
+    i18n: { da: { label: "Undersøg revnen", text: "Revnen er frisk, og spind trækker ned i mørket under kroen." } },
     requires: {
       questStepActive: { questId: "check_inn_infestation", stepId: "inspect_cellar" },
       notFlag: "inn_crack_found",
@@ -349,7 +383,8 @@ export const ACTION_CONFIG = {
   enter_inn_crack_cave: {
     id: "enter_inn_crack_cave",
     type: "enterSubregion",
-    label: "Gaa ned gennem revnen",
+    label: "Climb down through the crack",
+    i18n: { da: { label: "Gå ned gennem revnen" } },
     targetSubregionId: "inn_crack_cave",
     instanceScope: "sourceObject",
     persistence: "whileRootRegionActive",
@@ -366,7 +401,8 @@ export const ACTION_CONFIG = {
   destroy_inn_crack: {
     id: "destroy_inn_crack",
     type: "destroy",
-    label: "Oedelaeg revnen",
+    label: "Destroy the crack",
+    i18n: { da: { label: "Ødelæg revnen" } },
     prompt: "Oedelaeg revnen",
     requires: {
       questStepCompleted: { questId: "check_inn_infestation", stepId: "clear_crack_cave" },
@@ -384,16 +420,18 @@ export const ACTION_CONFIG = {
   talk_test_wanderer: {
     id: "talk_test_wanderer",
     type: "talk",
-    label: "Tal",
-    text: "Den fremmede nikker og siger: 'Pas paa i moerket.'",
+    label: "Talk",
+    text: "The stranger nods and says: 'Take care in the dark.'",
+    i18n: { da: { label: "Tal", text: "Den fremmede nikker og siger: 'Pas på i mørket.'" } },
     once: true,
   },
 
   talk_lost_miner: {
     id: "talk_lost_miner",
     type: "talk",
-    label: "Tal",
-    text: "Minearbejderen holder lampen taet ind til kroppen. 'Der er noget laengere inde.'",
+    label: "Talk",
+    text: "The miner holds the lamp close. 'There is something farther inside.'",
+    i18n: { da: { label: "Tal", text: "Minearbejderen holder lampen tæt ind til kroppen. 'Der er noget længere inde.'" } },
     once: false,
   },
 
@@ -401,7 +439,8 @@ export const ACTION_CONFIG = {
     id: "summon_wolf_boss",
     type: "summon",
     allowStub: true,
-    label: "Tilkald",
+    label: "Summon",
+    i18n: { da: { label: "Tilkald" } },
     spawn: [{ monsterId: "wolf_boss", count: 1 }],
     setFlags: ["summoned.wolf_boss"],
     once: true,
@@ -411,7 +450,8 @@ export const ACTION_CONFIG = {
     id: "start_lost_note_quest",
     type: "questStart",
     allowStub: true,
-    label: "Tag imod opgave",
+    label: "Accept quest",
+    i18n: { da: { label: "Tag imod opgave" } },
     questId: "lost_note",
     once: true,
   },
@@ -420,7 +460,8 @@ export const ACTION_CONFIG = {
     id: "deliver_ring_to_noble",
     type: "questAdvance",
     allowStub: true,
-    label: "Aflever ring",
+    label: "Deliver ring",
+    i18n: { da: { label: "Aflever ring" } },
     questId: "noble_ring",
     stepId: "deliver_ring",
     costs: {

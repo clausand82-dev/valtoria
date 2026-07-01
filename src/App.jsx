@@ -11,7 +11,10 @@ import { CHEAT_SETTINGS, cheatGiveOptions, installValtoriaCheats } from "./game/
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
 import { QUEST_DEFS } from "./game/config/quest-config.js";
+import { ACTION_CONFIG } from "./game/config/action-config.js";
 import { saveRepository } from "./storage/saveRepository.js";
+import { useLocalization } from "./i18n/index.js";
+import { HelpDialog } from "./app/help/index.js";
 import {
   calcThreatDeltaFromCityStats,
   calcThreatFallOnMapExit,
@@ -66,6 +69,17 @@ function loadUiImage(src) {
 
 const PERFORMANCE_MODE_STORAGE_KEY = "valtoria.performanceMode";
 const PERFORMANCE_CUSTOM_STORAGE_KEY = "valtoria.performanceCustom.v1";
+const LANGUAGE_SETTING = Object.freeze({
+  id: "language_setting",
+  label: "Language",
+  description: "Choose the language used for help and game text.",
+  i18n: Object.freeze({
+    da: Object.freeze({
+      label: "Sprog",
+      description: "Vælg sproget til hjælp og spiltekst.",
+    }),
+  }),
+});
 
 function clampNumber(value, min, max, fallback) {
   const numeric = Number(value);
@@ -169,6 +183,13 @@ function cityAddonIds() {
 }
 
 export default function App() {
+  const {
+    language,
+    setLanguage,
+    supportedLanguages,
+    localize,
+    t,
+  } = useLocalization();
   const canvasRef = useRef(null);
   const minimapRef = useRef(null);
   const minimapDynamicRef = useRef(null);
@@ -200,6 +221,7 @@ export default function App() {
   const [selectedCityStatId, setSelectedCityStatId] = useState(null);
   const [hoveredCityStatId, setHoveredCityStatId] = useState(null);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
+  const [helpState, setHelpState] = useState({ open: false, topicId: null });
   const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
   const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
   const [cheatResetQuestId, setCheatResetQuestId] = useState(() => Object.keys(QUEST_DEFS ?? {})[0] ?? "");
@@ -607,12 +629,22 @@ export default function App() {
     setSettingsDraft(performanceSettings);
   }, [citySettingsOpen, performanceSettings]);
 
+  useEffect(() => {
+    const openHelp = (event) => {
+      const topicId = String(event?.detail?.topicId ?? "").trim() || null;
+      setHelpState({ open: true, topicId });
+    };
+    window.addEventListener("valtoria:open-help", openHelp);
+    return () => window.removeEventListener("valtoria:open-help", openHelp);
+  }, []);
+
   useEngineModalLock({
     acceptedQuestNotice,
     cityOpen,
     confirmMapAbandonOpen,
     engineRef,
     heroOpen,
+    helpOpen: helpState.open,
     mapOpen,
     questOffer,
     questOverviewOpen,
@@ -674,7 +706,10 @@ export default function App() {
     const configuredMax = CITY_STATS_RULES.displayMax?.[stat.id] ?? 500;
     const max = Math.max(1, Math.floor(Number(need || (typeof stat.max === "function" ? stat.max(snapshot) : stat.max ?? configuredMax)) || 1));
     const pct = Math.max(0, Math.min(100, (value / max) * 100));
-    const label = stat.id === "popularity" ? `${stat.label} ${Math.round(value)}%` : `${stat.label} ${value}`;
+    const statLabel = localize(stat, "label");
+    const statusLabels = localize(CITY_STATS_RULES.balance, "statusLabels") || CITY_STATS_RULES.balance?.statusLabels;
+    const actionHints = localize(CITY_STATS_RULES.balance, "actionHints") || CITY_STATS_RULES.balance?.actionHints;
+    const label = stat.id === "popularity" ? `${statLabel} ${Math.round(value)}%` : `${statLabel} ${value}`;
     return {
       ...stat,
       value,
@@ -682,14 +717,14 @@ export default function App() {
       need,
       ratio,
       status,
-      statusLabel: status ? CITY_STATS_RULES.balance?.statusLabels?.[status] : "",
-      actionHint: CITY_STATS_RULES.balance?.actionHints?.[stat.id] ?? "",
+      statusLabel: status ? statusLabels?.[status] : "",
+      actionHint: actionHints?.[stat.id] ?? "",
       pct,
       label,
       classId: stat.classId ?? stat.id,
       breakdown: cityStatBreakdown[stat.id] ?? [],
     };
-  }), [cityStatBreakdown, derivedCityStats, snapshot]);
+  }), [cityStatBreakdown, derivedCityStats, localize, snapshot]);
   const selectedCityStat = useMemo(
     () => cityHudStats.find((stat) => stat.id === selectedCityStatId) ?? null,
     [cityHudStats, selectedCityStatId],
@@ -1009,8 +1044,21 @@ export default function App() {
       {citySettingsOpen && cityOpen && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
-            <h2 id="city-settings-title">Indstillinger</h2>
+            <h2 id="city-settings-title">{t("panel.settings.title")}</h2>
             <p className="city-settings-note">Vaelg en performance-profil eller brug custom for finjustering. Aendringer aktiveres ved OK.</p>
+            <div className="city-settings-section">
+              <h3>{localize(LANGUAGE_SETTING, "label")}</h3>
+              <p>{localize(LANGUAGE_SETTING, "description")}</p>
+              <select
+                aria-label={localize(LANGUAGE_SETTING, "label")}
+                value={language}
+                onChange={(event) => setLanguage(event.target.value)}
+              >
+                {Object.values(supportedLanguages).map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+            </div>
             <div className="city-settings-section">
               <h3>Performance profil</h3>
               <label>
@@ -1269,7 +1317,7 @@ export default function App() {
               </div>
             )}
             <div className="city-settings-actions">
-              <button type="button" onClick={() => setCitySettingsOpen(false)}>Annuller</button>
+              <button type="button" onClick={() => setCitySettingsOpen(false)}>{t("ui.cancel")}</button>
               <button
                 type="button"
                 onClick={() => {
@@ -1277,7 +1325,7 @@ export default function App() {
                   setCitySettingsOpen(false);
                 }}
               >
-                OK
+                {t("ui.ok")}
               </button>
             </div>
           </section>
@@ -1302,8 +1350,8 @@ export default function App() {
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog toast-log-dialog" role="dialog" aria-modal="true" aria-labelledby="toast-log-title">
             <header className="toast-log-head">
-              <h2 id="toast-log-title">Beskedlog</h2>
-              <button type="button" onClick={() => setToastLogOpen(false)}>Luk</button>
+              <h2 id="toast-log-title">{t("panel.messageLog.title")}</h2>
+              <button type="button" onClick={() => setToastLogOpen(false)}>{t("ui.close")}</button>
             </header>
             <div className="toast-log-list">
               {(snapshot.toastLog ?? []).length <= 0 ? (
@@ -1383,7 +1431,7 @@ export default function App() {
 
       {snapshot.nearbyActionTarget && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
-          Press <b>E</b> to {snapshot.nearbyActionTarget.label}
+          Press <b>E</b> to {localize(ACTION_CONFIG[snapshot.nearbyActionTarget.actionId], "label") || snapshot.nearbyActionTarget.label}
           {snapshot.nearbyActionTarget.targetCount > 1 && (
             <span> · <b>Tab</b> skift {snapshot.nearbyActionTarget.targetIndex}/{snapshot.nearbyActionTarget.targetCount}</span>
           )}
@@ -1551,6 +1599,12 @@ export default function App() {
       )}
       {(appLoading.active || snapshot.subregionTransition?.active) && (
         <AppLoadingScreen state={appLoading.active ? appLoading : snapshot.subregionTransition} />
+      )}
+      {helpState.open && (
+        <HelpDialog
+          topicId={helpState.topicId}
+          onClose={() => setHelpState({ open: false, topicId: null })}
+        />
       )}
     </main>
   );

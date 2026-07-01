@@ -14,6 +14,13 @@ import {
   ResourceBar,
 } from "../index.jsx";
 import { isRegionDebugShortcut } from "./region-debug-shortcut.js";
+import { useLocalization } from "../../i18n/index.js";
+import { localizeQuestField } from "../../i18n/quest-localization.js";
+import {
+  HELP_ACCESS_CONFIG,
+  getPlayerLevel,
+  openHelpTopic,
+} from "../help/help-access-config.js";
 
 function DebugStatsList({ title, values }) {
   const entries = Object.entries(values ?? {})
@@ -323,12 +330,16 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
 }
 
 function HeroModifierList({ events = {}, statusEffects = [] }) {
+  const { localize } = useLocalization();
   const activeOrderRef = useRef(new Map());
   const nextOrderRef = useRef(0);
   const [hoveredTooltip, setHoveredTooltip] = useState(null);
   const eventEntries = cityEventEntries(events)
     .map((event) => ({
       ...event,
+      label: localize(event, "label"),
+      detail: localize(event, "detail"),
+      solution: localize(event, "solution"),
       effectText: cityEventModifierText(event.modifiers),
       kind: event.positive ? "positive" : "negative",
       iconText: heroModifierIconText(event.id),
@@ -496,6 +507,7 @@ export function GameHud({
   trackedQuests,
   xpPct,
 }) {
+  const { localize, renderTemplate, t } = useLocalization();
   const [openPicker, setOpenPicker] = useState(null);
   const [regionDebugOpen, setRegionDebugOpen] = useState(false);
   const [regionDebugStats, setRegionDebugStats] = useState(null);
@@ -626,7 +638,7 @@ export function GameHud({
       )}
 
       {!cityOpen && trackedQuests.length > 0 && (
-        <section className="quest-tracker" aria-label="Aktive quests">
+        <section className="quest-tracker" aria-label={t("hud.activeQuests")}>
           {trackedQuests.slice(0, 8).map((quest) => (
             <div
               className={`quest-track-row ${quest.complete ? "complete" : ""}`}
@@ -636,7 +648,7 @@ export function GameHud({
               onClick={() => setViewedQuest(quest)}
               onKeyDown={(e) => { if (e.key === "Enter") setViewedQuest(quest); }}
             >
-              <b>{quest.title}</b>
+              <b>{localizeQuestField(quest, "title", localize, renderTemplate)}</b>
               <span>{quest.progressText}</span>
               <QuestObjectiveMeta quest={quest} compact />
             </div>
@@ -644,43 +656,55 @@ export function GameHud({
         </section>
       )}
 
+      {getPlayerLevel(player) >= HELP_ACCESS_CONFIG.floatingButtonUnlockLevel && (
+        <button
+          type="button"
+          className="floating-help-button"
+          title={t("hud.openHelp")}
+          aria-label={t("hud.openHelp")}
+          onClick={() => openHelpTopic("getting-started")}
+        >
+          ?
+        </button>
+      )}
+
       {cityOpen ? (
-        <section className="city-menu-bar" aria-label="City menu">
+        <section className="city-menu-bar" aria-label={t("hud.cityMenu")}>
           <button type="button" className="city-menu-button" onClick={() => setInventoryOpen((value) => !value)}>
             <ImageIcon src="/assets/generated/icon_backpack.png" />
-            <span>Back Pack</span>
+            <span>{t("hud.backpack")}</span>
           </button>
           <button type="button" className="city-menu-button" onClick={() => setCityStorageOpen(true)}>
             <ImageIcon src="/assets/generated/item/item_chest.png" />
             
-            <span>Storage</span>
+            <span>{t("hud.storage")}</span>
           </button>
           <button type="button" className="city-menu-button" onClick={() => setHeroOpen(true)}>
             <ImageIcon src="/assets/generated/ui_hero.png" />
-            <span>Hero</span>
+            <span>{t("hud.hero")}</span>
           </button>
           <button type="button" className="city-menu-button" onClick={() => setQuestOverviewOpen(true)}>
             <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
-            <span>Questlog</span>
+            <span>{t("hud.questLog")}</span>
             {questBadgeCount > 0 && <b className="city-menu-badge">{questBadgeCount}</b>}
           </button>
           <button type="button" className="city-menu-button" onClick={onOpenToastLog}>
             <ImageIcon src="/assets/generated/item/item_book_lore.png" />
-            <span>Beskeder</span>
+            <span>{t("hud.messages")}</span>
             {toastLogCount > 0 && <b className="city-menu-badge">{Math.min(99, toastLogCount)}</b>}
           </button>
           <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
             <ImageIcon src="/assets/generated/item/item_book_lore.png" />
-            <span>Setting</span>
+            <span>{t("hud.settings")}</span>
           </button>
           <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
             <ImageIcon src="/assets/generated/icon_map.png" />
-            <span>World map</span>
+            <span>{t("hud.worldMap")}</span>
           </button>
 
         </section>
       ) : (
-      <section className="skillbar" aria-label="Battle quickbar">
+      <section className="skillbar" aria-label={t("hud.battleQuickbar")}>
         {["1", "2", "3", "4"].map((slotId) => (
           <QuickSlot
             cityOpen={cityOpen}
@@ -694,22 +718,22 @@ export function GameHud({
             slotId={slotId}
           />
         ))}
-        <button type="button" className="skill" title="Rygsaek" onClick={() => setInventoryOpen((value) => !value)}>
+        <button type="button" className="skill" title={t("hud.backpack")} onClick={() => setInventoryOpen((value) => !value)}>
           <ImageIcon src="/assets/generated/icon_backpack.png" />
           <span className="hotkey-badge">I</span>
         </button>
-        <button type="button" className="skill" title={cityOpen ? "Minimap er deaktiveret i byen" : "Map"} disabled={cityOpen} onClick={() => setMapOpen(true)}>
+        <button type="button" className="skill" title={cityOpen ? t("status.unavailable") : t("hud.map")} disabled={cityOpen} onClick={() => setMapOpen(true)}>
           <ImageIcon src="/assets/generated/icon_map.png" />
           <span className="hotkey-badge">M</span>
         </button>
-        <button type="button" className="skill" title="Hero" onClick={() => setHeroOpen(true)}>
+        <button type="button" className="skill" title={t("hud.hero")} onClick={() => setHeroOpen(true)}>
           <ImageIcon src="/assets/generated/ui_hero.png" />
           <span className="hotkey-badge">C</span>
         </button>
-        <button type="button" className="skill" title="Questoversigt" onClick={() => setQuestOverviewOpen(true)}>
+        <button type="button" className="skill" title={t("hud.questLog")} onClick={() => setQuestOverviewOpen(true)}>
           <ImageIcon src={QUICKBAR_QUEST_ICON_URL} />
         </button>
-        <button type="button" className="skill" title="Beskedlog" onClick={onOpenToastLog}>
+        <button type="button" className="skill" title={t("panel.messageLog.title")} onClick={onOpenToastLog}>
           <ImageIcon src="/assets/generated/item/item_book_lore.png" />
           {toastLogCount > 0 && <b className="skill-badge">{Math.min(99, toastLogCount)}</b>}
         </button>

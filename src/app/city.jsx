@@ -78,6 +78,7 @@ import {
 import {
   CITY_CITIZEN_CONDITION_DEFS,
   CITY_STAT_ALIASES,
+  CITY_STAT_DEFS,
   CityStatDetailPanel,
   CITY_STAT_ICON_URLS,
 } from "./hud/resource-bar.jsx";
@@ -86,6 +87,14 @@ import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { InventorySortSelect } from "./inventory/inventory-sort-select.jsx";
 import { BestiaryViewer } from "./bestiary-viewer.jsx";
 import { QuestDetailCard, QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
+import { localizeItemField, useLocalization } from "../i18n/index.js";
+import { localizeQuestField } from "../i18n/quest-localization.js";
+import {
+  HELP_ACCESS_CONFIG,
+  HELP_GUIDE_NPC,
+  getPlayerLevel,
+  openHelpTopic,
+} from "./help/help-access-config.js";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 import {
@@ -271,6 +280,7 @@ function CityPage({
   storageOpen = false,
   onCloseStorage,
 }) {
+  const { localize, t } = useLocalization();
   const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
   const snapshotRef = useRef(snapshot);
   const cityStorageKeyRef = useRef(cityStorageKey);
@@ -338,9 +348,28 @@ function CityPage({
   const visibleDamageAreas = useMemo(() => (
     interactiveAreas.filter((area) => isCityAreaUnlocked(cityProgress, area))
   ), [interactiveAreas, cityProgress]);
-  const cityMapNpcs = useMemo(() => (
-    getCityMapQuestNpcs(snapshot.quests?.cityNpcStates ?? [], SHOW_INACTIVE_CITY_NPCS, npcPlacementSeedRef.current)
-  ), [snapshot.quests?.cityNpcStates]);
+  const cityMapNpcs = useMemo(() => {
+    const questNpcs = getCityMapQuestNpcs(
+      snapshot.quests?.cityNpcStates ?? [],
+      SHOW_INACTIVE_CITY_NPCS,
+      npcPlacementSeedRef.current,
+    );
+    if (getPlayerLevel(snapshot) > HELP_ACCESS_CONFIG.guideNpcUntilLevel) return questNpcs;
+    return [
+      ...questNpcs,
+      {
+        npcId: HELP_GUIDE_NPC.id,
+        name: localize(HELP_GUIDE_NPC, "name"),
+        action: localize(HELP_GUIDE_NPC, "action"),
+        imageUrl: HELP_GUIDE_NPC.imageUrl,
+        x: HELP_GUIDE_NPC.cityPosition.x,
+        y: HELP_GUIDE_NPC.cityPosition.y,
+        hasOffer: false,
+        hasActive: false,
+        hasComplete: false,
+      },
+    ];
+  }, [localize, snapshot, snapshot.quests?.cityNpcStates]);
   const cityStats = useMemo(() => calculateCityStats(cityProgress, snapshot, regionCorruption), [cityProgress, snapshot, regionCorruption]);
   const cityEventModifiers = useMemo(() => cityRuntimeModifiers(cityStats), [cityStats]);
   const cityMobs = useMemo(() => normalizeCityMobs(cityProgress?.cityMobs), [cityProgress?.cityMobs]);
@@ -858,6 +887,10 @@ function CityPage({
   };
 
   const openNpc = (npcId) => {
+    if (npcId === HELP_GUIDE_NPC.id) {
+      openHelpTopic(HELP_GUIDE_NPC.topicId);
+      return;
+    }
     const completedTalkQuests = engineRef.current?.advanceTalkToNpcQuests?.(npcId) ?? [];
     if (completedTalkQuests.length > 0) onQuestCompleted?.(completedTalkQuests[0]);
     setSelectedBuildingId(null);
@@ -927,7 +960,7 @@ function CityPage({
   return (
     <section className="city-page city-mode-page" role="dialog" aria-modal="true" aria-label="City page">
       <header className="city-page-header">
-        <h2>City</h2>
+        <h2>{t("panel.city.title")}</h2>
       </header>
       <div className="city-map-stage">
         <div
@@ -1072,8 +1105,8 @@ function CityPage({
       </div>
       {loadingCity && (
         <div className="city-loading" role="status">
-          <b>Loading city</b>
-          <span>Preparing map assets...</span>
+          <b>{t("city.loading")}</b>
+          <span>{t("city.preparingAssets")}</span>
         </div>
       )}
       {!loadingCity && selectedBuildingId && (
@@ -1151,6 +1184,7 @@ function CityAreaShape({ area, className, ...props }) {
 }
 
 function CityAreaLabel({ area, unlocked }) {
+  const { localize } = useLocalization();
   const center = cityAreaCenter(area);
   return (
     <button
@@ -1160,25 +1194,27 @@ function CityAreaLabel({ area, unlocked }) {
       tabIndex={-1}
       aria-hidden="true"
     >
-      {area.title}
+      {localize(area, "title")}
     </button>
   );
 }
 
 function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, buildingImageUrls = {}, onUnlock, onUpgrade, onRepair }) {
+  const { localize, t } = useLocalization();
   const unlocked = isCityAreaUnlocked(progress, area);
   const areaState = getCityAreaState(progress, area);
   const nextLevel = unlocked ? cityAreaNextLevel(area, areaState.level) : null;
+  const nextLevelTitle = localize(nextLevel, "title");
   const cleared = unlocked && (areaState.level ?? 0) <= 0;
-  const statusLabel = cleared ? "Cleared" : unlocked ? `Level ${areaState.level}` : "Locked";
+  const statusLabel = cleared ? t("city.area.cleared") : unlocked ? `Level ${areaState.level}` : t("status.locked");
   const nextLevelLabel = nextLevel
     ? cleared && nextLevel.level === 1
-      ? nextLevel.title ? `Restore area - ${nextLevel.title}` : "Restore area"
-      : `Level ${nextLevel.level}${nextLevel.title ? ` - ${nextLevel.title}` : ""}`
+      ? nextLevelTitle ? `${t("city.area.restoreArea")} - ${nextLevelTitle}` : t("city.area.restoreArea")
+      : `Level ${nextLevel.level}${nextLevelTitle ? ` - ${nextLevelTitle}` : ""}`
     : "";
-  const nextLevelButtonLabel = cleared && nextLevel?.level === 1 ? "Build area" : "Upgrade area";
-  const clearAreaLabel = cityAreaLockedLayerUrls(area).length > 0 ? "Clear area" : "Unlock area";
-  const clearAreaTargetLabel = cityAreaLockedLayerUrls(area).length > 0 ? "Cleared" : "Level 1";
+  const nextLevelButtonLabel = cleared && nextLevel?.level === 1 ? t("city.area.buildArea") : t("city.area.upgradeArea");
+  const clearAreaLabel = cityAreaLockedLayerUrls(area).length > 0 ? t("city.area.clearArea") : t("city.area.unlockArea");
+  const clearAreaTargetLabel = cityAreaLockedLayerUrls(area).length > 0 ? t("city.area.cleared") : "Level 1";
   const nextLevelCostEntries = cityLevelCostEntries(nextLevel);
   const nextLevelRequirementEntries = cityStatRequirementEntries(nextLevel?.statRequirements ?? nextLevel?.unlock?.statRequirements, cityStats);
   const canUpgrade = Boolean(nextLevel)
@@ -1202,50 +1238,50 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
       <header style={{ "--city-area-panel-image": `url("${panelImageUrl}")` }}>
         <div className="city-area-panel-heading">
           <div className="city-area-panel-titleline">
-            <b>{area.title}</b>
+            <b>{localize(area, "title")}</b>
             <span>{statusLabel}</span>
           </div>
-          <p>{area.description ?? "No area description configured yet."}</p>
+          <p>{localize(area, "description") || t("city.area.noDescription")}</p>
         </div>
       </header>
       {unlocked ? (
         <div className="city-area-popover-body">
           {occupation && (
-            <CityPanelSection title="Occupation">
+            <CityPanelSection title={t("city.section.occupation")}>
               <div className="city-area-work-card no-top-border">
                 <div className="city-area-work-head">
-                  <span>{occupation.profile.label ?? "Occupied"}</span>
+                  <span>{occupation.building ? t("city.mob.buildingOccupiedTitle", { building: localize(occupation.building, "title") || occupation.building.title }) : (localize(occupation.profile, "label") || occupation.profile.label || t("city.mob.occupied"))}</span>
                   <span>{occupation.mob ? cityMobDisplayName(occupation.mob) : "City mob"}</span>
                 </div>
-                <p>{cityMobOccupationStatusText(occupation.mob)}</p>
+                <p>{cityMobOccupationStatusText(occupation.mob, t)}</p>
                 <ul className="city-panel-list">
-                  {cityMobOccupationConsequences(occupation.mob).map((text) => <li key={text}>{text}</li>)}
+                  {cityMobOccupationConsequences(occupation.mob, t).map((text) => <li key={text}>{text}</li>)}
                 </ul>
               </div>
             </CityPanelSection>
           )}
-          <CityPanelSection title="Stats">
+          <CityPanelSection title={t("city.section.stats")}>
             <CityStatEffectsSummary effects={activeEffects} />
           </CityPanelSection>
           {buildingRefs.length > 0 && (
-            <CityPanelSection title="Buildings">
+            <CityPanelSection title={t("city.section.buildings")}>
               <CityBuildingIconList buildingRefs={buildingRefs} buildingImageUrls={buildingImageUrls} progress={progress} />
             </CityPanelSection>
           )}
           {area.id === "town_center" && <CityCampStats cityStats={cityStats} />}
-          <CityPanelSection title="Durability">
+          <CityPanelSection title={t("city.section.durability")}>
             <div className="city-durability-meter" style={{ "--city-durability": `${durabilityValue}%` }}>
               <div className="city-durability-meter-head">
                 <div>
                   <b>{durabilityValue.toFixed(2)}%</b>
-                  <span>{repairPct > 0 ? `${repairPct}% repair needed` : "Fully repaired"}</span>
+                  <span>{repairPct > 0 ? t("city.area.repairNeeded", { percent: repairPct }) : t("city.area.fullyRepaired")}</span>
                 </div>
                 <button
                   type="button"
                   disabled={durabilityValue >= 100}
                   onClick={() => onRepair?.(area, repairPct)}
                 >
-                  Repair
+                  {t("action.repair")}
                 </button>
               </div>
               <div className="city-durability-track" aria-label={`Durability ${durabilityValue.toFixed(2)} percent`}>
@@ -1254,9 +1290,9 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
               <CityCostGrid entries={repairCostEntries} snapshot={snapshot} progress={progress} emptyText="Ingen resources kraeves." />
             </div>
           </CityPanelSection>
-          {buildingRefs.length === 0 && <p>Empty area.</p>}
+          {buildingRefs.length === 0 && <p>{t("city.emptyArea")}</p>}
           {nextLevel && (
-            <CityPanelSection title="Upgrade">
+            <CityPanelSection title={t("city.section.upgrade")}>
               <div className="city-area-work-card no-top-border">
                 <div className="city-area-work-head">
                   <div>
@@ -1266,22 +1302,22 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
                 </div>
                 <CityStatEffectsSummary effects={nextLevel.statEffects} />
                 <CityRequirementGrid entries={nextLevelRequirementEntries} />
-                <CityCostGrid entries={nextLevelCostEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />
+                <CityCostGrid entries={nextLevelCostEntries} snapshot={snapshot} progress={progress} emptyText={t("city.noPriceConfigured")} />
               </div>
             </CityPanelSection>
           )}
         </div>
       ) : (
         <div className="city-area-popover-body">
-          <CityPanelSection title="Stats">
+          <CityPanelSection title={t("city.section.stats")}>
             <CityStatEffectsSummary effects={area.statEffects} />
           </CityPanelSection>
           {buildingRefs.length > 0 && (
-            <CityPanelSection title="Buildings">
+            <CityPanelSection title={t("city.section.buildings")}>
               <CityBuildingIconList buildingRefs={buildingRefs} buildingImageUrls={buildingImageUrls} progress={progress} />
             </CityPanelSection>
           )}
-          <CityPanelSection title="Unlock">
+          <CityPanelSection title={t("city.section.unlock")}>
             <div className="city-area-work-card no-top-border">
               <div className="city-area-work-head">
                 <span>{clearAreaTargetLabel}</span>
@@ -1290,7 +1326,7 @@ function CityAreaPopover({ area, snapshot, progress, cityStats, buildingRefs, bu
                 </button>
               </div>
               <CityRequirementGrid entries={gates} />
-              <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />
+              <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText={t("city.noPriceConfigured")} />
             </div>
           </CityPanelSection>
         </div>
@@ -1309,6 +1345,7 @@ function CityPanelSection({ title, children }) {
 }
 
 function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
+  const { localize, t } = useLocalization();
   const summary = cityBuildingHoverSummary(building, progress, snapshot, cityStats);
   const costEntries = Object.entries(building.cost ?? {});
   const statRequirementEntries = cityStatRequirementEntries(building.statRequirements ?? building.unlock?.statRequirements ?? building.unlock?.stats, cityStats);
@@ -1319,50 +1356,50 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
       <header style={{ "--city-area-panel-image": `url("${building.imageUrl ?? CITY_MAP_IMAGE.src}")` }}>
         <div className="city-area-panel-heading">
           <div className="city-area-panel-titleline">
-            <b>{building.title}</b>
-            <span>{summary.owned ? `${cityConfigEntryOwnedFromStart(building) ? "Owned from start" : "Built"} | Level ${summary.state.level}` : "Locked"}</span>
+            <b>{localize(building, "title") || building.title}</b>
+            <span>{summary.owned ? `${cityConfigEntryOwnedFromStart(building) ? t("city.building.ownedFromStart") : t("city.building.built") } | Level ${summary.state.level}` : t("status.locked")}</span>
           </div>
-          <p>{building.help ?? building.functionText ?? "No building description configured yet."}</p>
-          {building.functionText && <p>{building.functionText}</p>}
+          <p>{localize(building, "help") || localize(building, "functionText") || t("city.building.noDescription")}</p>
+          {localize(building, "functionText") && <p>{localize(building, "functionText")}</p>}
         </div>
       </header>
       <div className="city-area-popover-body">
         {occupation && (
-          <CityPanelSection title="Occupation">
+          <CityPanelSection title={t("city.section.occupation")}>
             <div className="city-area-work-card no-top-border">
               <div className="city-area-work-head">
-                <span>{occupation.profile.label ?? "Occupied"}</span>
+                <span>{occupation.building ? t("city.mob.buildingOccupiedTitle", { building: localize(occupation.building, "title") || occupation.building.title }) : (localize(occupation.profile, "label") || occupation.profile.label || t("city.mob.occupied"))}</span>
                 <span>{cityMobDisplayName(occupation.mob)}</span>
               </div>
-              <p>{cityMobOccupationStatusText(occupation.mob)}</p>
+              <p>{cityMobOccupationStatusText(occupation.mob, t)}</p>
               <ul className="city-panel-list">
-                {cityMobOccupationConsequences(occupation.mob).map((text) => <li key={text}>{text}</li>)}
+                {cityMobOccupationConsequences(occupation.mob, t).map((text) => <li key={text}>{text}</li>)}
               </ul>
             </div>
           </CityPanelSection>
         )}
-        <CityPanelSection title="Status">
+        <CityPanelSection title={t("city.mob.section.status")}>
           <div className="city-area-work-card no-top-border">
             <div className="city-area-work-head">
-              <span>{summary.owned ? `Durability ${durabilityValue.toFixed(2)}%` : "Not owned"}</span>
-              <span>{cityConfigEntryOwnedFromStart(building) ? "Starting building" : "Buildable building"}</span>
+              <span>{summary.owned ? `${t("city.durability")} ${durabilityValue.toFixed(2)}%` : t("city.notOwned")}</span>
+              <span>{cityConfigEntryOwnedFromStart(building) ? t("city.building.starting") : t("city.building.buildable")}</span>
             </div>
-            {!summary.owned && <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText="No price configured" />}
+            {!summary.owned && <CityCostGrid entries={costEntries} snapshot={snapshot} progress={progress} emptyText={t("city.noPriceConfigured")} />}
             {!summary.owned && statRequirementEntries.length > 0 && <CityRequirementGrid entries={statRequirementEntries} />}
           </div>
         </CityPanelSection>
-        <CityPanelSection title="Inventory">
+        <CityPanelSection title={t("city.section.inventory")}>
           <div className="city-area-costs city-chip-grid">
-            <span>Total slots: {summary.inventory.totalSlots}</span>
+            <span>{t("city.building.totalSlots", { count: summary.inventory.totalSlots })}</span>
             {Object.entries(summary.inventory.byType).map(([type, slots]) => (
               <span key={type}>{cityInventoryTypeLabel(type)}: {slots}</span>
             ))}
           </div>
         </CityPanelSection>
-        <CityPanelSection title="Stats">
+        <CityPanelSection title={t("city.section.stats")}>
           <CityStatEffectsSummary effects={summary.activeEffects} />
         </CityPanelSection>
-        <CityPanelSection title="Features">
+        <CityPanelSection title={t("city.building.features")}>
           <div className="city-area-building-icons city-building-feature-list">
             {[...summary.ownedAddons, ...summary.lockedAddons].map(({ addon, owned, unlocked }) => {
               const inventory = normalizeInventoryType(addon.inventoryType);
@@ -1371,10 +1408,10 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
               const cost = cityBuildingAddonCostEntries(addon);
               const reqs = cityStatRequirementEntries(addon.statRequirements ?? addon.unlock?.statRequirements ?? addon.unlock?.stats, cityStats);
               return (
-                <article className={`city-area-building-chip ${owned ? "owned" : "locked"}`} title={addon.help ?? addon.title} key={addon.id}>
-                  <b>{addon.title}</b>
-                  <span>{owned ? "Owned" : unlocked ? "Can buy" : "Locked"} | {cityBuildingFeatureLabel(addon.panel)}</span>
-                  {addon.help && <span>{addon.help}</span>}
+                <article className={`city-area-building-chip ${owned ? "owned" : "locked"}`} title={localize(addon, "help") || localize(addon, "title") || addon.title} key={addon.id}>
+                  <b>{localize(addon, "title") || addon.title}</b>
+                  <span>{owned ? t("status.owned") : unlocked ? t("city.building.canBuy") : t("status.locked")} | {cityBuildingFeatureLabel(addon.panel)}</span>
+                  {localize(addon, "help") && <span>{localize(addon, "help")}</span>}
                   {slots > 0 && <span>{cityInventoryTypeLabel(inventory.type)}: {slots} slots</span>}
                   {cost.length > 0 && <span>{cost.map(([id, amount]) => `${amount} ${cityCostLabel(id)}`).join(", ")}</span>}
                   {reqs.length > 0 && <span>{reqs.map((entry) => entry.label).join(", ")}</span>}
@@ -1392,15 +1429,16 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
 }
 
 function CityBuildingIconList({ buildingRefs, buildingImageUrls = {}, progress }) {
+  const { localize } = useLocalization();
   if (!buildingRefs?.length) return null;
   return (
     <div className="city-area-building-icons">
       {buildingRefs.map(({ building }) => {
         const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
         return (
-          <span className="city-area-building-chip" title={building.title} key={building.id}>
+          <span className="city-area-building-chip" title={localize(building, "title") || building.title} key={building.id}>
             {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : <i>{cityBuildingIconText(building)}</i>}
-            <b>{building.title}</b>
+            <b>{localize(building, "title") || building.title}</b>
           </span>
         );
       })}
@@ -1415,8 +1453,10 @@ function CityStatIcon({ statId }) {
 }
 
 function CityRequirementGrid({ entries, emptyText = "No requirements" }) {
+  const { t } = useLocalization();
+  const resolvedEmptyText = emptyText === "No requirements" ? t("city.noRequirements") : emptyText;
   if (!entries?.length) {
-    return <div className="city-area-requirements city-chip-grid"><span>{emptyText}</span></div>;
+    return <div className="city-area-requirements city-chip-grid"><span>{resolvedEmptyText}</span></div>;
   }
   return (
     <div className="city-area-requirements city-chip-grid">
@@ -1431,8 +1471,10 @@ function CityRequirementGrid({ entries, emptyText = "No requirements" }) {
 }
 
 function CityCostGrid({ entries, snapshot, progress, emptyText = "No price configured" }) {
+  const { t } = useLocalization();
+  const resolvedEmptyText = emptyText === "No price configured" ? t("city.noPriceConfigured") : emptyText;
   if (!entries?.length) {
-    return <div className="city-area-costs city-chip-grid"><span>{emptyText}</span></div>;
+    return <div className="city-area-costs city-chip-grid"><span>{resolvedEmptyText}</span></div>;
   }
   return (
     <div className="city-area-costs city-chip-grid">
@@ -1601,8 +1643,9 @@ function cityEffectUnit(value) {
 }
 
 function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls = {}, buildingImageUrls = {}, quests = null, onOpenBuilding, onHoverBuilding, onOpenNpc }) {
+  const { localize } = useLocalization();
   return (
-    <div className="city-map-hover-icons" aria-label={`${area.title} actions`}>
+    <div className="city-map-hover-icons" aria-label={`${localize(area, "title")} actions`}>
       {buildingRefs.map(({ building, x, y }) => {
         const imageUrl = cityBuildingMapImageUrl(buildingImageUrls, building, progress);
         const questStatus = cityBuildingQuestStatus(building?.id, quests);
@@ -1612,8 +1655,8 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
             type="button"
             className={`city-map-action-icon building ${owned ? "owned" : "locked"} ${questStatus.hasOffer ? "offer" : questStatus.hasComplete ? "complete" : questStatus.hasActive ? "active-quest" : ""}`}
             style={cityMapPositionStyle(x, y)}
-            title={building.title}
-            aria-label={building.title}
+            title={localize(building, "title")}
+            aria-label={localize(building, "title")}
             onMouseEnter={() => onHoverBuilding?.(building.id)}
             onFocus={() => onHoverBuilding?.(building.id)}
             onMouseLeave={() => onHoverBuilding?.(null)}
@@ -1627,7 +1670,7 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
             <span className="city-building-portrait">
               {imageUrl ? <img src={imageUrl} alt="" draggable="false" /> : cityBuildingIconText(building)}
             </span>
-            <b>{building.title}</b>
+            <b>{localize(building, "title")}</b>
             {(questStatus.hasComplete || questStatus.hasOffer || questStatus.hasActive) && (
               <i className="city-quest-status" aria-hidden="true">
                 {questStatus.hasOffer ? "!" : questStatus.hasComplete ? "?" : "?"}
@@ -1641,8 +1684,8 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
           type="button"
           className={`city-map-action-icon npc ${npc.hasOffer ? "offer" : npc.hasComplete ? "complete" : npc.hasActive ? "active-quest" : ""}`}
           style={cityMapPositionStyle(npc.x, npc.y)}
-          title={npc.name}
-          aria-label={npc.name}
+          title={npc.action ?? npc.name}
+          aria-label={npc.action ?? npc.name}
           onClick={(event) => {
             event.stopPropagation();
             onOpenNpc(npc.npcId);
@@ -1726,11 +1769,12 @@ function CityThreatMeter({ threatLevel }) {
 }
 
 function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack, onHover }) {
+  const { t } = useLocalization();
   return (
     <div className="city-map-hover-icons city-map-mob-icons" aria-label="City mobs">
       {mobRefs.map((mob) => {
         const attackable = attackableMobIds.has(mob.id);
-        const occupationStatus = mob.breachState === "inside" ? cityMobOccupationStatusText(mob) : "";
+        const occupationStatus = mob.breachState === "inside" ? cityMobOccupationStatusText(mob, t) : "";
         const markerStatus = occupationStatus ? ` - ${occupationStatus}` : "";
         return (
           <button
@@ -1758,6 +1802,7 @@ function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack, onHover }) {
 }
 
 function CityStatInfoPanel({ stat, onClose }) {
+  const { t } = useLocalization();
   if (!stat) return null;
   return (
     <aside className="city-area-popover city-stat-info-panel">
@@ -1768,7 +1813,7 @@ function CityStatInfoPanel({ stat, onClose }) {
           </div>
           <div>
             <b>{stat.label}</b>
-            <span>City stat details</span>
+            <span>{t("city.stat.detailsTitle")}</span>
           </div>
         </div>
         <button type="button" onClick={onClose}>X</button>
@@ -1781,6 +1826,7 @@ function CityStatInfoPanel({ stat, onClose }) {
 }
 
 function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, onHeroBattle, onArmyBattle, onClose }) {
+  const { t } = useLocalization();
   const armyUnits = normalizeArmyUnits(cityProgress?.armyUnits);
   const [sentUnits, setSentUnits] = useState(() => Object.fromEntries(
     Object.entries(armyUnits).map(([unitId, count]) => [unitId, Math.min(1, count)]),
@@ -1790,9 +1836,9 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
   const totalSent = Object.values(sentUnits).reduce((sum, count) => sum + Math.max(0, Math.floor(Number(count) || 0)), 0);
   const preview = resolveCityArmyBattle({ progress: cityProgress, cityStats, mob, sentUnits, rng: () => 0.5 });
   const penaltyEntries = cityMobStatPenaltyEntries(mob);
-  const durabilityThreat = cityMobDurabilityThreatText(mob);
-  const occupationConsequences = cityMobOccupationConsequences(mob);
-  const theftRisk = cityMobTheftRiskText(mob);
+  const durabilityThreat = cityMobDurabilityThreatText(mob, t);
+  const occupationConsequences = cityMobOccupationConsequences(mob, t);
+  const theftRisk = cityMobTheftRiskText(mob, t);
   const raidLogs = (cityProgress?.cityMobRaidLog ?? []).filter((entry) => String(entry.mobId ?? "") === String(mob.id)).slice(0, 3);
   return (
     <aside className="city-area-popover city-mob-info-panel">
@@ -1803,26 +1849,34 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
           </div>
           <div>
             <b>{cityMobDisplayName(mob)}</b>
-            <span>{mob.mobType} Lv.{mob.level} | {cityMobAreaLabel(mob)} | active {Math.max(0, Math.floor(Number(mob.visitsActive) || 0))} visits</span>
+            <span>
+              {mob.mobType} Lv.{mob.level} | {cityMobAreaLabel(mob)} | {t("city.mob.activeVisits", { count: Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) })}
+            </span>
           </div>
         </div>
         <button type="button" onClick={onClose}>X</button>
       </header>
       <div className="city-area-popover-body city-mob-info-body">
         <section className="city-mob-pressure-panel" aria-label="City mob occupation">
-          <b>Status</b>
-          <p>{cityMobOccupationStatusText(mob)}</p>
+          <b>{t("city.mob.section.status")}</b>
+          <p>{cityMobOccupationStatusText(mob, t)}</p>
           {occupationConsequences.length > 0 && (
             <ul>
               {occupationConsequences.map((text) => <li key={text}>{text}</li>)}
             </ul>
           )}
-          {theftRisk && <p>Storage raid risk: {theftRisk}</p>}
+          {theftRisk && <p>{t("city.mob.storageRaidRisk", { risk: theftRisk })}</p>}
           {raidLogs.length > 0 && (
             <ul>
               {raidLogs.map((entry) => (
                 <li key={entry.id}>
-                  <span>{entry.mode === "spoil" ? "Spoiled" : entry.mode === "destroy" ? "Destroyed" : "Stole"} {entry.itemName}</span>
+                  <span>
+                    {entry.mode === "spoil"
+                      ? t("city.mob.raidLog.spoiled", { itemName: entry.itemName })
+                      : entry.mode === "destroy"
+                        ? t("city.mob.raidLog.destroyed", { itemName: entry.itemName })
+                        : t("city.mob.raidLog.stole", { itemName: entry.itemName })}
+                  </span>
                   <strong>-{entry.amount}</strong>
                 </li>
               ))}
@@ -1830,7 +1884,7 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
           )}
         </section>
         <section className="city-mob-pressure-panel" aria-label="City mob pressure">
-          <b>City pressure</b>
+          <b>{t("city.mob.section.cityPressure")}</b>
           {penaltyEntries.length > 0 ? (
             <ul>
               {penaltyEntries.map((entry) => (
@@ -1841,18 +1895,18 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
               ))}
             </ul>
           ) : (
-            <p>No active city stat penalty yet.</p>
+            <p>{t("city.mob.noActivePenaltyYet")}</p>
           )}
           {durabilityThreat && <p>{durabilityThreat}</p>}
-          <p>Risk: {cityMobEscalationText(mob)}</p>
-          <p>{cityMobRecoveryText(mob)}</p>
+          <p>{t("city.mob.riskPrefix", { risk: cityMobEscalationText(mob, t) })}</p>
+          <p>{cityMobRecoveryText(mob, t)}</p>
         </section>
         {!attackable && (
-          <p className="city-mob-action-status">Clear closer threats before attacking outer mobs.</p>
+          <p className="city-mob-action-status">{t("city.mob.blockedAttackHint")}</p>
         )}
-        <button type="button" disabled={!attackable} onClick={onHeroBattle}>Fight with hero</button>
+        <button type="button" disabled={!attackable} onClick={onHeroBattle}>{t("city.mob.fightWithHero")}</button>
         <div className={`city-army-send-box ${attackable ? "" : "locked"}`}>
-          <b>Send army</b>
+          <b>{t("city.mob.sendArmy")}</b>
           {unitEntries.map(([unitId, def]) => {
             const available = armyUnits[unitId] ?? 0;
             return (
@@ -1873,8 +1927,8 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
               </label>
             );
           })}
-          <span>Win chance: {Math.round((preview.winChance ?? 0) * 100)}% | Morale x{preview.morale.toFixed(2)}</span>
-          <button type="button" disabled={!attackable || totalSent <= 0} onClick={() => onArmyBattle(sentUnits)}>Attack with army</button>
+          <span>{t("city.mob.winChanceMorale", { chance: Math.round((preview.winChance ?? 0) * 100), morale: preview.morale.toFixed(2) })}</span>
+          <button type="button" disabled={!attackable || totalSent <= 0} onClick={() => onArmyBattle(sentUnits)}>{t("city.mob.attackWithArmy")}</button>
         </div>
       </div>
     </aside>
@@ -2268,6 +2322,8 @@ function drawCityQuestStatusMarker(ctx, marker, camera, time) {
 }
 
 function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, onChangeProgress, onClose, onQuestCompleted }) {
+  const { localize, renderTemplate } = useLocalization();
+  const questText = (quest, field) => localizeQuestField(quest, field, localize, renderTemplate);
   const npc = QUEST_NPCS[npcId];
   const state = (npcStates ?? []).find((entry) => entry.npcId === npcId) ?? { active: [], offers: [] };
   const npcQuests = state.active ?? [];
@@ -2434,10 +2490,10 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
           {npcOffers.map((quest) => (
             <article className="quest-card quest-status-offer" key={`offer-${quest.id}`}>
               <header>
-                <b>{quest.title}</b>
+                <b>{questText(quest, "title")}</b>
                 <span>Ny quest</span>
               </header>
-              <p>{quest.story}</p>
+              <p>{questText(quest, "story")}</p>
               <QuestObjectiveMeta quest={quest} />
               <button
                 type="button"
@@ -2454,10 +2510,10 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
             return (
             <article className={`quest-card ${ready ? "complete quest-status-ready" : "quest-status-active"}`} key={quest.id}>
               <header>
-                <b>{displayQuest.title}</b>
+                <b>{questText(displayQuest, "title")}</b>
                 <span>{displayQuest.progressText}</span>
               </header>
-              <p>{ready ? displayQuest.turnInText : displayQuest.story}</p>
+              <p>{questText(displayQuest, ready ? "turnInText" : "story")}</p>
               <QuestObjectiveMeta quest={displayQuest} compact />
               <button
                 type="button"
@@ -2495,7 +2551,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       {confirmAbandonQuest && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
-            <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+            <h3>Opgiv {questText(confirmAbandonQuest, "title")}?</h3>
             <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
             <div className="confirm-actions">
               <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
@@ -2528,12 +2584,14 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
 }
 
 function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disabled = false, disabledText = "", onAcceptQuest, onAbandonQuest }) {
+  const { localize, renderTemplate, t } = useLocalization();
+  const questText = (quest, field) => localizeQuestField(quest, field, localize, renderTemplate);
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const offers = board?.offers ?? [];
-  const title = board?.title ?? fallbackConfig?.title ?? "Quest Board";
-  const subtitle = board?.subtitle ?? fallbackConfig?.subtitle ?? "";
-  const emptyText = board?.emptyText ?? fallbackConfig?.emptyText ?? "Ingen quests tilgaengelige lige nu.";
+  const title = localize(fallbackConfig, "title") || board?.title || "Quest Board";
+  const subtitle = localize(fallbackConfig, "subtitle") || board?.subtitle || "";
+  const emptyText = localize(fallbackConfig, "emptyText") || board?.emptyText || "No quests are available right now.";
   const acceptSelectedQuest = () => {
     if (!selectedQuest) return;
     const accepted = onAcceptQuest?.(selectedQuest);
@@ -2559,8 +2617,8 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
       </header>
       {disabled && (
         <div className="city-occupation-lock-note">
-          <b>Rumor Board disabled</b>
-          <span>{disabledText || "Clear the mob occupying the Inn to use the board again."}</span>
+          <b>{t("city.questBoard.rumorBoardDisabled")}</b>
+          <span>{disabledText || t("city.questBoard.clearInnMobToUseBoard")}</span>
         </div>
       )}
       {!disabled && (
@@ -2569,11 +2627,11 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
         {offers.map((quest) => (
           <article className="quest-card quest-status-offer" key={`board-${quest.questId}`}>
             <header>
-              <b>{quest.title}</b>
+              <b>{questText(quest, "title")}</b>
               <span>{quest.kind ?? quest.category ?? "Quest"}</span>
             </header>
-            <p>{quest.story}</p>
-            {quest.acceptText && <p>{quest.acceptText}</p>}
+            <p>{questText(quest, "story")}</p>
+            {quest.acceptText && <p>{questText(quest, "acceptText")}</p>}
             <QuestObjectiveMeta quest={quest} />
             <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
           </article>
@@ -2584,10 +2642,10 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
             {activeQuests.map((quest) => (
               <article className={`quest-card ${quest.complete ? "complete quest-status-ready" : "quest-status-active"}`} key={`board-active-${quest.id}`}>
                 <header>
-                  <b>{quest.title}</b>
+                  <b>{questText(quest, "title")}</b>
                   <span>{quest.progressText}</span>
                 </header>
-                <p>{quest.complete ? quest.turnInText : quest.story}</p>
+                <p>{questText(quest, quest.complete ? "turnInText" : "story")}</p>
                 <QuestObjectiveMeta quest={quest} />
                 <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
               </article>
@@ -2866,6 +2924,7 @@ function cityBuildingHoverSummary(building, progress, snapshot, cityStats = {}) 
 }
 
 function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progress, houseImages, cityStats = {}, regionCorruption = {}, onConvertResourceToResource, onChangeProgress, onClose }) {
+  const { localize, t } = useLocalization();
   const building = CITY_BUILDINGS.find((entry) => entry.id === buildingId);
   const [draggedCityItem, setDraggedCityItem] = useState(null);
   const [activeAddonId, setActiveAddonId] = useState(null);
@@ -2878,6 +2937,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const blacksmithModifiers = useMemo(() => blacksmithDurabilityModifiers(progress), [progress]);
   const readableQuestIdSet = useMemo(() => questReadableIds(QUEST_DEFS), []);
   if (!building) return null;
+  const buildingTitle = localize(building, "title");
+  const buildingHelp = localize(building, "help");
+  const buildingFunctionText = localize(building, "functionText");
   const backpackCapacity = inventoryUnlockedSlotCount(snapshot?.player?.level);
 
   const buildingState = getCityBuildingState(progress, building);
@@ -2887,7 +2949,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const parentAreaUnlocked = !parentArea || isCityAreaUnlocked(progress, parentArea);
   const parentAreaLockText = parentArea ? `Unlock ${parentArea.title} first.` : "";
   const occupation = cityMobOccupationForBuilding(progress, building.id);
-  const occupationConsequences = occupation ? cityMobOccupationConsequences(occupation.mob) : [];
+  const occupationConsequences = occupation ? cityMobOccupationConsequences(occupation.mob, t) : [];
   const payBuildingEntries = (entries, progressOverride = progress) => (
     payCityCostEntries(entries, engineRef.current, snapshotRef?.current ?? snapshot, progressOverride, onChangeProgress)
   );
@@ -2965,20 +3027,20 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   const questBoardId = activeQuestBoard ? activeAddon.config?.boardId : null;
   const activeBaseTab = functionModalId === BUILDING_BASE_TAB_ID;
   const functionModalTitle = activeBaseTab
-    ? building.title
+    ? buildingTitle
     : activeQuestBoard
-      ? QUEST_BOARD_CONFIG[questBoardId]?.title ?? activeAddon?.title ?? "Quests"
-      : activeAddon?.title ?? "Building function";
+      ? localize(QUEST_BOARD_CONFIG[questBoardId], "title") || localize(activeAddon, "title") || t("city.quests")
+      : localize(activeAddon, "title") || t("city.buildingFunction");
   const functionModalHelp = activeBaseTab
     ? ""
     : activeQuestBoard
-      ? QUEST_BOARD_CONFIG[questBoardId]?.subtitle ?? activeAddon?.help ?? "Available local quests and rumors."
-      : activeAddon?.help ?? activeAddon?.functionText ?? "";
+      ? localize(QUEST_BOARD_CONFIG[questBoardId], "subtitle") || localize(activeAddon, "help")
+      : localize(activeAddon, "help") || localize(activeAddon, "functionText");
   const headerStatus = activeAddon
-    ? `${cityConfigEntryOwnedFromStart(activeAddon) ? "Starting addon" : savedPurchasedAddons.has(activeAddon.id) ? "Built addon" : "Available addon"} | ${building.title}`
+    ? `${cityConfigEntryOwnedFromStart(activeAddon) ? t("city.startingAddon") : savedPurchasedAddons.has(activeAddon.id) ? t("city.builtAddon") : t("city.availableAddon")} | ${buildingTitle}`
     : owned
-          ? `${ownedFromStart ? "Owned from start | " : ""}Lvl ${buildingState.level}`
-          : "Not owned";
+          ? `${ownedFromStart ? `${t("city.ownedFromStart")} | ` : ""}${t("city.levelShort", { level: buildingState.level })}`
+          : t("city.notOwned");
   const storageSections = cityInventorySections(building, buildingState, owned);
   const activeAddonStorageSection = activeAddon
     ? storageSections.find((section) => section.key === cityInventorySectionKey(activeAddon)) ?? null
@@ -2994,8 +3056,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     innMainChestDisabled || occupiedBuildingStorageDisabled
   );
   const activeStorageDisabledText = occupiedBuildingStorageDisabled
-    ? `The occupying mob blocks all deposits and withdrawals from ${building.title} storage.`
-    : "The occupying mob blocks all deposits and withdrawals from the Main Chest.";
+    ? t("city.storageBlockedByMob", { name: buildingTitle })
+    : t("city.storageBlockedByMob", { name: localize(featureAddons.find((addon) => addon.id === "main_chest"), "title") || "Main Chest" });
   const storageSectionDisabled = (sectionKey) => (
     occupiedBuildingStorageDisabled
     || (
@@ -3905,7 +3967,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             fallbackConfig={QUEST_BOARD_CONFIG[activeAddon.config?.boardId]}
             activeQuests={(snapshot.quests?.active ?? []).filter((quest) => String(quest.source ?? "") === String(questBoard?.source ?? QUEST_BOARD_CONFIG[activeAddon.config?.boardId]?.source ?? ""))}
             disabled={innRumorBoardDisabled}
-            disabledText="Clear the mob occupying the Inn to restore rumors and local jobs."
+            disabledText={t("city.questBoard.clearInnMobToRestoreRumors")}
             onAcceptQuest={acceptBoardQuest}
             onAbandonQuest={(quest) => engineRef.current?.abandonQuest?.(quest.id)}
           />
@@ -3975,8 +4037,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         return (
           <section className="blacksmith-station">
             <header>
-              <h4>Civic Ledger</h4>
-              <span>Faction reputation</span>
+              <h4>{localize(activeAddon, "title")}</h4>
+              <span>{t("city.faction.reputation")}</span>
             </header>
             <CityFactionPanel factionRep={snapshot.player?.factionRep} />
           </section>
@@ -4121,8 +4183,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         return (
           <section className="blacksmith-station">
             <header>
-              <h4>{activeAddon.title}</h4>
-              <span>{activeAddon.help ?? "No separate station content configured yet."}</span>
+              <h4>{localize(activeAddon, "title")}</h4>
+              <span>{localize(activeAddon, "help") || t("city.noStationContent")}</span>
             </header>
           </section>
         );
@@ -4133,9 +4195,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     <div className="city-popup-backdrop">
       <div className="city-building-shell">
         <nav className="city-building-rail" aria-label="Building functions">
-          <button type="button" className={`city-building-rail-tab ${activeBaseTab ? "active" : ""}`} onClick={openBaseTab} title={`${building.title} overview`}>
+          <button type="button" className={`city-building-rail-tab ${activeBaseTab ? "active" : ""}`} onClick={openBaseTab} title={t("city.overview", { name: buildingTitle })}>
             {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
-            <span>{building.title}</span>
+            <span>{buildingTitle}</span>
           </button>
           {featureAddons.map((addon) => {
             const bought = purchasedAddons.has(addon.id);
@@ -4153,27 +4215,27 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   setActiveAddonId(addon.id);
                   setFunctionModalId(addon.id);
                 }}
-                title={!unlocked ? cityAddonLockText(addon, snapshot, cityStats) : bought ? addon.title : buyCheck.canBuy ? `Buy ${addon.title}` : buyCheck.reasons.join(", ")}
+                title={!unlocked ? cityAddonLockText(addon, snapshot, cityStats, t) : bought ? localize(addon, "title") : buyCheck.canBuy ? t("city.buyNamed", { name: localize(addon, "title") }) : buyCheck.reasons.join(", ")}
               >
                 {addonIconUrl && <img src={addonIconUrl} alt="" draggable="false" />}
-                <span>{addon.title}</span>
+                <span>{localize(addon, "title")}</span>
               </button>
             );
           })}
         </nav>
-      <section className={`city-popup city-building-modal ${activeBaseTab ? "base-tab" : "function-tab"} ${occupation ? "has-occupation" : ""}`} role="dialog" aria-modal="true" aria-label={building.title}>
+      <section className={`city-popup city-building-modal ${activeBaseTab ? "base-tab" : "function-tab"} ${occupation ? "has-occupation" : ""}`} role="dialog" aria-modal="true" aria-label={buildingTitle}>
         <header className="city-popup-header">
           <div>
             <h3>{functionModalTitle}</h3>
             <span>{headerStatus}</span>
             {!activeBaseTab && functionModalHelp && <p className="city-building-tab-help">{functionModalHelp}</p>}
           </div>
-          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+          <button type="button" className="city-popup-close" aria-label={t("ui.close")} title={t("ui.close")} onClick={onClose}>X</button>
         </header>
         {occupation && (
           <div className="city-building-occupation-warning">
-            <b>{occupation.profile.label ?? "Building occupied"}</b>
-            <span>{cityMobDisplayName(occupation.mob)} is disrupting this building.</span>
+            <b>{occupation.building ? t("city.mob.buildingOccupiedTitle", { building: localize(occupation.building, "title") || occupation.building.title }) : (localize(occupation.profile, "label") || t("city.buildingOccupied"))}</b>
+            <span>{t("city.mob.disruptingBuilding", { mobName: cityMobDisplayName(occupation.mob) })}</span>
             {occupationConsequences.length > 0 && <small>{occupationConsequences.join(" | ")}</small>}
           </div>
         )}
@@ -4183,25 +4245,25 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             {buildingImageSrc && <img src={buildingImageSrc} alt="" draggable="false" />}
           </div>
           <div>
-            <p>{building.help}</p>
-            {building.functionText && <p>{building.functionText}</p>}
-            {owned && <CityStatEffectsSummary title="Building effects" effects={cityBuildingActiveStatEffects(building, buildingState.level)} />}
+            <p>{buildingHelp}</p>
+            {buildingFunctionText && <p>{buildingFunctionText}</p>}
+            {owned && <CityStatEffectsSummary title={t("city.buildingEffects")} effects={cityBuildingActiveStatEffects(building, buildingState.level)} />}
             {owned && (
               <div style={{ marginTop: 8 }}>
-                <b>Durability:</b> {(Math.floor(Number(buildingState.durability ?? DURABILITY_DEFAULT) * 100) / 100).toFixed(2)}%
+                <b>{t("city.durability")}:</b> {(Math.floor(Number(buildingState.durability ?? DURABILITY_DEFAULT) * 100) / 100).toFixed(2)}%
               </div>
             )}
             {owned && (
               <div style={{ marginTop: 6 }}>
-                <b>Repair cost:</b>
+                <b>{t("city.repairCost")}:</b>
                 <div className="city-area-costs" style={{ marginTop: 6 }}>
                   {(computeRepairCostEntries(building.cost ?? {}, Math.max(0, Math.ceil(100 - (buildingState.durability ?? DURABILITY_DEFAULT))))).length === 0 && (
-                    <span>Ingen resources kræves.</span>
+                    <span>{t("city.noResourcesRequired")}</span>
                   )}
                   {computeRepairCostEntries(building.cost ?? {}, Math.max(0, Math.ceil(100 - (buildingState.durability ?? DURABILITY_DEFAULT)))).map(([resourceId, amount]) => (
                     <span key={resourceId} className={buildingResourceAvailable(resourceId) >= amount ? "met" : "missing"}>
                       <CityCostIcon resourceId={resourceId} />
-                      {amount} {cityCostLabel(resourceId)} {buildingResourceAvailable(resourceId) !== undefined && `(${buildingResourceAvailable(resourceId)} available)`}
+                      {amount} {cityCostLabel(resourceId)} {buildingResourceAvailable(resourceId) !== undefined && `(${t("city.availableCount", { count: buildingResourceAvailable(resourceId) })})`}
                     </span>
                   ))}
                 </div>
@@ -4209,8 +4271,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
             )}
             {owned && nextBuildingLevel && (
               <div className="city-upgrade-summary">
-                <b>Next: Level {nextBuildingLevel.level}{nextBuildingLevel.title ? ` - ${nextBuildingLevel.title}` : ""}</b>
-                <CityStatEffectsSummary title="Adds" effects={nextBuildingLevel.statEffects} />
+                <b>{t("city.nextLevel", { level: nextBuildingLevel.level })}{nextBuildingLevel.title ? ` - ${nextBuildingLevel.title}` : ""}</b>
+                <CityStatEffectsSummary title={t("city.adds")} effects={nextBuildingLevel.statEffects} />
                 {nextBuildingLevelRequirementEntries.length > 0 && (
                   <div className="city-area-requirements city-building-requirements">
                     {nextBuildingLevelRequirementEntries.map((entry) => (
@@ -4271,12 +4333,12 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                 disabled={owned || Boolean(manualBuildingPurchaseDisabledReason) || !statRequirementsMet || !areaRequirementsMet || !parentAreaUnlocked}
                 title={!owned && manualBuildingPurchaseDisabledReason ? manualBuildingPurchaseDisabledReason : undefined}
               >
-                Buy
+                {t("action.buy")}
               </button>
               <button type="button" onClick={upgradeBuilding} disabled={!owned || !nextBuildingLevel || !canUpgradeBuilding}>
-                Upgrade
+                {t("action.upgrade")}
               </button>
-              <button type="button" onClick={() => repairBuilding()} disabled={(buildingState.durability ?? 100) >= 100}>Repair</button>
+              <button type="button" onClick={() => repairBuilding()} disabled={(buildingState.durability ?? 100) >= 100}>{t("action.repair")}</button>
             </div>
           </div>
         </div>}
@@ -4284,9 +4346,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         <main className={`city-popup-main ${activeStorageSection ? "storage-tab" : ""}`}>
           {activeBaseTab && (
             <section className="city-building-base-note">
-              <h4>{building.title}</h4>
-              <p>{building.functionText ?? building.help}</p>
-              {featureAddons.length > 0 && <span>{featureAddons.filter((addon) => purchasedAddons.has(addon.id)).length} / {featureAddons.length} addons active</span>}
+              <h4>{buildingTitle}</h4>
+              <p>{buildingFunctionText || buildingHelp}</p>
+              {featureAddons.length > 0 && <span>{t("city.addonsActive", { owned: featureAddons.filter((addon) => purchasedAddons.has(addon.id)).length, total: featureAddons.length })}</span>}
             </section>
           )}
           {!activeBaseTab && (
@@ -4294,8 +4356,8 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   {activeAddon && !activeAddonOwned && (
                     <section className="city-addon-purchase-panel">
                       <header>
-                        <h4>{activeAddon.title}</h4>
-                        <span>{activeAddon.help}</span>
+                        <h4>{localize(activeAddon, "title")}</h4>
+                        <span>{localize(activeAddon, "help")}</span>
                       </header>
                       {cityAreaRequirementEntries(activeAddon, progress).length > 0 && (
                         <div className="city-area-requirements city-building-requirements">
@@ -4312,15 +4374,15 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                         </p>
                       )}
                       <div className="city-addon-purchase-row">
-                        <b>Cost</b>
-                        <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText="Free" />
+                        <b>{t("ui.cost")}</b>
+                        <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText={t("city.free")} />
                         <button
                           type="button"
                           disabled={!cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).canBuy}
                           onClick={() => buyAddon(activeAddon)}
                           title={cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).reasons.join(" ") || undefined}
                         >
-                          Buy addon
+                          {t("city.buyAddon")}
                         </button>
                       </div>
                     </section>
@@ -4416,17 +4478,18 @@ function cityAddonIsUnlocked(addon, snapshot, cityStats = {}) {
   return required.every((questId) => completed.has(String(questId)));
 }
 
-function cityAddonLockText(addon, snapshot, cityStats = {}) {
+function cityAddonLockText(addon, snapshot, cityStats = {}, t = null) {
   if (cityAddonIsUnlocked(addon, snapshot, cityStats)) return "";
   if (addon?.unlock?.text) return addon.unlock.text;
   const statRequirementEntries = cityStatRequirementEntries(addon?.statRequirements ?? addon?.unlock?.statRequirements ?? addon?.unlock?.stats, cityStats);
   const missingStats = statRequirementEntries.filter((entry) => !entry.met).map((entry) => entry.label);
-  if (missingStats.length) return `Requires ${missingStats.join(", ")}`;
+  if (missingStats.length) return t ? t("city.addon.requires", { list: missingStats.join(", ") }) : `Requires ${missingStats.join(", ")}`;
   const required = addon?.unlock?.completedQuests ?? [];
   const completed = new Set((snapshot?.quests?.completed ?? []).map(String));
   const missing = required.filter((questId) => !completed.has(String(questId)));
-  if (!missing.length) return "Locked";
-  return `Requires ${missing.map((questId) => QUEST_DEFS[questId]?.title ?? questId).join(", ")}`;
+  if (!missing.length) return t ? t("status.locked") : "Locked";
+  const list = missing.map((questId) => QUEST_DEFS[questId]?.title ?? questId).join(", ");
+  return t ? t("city.addon.requires", { list }) : `Requires ${list}`;
 }
 
 function normalizeInventoryType(value) {
@@ -4462,6 +4525,7 @@ function cityInventorySections(building, state, owned) {
   if (baseInventory.type !== "none" && baseSlots > 0) {
     sections.push({
       key: "base",
+      source: building,
       label: building.title,
       type: baseInventory.type,
       typeLabel: cityInventoryTypeLabel(baseInventory.type),
@@ -4480,6 +4544,7 @@ function cityInventorySections(building, state, owned) {
     if (addonInventory.type === "none" || slots <= 0) continue;
     sections.push({
       key: cityInventorySectionKey(addon),
+      source: addon,
       label: addon.title,
       type: addonInventory.type,
       typeLabel: cityInventoryTypeLabel(addonInventory.type),
@@ -4951,6 +5016,7 @@ function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
 }
 
 function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costMultiplier = 1, onTrain }) {
+  const { localize } = useLocalization();
   const recipes = armyTrainingRecipesForAddon(addon?.id);
   const armyUnits = normalizeArmyUnits(progress?.armyUnits);
   const used = cityArmyUnitCount(armyUnits);
@@ -4959,7 +5025,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>{addon.title}</h4>
+        <h4>{localize(addon, "title")}</h4>
         <span>Soldiers {used} / {capacity} usable citizens</span>
         {trainingCostMultiplier !== 1 && <p>Recruitment costs x{trainingCostMultiplier.toFixed(2)} while Barracks are disrupted.</p>}
       </header>
@@ -4967,7 +5033,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
         <div className="blacksmith-row" key={`owned-${unitId}`}>
           {def.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
           <div>
-            <b>{def.label}</b>
+            <b>{localize(def, "label")}</b>
             <span>Owned: {armyUnits[unitId] ?? 0} | Power: {def.armyValue}</span>
           </div>
         </div>
@@ -4984,7 +5050,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
           <div className="blacksmith-row" key={recipe.id}>
             {def?.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
             <div>
-              <b>Train {def?.label ?? recipe.unitId}</b>
+              <b>Train {localize(def, "label") || recipe.unitId}</b>
               <div className="city-area-costs city-army-training-costs">
                 {costEntries.map(([resourceId, count]) => {
                   const available = cityCostAvailable(snapshot, resourceId, progress);
@@ -5009,6 +5075,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
 }
 
 function CityArmoryPanel({ inventory, progress, onConvert }) {
+  const { localize } = useLocalization();
   const points = cityArmoryPoints(progress);
   const convertibleItems = (inventory ?? [])
     .map((item, index) => ({ item, index }))
@@ -5039,7 +5106,7 @@ function CityArmoryPanel({ inventory, progress, onConvert }) {
           <div className="blacksmith-row armory-item-row" style={{ "--item-quality": rarityColor }} key={item.id ?? index}>
             <InventoryIcon iconSheet="items" iconUrl={item.iconUrl ?? iconUrl} />
             <div>
-              <b>{item.name ?? "Unnamed item"}</b>
+              <b>{localizeItemField(item, "name", localize) || "Unnamed item"}</b>
               <span><i>{rarityLabel}</i> | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? ` each, ${quantity} available` : ""}</span>
             </div>
             <button type="button" onClick={() => onConvert(index, 1)}>Convert</button>
@@ -5052,6 +5119,7 @@ function CityArmoryPanel({ inventory, progress, onConvert }) {
 }
 
 function CityStatEffectsSummary({ title, effects }) {
+  const { localize } = useLocalization();
   const entries = Object.entries(mergeCityStatEffects([effects]));
   if (!entries.length) return null;
   return (
@@ -5059,7 +5127,7 @@ function CityStatEffectsSummary({ title, effects }) {
       {title && <b>{title}</b>}
       <div>
         {entries.map(([statId, amount]) => (
-          <span className={amount >= 0 ? "positive" : "negative"} key={statId} title={cityStatLabel(statId)}>
+          <span className={amount >= 0 ? "positive" : "negative"} key={statId} title={localize(CITY_STAT_DEFS.find((entry) => entry.id === statId), "label") || cityStatLabel(statId)}>
             <CityStatIcon statId={statId} />
             <b>{amount >= 0 ? "+" : ""}{amount}</b>
           </span>
@@ -5070,6 +5138,7 @@ function CityStatEffectsSummary({ title, effects }) {
 }
 
 function CityCampStats({ cityStats }) {
+  const { localize } = useLocalization();
   const events = cityStats.events ?? {};
   const activeEntries = cityEventEntries(events, { includeRisk: true });
   return (
@@ -5079,12 +5148,12 @@ function CityCampStats({ cityStats }) {
         {activeEntries.length ? activeEntries.map((event) => (
           <span
             className={event.positive ? "positive" : "negative"}
-            title={event.detail ?? event.label}
+            title={localize(event, "detail") || localize(event, "label")}
             key={event.id}
           >
-            <b>{event.label}</b>
+            <b>{localize(event, "label")}</b>
             {event.positive ? <em>Positive</em> : Number(event.risk) > 0 ? <em>Risk {Math.round(Number(event.risk))}%</em> : null}
-            {event.detail ? <small>{event.detail}</small> : null}
+            {event.detail ? <small>{localize(event, "detail")}</small> : null}
           </span>
         )) : <span><b>Stable</b></span>}
       </div>
@@ -5093,16 +5162,17 @@ function CityCampStats({ cityStats }) {
   );
 }
 
-function factionStatusLabel(value) {
+function factionStatusLabel(value, t) {
   const rep = Number(value) || 0;
-  if (rep <= -50) return "Hostile";
-  if (rep <= -10) return "Distrust";
-  if (rep <= 9) return "Neutral";
-  if (rep <= 49) return "Friendly";
-  return "Allied";
+  if (rep <= -50) return t("city.faction.status.hostile");
+  if (rep <= -10) return t("city.faction.status.distrust");
+  if (rep <= 9) return t("city.faction.status.neutral");
+  if (rep <= 49) return t("city.faction.status.friendly");
+  return t("city.faction.status.allied");
 }
 
 function CityFactionPanel({ factionRep }) {
+  const { localize, t } = useLocalization();
   const rep = normalizeFactionRep(factionRep);
   return (
     <div className="city-faction-list">
@@ -5111,12 +5181,12 @@ function CityFactionPanel({ factionRep }) {
         return (
           <article className="city-faction-row" key={faction.id}>
             <div>
-              <b>{faction.label}</b>
-              <span>{faction.description}</span>
+              <b>{localize(faction, "label") || faction.label}</b>
+              <span>{localize(faction, "description") || faction.description}</span>
             </div>
-            <strong title={`Reputation ${value}`}>
+            <strong title={t("city.faction.reputationValue", { value })}>
               {value}
-              <em>{factionStatusLabel(value)}</em>
+              <em>{factionStatusLabel(value, t)}</em>
             </strong>
           </article>
         );
@@ -5207,6 +5277,7 @@ function CityStorageOverviewModal({
   onSortStoredItems,
   onClose,
 }) {
+  const { localize, t } = useLocalization();
   const backpackSlots = Array.from({ length: MAX_INVENTORY }, (_, index) => ({ item: inventory[index] ?? null, index }));
   const firstTargetForItem = (item) => {
     for (const entry of storageEntries) {
@@ -5218,18 +5289,18 @@ function CityStorageOverviewModal({
 
   return (
     <div className="city-storage-overview-backdrop" role="presentation">
-      <section className="city-storage-overview" role="dialog" aria-modal="true" aria-label="Inventory and storage">
+      <section className="city-storage-overview" role="dialog" aria-modal="true" aria-label={t("storage.title")}>
         <header>
           <div>
-            <h3>Inventory / Storage</h3>
-            <span>Traek items mellem backpack og byens inventories.</span>
+            <h3>{t("storage.title")}</h3>
+            <span>{t("storage.description")}</span>
           </div>
-          <button type="button" onClick={onClose}>X</button>
+          <button type="button" aria-label={t("ui.close")} title={t("ui.close")} onClick={onClose}>X</button>
         </header>
         <div className="city-storage-overview-body">
           <section className="city-storage-overview-panel backpack-drop">
             <div className="city-inventory-heading">
-              <h4>Back pack <span>{backpackSlots.filter(({ item }) => item).length} / {backpackUnlockedSlots}</span></h4>
+              <h4>{t("hud.backpack")} <span>{backpackSlots.filter(({ item }) => item).length} / {backpackUnlockedSlots}</span></h4>
               <InventorySortSelect onSort={onSortBackpack} />
             </div>
             <div
@@ -5289,16 +5360,16 @@ function CityStorageOverviewModal({
           <div className="city-storage-overview-panels">
             {storageEntries.length === 0 && (
               <section className="city-storage-overview-panel empty">
-                <h4>No city storage</h4>
-                <p>Bygninger skal have en inventoryType med slots for at blive vist her.</p>
+                <h4>{t("storage.noCityStorage")}</h4>
+                <p>{t("storage.noCityStorageDescription")}</p>
               </section>
             )}
             {storageEntries.map((entry) => (
               <section className="city-storage-overview-panel" key={`${entry.buildingId}-${entry.section.key}`}>
                 <div className="city-inventory-heading">
                   <h4>
-                    {entry.section.label}
-                    <span>{entry.building.title} | {entry.section.typeLabel} | {entry.items.filter(Boolean).length}/{entry.section.slots}</span>
+                    {localize(entry.section.source, "title") || entry.section.label}
+                    <span>{localize(entry.building, "title")} | {t(`storage.type.${entry.section.type}`)} | {entry.items.filter(Boolean).length}/{entry.section.slots}</span>
                   </h4>
                   {!entry.section.fixedDefs?.length && (
                     <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(entry.buildingId, entry.section.key, sortId)} />
@@ -5383,6 +5454,7 @@ function CityStoragePanel({
   onSortBackpack,
   onSortStoredItems,
 }) {
+  const { localize, t } = useLocalization();
   const sections = cityInventorySections(building, buildingState, owned);
   const activeSection = sections.find((section) => section.key === activeSectionKey) ?? sections[0];
   const inventories = normalizeCityInventories(buildingState, building);
@@ -5402,7 +5474,7 @@ function CityStoragePanel({
     <section className={`city-bank-panel ${disabled ? "occupation-disabled" : ""}`}>
       <div className="city-bank-column">
         <div className="city-inventory-heading">
-          <h4>Backpack <span>{inventory.filter(Boolean).length} / {backpackUnlockedSlots}</span></h4>
+          <h4>{t("hud.backpack")} <span>{inventory.filter(Boolean).length} / {backpackUnlockedSlots}</span></h4>
           <InventorySortSelect onSort={onSortBackpack} />
           <button 
             type="button" 
@@ -5410,7 +5482,7 @@ function CityStoragePanel({
             onClick={() => onTransferAllResources?.(activeSection.key)}
             style={{ padding: "4px 8px", fontSize: "12px" }}
           >
-            Overfør al
+            {t("storage.transferAll")}
           </button>
         </div>
         <div
@@ -5467,9 +5539,9 @@ function CityStoragePanel({
       </div>
       <div className="city-bank-column">
         <div className="city-inventory-heading">
-          <h4>{activeSection.label} <span>{activeSection.typeLabel}</span></h4>
+          <h4>{localize(activeSection.source, "title") || activeSection.label} <span>{t(`storage.type.${activeSection.type}`)}</span></h4>
           {disabled ? (
-            <span className="city-storage-disabled-badge" title={disabledText || "Clear the occupying mob to use this storage again."}>Occupied · Locked</span>
+            <span className="city-storage-disabled-badge" title={disabledText || t("storage.occupiedHelp")}>{t("storage.occupiedLocked")}</span>
           ) : !activeSection.fixedDefs?.length ? (
             <InventorySortSelect onSort={(sortId) => onSortStoredItems?.(activeSection.key, sortId)} />
           ) : null}

@@ -1,8 +1,11 @@
 import React, { useState } from "react";
 import { SPELL_DEFS } from "../../game/config/spell-config.js";
 import { QuestObjectiveMeta } from "../quests/quest-dialogs.jsx";
+import { useLocalization } from "../../i18n/index.js";
+import { localizeQuestField } from "../../i18n/quest-localization.js";
 
 export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
+  const { localize, renderTemplate, t } = useLocalization();
   const [tab, setTab] = useState("overview");
   const player = snapshot.player;
   const stats = snapshot.player.stats ?? {};
@@ -77,16 +80,16 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
   const destroyedRarity = detailEntries(stats.itemsDestroyedByRarity);
   return (
     <div className="confirm-backdrop" role="presentation">
-      <section className="hero-dialog" role="dialog" aria-modal="true" aria-label="Hero">
+      <section className="hero-dialog" role="dialog" aria-modal="true" aria-label={t("panel.hero.title")}>
         <header>
           <div className="hero-dialog-title">
             <img src="/assets/generated/ui_hero.png" alt="" />
             <div>
-              <h2>Hero</h2>
-              <span>{player.className ?? "Adventurer"} | Level {player.level} | XP {player.xp} / {player.nextXp}</span>
+              <h2>{t("panel.hero.title")}</h2>
+              <span>{player.className ?? "Adventurer"} | {t("ui.level")} {player.level} | {t("ui.xp")} {player.xp} / {player.nextXp}</span>
             </div>
           </div>
-          <button type="button" className="city-popup-close" onClick={onClose}>X</button>
+          <button type="button" className="city-popup-close" aria-label={t("ui.close")} title={t("ui.close")} onClick={onClose}>X</button>
         </header>
         <div className="hero-tabs" role="tablist" aria-label="Hero tabs">
           {["overview", "combat", "loot", "quests"].map((id) => (
@@ -102,7 +105,7 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
               <div className="hero-profile-copy">
                 <span>{player.className ?? "Adventurer"}</span>
                 <b>Level {player.level}</b>
-                <em>{player.activeSpellTitle ?? "No active spell"}</em>
+                <em>{localize(SPELL_DEFS[player.activeSpellId], "title") || player.activeSpellTitle || "No active spell"}</em>
               </div>
               <div className="hero-vital-bars" aria-label="Hero vitals">
                 <HeroBar label="HP" value={player.hp} max={player.maxHp} tone="health" />
@@ -126,7 +129,7 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
                 key={spellId}
                 onClick={() => onSelectSpell?.(spellId)}
               >
-                {SPELL_DEFS[spellId]?.title ?? spellId}
+                {localize(SPELL_DEFS[spellId], "title") || spellId}
               </button>
             ))}
           </div>
@@ -167,7 +170,7 @@ export function HeroDialog({ snapshot, onSelectSpell, onClose }) {
                 {(snapshot.quests?.active ?? []).map((quest) => (
                   <article className={`quest-card ${quest.complete ? "complete" : ""}`} key={quest.id}>
                     <header>
-                      <b>{quest.title}</b>
+                      <b>{localizeQuestField(quest, "title", localize, renderTemplate)}</b>
                       <span>{quest.progressText}</span>
                     </header>
                     <QuestObjectiveMeta quest={quest} compact />

@@ -115,6 +115,7 @@ export const CITY_MOB_BALANCE = {
 export const CITY_MOB_TYPE_EFFECTS = {
   Peasant: {
     label: "Angry peasants",
+    i18n: { da: { label: "Vrede bønder" } },
     tags: ["humanoid", "raider"],
     raidProfileId: "humanoid_raider",
     cityStats: { safety: -3, provision: -2, popularity: -2 },
@@ -122,6 +123,7 @@ export const CITY_MOB_TYPE_EFFECTS = {
   },
   Knight: {
     label: "Rogue knights",
+    i18n: { da: { label: "Lovløse riddere" } },
     tags: ["humanoid", "raider"],
     raidProfileId: "humanoid_raider",
     cityStats: { safety: -5, trade: -3, wealth: -2 },
@@ -129,6 +131,7 @@ export const CITY_MOB_TYPE_EFFECTS = {
   },
   Demon: {
     label: "Demonic incursion",
+    i18n: { da: { label: "Dæmonisk invasion" } },
     tags: ["demon", "corrupted"],
     raidProfileId: "corrupted_burn",
     cityStats: { safety: -5, faith: -4, health: -2 },
@@ -136,12 +139,14 @@ export const CITY_MOB_TYPE_EFFECTS = {
   },
   Skeleton: {
     label: "Restless dead",
+    i18n: { da: { label: "Rastløse døde" } },
     tags: ["undead"],
     cityStats: { safety: -4, faith: -3, health: -2 },
     pressureText: "Undead pressure strains city order, faith and public health.",
   },
   Wolf: {
     label: "Wolf pack",
+    i18n: { da: { label: "Ulveflok" } },
     tags: ["beast"],
     raidProfileId: "beast_food",
     cityStats: { safety: -4, provision: -3, trade: -1 },
@@ -149,6 +154,7 @@ export const CITY_MOB_TYPE_EFFECTS = {
   },
   Spider: {
     label: "Spider nest",
+    i18n: { da: { label: "Edderkopperede" } },
     tags: ["beast"],
     raidProfileId: "beast_food",
     cityStats: { health: -4, provision: -2, safety: -2 },
@@ -156,6 +162,7 @@ export const CITY_MOB_TYPE_EFFECTS = {
   },
   default: {
     label: "City threat",
+    i18n: { da: { label: "Trussel mod byen" } },
     tags: [],
     cityStats: { safety: -3 },
     pressureText: "This threat reduces city safety while it remains active.",
@@ -165,6 +172,7 @@ export const CITY_MOB_TYPE_EFFECTS = {
 export const CITY_MOB_OCCUPATION_PROFILES = {
   merchant_disruption: {
     label: "Merchant occupied",
+    i18n: { da: { label: "Merchant besat" } },
     buildingIds: ["merchant"],
     allowedMobTags: ["humanoid", "raider"],
     cityStats: { trade: -8, wealth: -5, safety: -3 },
@@ -180,6 +188,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   blacksmith_disruption: {
     label: "Blacksmith occupied",
+    i18n: { da: { label: "Blacksmith besat" } },
     buildingIds: ["blacksmith"],
     allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
     cityStats: { maintenance: -8, defense: -5 },
@@ -194,6 +203,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   inn_disruption: {
     label: "Inn occupied",
+    i18n: { da: { label: "Inn besat" } },
     buildingIds: ["inn"],
     allowedMobTags: ["humanoid", "raider", "beast", "undead"],
     cityStats: { popularity: -8, safety: -4, culture: -3 },
@@ -209,6 +219,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   town_hall_disruption: {
     label: "Town Hall occupied",
+    i18n: { da: { label: "Town Hall besat" } },
     buildingIds: ["town_hall"],
     allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
     cityStats: { popularity: -10, safety: -5, culture: -4 },
@@ -223,6 +234,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   sanctuary_disruption: {
     label: "Sanctuary occupied",
+    i18n: { da: { label: "Sanctuary besat" } },
     buildingIds: ["sanctuary"],
     allowedMobTags: ["undead", "demon", "corrupted", "humanoid"],
     cityStats: { faith: -10, culture: -4, health: -3 },
@@ -236,6 +248,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   barracks_disruption: {
     label: "Barracks occupied",
+    i18n: { da: { label: "Barracks besat" } },
     buildingIds: ["barracks", "armory"],
     allowedMobTags: ["humanoid", "raider", "demon", "corrupted"],
     cityStats: { defense: -10, safety: -4 },
@@ -249,6 +262,7 @@ export const CITY_MOB_OCCUPATION_PROFILES = {
   },
   storage_raid: {
     label: "Storage occupied",
+    i18n: { da: { label: "Storage besat" } },
     buildingIds: ["bank", "inn"],
     allowedMobTags: ["humanoid", "raider", "beast"],
     cityStats: { safety: -6, trade: -4 },
@@ -291,6 +305,7 @@ export const CITY_MOB_THEFT_CONFIG = {
 export const CITY_MOB_THEFT_PROFILES = {
   humanoid_raider: {
     label: "low",
+    i18n: { da: { label: "lav" } },
     mode: "steal",
     allowedItemTypes: ["resource", "equipment"],
     allowedResourceIds: [
@@ -309,6 +324,7 @@ export const CITY_MOB_THEFT_PROFILES = {
   },
   beast_food: {
     label: "low",
+    i18n: { da: { label: "lav" } },
     mode: "spoil",
     allowedItemTypes: ["resource"],
     allowedResourceIds: ["food", "meat", "fruit", "wheat", "ale"],
@@ -316,6 +332,7 @@ export const CITY_MOB_THEFT_PROFILES = {
   },
   corrupted_burn: {
     label: "low",
+    i18n: { da: { label: "lav" } },
     mode: "destroy",
     allowedItemTypes: ["resource"],
     allowedResourceIds: ["magic_essence", "crystal_piece", "crystal"],

@@ -5,21 +5,25 @@ export const CLASS_DEFS = {
     id: "adventurer",
     name: "Adventurer",
     description: "A flexible wanderer without a specialized class path.",
+    i18n: { da: { name: "Eventyrer", description: "En fleksibel omvandrende helt uden specialiseret class-vej." } },
     nodes: {},
   },
   warrior: {
     id: "warrior",
     name: "Warrior",
     description: "Armor, shields, and physical pressure.",
+    i18n: { da: { name: "Kriger", description: "Armor, skjolde og fysisk pres." } },
     nodes: {
       "warrior.base": {
         id: "warrior.base",
         title: "Warrior Training",
+        i18n: { da: { title: "Krigertræning" } },
         bonuses: { maxHp: 18, armorFlat: 3, physicalDamageBonus: 0.04 },
       },
       "warrior.shield_wall": {
         id: "warrior.shield_wall",
         title: "Shield Wall",
+        i18n: { da: { title: "Skjoldmur" } },
         requires: ["warrior.base"],
         requiresBuilding: "armory",
         requiresAddon: "melee_training",
@@ -31,15 +35,18 @@ export const CLASS_DEFS = {
     id: "ranger",
     name: "Ranger",
     description: "Range, critical hits, and toxins.",
+    i18n: { da: { name: "Ranger", description: "Rækkevidde, kritiske træf og toksiner." } },
     nodes: {
       "ranger.base": {
         id: "ranger.base",
         title: "Ranger Training",
+        i18n: { da: { title: "Rangertræning" } },
         bonuses: { range: 0.2, critChance: 0.02, poisonDamageBonus: 0.04 },
       },
       "ranger.ranged_training": {
         id: "ranger.ranged_training",
         title: "Ranged Training",
+        i18n: { da: { title: "Ranged-træning" } },
         requires: ["ranger.base"],
         requiresAddon: "ranged_training",
         bonuses: { range: 0.15, directDamageBonus: 0.03 },
@@ -50,15 +57,18 @@ export const CLASS_DEFS = {
     id: "mage",
     name: "Mage",
     description: "Spell power and elemental control.",
+    i18n: { da: { name: "Magiker", description: "Spellkraft og elementær kontrol." } },
     nodes: {
       "mage.base": {
         id: "mage.base",
         title: "Mage Training",
+        i18n: { da: { title: "Magikertræning" } },
         bonuses: { magic: 4, maxMana: 18, spellDamageBonus: 0.04 },
       },
       "mage.frost_adept": {
         id: "mage.frost_adept",
         title: "Frost Adept",
+        i18n: { da: { title: "Frostadept" } },
         requires: ["mage.base"],
         requiresBuilding: "mage_tower",
         bonuses: { iceDamageBonus: 0.06, iceResist: 8, areaDamageBonus: 0.03 },
@@ -66,6 +76,7 @@ export const CLASS_DEFS = {
       "mage.arcane_study": {
         id: "mage.arcane_study",
         title: "Arcane Study",
+        i18n: { da: { title: "Arkanstudie" } },
         requires: ["mage.base"],
         requiresAddon: "arcane_archive",
         bonuses: { arcaneDamageBonus: 0.05, spellDamageBonus: 0.02 },
@@ -76,15 +87,18 @@ export const CLASS_DEFS = {
     id: "cleric",
     name: "Cleric",
     description: "Resilience and holy force.",
+    i18n: { da: { name: "Kleriker", description: "Robusthed og hellig kraft." } },
     nodes: {
       "cleric.base": {
         id: "cleric.base",
         title: "Cleric Training",
+        i18n: { da: { title: "Klerikertræning" } },
         bonuses: { allResist: 3, holyDamageBonus: 0.05, maxMana: 10 },
       },
       "cleric.holy_training": {
         id: "cleric.holy_training",
         title: "Holy Training",
+        i18n: { da: { title: "Hellig træning" } },
         requires: ["cleric.base"],
         requiresBuilding: "sanctuary",
         bonuses: { holyDamageBonus: 0.05, allResist: 2 },
@@ -95,15 +109,18 @@ export const CLASS_DEFS = {
     id: "rogue",
     name: "Rogue",
     description: "Avoidance, speed, and critical bursts.",
+    i18n: { da: { name: "Slyngel", description: "Undvigelse, fart og kritiske udbrud." } },
     nodes: {
       "rogue.base": {
         id: "rogue.base",
         title: "Rogue Training",
+        i18n: { da: { title: "Slyngeltræning" } },
         bonuses: { dodgeChance: 0.02, critDamage: 0.12, attackSpeed: 0.03 },
       },
       "rogue.shadow_training": {
         id: "rogue.shadow_training",
         title: "Shadow Training",
+        i18n: { da: { title: "Skyggetræning" } },
         requires: ["rogue.base"],
         requiresBuilding: "library",
         bonuses: { shadowDamageBonus: 0.05, dodgeChance: 0.01 },
@@ -114,15 +131,18 @@ export const CLASS_DEFS = {
     id: "warden",
     name: "Warden",
     description: "Nature magic and durable survival.",
+    i18n: { da: { name: "Skovvogter", description: "Naturmagi og robust overlevelse." } },
     nodes: {
       "warden.base": {
         id: "warden.base",
         title: "Warden Training",
+        i18n: { da: { title: "Skovvogtertræning" } },
         bonuses: { natureDamageBonus: 0.05, poisonResist: 8, natureResist: 5, maxHp: 10 },
       },
       "warden.nature_training": {
         id: "warden.nature_training",
         title: "Nature Training",
+        i18n: { da: { title: "Naturtræning" } },
         requires: ["warden.base"],
         requiresBuilding: "farm",
         bonuses: { natureDamageBonus: 0.05, natureResist: 5 },

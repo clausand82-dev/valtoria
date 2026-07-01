@@ -76,6 +76,7 @@ import { CITY_STORAGE_KEY, regionStatusKey } from "./save/save-keys.js";
 import { QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
 import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { InventoryItemDetail } from "./inventory/inventory-item-detail.jsx";
+import { localizeItemField, useLocalization } from "../i18n/index.js";
 import { mapRegionColor } from "./map/map-dialogs.jsx";
 import { emptySnapshot } from "./app-snapshot.js";
 
@@ -104,6 +105,7 @@ function cityHoverPanelStyle(pointer) {
 
 
 function CityItemName({ item, equipment = [] }) {
+  const { localize } = useLocalization();
   if (!item) return null;
   const [hoverPointer, setHoverPointer] = useState(null);
   const className = item.mode === "resource" ? "resource-rarity" : item.rarity ?? "";
@@ -117,7 +119,7 @@ function CityItemName({ item, equipment = [] }) {
         onMouseMove={(event) => setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 })}
         onMouseLeave={() => setHoverPointer(null)}
       >
-        {item.name}
+        {localizeItemField(item, "name", localize)}
       </b>
       {hoverStyle && (
         <aside className="item-hover-panel is-floating city-item-hover-panel" style={hoverStyle} aria-hidden="true">

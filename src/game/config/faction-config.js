@@ -3,6 +3,7 @@ export const FACTIONS = {
     id: "village_outskirt",
     label: "Village Outskirt",
     description: "The struggling settlement where the hero's journey begins.",
+    i18n: { da: { label: "Landsbyudkant", description: "Den pressede bosaetning, hvor heltens rejse begynder." } },
     defaultRep: 0,
   },
 
@@ -10,6 +11,7 @@ export const FACTIONS = {
     id: "eldiria_court",
     label: "Eldiria's Court",
     description: "The southern elven court loyal to Eldiria and the protection of Elvindalen.",
+    i18n: { da: { label: "Eldirias Hof", description: "Det sydlige elverhof loyalt mod Eldiria og beskyttelsen af Elvindalen." } },
     defaultRep: 0,
   },
 
@@ -17,6 +19,7 @@ export const FACTIONS = {
     id: "life_tree_guardians",
     label: "Life Tree Guardians",
     description: "Protectors of the Life Tree and the light balance of Elvindalen.",
+    i18n: { da: { label: "Livstraeets Vogtere", description: "Beskyttere af Livstraeet og den lyse balance i Elvindalen." } },
     defaultRep: 0,
   },
 
@@ -24,6 +27,7 @@ export const FACTIONS = {
     id: "sunken_city",
     label: "The Sunken City",
     description: "Remnants, survivors, and forces tied to the flooded northern city.",
+    i18n: { da: { label: "Den Sankede By", description: "Rester, overlevende og kraefter knyttet til den oversvoemmede nordlige by." } },
     defaultRep: 0,
   },
 
@@ -31,6 +35,7 @@ export const FACTIONS = {
     id: "nethrendor_regime",
     label: "Nethrendor's Regime",
     description: "Nethrendor's soldiers, servants, spies, and corrupted forces.",
+    i18n: { da: { label: "Nethrendors Regime", description: "Nethrendors soldater, tjenere, spioner og korrumperede kraefter." } },
     defaultRep: 0,
   },
 
@@ -38,6 +43,7 @@ export const FACTIONS = {
     id: "tornvalhed_trolls",
     label: "Tornvalhed Trolls",
     description: "The troll remnants and clans tied to Tornvalhed.",
+    i18n: { da: { label: "Tornvalhed-trolde", description: "Trolderesterne og klanerne knyttet til Tornvalhed." } },
     defaultRep: 0,
   },
 
@@ -45,6 +51,7 @@ export const FACTIONS = {
     id: "wilds",
     label: "The Wilds",
     description: "Natural hostile wildlife and wilderness creatures.",
+    i18n: { da: { label: "Vildnisset", description: "Naturligt fjendtligt dyreliv og vaesner fra vildmarken." } },
     defaultRep: 0,
     hidden: true,
   },
@@ -53,6 +60,7 @@ export const FACTIONS = {
     id: "corrupted_wilds",
     label: "Corrupted Wilds",
     description: "Wild creatures affected by corruption, dark magic, or Net'dra'thot.",
+    i18n: { da: { label: "Korrumperet Vildnis", description: "Vilde vaesner paavirket af korruption, moerk magi eller Net'dra'thot." } },
     defaultRep: 0,
     hidden: true,
   },

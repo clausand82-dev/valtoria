@@ -527,22 +527,49 @@ function cityMobSpreadChance(mob) {
   return Number(CITY_MOB_BALANCE.spreadChanceByLevel?.[level] ?? CITY_MOB_LEVELS[level]?.spreadChance ?? 0) || 0;
 }
 
-function cityMobEscalationText(mob) {
+function cityMobTranslate(t, key, params, fallback) {
+  if (typeof t === "function") return t(key, params);
+  if (!fallback) return "";
+  return String(fallback).replace(/\{([^{}]+)\}/g, (_, name) => (params?.[name] == null ? `{${name}}` : String(params[name])));
+}
+
+const CITY_MOB_CONSEQUENCE_TEXT_KEYS = Object.freeze({
+  "Merchant stock reduced": "city.mob.consequence.merchantStockReduced",
+  "Worse buy and sell prices": "city.mob.consequence.worseTradePrices",
+  "Repairs cost more": "city.mob.consequence.repairsCostMore",
+  "Crafting pressure increased": "city.mob.consequence.craftingPressureIncreased",
+  "Rumor Board disabled": "city.mob.consequence.rumorBoardDisabled",
+  "Main Chest transfers blocked": "city.mob.consequence.mainChestBlocked",
+  "Popularity pressure increased": "city.mob.consequence.popularityPressureIncreased",
+  "Policy changes blocked": "city.mob.consequence.policyChangesBlocked",
+  "Civic quest board disrupted": "city.mob.consequence.civicQuestBoardDisrupted",
+  "Sanctuary donations are weakened": "city.mob.consequence.sanctuaryDonationsWeakened",
+  "Faith pressure increased": "city.mob.consequence.faithPressureIncreased",
+  "Army recruitment costs more": "city.mob.consequence.armyRecruitmentCostsMore",
+  "Defense pressure increased": "city.mob.consequence.defensePressureIncreased",
+  "Occupied storage can be viewed but not used": "city.mob.consequence.occupiedStorageViewOnly",
+  "City storage can be raided each visit": "city.mob.consequence.cityStorageRaidedEachVisit",
+  "Stored quest and unique items are protected": "city.mob.consequence.storedQuestItemsProtected",
+});
+
+function cityMobEscalationText(mob, t = null) {
   const visitsActive = Math.max(0, Math.floor(Number(mob?.visitsActive) || 0));
   const minLevel = Math.max(0, Math.floor(Number(CITY_MOB_BALANCE.minVisitsBeforeLevelUp) || 0));
   const minSpread = Math.max(0, Math.floor(Number(CITY_MOB_BALANCE.minVisitsBeforeSpread) || 0));
   const levelChance = Math.round((Number(CITY_MOB_BALANCE.levelUpChancePerVisit) || CITY_MOB_LEVEL_UP_CHANCE) * 100);
   const spreadChance = Math.round(cityMobSpreadChance(mob) * 100);
-  const levelText = visitsActive < minLevel ? `level-up after ${minLevel - visitsActive} more visit` : `${levelChance}% level-up per visit`;
+  const levelText = visitsActive < minLevel
+    ? cityMobTranslate(t, "city.mob.escalation.levelUpAfter", { count: minLevel - visitsActive }, "level-up after {count} more visit")
+    : cityMobTranslate(t, "city.mob.escalation.levelUpPerVisit", { chance: levelChance }, "{chance}% level-up per visit");
   const spreadText = Math.max(1, Math.floor(Number(mob?.level) || 1)) < 3
-    ? "spread starts at level 3"
+    ? cityMobTranslate(t, "city.mob.escalation.spreadStartsAtLevel3", {}, "spread starts at level 3")
     : visitsActive < minSpread
-      ? `spread after ${minSpread - visitsActive} more visit`
-      : `${spreadChance}% spread per visit`;
-  return `${levelText}; ${spreadText}`;
+      ? cityMobTranslate(t, "city.mob.escalation.spreadAfter", { count: minSpread - visitsActive }, "spread after {count} more visit")
+      : cityMobTranslate(t, "city.mob.escalation.spreadPerVisit", { chance: spreadChance }, "{chance}% spread per visit");
+  return cityMobTranslate(t, "city.mob.escalation.join", { levelText, spreadText }, "{levelText}; {spreadText}");
 }
 
-function cityMobDurabilityThreatText(mob) {
+function cityMobDurabilityThreatText(mob, t = null) {
   const targetAreaId = CITY_SPAWN_AREA_BUILDING_TARGETS[mob?.areaId];
   if (!targetAreaId) return "";
   const target = CITY_AREAS.find((entry) => entry.id === targetAreaId);
@@ -551,16 +578,38 @@ function cityMobDurabilityThreatText(mob) {
   if (multiplier <= 0) return "";
   const baseDamage = Number(CITY_MOB_BALANCE.durabilityDamagePerLevelPct ?? CITY_MOB_DAMAGE_PER_LEVEL_PCT) || 0;
   const damage = baseDamage * Math.max(1, Number(mob?.level) || 1) * Math.max(1, Number(mob?.count) || 1) * multiplier;
-  return `${target?.title ?? targetAreaId} durability -${damage.toFixed(2)}% per visit`;
+  return cityMobTranslate(
+    t,
+    "city.mob.durabilityThreat",
+    { target: target?.title ?? targetAreaId, damage: damage.toFixed(2) },
+    "{target} durability -{damage}% per visit",
+  );
 }
 
-function cityMobRecoveryText(mob) {
-  const durabilityThreat = cityMobDurabilityThreatText(mob);
+function cityMobRecoveryText(mob, t = null) {
+  const durabilityThreat = cityMobDurabilityThreatText(mob, t);
   const occupation = cityMobOccupationEntry(mob);
-  if (occupation) return "Clearing this threat restores the occupied city function. Any storage already lost stays lost.";
+  if (occupation) {
+    return cityMobTranslate(
+      t,
+      "city.mob.recovery.occupied",
+      {},
+      "Clearing this threat restores the occupied city function. Any storage already lost stays lost.",
+    );
+  }
   return durabilityThreat
-    ? "Clearing this threat removes its stat penalties. Durability damage already done must still be repaired."
-    : "Clearing this threat immediately restores its city stat penalties.";
+    ? cityMobTranslate(
+      t,
+      "city.mob.recovery.durability",
+      {},
+      "Clearing this threat removes its stat penalties. Durability damage already done must still be repaired.",
+    )
+    : cityMobTranslate(
+      t,
+      "city.mob.recovery.penalties",
+      {},
+      "Clearing this threat immediately restores its city stat penalties.",
+    );
 }
 
 function cityMobTags(mobOrType) {
@@ -618,21 +667,28 @@ function cityMobOccupationForArea(progress = {}, areaId) {
   return cityMobOccupationEntries(progress).find((entry) => String(entry.mob.occupiedAreaId ?? "") === id) ?? null;
 }
 
-function cityMobOccupationConsequences(mob) {
+function cityMobOccupationConsequences(mob, t = null) {
   const entry = cityMobOccupationEntry(mob);
   if (!entry) return [];
   const consequences = Array.isArray(entry.profile.consequences) ? entry.profile.consequences : [];
-  const raidText = cityMobTheftRiskText(mob);
-  return raidText ? [...consequences, `Theft risk: ${raidText}`] : consequences;
+  const translated = consequences.map((text) => {
+    const key = CITY_MOB_CONSEQUENCE_TEXT_KEYS[text];
+    return key ? cityMobTranslate(t, key, {}, text) : text;
+  });
+  const raidText = cityMobTheftRiskText(mob, t);
+  return raidText
+    ? [...translated, cityMobTranslate(t, "city.mob.consequence.theftRisk", { risk: raidText }, "Theft risk: {risk}")]
+    : translated;
 }
 
-function cityMobTheftRiskText(mob) {
+function cityMobTheftRiskText(mob, t = null) {
   const raidProfileId = mob?.raidProfileId ?? cityMobTypeEffectDef(mob?.mobType).raidProfileId;
   const profile = CITY_MOB_THEFT_PROFILES?.[raidProfileId];
   if (!profile) return "";
   const occupation = cityMobOccupationEntry(mob);
   if (!occupation?.profile?.runtimeModifiers?.storageRaidEnabled && occupation?.profileId !== "storage_raid") return "";
-  return profile.label ?? "low";
+  const label = String(profile.label ?? "low").toLowerCase();
+  return cityMobTranslate(t, `city.mob.theftRisk.${label}`, {}, profile.label ?? "low");
 }
 
 function cityMobOccupationStatPenalties(progress = {}) {
@@ -669,9 +725,11 @@ function mergeRuntimeModifierValues(target, source = {}) {
   return target;
 }
 
-function cityMobOccupationStatusText(mob) {
+function cityMobOccupationStatusText(mob, t = null) {
   const occupation = cityMobOccupationEntry(mob);
-  if (occupation) return `Occupying: ${occupation.targetLabel}`;
+  if (occupation) {
+    return cityMobTranslate(t, "city.mob.status.occupying", { target: occupation.targetLabel }, "Occupying: {target}");
+  }
   if (mob?.breachState === "inside") {
     const building = mob.occupiedBuildingId
       ? CITY_BUILDINGS.find((entry) => entry.id === mob.occupiedBuildingId)
@@ -680,9 +738,13 @@ function cityMobOccupationStatusText(mob) {
       ? CITY_AREAS.find((entry) => entry.id === mob.occupiedAreaId)
       : null;
     const targetLabel = building?.title ?? area?.title;
-    return targetLabel ? `Occupying: ${targetLabel}` : "Inside the city";
+    return targetLabel
+      ? cityMobTranslate(t, "city.mob.status.occupying", { target: targetLabel }, "Occupying: {target}")
+      : cityMobTranslate(t, "city.mob.status.insideCity", {}, "Inside the city");
   }
-  return cityMobZoneKind(mob?.areaId) === "close" ? "At the city wall" : "Outside the city";
+  return cityMobZoneKind(mob?.areaId) === "close"
+    ? cityMobTranslate(t, "city.mob.status.atCityWall", {}, "At the city wall")
+    : cityMobTranslate(t, "city.mob.status.outsideCity", {}, "Outside the city");
 }
 
 function pickCityBattleRegion(mobType, mapSize = "small", areaId = null, target = {}) {

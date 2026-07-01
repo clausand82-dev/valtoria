@@ -1,6 +1,7 @@
 export const CITY_ARMY_UNIT_DEFS = {
   peasant: {
     label: "Peasant",
+    i18n: { da: { label: "Bonde" } },
     imageUrl: "",
     category: "melee",
     populationCost: 1,
@@ -13,6 +14,7 @@ export const CITY_ARMY_UNIT_DEFS = {
   
   sword_soldier: {
     label: "Sword Soldier",
+    i18n: { da: { label: "Sværdkæmper" } },
     imageUrl: "",
     category: "melee",
     populationCost: 1,
@@ -24,6 +26,7 @@ export const CITY_ARMY_UNIT_DEFS = {
   },
   spear_soldier: {
     label: "Spear Soldier",
+    i18n: { da: { label: "Spydkæmper" } },
     imageUrl: "",
     category: "melee",
     populationCost: 1,
@@ -35,6 +38,7 @@ export const CITY_ARMY_UNIT_DEFS = {
   },
   archer_soldier: {
     label: "Archer Soldier",
+    i18n: { da: { label: "Bueskytte" } },
     imageUrl: "",
     category: "ranged",
     populationCost: 1,
@@ -46,6 +50,7 @@ export const CITY_ARMY_UNIT_DEFS = {
   },
   crossbow_soldier: {
     label: "Crossbow Soldier",
+    i18n: { da: { label: "Armbrøstskytte" } },
     imageUrl: "",
     category: "ranged",
     populationCost: 1,
@@ -57,6 +62,7 @@ export const CITY_ARMY_UNIT_DEFS = {
   },
     james_gray: {
     label: "Legendary James Gray",
+    i18n: { da: { label: "Legendariske James Gray" } },
     imageUrl: "",
     category: "melee",
     populationCost: 1,

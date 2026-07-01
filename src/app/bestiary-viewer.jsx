@@ -6,6 +6,7 @@ import {
   bestiaryStatRows,
   getBestiaryEntries,
 } from "../game/bestiary.js";
+import { useLocalization } from "../i18n/index.js";
 
 const STAGE_LABELS = {
   unknown: "Ukendt",
@@ -47,6 +48,7 @@ function MonsterSpriteCanvas({ monsterId, seen }) {
 }
 
 function BestiaryBookModal({ entry, onClose }) {
+  const { language, t } = useLocalization();
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === "Escape") onClose?.();
@@ -56,15 +58,22 @@ function BestiaryBookModal({ entry, onClose }) {
   }, [onClose]);
 
   if (!entry) return null;
-  const { def, discovery, id, stage, stats } = entry;
-  const library = def.library ?? {};
+  const { catalogEntry, discovery, id, stage, stats } = entry;
+  const library = catalogEntry;
   const seen = stage !== "unknown";
   const fought = stage === "fought" || stage === "killed";
   const killed = stage === "killed";
   const statRows = bestiaryStatRows(stats);
-  const metadataRows = bestiaryMetadataRows(entry);
+  const metadataRows = bestiaryMetadataRows(entry, language);
   const regionRows = bestiaryRegionRows(discovery);
-  const loreText = String(library.text ?? "Feltstudierne er endnu sparsomme, men vaesenet er nu identificeret.").trim();
+  const loreText = library.text;
+  const labels = language === "da" ? {
+    unknown: "Ukendt væsen", locked: "Denne side er låst. Find væsenet i vildmarken for at begynde noterne.",
+    habitat: "Levested", strengths: "Styrker", weaknesses: "Svagheder",
+  } : {
+    unknown: "Unknown creature", locked: "This page is locked. Find the creature in the wild to begin the notes.",
+    habitat: "Habitat", strengths: "Strengths", weaknesses: "Weaknesses",
+  };
 
   return (
     <div className="confirm-backdrop" role="presentation">
@@ -80,8 +89,8 @@ function BestiaryBookModal({ entry, onClose }) {
             <article className="bestiary-book-page">
               {!seen ? (
                 <>
-                  <h4 id="bestiary-title">Ukendt vaesen</h4>
-                  <p>Denne side er laast. Find vaesenet i vildmarken for at begynde noterne.</p>
+                  <h4 id="bestiary-title">{labels.unknown}</h4>
+                  <p>{labels.locked}</p>
                 </>
               ) : (
                 <>
@@ -97,16 +106,16 @@ function BestiaryBookModal({ entry, onClose }) {
                   {fought && (
                     <>
                       <p>{loreText}</p>
-                      {library.habitatText && <p><b>Habitat:</b> {library.habitatText}</p>}
+                      {library.habitatText && <p><b>{labels.habitat}:</b> {library.habitatText}</p>}
                       {Array.isArray(library.strengths) && library.strengths.length > 0 && (
                         <div className="bestiary-chip-group">
-                          <b>Styrker</b>
+                          <b>{labels.strengths}</b>
                           {library.strengths.map((item) => <span key={item}>{item}</span>)}
                         </div>
                       )}
                       {Array.isArray(library.weaknesses) && library.weaknesses.length > 0 && (
                         <div className="bestiary-chip-group weak">
-                          <b>Svagheder</b>
+                          <b>{labels.weaknesses}</b>
                           {library.weaknesses.map((item) => <span key={item}>{item}</span>)}
                         </div>
                       )}
@@ -152,7 +161,7 @@ function BestiaryBookModal({ entry, onClose }) {
           </div>
           <div className="readable-controls">
             <div />
-            <button type="button" onClick={onClose}>Close</button>
+            <button type="button" onClick={onClose}>{t("ui.close")}</button>
           </div>
         </div>
       </section>
@@ -161,17 +170,18 @@ function BestiaryBookModal({ entry, onClose }) {
 }
 
 export function BestiaryViewer({ worldState }) {
-  const entries = useMemo(() => getBestiaryEntries(worldState), [worldState]);
+  const { language, t } = useLocalization();
+  const entries = useMemo(() => getBestiaryEntries(worldState, language), [worldState, language]);
   const [openEntryId, setOpenEntryId] = useState(null);
   const openEntry = entries.find((entry) => entry.id === openEntryId) ?? null;
 
   return (
     <section className="blacksmith-station bestiary-panel">
       <header>
-        <h4>Bestiary</h4>
+        <h4>{t("panel.bestiary.title")}</h4>
         <span>{entries.length} vaesener fra monster-config</span>
       </header>
-      <div className="bestiary-list" role="listbox" aria-label="Bestiary entries">
+      <div className="bestiary-list" role="listbox" aria-label={t("panel.bestiary.title")}>
         {entries.map((entry) => {
           const seen = entry.stage !== "unknown";
           return (

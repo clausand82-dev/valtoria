@@ -2,6 +2,7 @@ export const QUEST_NPCS = {
   mayor: {
     name: "Mayor",
     title: "Mayor",
+    i18n: { da: { title: "Borgmester" } },
     imageUrl: "/assets/generated/npc/npc_mayor.png",
     cityLocation: "town_center",
     cityHint: "Ved byens midte",
@@ -14,6 +15,7 @@ export const QUEST_NPCS = {
   blacksmith: {
     name: "Traver",
     title: "Blacksmith",
+    i18n: { da: { title: "Smed" } },
     imageUrl: "/assets/generated/npc/npc_blacksmith.png",
     cityLocation: "blacksmith",
     cityHint: "Ved blacksmith i byen",
@@ -22,6 +24,7 @@ export const QUEST_NPCS = {
   farmer: {
     name: "Willis",
     title: "Farmer",
+    i18n: { da: { title: "Bonde" } },
     imageUrl: "/assets/generated/npc/npc_farmer.png",
     cityLocation: "farm",
     cityHint: "Ved farmen i byen",
@@ -30,6 +33,7 @@ export const QUEST_NPCS = {
   hunter: {
     name: "Y'atho",
     title: "Hunter",
+    i18n: { da: { title: "Jaeger" } },
     imageUrl: "/assets/generated/npc/npc_hunter.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -38,6 +42,7 @@ export const QUEST_NPCS = {
   innkeeper: {
     name: "Oliver",
     title: "Innkeeper",
+    i18n: { da: { title: "Krovaert" } },
     imageUrl: "/assets/generated/npc/npc_innkeeper.png",
     cityLocation: "inn",
     cityHint: "Ved inn i byen",
@@ -46,6 +51,7 @@ export const QUEST_NPCS = {
   mage: {
     name: "Darium",
     title: "Mage",
+    i18n: { da: { title: "Magiker" } },
     imageUrl: "/assets/generated/npc/npc_mage.png",
     cityLocation: "mage_tower",
     cityHint: "Ved mage tower i byen",
@@ -54,6 +60,7 @@ export const QUEST_NPCS = {
   merchant: {
     name: "Elis",
     title: "Merchant",
+    i18n: { da: { title: "Koebmand" } },
     imageUrl: "/assets/generated/npc/npc_merchant.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -62,6 +69,7 @@ export const QUEST_NPCS = {
   noble: {
     name: "Turanios",
     title: "Noble",
+    i18n: { da: { title: "Adelig" } },
     imageUrl: "/assets/generated/npc/npc_noble.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -70,6 +78,7 @@ export const QUEST_NPCS = {
   soldier: {
     name: "Himus",
     title: "Soldier",
+    i18n: { da: { title: "Soldat" } },
     imageUrl: "/assets/generated/npc/npc_soldier.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -78,6 +87,7 @@ export const QUEST_NPCS = {
   wiseman: {
     name: "Vitlias",
     title: "Wiseman",
+    i18n: { da: { title: "Vismand" } },
     imageUrl: "/assets/generated/npc/npc_wiseman.png",
     cityLocation: "library",
     cityHint: "Ved library i byen",
@@ -86,6 +96,7 @@ export const QUEST_NPCS = {
   captain: {
     name: "Kaptajn Varlo",
     title: "Captain",
+    i18n: { da: { title: "Kaptajn" } },
     imageUrl: "/assets/generated/npc/npc_captain.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -93,7 +104,8 @@ export const QUEST_NPCS = {
   },
   begger: {
     name: "Tigger",
-    title: "Begger",
+    title: "Beggar",
+    i18n: { da: { title: "Tigger" } },
     imageUrl: "/assets/generated/npc/npc_begger.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -102,6 +114,7 @@ export const QUEST_NPCS = {
   cook: {
     name: "Marla",
     title: "Cook",
+    i18n: { da: { title: "Kok" } },
     imageUrl: "/assets/generated/npc/npc_cook.png",
     cityLocation: "inn",
     cityHint: "Ved inn i byen",
@@ -110,6 +123,7 @@ export const QUEST_NPCS = {
   creature: {
     name: "O'la-chan",
     title: "Creature",
+    i18n: { da: { title: "Skabning" } },
     imageUrl: "/assets/generated/npc/npc_creature.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -118,6 +132,7 @@ export const QUEST_NPCS = {
   lady: {
     name: "Annelise",
     title: "Lady",
+    i18n: { da: { title: "Dame" } },
     imageUrl: "/assets/generated/npc/npc_lady.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -126,6 +141,7 @@ export const QUEST_NPCS = {
   oneleggedman: {
     name: "Enben",
     title: "Onelegged Man",
+    i18n: { da: { title: "Enbenet mand" } },
     imageUrl: "/assets/generated/npc/npc_oneleggedman.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -134,6 +150,7 @@ export const QUEST_NPCS = {
   poorboy: {
     name: "Jory",
     title: "Poor Boy",
+    i18n: { da: { title: "Fattig dreng" } },
     imageUrl: "/assets/generated/npc/npc_poorboy.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -142,6 +159,7 @@ export const QUEST_NPCS = {
   sailor: {
     name: "Svend",
     title: "Sailor",
+    i18n: { da: { title: "Soemand" } },
     imageUrl: "/assets/generated/npc/npc_sailor.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -150,6 +168,7 @@ export const QUEST_NPCS = {
   darkwizard: {
     name: "Morthen",
     title: "Dark Wizard",
+    i18n: { da: { title: "Mork troldmand" } },
     imageUrl: "/assets/generated/npc/npc_darkwizard.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -158,6 +177,7 @@ export const QUEST_NPCS = {
   dwarf: {
     name: "Brom",
     title: "Dwarf",
+    i18n: { da: { title: "Dvaerg" } },
     imageUrl: "/assets/generated/npc/npc_dwarf.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -166,6 +186,7 @@ export const QUEST_NPCS = {
   eldiria: {
     name: "Eldiria",
     title: "High Seer",
+    i18n: { da: { title: "Hojseer" } },
     imageUrl: "/assets/generated/npc/npc_eldiria.png",
     citySpawn: false,
     cityLocation: "random",
@@ -174,7 +195,8 @@ export const QUEST_NPCS = {
   },
   elver: {
     name: "Caelen",
-    title: "Elver",
+    title: "Elf",
+    i18n: { da: { title: "Elver" } },
     imageUrl: "/assets/generated/npc/npc_elver.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -182,7 +204,8 @@ export const QUEST_NPCS = {
   },
   elvera: {
     name: "Elvera",
-    title: "Warden",
+    title: "Elf",
+    i18n: { da: { title: "Skovvogter" } },
     imageUrl: "/assets/generated/npc/npc_elvera.png",
     citySpawn: false,
     cityLocation: "random",
@@ -192,6 +215,7 @@ export const QUEST_NPCS = {
   farmer2: {
     name: "Bertil",
     title: "Farmer",
+    i18n: { da: { title: "Bonde" } },
     imageUrl: "/assets/generated/npc/npc_farmer2.png",
     cityLocation: "farm",
     cityHint: "Ved farmen i byen",
@@ -200,6 +224,7 @@ export const QUEST_NPCS = {
   foldrik: {
     name: "Foldrik",
     title: "Pathfinder",
+    i18n: { da: { title: "Spejder" } },
     imageUrl: "/assets/generated/npc/npc_foldrik.png",
     citySpawn: false,
     cityLocation: "random",
@@ -209,6 +234,7 @@ export const QUEST_NPCS = {
   ghost: {
     name: "Whisper",
     title: "Ghost",
+    i18n: { da: { title: "Spogelse" } },
     imageUrl: "/assets/generated/npc/npc_ghost.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -217,6 +243,7 @@ export const QUEST_NPCS = {
   goat: {
     name: "Goat",
     title: "Mountain Goat",
+    i18n: { da: { title: "Bjergged" } },
     imageUrl: "/assets/generated/npc/npc_goat.png",
     citySpawn: false,
     cityLocation: "random",
@@ -226,6 +253,7 @@ export const QUEST_NPCS = {
   king: {
     name: "Aureon",
     title: "King",
+    i18n: { da: { title: "Konge" } },
     imageUrl: "/assets/generated/npc/npc_king.png",
     cityLocation: "town_center",
     cityHint: "Ved byens midte",
@@ -234,6 +262,7 @@ export const QUEST_NPCS = {
   ladylirian: {
     name: "Lady Lirian",
     title: "Lady",
+    i18n: { da: { title: "Dame" } },
     imageUrl: "/assets/generated/npc/npc_ladylirian.png",
     citySpawn: false,
     cityLocation: "random",
@@ -243,6 +272,7 @@ export const QUEST_NPCS = {
   lordkealand: {
     name: "Lord Kealand",
     title: "Lord",
+    i18n: { da: { title: "Lord" } },
     imageUrl: "/assets/generated/npc/npc_lordkealand.png",
     citySpawn: false,
     cityLocation: "random",
@@ -252,6 +282,7 @@ export const QUEST_NPCS = {
   lydrendor: {
     name: "Lydrendor",
     title: "Elven King",
+    i18n: { da: { title: "Elverkonge" } },
     imageUrl: "/assets/generated/npc/npc_lydrendor.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -260,6 +291,7 @@ export const QUEST_NPCS = {
   nethrendor: {
     name: "Nethrendor",
     title: "Shadow Lord",
+    i18n: { da: { title: "Skyggehersker" } },
     imageUrl: "/assets/generated/npc/npc_nethrendor.png",
     citySpawn: false,
     cityLocation: "random",
@@ -269,6 +301,7 @@ export const QUEST_NPCS = {
   poorgirl: {
     name: "Miri",
     title: "Poor Girl",
+    i18n: { da: { title: "Fattig pige" } },
     imageUrl: "/assets/generated/npc/npc_poorgirl.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -277,6 +310,7 @@ export const QUEST_NPCS = {
   poorminer: {
     name: "Rusk",
     title: "Poor Miner",
+    i18n: { da: { title: "Fattig minearbejder" } },
     imageUrl: "/assets/generated/npc/npc_poorminer.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",
@@ -285,6 +319,7 @@ export const QUEST_NPCS = {
   priest: {
     name: "Iolan",
     title: "Priest",
+    i18n: { da: { title: "Praest" } },
     imageUrl: "/assets/generated/npc/npc_priest.png",
     cityLocation: "library",
     cityHint: "Ved library i byen",
@@ -293,6 +328,7 @@ export const QUEST_NPCS = {
   richman: {
     name: "Veldor",
     title: "Rich Man",
+    i18n: { da: { title: "Rig mand" } },
     imageUrl: "/assets/generated/npc/npc_richman.png",
     cityLocation: "town_center",
     cityHint: "Ved byens midte",
@@ -301,6 +337,7 @@ export const QUEST_NPCS = {
   spy: {
     name: "Shade",
     title: "Spy",
+    i18n: { da: { title: "Spion" } },
     imageUrl: "/assets/generated/npc/npc_spy.png",
     cityLocation: "random",
     cityHint: "Et aabent sted i byen",

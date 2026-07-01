@@ -1,7 +1,8 @@
 export const SUBREGION_CONFIG = {
   cave01_lvl1: {
     id: "cave01_lvl1",
-    label: "Gammel grotte",
+    label: "Old Cave",
+    i18n: { da: { label: "Gammel grotte" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -41,7 +42,8 @@ export const SUBREGION_CONFIG = {
 
   cave01_lvl2: {
     id: "cave01_lvl2",
-    label: "Gammel grotte - dybet",
+    label: "Old Cave - The Depths",
+    i18n: { da: { label: "Gammel grotte - dybet" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -76,7 +78,8 @@ export const SUBREGION_CONFIG = {
 
   inn_crack_cave: {
     id: "inn_crack_cave",
-    label: "Hulen under kroen",
+    label: "The Cave Beneath the Inn",
+    i18n: { da: { label: "Hulen under kroen" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -127,7 +130,8 @@ export const SUBREGION_CONFIG = {
       addCounters: {
         subregionsCleared: 1,
       },
-      message: "Hulen er ryddet. Revnen kan nu oedelaegges.",
+      message: "The cave is clear. The crack can now be destroyed.",
+      i18n: { da: { message: "Hulen er ryddet. Revnen kan nu ødelægges." } },
       questStepComplete: {
         questId: "check_inn_infestation",
         stepId: "clear_crack_cave",
@@ -137,7 +141,8 @@ export const SUBREGION_CONFIG = {
 
   blacksmith_boar_cave_lvl1: {
     id: "blacksmith_boar_cave_lvl1",
-    label: "Blodsporet i grotten",
+    label: "The Blood Trail in the Cave",
+    i18n: { da: { label: "Blodsporet i grotten" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -183,7 +188,8 @@ export const SUBREGION_CONFIG = {
 
   blacksmith_boar_cave_lvl2: {
     id: "blacksmith_boar_cave_lvl2",
-    label: "Den dybere revne",
+    label: "The Deeper Crack",
+    i18n: { da: { label: "Den dybere revne" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -229,7 +235,8 @@ export const SUBREGION_CONFIG = {
 
   blacksmith_boar_cave_lvl3: {
     id: "blacksmith_boar_cave_lvl3",
-    label: "Vildsvinets hule",
+    label: "The Boar's Den",
+    i18n: { da: { label: "Vildsvinets hule" } },
     kind: "cave",
     generator: "mapRegion",
     mapSize: "small",
@@ -271,7 +278,8 @@ export const SUBREGION_CONFIG = {
 
   the_mine_lvl1: {
     id: "the_mine_lvl1",
-    label: "Den gamle mine",
+    label: "The Old Mine",
+    i18n: { da: { label: "Den gamle mine" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",
@@ -317,13 +325,15 @@ export const SUBREGION_CONFIG = {
       conditions: { questActive: "veldor_clear_the_mine" },
       setFlags: ["the_mine_lvl1_cleared"],
       addCounters: { subregionsCleared: 1 },
-      message: "Foerste mineniveau er ryddet.",
+      message: "The first mine level is clear.",
+      i18n: { da: { message: "Første mineniveau er ryddet." } },
     },
   },
 
   the_mine_lvl2: {
     id: "the_mine_lvl2",
-    label: "Den gamle mine - dybere skakt",
+    label: "The Old Mine - Deeper Shaft",
+    i18n: { da: { label: "Den gamle mine - dybere skakt" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",
@@ -370,13 +380,15 @@ export const SUBREGION_CONFIG = {
       conditions: { questActive: "veldor_clear_the_mine" },
       setFlags: ["the_mine_lvl2_cleared"],
       addCounters: { subregionsCleared: 1 },
-      message: "Andet mineniveau er ryddet.",
+      message: "The second mine level is clear.",
+      i18n: { da: { message: "Andet mineniveau er ryddet." } },
     },
   },
 
   the_mine_lvl3: {
     id: "the_mine_lvl3",
-    label: "Den gamle mine - bundskakten",
+    label: "The Old Mine - Bottom Shaft",
+    i18n: { da: { label: "Den gamle mine - bundskakten" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",
@@ -438,13 +450,15 @@ export const SUBREGION_CONFIG = {
       conditions: { questActive: "veldor_clear_the_mine" },
       setFlags: ["the_mine_lvl3_cleared"],
       addCounters: { subregionsCleared: 1 },
-      message: "Bundskakten er ryddet.",
+      message: "The bottom shaft is clear.",
+      i18n: { da: { message: "Bundskakten er ryddet." } },
     },
   },
 
   forest_mine_lvl1: {
     id: "forest_mine_lvl1",
-    label: "Skovminen",
+    label: "The Forest Mine",
+    i18n: { da: { label: "Skovminen" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",
@@ -488,7 +502,8 @@ export const SUBREGION_CONFIG = {
 
   forest_mine_lvl2: {
     id: "forest_mine_lvl2",
-    label: "Skovminen - rodskakten",
+    label: "The Forest Mine - Root Shaft",
+    i18n: { da: { label: "Skovminen - rodskakten" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",
@@ -533,7 +548,8 @@ export const SUBREGION_CONFIG = {
 
   forest_mine_lvl3: {
     id: "forest_mine_lvl3",
-    label: "Skovminen - den lukkede grav",
+    label: "The Forest Mine - The Sealed Grave",
+    i18n: { da: { label: "Skovminen - den lukkede grav" } },
     kind: "mine",
     generator: "mapRegion",
     mapSize: "small",

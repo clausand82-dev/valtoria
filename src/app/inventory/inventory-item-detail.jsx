@@ -1,16 +1,17 @@
 import React from "react";
 import { ITEM_DURABILITY_PENALTY_THRESHOLD } from "../../game/config/durability-config.js";
+import { localizeItemField, localizeItemSummary, useLocalization } from "../../i18n/index.js";
 
 const EFFECTIVE_STAT_ROWS = [
-  { key: "damageMin", label: "Skade min", decimals: 0 },
-  { key: "damageMax", label: "Skade max", decimals: 0 },
-  { key: "armor", label: "Armor", decimals: 0 },
-  { key: "maxHp", label: "Liv", decimals: 0 },
-  { key: "maxMana", label: "Mana", decimals: 0 },
-  { key: "magic", label: "Magi", decimals: 0 },
-  { key: "speed", label: "Fart", decimals: 2 },
-  { key: "range", label: "Range", decimals: 2 },
-  { key: "cooldown", label: "Cooldown", decimals: 2, lowerIsBetter: true },
+  { key: "damageMin", labelKey: "inventory.stat.damageMin", decimals: 0 },
+  { key: "damageMax", labelKey: "inventory.stat.damageMax", decimals: 0 },
+  { key: "armor", labelKey: "inventory.stat.armor", decimals: 0 },
+  { key: "maxHp", labelKey: "inventory.stat.health", decimals: 0 },
+  { key: "maxMana", labelKey: "inventory.stat.mana", decimals: 0 },
+  { key: "magic", labelKey: "inventory.stat.magic", decimals: 0 },
+  { key: "speed", labelKey: "inventory.stat.speed", decimals: 2 },
+  { key: "range", labelKey: "inventory.stat.range", decimals: 2 },
+  { key: "cooldown", labelKey: "inventory.stat.cooldown", decimals: 2, lowerIsBetter: true },
 ];
 
 function durabilityMultiplier(item) {
@@ -68,9 +69,9 @@ function findEquippedComparison(item, equipment) {
   return equipment.find((slot) => slot.id === slotId)?.item ?? null;
 }
 
-function getItemDiffs(item, equipped) {
+function getItemDiffs(item, equipped, t) {
   const rows = EFFECTIVE_STAT_ROWS.map((entry) => diffNumber(
-    entry.label,
+    t(entry.labelKey),
     durabilityAdjustedStat(item, entry.key),
     durabilityAdjustedStat(equipped, entry.key),
     { decimals: entry.decimals, lowerIsBetter: entry.lowerIsBetter }
@@ -91,26 +92,28 @@ function diffNumber(label, next, current, options = {}) {
 }
 
 export function InventoryItemDetail({ selectedItem, equipment, showSummary = true }) {
+  const { language, localize, t } = useLocalization();
   if (!selectedItem) return null;
 
   const comparisonItem = findEquippedComparison(selectedItem, equipment);
-  const diffs = comparisonItem ? getItemDiffs(selectedItem, comparisonItem) : [];
+  const diffs = comparisonItem ? getItemDiffs(selectedItem, comparisonItem, t) : [];
   const itemNameColor = selectedItem.rarityColor ?? undefined;
-  const displaySummary = effectiveSummaryText(selectedItem);
+  const displaySummary = localizeItemSummary(selectedItem, effectiveSummaryText(selectedItem), language, localize);
   const showDurability = selectedItem.mode !== "resource" && selectedItem.mode !== "potion" && selectedItem.mode !== "readable";
   const durPct = showDurability ? Math.max(0, Math.min(100, Number(selectedItem.durability ?? 100))) : null;
   const durColor = durPct === null ? null : durPct >= 75 ? "#58d96d" : durPct >= 40 ? "#ffd85d" : "#ff6b5f";
 
   return (
     <div className="item-detail">
-      <b className={selectedItem.mode === "resource" ? "resource-rarity" : selectedItem.rarity} style={{ color: itemNameColor }}>{selectedItem.name}</b>
-      {selectedItem.mode === "resource" && <em>Stack: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
-      {selectedItem.mode === "potion" && selectedItem.count > 1 && <em>Stack: {selectedItem.count}</em>}
-      {selectedItem.mode === "quest" && (selectedItem.flags?.stackable || selectedItem.stackMax > 1) && <em>Stack: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
+      <b className={selectedItem.mode === "resource" ? "resource-rarity" : selectedItem.rarity} style={{ color: itemNameColor }}>{localizeItemField(selectedItem, "name", localize)}</b>
+      {localizeItemField(selectedItem, "description", localize) && <p className="item-detail-description">{localizeItemField(selectedItem, "description", localize)}</p>}
+      {selectedItem.mode === "resource" && <em>{t("inventory.stack")}: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
+      {selectedItem.mode === "potion" && selectedItem.count > 1 && <em>{t("inventory.stack")}: {selectedItem.count}</em>}
+      {selectedItem.mode === "quest" && (selectedItem.flags?.stackable || selectedItem.stackMax > 1) && <em>{t("inventory.stack")}: {selectedItem.count ?? 1} / {selectedItem.stackMax ?? "?"}</em>}
       {showDurability && (
         <div className="item-detail-durability">
           <span style={{ color: durColor }}>
-            Durability: {Math.round(durPct)}%{durPct < 75 && durPct > 0 ? " - Stats reduceret" : ""}{durPct <= 0 ? " - Ubrugeligt" : ""}
+            {t("inventory.durability")}: {Math.round(durPct)}%{durPct < 75 && durPct > 0 ? ` - ${t("inventory.statsReduced")}` : ""}{durPct <= 0 ? ` - ${t("inventory.unusable")}` : ""}
           </span>
           <span className="item-detail-dur-bar-wrap">
             <span className="item-detail-dur-bar-fill" style={{ width: String(durPct) + "%", background: durColor }} />
@@ -119,7 +122,7 @@ export function InventoryItemDetail({ selectedItem, equipment, showSummary = tru
       )}
       {comparisonItem && diffs.length > 0 && (
         <>
-          <span className="item-detail-section-label">Sammenlignet med udstyret item</span>
+          <span className="item-detail-section-label">{t("inventory.comparedWithEquipped")}</span>
           <div className="comparison-list">
             {diffs.map((diff) => (
               <span className={diff.good ? "diff-good" : "diff-bad"} key={diff.label}>

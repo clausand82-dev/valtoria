@@ -1,13 +1,15 @@
 import React, { useState } from "react";
 import { formatSaveTimestamp } from "../save/save-slots.js";
+import { useLocalization } from "../../i18n/index.js";
 
 export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave }) {
+  const { t } = useLocalization();
   const hasSaves = saveSlots.some((slot) => slot.exists);
   const [menuImageLoaded, setMenuImageLoaded] = useState(false);
   const [confirmNewGameOpen, setConfirmNewGameOpen] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
   return (
-    <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label="Valtoria start menu">
+    <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label={t("menu.main")}>
       <img
         className="start-menu-bg"
         src="/assets/generated/menu.png"
@@ -19,17 +21,17 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
       <div className="start-menu-panel">
         {!menuImageLoaded && <h1>Valtoria</h1>}
         {view === "main" && (
-          <nav className="start-menu-actions" aria-label="Main menu">
-            <button type="button" onClick={() => setConfirmNewGameOpen(true)}>New Game</button>
-            <button type="button" onClick={onLoadClick} disabled={!hasSaves}>Load Game</button>
-            <button type="button" disabled>Game Setting</button>
+          <nav className="start-menu-actions" aria-label={t("menu.main")}>
+            <button type="button" onClick={() => setConfirmNewGameOpen(true)}>{t("menu.newGame")}</button>
+            <button type="button" onClick={onLoadClick} disabled={!hasSaves}>{t("menu.loadGame")}</button>
+            <button type="button" disabled>{t("menu.gameSettings")}</button>
           </nav>
         )}
         {view === "load" && (
           <div className="load-menu">
             <div className="load-menu-head">
-              <button type="button" onClick={onBack}>Back</button>
-              <span>Choose save</span>
+              <button type="button" onClick={onBack}>{t("ui.back")}</button>
+              <span>{t("menu.chooseSave")}</span>
             </div>
             <div className="save-slot-list">
               {saveSlots.filter((slot) => slot.exists).map((slot) => (
@@ -41,20 +43,20 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
                   >
                     <b>{slot.label}</b>
                     <span>
-                      Level {slot.level} | Gold {slot.gold} | Quests {slot.activeQuestCount} | {formatSaveTimestamp(slot.updatedAt)}
+                      {t("menu.saveSummary", { level: slot.level, gold: slot.gold, quests: slot.activeQuestCount, updatedAt: formatSaveTimestamp(slot.updatedAt) })}
                     </span>
                   </button>
                   <button
                     type="button"
                     className="save-slot-delete danger-action"
                     onClick={() => setDeleteCandidate(slot)}
-                    aria-label={`Delete ${slot.label}`}
+                    aria-label={t("menu.deleteSaveLabel", { name: slot.label })}
                   >
-                    Delete
+                    {t("ui.delete")}
                   </button>
                 </div>
               ))}
-              {!hasSaves && <p>Ingen saves fundet.</p>}
+              {!hasSaves && <p>{t("menu.noSaves")}</p>}
             </div>
           </div>
         )}
@@ -62,11 +64,11 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
         {confirmNewGameOpen && (
           <div className="confirm-backdrop" role="presentation">
             <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="new-game-confirm-title">
-              <h2 id="new-game-confirm-title">Start nyt spil?</h2>
-              <p>Vil du starte et nyt spil nu?</p>
+              <h2 id="new-game-confirm-title">{t("menu.startNewGameTitle")}</h2>
+              <p>{t("menu.startNewGamePrompt")}</p>
               <div>
                 <button type="button" onClick={() => setConfirmNewGameOpen(false)}>
-                  Nej
+                  {t("ui.no")}
                 </button>
                 <button
                   type="button"
@@ -75,7 +77,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
                     onNewGame();
                   }}
                 >
-                  Ja, start nyt spil
+                  {t("menu.startNewGameConfirm")}
                 </button>
               </div>
             </section>
@@ -85,13 +87,11 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
         {deleteCandidate && (
           <div className="confirm-backdrop" role="presentation">
             <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-save-confirm-title">
-              <h2 id="delete-save-confirm-title">Slet gem?</h2>
-              <p>
-                Du er ved at slette <b>{deleteCandidate.label}</b>. Denne handling kan ikke fortrydes.
-              </p>
+              <h2 id="delete-save-confirm-title">{t("menu.deleteSaveTitle")}</h2>
+              <p>{t("menu.deleteSavePrompt", { name: deleteCandidate.label })}</p>
               <div>
                 <button type="button" onClick={() => setDeleteCandidate(null)}>
-                  Annuller
+                  {t("ui.cancel")}
                 </button>
                 <button
                   type="button"
@@ -101,7 +101,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
                     setDeleteCandidate(null);
                   }}
                 >
-                  Ja, slet dette gem
+                  {t("menu.deleteSaveConfirm")}
                 </button>
               </div>
             </section>

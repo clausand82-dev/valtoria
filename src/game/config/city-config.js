@@ -58,6 +58,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_famine.png",
     detail: "Provision capacity is too low for the population. Food resource drops are reduced by 50%.",
     solution: "Increase provision or reduce population pressure.",
+    i18n: { da: { label: "Hungersnød", detail: "Provision-kapaciteten er for lav til befolkningen. Drops af food-ressourcer reduceres med 50%", solution: "Forøg provision eller reducer presset fra befolkningen." } },
     conditions: { statRatioBelow: { provision: 1 } },
     modifiers: {
       resourceDropMultiplierById: {
@@ -76,6 +77,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_water_shortage.png",
     detail: "Water capacity is too low for the population. Potion drops stop until water recovers.",
     solution: "Increase water production before returning to the wilds.",
+    i18n: { da: { label: "Vandmangel", detail: "Vandkapaciteten er for lav til befolkningen. Potion drops stopper, indtil vandforsyningen er genoprettet.", solution: "Forøg vandproduktionen, før du vender tilbage til wilderness." } },
     conditions: { statRatioBelow: { water: 1 } },
     modifiers: {
       potionDropMultiplier: 0,
@@ -87,6 +89,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_disease_outbreak.png",
     detail: "Health capacity is strained. Hero max HP is reduced by 25%.",
     solution: "Raise health capacity relative to population.",
+    i18n: { da: { label: "Sygdomsudbrud", detail: "Health-kapaciteten er presset. Heltens maksimale HP reduceres med 25%.", solution: "Forøg health-kapaciteten i forhold til befolkningen." } },
     conditions: { statRatioBelow: { health: 0.75 } },
     modifiers: {
       heroMaxHpMultiplier: 0.75,
@@ -98,6 +101,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_uprising_poorness.png",
     detail: "Wealth is low compared to the city's needs. Gold drops are reduced by 50%.",
     solution: "Increase wealth or reduce population pressure.",
+    i18n: { da: { label: "Risiko for oprør", detail: "Wealth er lav i forhold til byens behov. Gold drops reduceres med 50%.", solution: "Forøg wealth eller reducer presset fra befolkningen." } },
     conditions: { statRatioBelow: { wealth: 0.75 } },
     modifiers: {
       goldDropMultiplier: 0.5,
@@ -109,6 +113,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_fire.png",
     detail: "Low safety, especially with water shortage, accelerates city durability damage.",
     solution: "Raise safety and solve water shortage.",
+    i18n: { da: { label: "Brandfare", detail: "Lav safety, især under vandmangel, øger durability-skader i byen.", solution: "Forøg safety og løs vandmanglen." } },
     conditions: { fireRiskAtLeast: CITY_EVENT_RULES.fireRiskActiveThreshold },
     modifiers: {
       cityDurabilityDegradeChanceMultiplier: 2,
@@ -121,6 +126,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_lawlessness.png",
     detail: "Safety capacity is strained. City mob spawn chance is increased by 25%.",
     solution: "Raise safety or clear city mobs.",
+    i18n: { da: { label: "Lovløshed", detail: "Safety-kapaciteten er presset. Chancen for city mob-spawns øges med 25%.", solution: "Forøg safety eller fjern city mobs." } },
     conditions: { statRatioBelow: { safety: 0.75 } },
     modifiers: {
       cityMobSpawnChanceMultiplier: 1.25,
@@ -132,6 +138,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_supply_crisis.png",
     detail: "Supply capacity is strained. Repair and crafting costs are increased.",
     solution: "Increase supply through city buildings, addons, or regions.",
+    i18n: { da: { label: "Forsyningskrise", detail: "Supply-kapaciteten er presset. Repair- og crafting-priser stiger.", solution: "Forøg supply gennem bygninger, addons eller regioner." } },
     conditions: { statRatioBelow: { supply: 0.75 } },
     modifiers: {
       repairCostMultiplier: 1.25,
@@ -144,6 +151,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_trade_collapse.png",
     detail: "Trade capacity is strained. Merchant stock and prices are worse.",
     solution: "Increase trade before shopping.",
+    i18n: { da: { label: "Handelskollaps", detail: "Trade-kapaciteten er presset. Merchant-udvalg og priser bliver dårligere.", solution: "Forøg trade, før du handler." } },
     conditions: { statRatioBelow: { trade: 0.75 } },
     modifiers: {
       merchantBuyPriceMultiplier: 1.25,
@@ -157,6 +165,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_faith_crisis.png",
     detail: "Faith support is strained. Health potions restore 50% less health.",
     solution: "Increase faith. Mana potions are not affected.",
+    i18n: { da: { label: "Troskrise", detail: "Faith er presset. Health potions helbreder 50% mindre.", solution: "Forøg faith. Mana potions påvirkes ikke." } },
     conditions: { statRatioBelow: { faith: 0.75 } },
     modifiers: {
       healthPotionHealMultiplier: 0.5,
@@ -168,6 +177,7 @@ export const CITY_EVENT_DEFS = {
     iconUrl: "/assets/generated/icon/buff_prosperity.png",
     detail: "Wealth and trade are high. Merchant prices and quest gold rewards improve.",
     solution: "Keep wealth and trade high to preserve this bonus.",
+    i18n: { da: { label: "Velstand", detail: "Wealth og trade er høj. Merchant-priser og gold-belønninger fra quests forbedres.", solution: "Hold wealth og trade høj for at bevare bonussen." } },
     positive: true,
     conditions: { statRatioAtLeast: { wealth: 1.5, trade: 1.5 } },
     modifiers: {
@@ -233,29 +243,29 @@ export const CITY_STAT_ALIASES = {
 };
 
 export const CITY_STAT_DEFS = [
-  { id: "population", label: "POPULATION" },
-  { id: "housing", label: "HOUSING" },
-  { id: "provision", label: "PROVISION" },
-  { id: "water", label: "WATER" },
-  { id: "supply", label: "SUPPLY" },
-  { id: "wealth", label: "WEALTH" },
-  { id: "trade", label: "TRADE" },
-  { id: "safety", label: "SAFETY", max: 100 },
-  { id: "health", label: "HEALTH", max: 100 },
-  { id: "defense", classId: "defence", label: "DEFENSE" },
-  { id: "popularity", label: "POPULARITY", max: 100 },
-  { id: "knowledge", label: "KNOWLEDGE" },
-  { id: "culture", label: "CULTURE" },
-  { id: "faith", label: "FAITH" },
-  { id: "maintenance", label: "MAINTENANCE", max: 100 },
+  { id: "population", label: "POPULATION", /*i18n: { da: { label: "BEFOLKNING" } } */ },
+  { id: "housing", label: "HOUSING", /*i18n: { da: { label: "BOLIGER" } } */ },
+  { id: "provision", label: "PROVISION", /*i18n: { da: { label: "PROVISION" } } */ },
+  { id: "water", label: "WATER", /*i18n: { da: { label: "VAND" } } */ },
+  { id: "supply", label: "SUPPLY", /*i18n: { da: { label: "FORSYNING" } } */ },
+  { id: "wealth", label: "WEALTH", /*i18n: { da: { label: "VELSTAND" } } */ },
+  { id: "trade", label: "TRADE", /*i18n: { da: { label: "HANDEL" } } */ },
+  { id: "safety", label: "SAFETY", max: 100, /*i18n: { da: { label: "SIKKERHED" } } */ },
+  { id: "health", label: "HEALTH", max: 100, /*i18n: { da: { label: "SUNDHED" } } */ },
+  { id: "defense", classId: "defence", label: "DEFENSE", /*i18n: { da: { label: "FORSVAR" } } */ },
+  { id: "popularity", label: "POPULARITY", max: 100, /*i18n: { da: { label: "POPULARITET" } } */ },
+  { id: "knowledge", label: "KNOWLEDGE", /*i18n: { da: { label: "VIDEN" } } */ },
+  { id: "culture", label: "CULTURE", /*i18n: { da: { label: "KULTUR" } } */ },
+  { id: "faith", label: "FAITH", /*i18n: { da: { label: "TRO" } } */ },
+  { id: "maintenance", label: "MAINTENANCE", max: 100, /*i18n: { da: { label: "VEDLIGEHOLDELSE" } } */ },
 ];
 
 export const CITY_CITIZEN_CONDITION_DEFS = [
-  { id: "homeless_people", label: "Homeless" },
-  { id: "hungry_people", label: "Hungry" },
-  { id: "thirsty_people", label: "Thirsty" },
-  { id: "sick_people", label: "Sick" },
-  { id: "angry_people", label: "Angry" },
+  { id: "homeless_people", label: "Homeless", i18n: { da: { label: "Hjemløse" } } },
+  { id: "hungry_people", label: "Hungry", i18n: { da: { label: "Sultne" } } },
+  { id: "thirsty_people", label: "Thirsty", i18n: { da: { label: "Tørstige" } } },
+  { id: "sick_people", label: "Sick", i18n: { da: { label: "Syge" } } },
+  { id: "angry_people", label: "Angry", i18n: { da: { label: "Vrede" } } },
 ];
 
 export const CITY_STAT_ICON_URLS = {
@@ -265,18 +275,18 @@ export const CITY_STAT_ICON_URLS = {
   housing: "/assets/generated/icon/icon_housing.png",
   provision: "/assets/generated/icon/icon_provision.png",
   water: "/assets/generated/icon/icon_water.png",
-  supply: "/assets/generated/icon/icon_provision.png",
-  wealth: CITY_MONEY_ICON_URL,
-  trade: CITY_MONEY_ICON_URL,
-  safety: "/assets/generated/icon/icon_citydefence.png",
+  supply: "/assets/generated/icon/icon_supply.png",
+  wealth: "/assets/generated/icon/icon_wealth.png",
+  trade: "/assets/generated/icon/icon_trade.png",
+  safety: "/assets/generated/icon/icon_army.png",
   army: "/assets/generated/icon/icon_army.png",
   happiness: "/assets/generated/icon/icon_happiness.png",
   health: "/assets/generated/icon/icon_health.png",
   citizens_health: "/assets/generated/icon/icon_health.png",
-  knowledge: "/assets/generated/item/item_book_lore.png",
-  culture: "/assets/generated/icon/icon_popularity.png",
-  faith: "/assets/generated/house/house_sanctury.png",
-  maintenance: "/assets/generated/item/item_tools_repairkit.png",
+  knowledge: "/assets/generated/icon/icon_knowledge.png",
+  culture: "/assets/generated/icon/icon_culture.png",
+  faith: "/assets/generated/icon/icon_faith.png",
+  maintenance: "/assets/generated/icon/icon_maintenance.png",
   hungry_people: "/assets/generated/icon/icon_hunger.png",
   homeless_people: "/assets/generated/icon/icon_homeless.png",
   thirsty_people: "/assets/generated/icon/icon_thirst.png",
@@ -305,6 +315,22 @@ export const CITY_STAT_RULE_TEXT = {
   culture: ["If culture is at least population, popularity gains +10%."],
   faith: ["If faith is at least population, non-unique drop rate bonus is exposed as 5%."],
   maintenance: ["Average durability percent of unlocked city areas and built buildings."],
+  i18n: { da: {
+    population: ["Styrer hvor mange borgere der kan bruges til rekruttering til hæren.", "Oplåste regioner kan tilføje deres aktuelle population gennem den skalerede cityStats.population-værdi."],
+    housing: ["Hvis population overstiger housing, kan senere city events reagere på overbefolkning."],
+    provision: ["Provision sammenlignes med det befolkningsbaserede behov.", "Lav provision kan udløse hungersnød og reducere health-kapaciteten."],
+    water: ["Water sammenlignes med det befolkningsbaserede behov.", "Lav water kan udløse vandmangel og reducere health-kapaciteten."],
+    supply: ["Generel supply kan forbedres af regioner, bygninger og addons."],
+    wealth: ["Hvis wealth/population er under 0,5, bliver risikoen for oprør aktiv."],
+    trade: ["Trade kan bidrage til senere wealth- og supply-logik."],
+    safety: ["Safety er kapacitet sammenlignet med byens behov.", "City mobs giver midlertidige config-styrede straffe, mens de er aktive.", "Lav safety øger brandfaren og kan udløse lovløshed."],
+    health: ["Health er kapacitet sammenlignet med byens behov.", "En lav health-ratio kan udløse sygdomsudbrud."],
+    defense: ["Bruger den tidligere army unit power som defense.", "Hvis knowledge mindst svarer til population, får defense +5%."],
+    knowledge: ["Hvis knowledge mindst svarer til population, får defense +5%."],
+    culture: ["Hvis culture mindst svarer til population, får popularity +10%."],
+    faith: ["Hvis faith mindst svarer til population, gives en bonus på 5% til non-unique drop rate."],
+    maintenance: ["Gennemsnitlig durability-procent for oplåste byområder og byggede bygninger."],
+  } },
 };
 
 export function cityEventEntries(events = {}, options = {}) {

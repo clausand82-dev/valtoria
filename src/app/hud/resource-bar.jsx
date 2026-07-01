@@ -1,4 +1,5 @@
 import React from "react";
+import { useLocalization } from "../../i18n/index.js";
 import { cityEventEntries } from "../../game/config/city-config.js";
 import {
   CITY_CITIZEN_CONDITION_DEFS,
@@ -25,6 +26,7 @@ export function ResourceBar({ type, value, label }) {
 }
 
 export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null }) {
+  const { localize } = useLocalization();
   return (
     <div className="city-top-stat-bar" aria-label="City stats">
       {stats.map((stat) => (
@@ -46,7 +48,7 @@ export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null
         >
           <img src={CITY_STAT_ICON_URLS[stat.id]} alt="" draggable="false" />
           <div>
-            <span>{cityTopStatLabel(stat)}</span>
+            <span>{localize(CITY_STAT_DEFS.find((entry) => entry.id === stat.id), "label") || cityTopStatLabel(stat)}</span>
             <b>{cityTopStatValue(stat)}</b>
           </div>
         </div>
@@ -56,22 +58,23 @@ export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null
 }
 
 export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, events = {} }) {
+  const { localize } = useLocalization();
   const activeEvents = cityEventEntries(events);
   return (
     <div className="city-side-stats" aria-label="City summary stats">
       <CitySideStat icon={CITY_STAT_ICON_URLS.gold} label="Gold" value={Math.max(0, Math.floor(Number(gold) || 0))} />
-      <CitySideStat icon="/assets/generated/mini/mini_demon.png" label="Threat" value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
+      <CitySideStat icon="/assets/generated/icon/icon_threat.png" label="Threat" value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
       <CitySideStat icon={CITY_STAT_ICON_URLS.popularity} label="Popularity" value={`${Math.max(0, Math.min(100, Math.floor(Number(popularity) || 0)))}%`} />
       {activeEvents.length > 0 && (
         <div className="city-side-events" aria-label="Active city events">
           <b>EVENT</b>
           {activeEvents.map((event) => (
             <span className="city-side-event-entry" key={event.id} tabIndex={0}>
-              {event.label}
+              {localize(event, "label")}
               <span className="city-side-event-tooltip" role="tooltip">
-                <strong>{event.label}</strong>
-                {event.detail ? <small>{event.detail}</small> : null}
-                {event.solution ? <small>{event.solution}</small> : null}
+                <strong>{localize(event, "label")}</strong>
+                {event.detail ? <small>{localize(event, "detail")}</small> : null}
+                {event.solution ? <small>{localize(event, "solution")}</small> : null}
                 {citySideEventModifierText(event.modifiers) ? <em>{citySideEventModifierText(event.modifiers)}</em> : null}
               </span>
             </span>
@@ -112,8 +115,9 @@ function citySideEventModifierText(modifiers = {}) {
 }
 
 export function CityStatDetailPanel({ stat, compact = false }) {
+  const { localize, t } = useLocalization();
   const entries = Array.isArray(stat.breakdown) ? stat.breakdown : [];
-  const rules = CITY_STAT_RULE_TEXT[stat.id] ?? [];
+  const rules = localize(CITY_STAT_RULE_TEXT, stat.id) || CITY_STAT_RULE_TEXT[stat.id] || [];
   const ratio = Number(stat.ratio);
   const hasNeed = Math.max(0, Math.floor(Number(stat.need) || 0)) > 0;
   const statusClass = stat.status ? `city-stat-status-${stat.status}` : "";
@@ -122,15 +126,15 @@ export function CityStatDetailPanel({ stat, compact = false }) {
       <b>{stat.label}</b>
       <span>
         {stat.id === "maintenance"
-          ? `Average durability: ${Math.round(stat.value)}%`
+          ? t("city.stat.averageDurability", { value: Math.round(stat.value) })
           : hasNeed
-            ? `Effective: ${stat.value} / ${stat.need}`
-            : `Current: ${cityTopStatValue(stat)}`}
+            ? t("city.stat.effectiveValue", { value: stat.value, need: stat.need })
+            : t("city.stat.currentValue", { value: cityTopStatValue(stat) })}
       </span>
       {hasNeed && (
         <div className={`city-stat-status-line ${statusClass}`}>
-          <strong>{stat.statusLabel || "Status"}</strong>
-          <span>{Number.isFinite(ratio) ? `${Math.round(ratio * 100)}% of need` : "No ratio"}</span>
+          <strong>{stat.statusLabel || t("city.stat.status")}</strong>
+          <span>{Number.isFinite(ratio) ? t("city.stat.ofNeed", { percent: Math.round(ratio * 100) }) : t("city.stat.noRatio")}</span>
         </div>
       )}
       {hasNeed && stat.actionHint ? <p className="city-stat-action-hint">{stat.actionHint}</p> : null}
@@ -147,11 +151,11 @@ export function CityStatDetailPanel({ stat, compact = false }) {
           ))}
         </dl>
       ) : (
-        <p>No active modifiers.</p>
+        <p>{t("city.stat.noActiveModifiers")}</p>
       )}
       {rules.length > 0 && (
         <div className="city-stat-rules">
-          <b>Rules</b>
+          <b>{t("city.stat.rulesTitle")}</b>
           {rules.map((rule) => <p key={rule}>{rule}</p>)}
         </div>
       )}
@@ -160,12 +164,13 @@ export function CityStatDetailPanel({ stat, compact = false }) {
 }
 
 export function CityCitizenConditions({ stats }) {
+  const { localize } = useLocalization();
   return (
     <div className="city-citizen-conditions" aria-label="Citizen conditions">
       {CITY_CITIZEN_CONDITION_DEFS.map((entry) => {
         const value = Math.max(0, Math.floor(Number(stats?.[entry.id]) || 0));
         return (
-          <div className={value > 0 ? "warning" : ""} title={entry.label} key={entry.id}>
+          <div className={value > 0 ? "warning" : ""} title={localize(entry, "label")} key={entry.id}>
             <img src={CITY_STAT_ICON_URLS[entry.id]} alt="" draggable="false" />
             <span>{value}</span>
           </div>

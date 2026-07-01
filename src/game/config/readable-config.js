@@ -11,6 +11,7 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "demon_note_1",
     title: "Demon Note Fragment I",
+    i18n: { da: { title: "Daemonnotat fragment I", summary: "En revet seddel med aske i kanterne.", story: "Fragment I af III." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "lorenote",
     status: "mergeable",
@@ -18,12 +19,13 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    summary: "En revet seddel med aske i kanterne.",
-    story: "Fragment I af III."
+    summary: "A torn note with ash along the edges.",
+    story: "Fragment I of III."
   },
   {
     id: "demon_note_2",
     title: "Demon Note Fragment II",
+    i18n: { da: { title: "Daemonnotat fragment II", summary: "Skriftlinjer om ritualer i de sydlige ruiner.", story: "Fragment II af III." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "lorenote",
     status: "mergeable",
@@ -31,12 +33,13 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    summary: "Skriftlinjer om ritualer i de sydlige ruiner.",
-    story: "Fragment II af III."
+    summary: "Written lines about rituals in the southern ruins.",
+    story: "Fragment II of III."
   },
   {
     id: "demon_note_3",
     title: "Demon Note Fragment III",
+    i18n: { da: { title: "Daemonnotat fragment III", summary: "Den sidste del mangler stadig et par ord.", story: "Fragment III af III." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "lorenote",
     status: "mergeable",
@@ -44,12 +47,13 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 6,
     xp: 0,
-    summary: "Den sidste del mangler stadig et par ord.",
-    story: "Fragment III af III."
+    summary: "The final part is still missing a few words.",
+    story: "Fragment III of III."
   },
   {
     id: "demon_notes_compiled",
     title: "Demon Notes",
+    i18n: { da: { title: "Daemonnoter", summary: "Samlede noter om daemondyrkelse og rituelle spor.", story: "De samlede noter beskriver en gammel orden, som brugte tre sejl for at aabne en port under Nethrendor. Den sidste side peger mod ruiner i nord." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "lorebook",
     status: "readable",
@@ -62,12 +66,13 @@ export const READABLE_ITEM_DEFS = [
       "demon_note_2",
       "demon_note_3"
     ],
-    summary: "Samlede noter om daemondyrkelse og rituelle spor.",
-    story: "De samlede noter beskriver en gammel orden, som brugte tre sejl for at aabne en port under Nethrendor. Den sidste side peger mod ruiner i nord."
+    summary: "Collected notes on demon worship and ritual traces.",
+    story: "The compiled notes describe an old order that used three seals to open a gate beneath Nethrendor. The last page points toward ruins in the north."
   },
   {
     id: "ember_spell_fragment_1",
     title: "Ember Spell Fragment I",
+    i18n: { da: { title: "Ember-besvaergelse fragment I", summary: "Runeudklip med instrukser til ildkanalisering.", story: "Fragment I af II." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "mergeable",
@@ -75,12 +80,13 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 12,
     xp: 0,
-    summary: "Runeudklip med instrukser til ildkanalisering.",
-    story: "Fragment I af II."
+    summary: "Rune clippings with instructions for channeling fire.",
+    story: "Fragment I of II."
   },
   {
     id: "ember_spell_fragment_2",
     title: "Ember Spell Fragment II",
+    i18n: { da: { title: "Ember-besvaergelse fragment II", summary: "En side med maalinger for mana-flow.", story: "Fragment II af II." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "mergeable",
@@ -88,12 +94,19 @@ export const READABLE_ITEM_DEFS = [
     rarity: "unique",
     value: 12,
     xp: 0,
-    summary: "En side med maalinger for mana-flow.",
-    story: "Fragment II af II."
+    summary: "A page with measurements for mana flow.",
+    story: "Fragment II of II."
   },
   {
     id: "ember_spellbook",
     title: "Spellbook: Ember Rite",
+    i18n: {
+      da: {
+        title: "Stavbog: Ember-ritualet",
+        summary: "En komplet spellbook der styrker magisk skade.",
+        story: "Denne bog samler to fragmenter af Ember Rite. Brug den ved mage tower for sikker afkodning.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "consumable",
@@ -105,11 +118,12 @@ export const READABLE_ITEM_DEFS = [
       "ember_spell_fragment_1",
       "ember_spell_fragment_2"
     ],
-    summary: "En komplet spellbook der styrker magisk skade.",
-    story: "Denne bog samler to fragmenter af Ember Rite. Brug den ved mage tower for sikker afkodning.",
+    summary: "A complete spellbook that boosts magic damage.",
+    story: "This book combines two fragments of Ember Rite. Use it at the mage tower for safe decoding.",
     spellUnlock: "fireball",
     consumable: {
       label: "+2 magic permanent",
+      i18n: { da: { label: "+2 magi permanent" } },
       statBonuses: {
         magic: 2
       }
@@ -118,6 +132,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "explosion_spellbook",
     title: "Spellbook: Shatterflare",
+    i18n: {
+      da: {
+        title: "Stavbog: Shatterflare",
+        summary: "En spellbook, der beskriver en kompakt eksplosionsrune.",
+        story: "Shatterflare lagrer tryk i en flydende gloed og udloeser det som en omraadeeksplosion.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_res_paper.png",
     kind: "spellbook",
     status: "readable",
@@ -132,6 +153,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "ice_bolt_spellbook",
     title: "Spellbook: Rime Needle",
+    i18n: {
+      da: {
+        title: "Stavbog: Rimnaal",
+        summary: "En spellbook om at fryse mana til et bremsende projektil.",
+        story: "Rimnaal gennemborer ved traef og efterlader et kort frostspor, der saenker naerliggende fjender.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_quest_scroll.png",
     kind: "spellbook",
     status: "readable",
@@ -146,6 +174,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "blizzard_spellbook",
     title: "Spellbook: Blizzard",
+    i18n: {
+      da: {
+        title: "Stavbog: Snestorm",
+        summary: "En spellbook om at kalde isskaar ned over et stort omraade.",
+        story: "Snestorm aabner en kold stroem over slagmarken og lader takkede isskaar falde ned, som splintrer i frost ved traef.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_book_lore_moonlight.png",
     kind: "spellbook",
     status: "readable",
@@ -160,6 +195,7 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "firerain_spell_fragment_1",
     title: "Fire Rain Fragment I",
+    i18n: { da: { title: "Ildregn-fragment I", summary: "En sveden side med himmelfaldsruner.", story: "Fragment I af II." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "mergeable",
@@ -168,11 +204,12 @@ export const READABLE_ITEM_DEFS = [
     value: 14,
     xp: 0,
     summary: "A scorched page with skyfall rune marks.",
-    story: "Fragment I af II."
+    story: "Fragment I of II."
   },
   {
     id: "firerain_spell_fragment_2",
     title: "Fire Rain Fragment II",
+    i18n: { da: { title: "Ildregn-fragment II", summary: "En varmeforvredet side, der beskriver moenstre for gloedespredning.", story: "Fragment II af II." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "mergeable",
@@ -181,11 +218,18 @@ export const READABLE_ITEM_DEFS = [
     value: 14,
     xp: 0,
     summary: "A heat-warped page describing ember spread patterns.",
-    story: "Fragment II af II."
+    story: "Fragment II of II."
   },
   {
     id: "energy_beam_spellbook",
     title: "Spellbook: Luminous Lance",
+    i18n: {
+      da: {
+        title: "Stavbog: Lysende lanse",
+        summary: "En spellbook til en hoej-skade straale med lang nedkoeling.",
+        story: "Lysende lanse komprimerer mana til en enkelt voldsom kraftlinje.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "readable",
@@ -200,6 +244,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "poison_cloud_spellbook",
     title: "Spellbook: Venom Script",
+    i18n: {
+      da: {
+        title: "Stavbog: Giftmanuskript",
+        summary: "En spellbook om at binde gift til vedvarende mana.",
+        story: "Giftmanuskript efterlader et giftigt spor i maalets krop og i luften omkring traefpunktet.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_res_paper.png",
     kind: "spellbook",
     status: "readable",
@@ -214,6 +265,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "lightning_spellbook",
     title: "Spellbook: Storm Chain",
+    i18n: {
+      da: {
+        title: "Stavbog: Stormkaede",
+        summary: "En spellbook om at forme stormenergi til en lammende bolt.",
+        story: "Stormkaede flaaner gennem luften og giver naerliggende fjender stoed, sa laenge at deres bevaegelse og angreb afbrydes.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "spellbook",
     status: "readable",
@@ -228,6 +286,13 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "firerain_spellbook",
     title: "Spellbook: Fire Rain",
+    i18n: {
+      da: {
+        title: "Stavbog: Ildregn",
+        summary: "En spellbook om at lade braendende skaer falde over et stort omraade.",
+        story: "Ildregn river en ophedet stroem op over slagmarken og lader gloedende ember falde, som svider nedslagzoner og saetter fjender i brand.",
+      },
+    },
     iconUrl: "/assets/generated/item/item_book_lore_moonlight.png",
     kind: "spellbook",
     status: "readable",
@@ -246,6 +311,7 @@ export const READABLE_ITEM_DEFS = [
   {
     id: "sam_tylion_lion_gold_idol_note",
     title: "Sam Tylions Note",
+    i18n: { da: { title: "Sam Tylions note", summary: "En note om en forsvunden kasse med sjaeldne lion gold idols.", story: "Til den, der finder dette: Jeg er Sam Tylion, og jeg har mistet en kasse med 24 sjaeldne lion gold idols. Vaesnerne rev kassen op og spredte dem gennem regionerne. Hvis du finder alle 24, saa aflever dem til min faetter Himus i byen. Han ved, hvordan de kommer sikkert hjem." } },
     iconUrl: "/assets/generated/item/item_res_scroll.png",
     kind: "lorenote",
     status: "readable",
@@ -254,12 +320,13 @@ export const READABLE_ITEM_DEFS = [
     xp: 0,
     mergeLocation: "library",
     questId: "sam_tylion_lion_gold_idols",
-    summary: "En note om en forsvunden kasse med sjældne lion gold idols.",
-    story: "Til den, der finder dette: Jeg er Sam Tylion, og jeg har mistet en kasse med 24 sjældne lion gold idols. Væsnerne rev kassen op og spredte dem gennem regionerne. Hvis du finder alle 24, så aflever dem til min fætter Himus i byen. Han ved, hvordan de kommer sikkert hjem."
+    summary: "A note about a missing crate of rare lion gold idols.",
+    story: "To whoever finds this: I am Sam Tylion, and I have lost a crate containing 24 rare lion gold idols. Creatures tore the crate apart and scattered them across the regions. If you find all 24, deliver them to my cousin Himus in town. He knows how to get them safely home."
   },
   {
     id: "lord_kealands_missing_daughter",
     title: "Lord Kealand's Missing Daughter",
+    i18n: { da: { title: "Lord Kealands forsvundne datter", summary: "Historien om Lord Kealands forsvundne datter.", story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev draebt og hans datter bortfoert. \n\nHan soegte desperat efter hende i aarevis, men uden held. Rygtet siger, at han til sidst blev saa desperat, at han begyndte at opsoege fare, og at hans soegen foerte ham til en by i udkanten af Elvindalen. Der hoerte han om en quest, om troldenes skat, som vil goere ham rig. \n\nKort efter han begav sig afsted, moedte han Elverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsoeg paa at konfronterer ham, endte Lord Kealand i Nethrendes faengsel, hvor han moedte Lady Lirian. \n\nDe flygtede sammen og naaede til Troldenoeen, hvor et mystisk smykke Lady Lirian bar, afsloerede at hun var Lord Kealands forsvunde datter. Hendes foerste 'far' ord, smeltede hans hjerte. Sammen drog de paa flere eventyr." } },
     iconUrl: "/assets/generated/item/item_book_lore.png",
     kind: "lorebook",
     status: "readable",
@@ -267,8 +334,8 @@ export const READABLE_ITEM_DEFS = [
     value: 200,
     xp: 250,
     mergeLocation: "library",
-    summary: "Historien om Lord Kealands forsvundne datter.",
-    story: "Lord Kealand mistede sin datter i Den Store Trolde krig, hvor hans kone blev dræbt og hans datter bortført. \n\nHan søgte desperat efter hende i årevis, men uden held. Rygtet siger, at han til sidst blev så desperat, at han begyndte at opsøge fare, og at hans søgen førte ham til en by i udkanten af Elvindalen. Der hørte han om en quest, om troldenes skat, som vil gøre ham rig. \n\nKort efter han begav sig afsted, mødte han Elverdronning Eldiria, som han reddede. Hun fortalte om den frygtelige elverkonge Nethrendor, der var ond og grusom. I et desperat forsøg på at konfronterer ham, endte Lord Kealand i Nethrendes fængsel, hvor han mødte Lady Lirian. \n\nDe flygtede sammen og nåede til Troldenøen, hvor et mystisk smykke Lady Lirian bar, afslørede at hun var Lord Kealands forsvunde datter. Hendes første 'far' ord, smeltede hans hjerte. Sammen drog de på flere eventyr."
+    summary: "The story of Lord Kealand's missing daughter.",
+    story: "Lord Kealand lost his daughter in the Great Troll War, where his wife was killed and his daughter abducted. \n\nHe searched desperately for her for years, but without success. Rumor says he eventually grew so desperate that he began seeking danger, and that his search led him to a town on the edge of Elvindale. There he heard of a quest about the trolls' treasure, which would make him rich. \n\nShortly after setting out, he met Elven Queen Eldiria, whom he rescued. She told him of the dreadful elven king Nethrendor, who was cruel and ruthless. In a desperate attempt to confront him, Lord Kealand ended up in Nethrendor's prison, where he met Lady Lirian. \n\nThey escaped together and reached Troll Island, where a mysterious necklace worn by Lady Lirian revealed that she was Lord Kealand's long-lost daughter. Her first word, 'father', melted his heart. Together they set out on many more adventures."
   }
 ];
 

@@ -680,6 +680,30 @@ export const MONSTER_DEFS = {
   }
 };
 
+const MONSTER_CATALOG_IDS = {
+  Fallen: "fallen", "Thorn Husk": "thorn_husk", "Mire Brute": "mire_brute",
+  Hollow: "hollow", "Shard Crawler": "shard_crawler", "Deep Guard": "deep_guard",
+  Raider: "raider", Ashbound: "ashbound", "Gate Warden": "gate_warden",
+  "Bone Warden": "bone_warden", Knight: "knight", "Wild Boar": "wild_boar",
+  "Blacksmiths Bane": "blacksmiths_bane", Bear: "bear", Icebear: "icebear",
+  Lion: "lion", Rat: "rat", SickRat: "sick_rat", Village01: "village_01",
+  Village02: "village_02", Peasant: "peasant", Village03: "village_03",
+  Village04: "village_04", Village05: "village_05", Village06: "village_06",
+  Wizard: "wizard", "Spawn of Hydra": "spawn_of_hydra", Hellhound: "hellhound",
+  Flesheater: "flesheater", "Flesheater Young": "flesheater_young",
+  "Spawn of Archnogrim": "spawn_of_archnogrim", "Infernus Minion": "infernus_minion",
+  Shadowdragon: "shadowdragon", MountainTroll: "mountain_troll", GiantTroll: "giant_troll",
+  "Rune Shade": "rune_shade", "Iron Revenant": "iron_revenant", Demon: "demon",
+  Ghost: "ghost", Skeleton: "skeleton", Scorpion: "scorpion", Snake: "snake",
+  Spider: "spider", MiniSpider: "mini_spider", MediumSpider: "medium_spider",
+  LargeSpider: "large_spider", MotherSpider: "mother_spider", WolfCub: "wolf_cub",
+  Wolf: "wolf", WolfFenris: "wolf_fenris",
+};
+
+for (const [typeName, def] of Object.entries(MONSTER_DEFS)) {
+  def.catalogId = MONSTER_CATALOG_IDS[typeName];
+}
+
 const dedupeMonsterSprites = (monsters) => {
   const sprites = new Map();
   for (const monster of monsters) {

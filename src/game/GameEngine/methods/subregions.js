@@ -7,6 +7,8 @@ import {
 } from "../../config/region-object-config.js";
 import { QUEST_NPCS } from "../../config/npc-config.js";
 import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
+import { localize } from "../../../i18n/localization.js";
+import { normalizeLanguage, STORAGE_KEY } from "../../../i18n/language-config.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset } from "../../config/region-asset-config.js";
 import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
 import {
@@ -158,8 +160,16 @@ function repairLoadedSubregionMapId(engine, expedition) {
   return repairedId;
 }
 
+function currentLanguage() {
+  try {
+    return normalizeLanguage(globalThis.localStorage?.getItem?.(STORAGE_KEY));
+  } catch {
+    return normalizeLanguage();
+  }
+}
+
 function transitionLabelFor(regionConfig, fallback = "Subregion") {
-  return regionConfig?.label ?? regionConfig?.id ?? fallback;
+  return localize(regionConfig, "label", { language: currentLanguage() }) || regionConfig?.id || fallback;
 }
 
 function serializeChunk(chunk) {
@@ -586,7 +596,7 @@ function applySubregionOnClear(engine, instanceId) {
   if (onClear.questStepComplete) changed = Boolean(engine.advanceQuestProgress?.(onClear.questStepComplete)) || changed;
   if (onClear.questAdvance) changed = Boolean(engine.advanceQuestProgress?.(onClear.questAdvance)) || changed;
   changed = Boolean(engine.refreshQuestStepProgress?.()) || changed;
-  if (onClear.message) engine.addToast?.(String(onClear.message));
+  if (onClear.message) engine.addToast?.(String(localize(onClear, "message", { language: currentLanguage() }) || onClear.message));
   return changed;
 }
 

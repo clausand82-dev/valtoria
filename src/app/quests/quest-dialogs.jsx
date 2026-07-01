@@ -9,6 +9,9 @@ import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
 import { NAMED_ITEM_TEMPLATES } from "../../game/config/item-config.js";
+import { useLocalization } from "../../i18n/index.js";
+import { localizeQuestField } from "../../i18n/quest-localization.js";
+import { localizeItemField } from "../../i18n/item-localization.js";
 
 function normalizeQuestRegions(quest) {
   const target = quest?.target ?? {};
@@ -71,14 +74,14 @@ function QuestMonsterSprite({ monsterType }) {
   return <canvas ref={canvasRef} className="quest-monster-mini" width={22} height={22} />;
 }
 
-function collectQuestTargets(quest) {
+function collectQuestTargets(quest, localize) {
   const target = quest?.target ?? {};
   const rows = [];
   if (target.questItemId) {
     const def = QUEST_ITEM_DEFS[target.questItemId];
     rows.push({
       key: `quest-item-${target.questItemId}`,
-      label: `${target.count ?? 1}x ${def?.name ?? target.questItemId}`,
+      label: `${target.count ?? 1}x ${localize(def, "name") || target.questItemId}`,
       iconUrl: def?.iconUrl ?? ITEM_STANDARD_ICON_URL,
     });
   }
@@ -87,7 +90,7 @@ function collectQuestTargets(quest) {
     const def = QUEST_ITEM_DEFS[entry.questItemId];
     rows.push({
       key: `quest-item-${entry.questItemId}`,
-      label: `${entry.count ?? 1}x ${def?.name ?? entry.questItemId}`,
+      label: `${entry.count ?? 1}x ${localize(def, "name") || entry.questItemId}`,
       iconUrl: def?.iconUrl ?? ITEM_STANDARD_ICON_URL,
     });
   }
@@ -127,9 +130,9 @@ function killQuestCountLabel(quest) {
   return "?";
 }
 
-function talkQuestTargetLabel(quest) {
+function talkQuestTargetLabel(quest, localize) {
   const target = quest?.target ?? {};
-  if (target.text) return String(target.text);
+  if (target.text) return String(localize(target, "text"));
   const npcIds = Array.isArray(target.targetNpcIds)
     ? target.targetNpcIds
     : target.targetNpcId
@@ -151,6 +154,7 @@ function signedRewardValue(value) {
 }
 
 function QuestRewardList({ quest }) {
+  const { localize, t } = useLocalization();
   const rewards = questDisplayRewards(quest);
   return (
     <div className="comparison-list">
@@ -160,14 +164,14 @@ function QuestRewardList({ quest }) {
       {(rewards.netdra ?? 0) > 0 && <span className="diff-good">+ Net'dra'thot {rewards.netdra}</span>}
       {Object.entries(rewards.factionRep ?? {}).map(([factionId, amount]) => (
         <span className={Number(amount) >= 0 ? "diff-good" : "diff-bad"} key={`faction-${factionId}`}>
-          {signedRewardValue(amount)} reputation: {FACTIONS[factionId]?.label ?? factionId}
+          {signedRewardValue(amount)} {t("city.faction.reputation")}: {localize(FACTIONS[factionId], "label") || FACTIONS[factionId]?.label || factionId}
         </span>
       ))}
       {(rewards.resources ?? []).map((r) => (
         <span className="diff-good" key={`res-${r.resource ?? r.id}`}>+ {r.count}x {r.name ?? RESOURCE_DEFS[r.resource ?? r.id]?.name ?? r.resource ?? r.id}</span>
       ))}
       {(rewards.items ?? []).map((item, index) => (
-        <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {item.name}</span>
+        <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {localizeItemField(item, "name", localize)}</span>
       ))}
       {(Array.isArray(rewards.cityProgress) ? rewards.cityProgress : []).map((entry, index) => (
         <span className="diff-good" key={`reward-city-${entry.type ?? "city"}-${entry.id ?? index}`}>
@@ -184,10 +188,11 @@ function QuestRewardList({ quest }) {
 }
 
 export function QuestObjectiveMeta({ quest, compact = false }) {
+  const { localize } = useLocalization();
   if (!quest) return null;
   const visibleSteps = Array.isArray(quest.visibleSteps) ? quest.visibleSteps : [];
   const regions = normalizeQuestRegions(quest);
-  const collectRows = quest.type === "collect_quest_item" ? collectQuestTargets(quest) : [];
+  const collectRows = quest.type === "collect_quest_item" ? collectQuestTargets(quest, localize) : [];
   const killMonsters = quest.type === "kill_monsters" ? killQuestMonsters(quest) : [];
   const clearMapMonsters = quest.type === "clear_map" ? (quest.target?.monsters ?? []).map(String) : [];
   return (
@@ -197,7 +202,7 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
           {visibleSteps.map((step) => (
             <span className={`quest-chip quest-step-chip ${step.completed ? "complete" : step.current ? "current" : ""}`} key={step.id}>
               <span aria-hidden="true">{step.completed ? "[x]" : step.current ? "->" : "[ ]"}</span>
-              {step.title}
+              {localize(step, "title")}
             </span>
           ))}
         </div>
@@ -239,7 +244,7 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
 
       {quest.type === "talk_to_npc" && (
         <div className="quest-objective-row quest-objective-regions">
-          <span className="quest-chip region-chip">{talkQuestTargetLabel(quest)}</span>
+          <span className="quest-chip region-chip">{talkQuestTargetLabel(quest, localize)}</span>
         </div>
       )}
 
@@ -247,7 +252,7 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
         <div className="quest-objective-row quest-objective-regions">
           {(quest.target?.groups ?? [{ label: quest.target?.label }]).map((group, index) => (
             <span key={group?.questTargetKey ?? index} className="quest-chip region-chip">
-              {group?.label ?? "Interager med alle quest-maal"}
+              {localize(group, "label") || "Interager med alle quest-maal"}
             </span>
           ))}
         </div>
@@ -268,6 +273,8 @@ export function QuestObjectiveMeta({ quest, compact = false }) {
 }
 
 export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurnInQuest, onAbandonQuest }) {
+  const { localize, renderTemplate, t } = useLocalization();
+  const questText = (quest, field) => localizeQuestField(quest, field, localize, renderTemplate);
   const npc = QUEST_NPCS[interaction.npcId];
   const offers = interaction.offers ?? [];
   const active = interaction.active ?? [];
@@ -318,10 +325,10 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
               {completeActive.map((quest) => (
                 <article className="quest-card complete quest-status-ready" key={quest.id}>
                   <header>
-                    <b>{quest.title}</b>
+                    <b>{questText(quest, "title")}</b>
                     <span>{quest.progressText}</span>
                   </header>
-                  <p>{quest.turnInText}</p>
+                  <p>{questText(quest, "turnInText")}</p>
                   <QuestObjectiveMeta quest={quest} />
                   <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
                 </article>
@@ -336,11 +343,11 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
               {offers.map((quest) => (
                 <article className="quest-card quest-status-offer" key={quest.id}>
                   <header>
-                    <b>{quest.title}</b>
+                    <b>{questText(quest, "title")}</b>
                     <span>{quest.progressText}</span>
                   </header>
-                  <p>{quest.story}</p>
-                  <p>{quest.acceptText}</p>
+                  <p>{questText(quest, "story")}</p>
+                  <p>{questText(quest, "acceptText")}</p>
                   <QuestObjectiveMeta quest={quest} />
                   <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
                 </article>
@@ -355,10 +362,10 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
               {inProgress.map((quest) => (
                 <article className="quest-card quest-status-active" key={quest.id}>
                   <header>
-                    <b>{quest.title}</b>
+                    <b>{questText(quest, "title")}</b>
                     <span>{quest.progressText}</span>
                   </header>
-                  <p>{quest.story}</p>
+                  <p>{questText(quest, "story")}</p>
                   <QuestObjectiveMeta quest={quest} />
                   <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
                 </article>
@@ -370,7 +377,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
           <p>Ingen quests tilgaengelige lige nu.</p>
         )}
         <div>
-          <button type="button" onClick={onDecline}>Luk</button>
+          <button type="button" onClick={onDecline}>{t("ui.close")}</button>
         </div>
       </section>}
       {selectedQuest && (
@@ -403,7 +410,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
             <h3>Opgiv {confirmAbandonQuest.title}?</h3>
             <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
             <div className="confirm-actions">
-              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>{t("ui.cancel")}</button>
               <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
             </div>
           </section>
@@ -414,6 +421,7 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
 }
 
 export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, onQuestAbandoned, cityOpen }) {
+  const { localize, renderTemplate, t } = useLocalization();
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   if (!quest) return null;
   const npc = QUEST_NPCS[quest.turnInNpcId ?? quest.npcId];
@@ -439,7 +447,7 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
         onClose={onClose}
         footer={(
           <>
-            <button type="button" onClick={onClose}>Luk</button>
+            <button type="button" onClick={onClose}>{t("ui.close")}</button>
             <button type="button" onClick={() => setConfirmAbandon(true)}>Opgiv quest</button>
             {cityOpen && (
               <button type="button" disabled={!quest.complete} onClick={turnIn}>Indlever quest</button>
@@ -450,10 +458,10 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
       {confirmAbandon && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
-            <h3>Opgiv {quest.title}?</h3>
+            <h3>Opgiv {localizeQuestField(quest, "title", localize, renderTemplate)}?</h3>
             <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
             <div className="confirm-actions">
-              <button type="button" onClick={() => setConfirmAbandon(false)}>Annuller</button>
+              <button type="button" onClick={() => setConfirmAbandon(false)}>{t("ui.cancel")}</button>
               <button type="button" onClick={abandon}>Opgiv quest</button>
             </div>
           </section>
@@ -464,18 +472,20 @@ export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted,
 }
 
 export function QuestDetailCard({ quest, npc, onClose, footer }) {
+  const { localize, renderTemplate } = useLocalization();
   if (!quest) return null;
+  const questText = (field) => localizeQuestField(quest, field, localize, renderTemplate);
   return (
     <div className="confirm-backdrop" role="presentation">
-      <section className="confirm-dialog quest-offer-dialog quest-parchment-dialog quest-detail-dialog" role="dialog" aria-modal="true" aria-label={quest.title}>
+      <section className="confirm-dialog quest-offer-dialog quest-parchment-dialog quest-detail-dialog" role="dialog" aria-modal="true" aria-label={questText("title")}>
         <div className="quest-offer-header">
           {npc?.imageUrl && <img src={npc.imageUrl} alt="" />}
           <div>
-            <h2>{quest.title}</h2>
+            <h2>{questText("title")}</h2>
             <span>{npc?.name ?? "Questgiver"} - {npc?.title ?? ""}</span>
           </div>
         </div>
-        <p>{quest.complete ? quest.turnInText : quest.story}</p>
+        <p>{questText(quest.complete ? "turnInText" : "story")}</p>
         {quest.progressText && (
           <p className="quest-progress-line">
             <b>Progress:</b> {quest.progressText}
@@ -492,6 +502,7 @@ export function QuestDetailCard({ quest, npc, onClose, footer }) {
 }
 
 export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onClose, onToggleTracked, onOpenQuest, onAbandonQuest }) {
+  const { localize, renderTemplate, t } = useLocalization();
   const [tab, setTab] = useState(activeQuests.length > 0 ? "active" : "completed");
   const [selectedQuestId, setSelectedQuestId] = useState(activeQuests[0]?.id ?? null);
   const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
@@ -535,7 +546,7 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
     <div className="confirm-backdrop" role="presentation">
       <section className="confirm-dialog quest-overview-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-overview-title">
         <header className="quest-overview-head">
-          <h2 id="quest-overview-title">Questoversigt</h2>
+          <h2 id="quest-overview-title">{t("panel.questLog.title")}</h2>
           {activeQuests.length > 0 && completedQuests.length > 0 && (
             <div className="quest-overview-tabs">
               <button
@@ -577,7 +588,7 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                           "--quest-pct": `${completionPct}%`,
                         }}
                       >
-                        <b className="quest-name-label">{quest.title}</b>
+                        <b className="quest-name-label">{localizeQuestField(quest, "title", localize, renderTemplate)}</b>
                       </span>
                     </button>
                     {tab === "active" && (
@@ -600,7 +611,7 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                 <aside className="quest-overview-detail quest-parchment-panel">
                   <header>
                     <div>
-                      <b>{selectedQuest.title}</b>
+                      <b>{localizeQuestField(selectedQuest, "title", localize, renderTemplate)}</b>
                       <span>{selectedNpc?.name ?? "Questgiver"}{selectedNpc?.title ? ` | ${selectedNpc.title}` : ""}</span>
                     </div>
                     <div>
@@ -610,7 +621,12 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
                       )}
                     </div>
                   </header>
-                  <p>{selectedQuest.complete ? selectedQuest.turnInText : selectedQuest.story}</p>
+                  <p>{localizeQuestField(
+                    selectedQuest,
+                    selectedQuest.complete ? "turnInText" : "story",
+                    localize,
+                    renderTemplate,
+                  )}</p>
                   {selectedQuest.progressText && (
                     <p className="quest-progress-line">
                       <b>Progress:</b> {selectedQuest.progressText}
@@ -625,15 +641,15 @@ export function QuestOverviewDialog({ activeQuests, completedQuestIds = [], onCl
         </div>
 
         <footer className="quest-overview-foot">
-          <button type="button" onClick={onClose}>Luk</button>
+          <button type="button" onClick={onClose}>{t("ui.close")}</button>
         </footer>
       </section>
       {confirmAbandonQuest && (
         <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
-          <h3>Opgiv {confirmAbandonQuest.title}?</h3>
+          <h3>Opgiv {localizeQuestField(confirmAbandonQuest, "title", localize, renderTemplate)}?</h3>
           <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
           <div className="confirm-actions">
-            <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
+            <button type="button" onClick={() => setConfirmAbandonQuest(null)}>{t("ui.cancel")}</button>
             <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
           </div>
         </section>

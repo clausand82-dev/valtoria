@@ -4,8 +4,9 @@ export function createVillageOutskirtsMapRegions(region) {
     region({
       id: "path-to-hunter-hut",
       label: "Path to Hunter Hut",
+      i18n: { da: { label: "Sti til jaegerhytten" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 38,
       labelY: 10,
       // TODO:DELETE: weights: { tree: 6, rock: 2, foilage: 8, fireplace: 1 }
@@ -21,9 +22,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "lookout-post",
-      label: "Udkigsposten",
+      label: "Lookout Post",
+      i18n: { da: { label: "Udkigsposten" } },
       color: "#9fca66",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 35,
       labelY: 26,
       // TODO:DELETE: weights: { tree: 7, rock: 3, foilage: 7, fireplace: 1 }
@@ -40,9 +42,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "old-shrine",
-      label: "Den gamle helligdom",
+      label: "The Old Shrine",
+      i18n: { da: { label: "Den gamle helligdom" } },
       color: "#cadf74",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 72,
       labelY: 14,
       // TODO:DELETE: weights: { pillar: 2, ruin: 2, tree: 4, rock: 3, foilage: 5 }
@@ -62,9 +65,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "paths-into-elvindale",
-      label: "Stier videre ind i elvindalen",
+      label: "Paths into Elvindale",
+      i18n: { da: { label: "Stier videre ind i elvindalen" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 89,
       labelY: 13,
       // TODO:DELETE: weights: { tree: 8, rock: 2, foilage: 9, fireplace: 1 }
@@ -81,10 +85,11 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "southern-fields",
-      label: "Soendre marker",
+      label: "Southern Fields",
+      i18n: { da: { label: "Soendre marker" } },
       color: "#b4c46f",
       cityStats: { population: 5 },
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 70,
       labelY: 73,
       // TODO:DELETE: weights: { tree: 3, rock: 1, foilage: 6, house: 1, fireplace: 1 }
@@ -100,10 +105,11 @@ export function createVillageOutskirtsMapRegions(region) {
       points: "66.99,87.14 87.32,72.26 70.57,57.39 56.22,74.39",
     }),
     region({
-      id: "river-creek", label: "Elvbaekken", color: "#7fb6d6",
+      id: "river-creek", label: "River Creek", i18n: { da: { label: "Elvbaekken" } }, color: "#7fb6d6",
       unlock: {
         questStepCompleted: { questId: "annelise_document_chain", stepId: "ring_for_noble" },
-        text: "Kraever, at Noble har aabnet Elvbaekken.",
+        text: "Requires Noble to have opened River Creek.",
+        i18n: { da: { text: "Kraever, at Noble har aabnet Elvbaekken." } },
       },
       labelX: 49, labelY: 79,
       mapSize: "small",
@@ -201,9 +207,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "trail-to-inner-elvindale",
-      label: "Sti mod Elvindalens indre dal",
+      label: "Trail to Inner Elvindale",
+      i18n: { da: { label: "Sti mod Elvindalens indre dal" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 25,
       labelY: 77,
       // TODO:DELETE: weights: { tree: 6, rock: 2, foilage: 9, fireplace: 1 }
@@ -221,6 +228,7 @@ export function createVillageOutskirtsMapRegions(region) {
     region({
       id: "market-square",
       label: "Marketplace",
+      i18n: { da: { label: "Markedspladsen" } },
       color: "#f0d58a",
       mapSize: "medium",
       unlock: {
@@ -229,6 +237,7 @@ export function createVillageOutskirtsMapRegions(region) {
           { questCompleted: "elis_stolen_fruit_barrel" },
         ],
         text: "Marketplace aabnes, naar Elis beder dig finde den stjaalne frugt.",
+        i18n: { da: { text: "Markedspladsen aabnes, naar Elis beder dig finde den stjaalne frugt." } },
       },
       labelX: 50,
       labelY: 45,
@@ -285,7 +294,8 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "well",
-      label: "Broenden",
+      label: "The Well",
+      i18n: { da: { label: "Broenden" } },
       mapSize: "small",
       color: "#7fb6d6",
       cityStats: { population: 5, water: 50 },
@@ -294,7 +304,8 @@ export function createVillageOutskirtsMapRegions(region) {
           { questActive: "miri_find_father" },
           { questCompleted: "miri_find_father" },
         ],
-        text: "Broenden aabnes, naar Miri beder dig finde Rusk.",
+        text: "The Well opens when Miri asks you to find Rusk.",
+        i18n: { da: { text: "Broenden aabnes, naar Miri beder dig finde Rusk." } },
       },
       labelX: 53,
       labelY: 52,
@@ -326,7 +337,8 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "inn-of-the-good-oak",
-      label: "Kroen Den Gode Eg",
+      label: "Inn of the Good Oak",
+      i18n: { da: { label: "Kroen Den Gode Eg" } },
       corrupted: true,
       cityStats: { population: 5, supply: 20, trade: 10, culture: 5, },
       mapSize: "small",
@@ -456,7 +468,8 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "barn",
-      label: "Laden",
+      label: "The Barn",
+      i18n: { da: { label: "Laden" } },
       mapSize: "small",
       color: "#c4a86a",
       cityStats: { population: 5, provision: 50, trade: 5, wealth: 5 },
@@ -494,9 +507,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "mill",
-      label: "Kvaernen",
+      label: "The Mill",
+      i18n: { da: { label: "Kvaernen" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 83,
       labelY: 57,
       // TODO:DELETE: weights: { house: 3, tree: 3, rock: 2, foilage: 4, fireplace: 1 }
@@ -513,9 +527,10 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "hunter-trail-to-the-forest",
-      label: "Jaegerstien mod skoven",
+      label: "Hunter Trail to the Forest",
+      i18n: { da: { label: "Jaegerstien mod skoven" } },
       color: "#9fca66",
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 93,
       labelY: 45,
       // TODO:DELETE: weights: { tree: 9, rock: 2, foilage: 10, fireplace: 1 }
@@ -532,7 +547,8 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "smithy",
-      label: "Smedjen",
+      label: "The Smithy",
+      i18n: { da: { label: "Smedjen" } },
       mapSize: "small",
       color: "#c4a86a",
       cityStats: { population: 10, trade: 10, health: 10, culture: 5 },
@@ -593,10 +609,11 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "northern-fields",
-      label: "Nordlige marker",
+      label: "Northern Fields",
+      i18n: { da: { label: "Nordlige marker" } },
       color: "#b4c46f",
       cityStats: { population: 25, provision: 15 },
-      unlock: { locked: true, text: "Laas op ved at fuldfoere quests i landsbyen." },
+      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       tileset: { fileName: "tileset/tileset_field.png"},
       foliageSet: [
         { fileName: "foilage/foilage_field.png", weight: 45, lootTables: ["material_plant"]},
@@ -626,7 +643,8 @@ export function createVillageOutskirtsMapRegions(region) {
     }),
     region({
       id: "village",
-      label: "Landsbyen",
+      label: "The Village",
+      i18n: { da: { label: "Landsbyen" } },
       color: "#d7a85b",
       mapSize: "medium",
       cityStats: { population: 50 },
@@ -727,6 +745,7 @@ export function createVillageOutskirtsMapRegions(region) {
     region({
       id: "the-forest",
       label: "The Forest",
+      i18n: { da: { label: "Skoven" } },
       color: "#7fb172",
       mapSize: "large",
       cityStats: { population: 20 },
@@ -748,7 +767,8 @@ export function createVillageOutskirtsMapRegions(region) {
           { questActive: "find_veldors_wife" },
           { questCompleted: "find_veldors_wife" },
         ],
-        text: "Skoven aabnes, naar Priest sender dig efter Veldors kone.",
+        text: "The forest opens when Priest sends you to find Veldor's wife.",
+        i18n: { da: { text: "Skoven aabnes, naar Priest sender dig efter Veldors kone." } },
       },
       labelX: 54,
       labelY: 16,

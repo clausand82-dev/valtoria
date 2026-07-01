@@ -1,7 +1,7 @@
 STATUS:
 Små rettelse observeret igennem spil test:
-- noget betingelse på bank mobs map (måske forskellige mængde objekter udfra wealth)
 - skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
+- lad de sidste oversættelser
 
 
 HELP system
@@ -12,6 +12,9 @@ Selve hjælpe systemet skal være et modal med en side menu der fylder 1/3 af mo
 Menu delen er inddelt i passende overskrifter og passende underpunktet (overskift er collapsebe). Et klik på overskrifter/overpunkter åbner og lukker underpunkter. Et klik på et underpunkt åbner underpunktets indhold i indholdsfeltet.
 
 Hjælpesystemet skal være søgbart og guiderne skal benytte eksisterende billeder i sine forklaringer med mulighed for jeg kan bytte billederne ud. Alt skal matche systemets nuværende layout.
+
+HJÆLPESYSTEM IGANG MED IMPLAMANTERING
+
 
 
 
@@ -30,6 +33,8 @@ CITY QUESTS:
 ARTIFACTS:
 
 
+VEJRSYSTEM
+Et vejrsystem, der skifter ved hver city visit. lydra/netdra balance spiller ind på vejret, samtidig med lidt randomness. Forskelligt vejr giver fordele eller ulemper. F.eks. giver for meget sol tørke, som reducere provision. Skal gennemtænkes noget mere
 
 
 --- TJEK OM DISSE POLICY FINDES ---

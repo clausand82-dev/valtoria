@@ -3,6 +3,7 @@ import { getMonsterDiscovery } from "./world-state.js";
 import { FACTIONS } from "./config/faction-config.js";
 import { speciesLabel } from "./config/species-config.js";
 import { tagLabel } from "./config/tag-config.js";
+import { getMonsterCatalogEntry, getMonsterDisplayName } from "../i18n/beast/monster-localization.js";
 
 const STAT_LABELS = {
   hp: "HP",
@@ -24,8 +25,8 @@ const STAT_LABELS = {
   natureResist: "Nature resist",
 };
 
-export function monsterLibraryTitle(monsterId, def = MONSTER_DEFS[monsterId]) {
-  return String(def?.library?.title ?? def?.displayName ?? def?.name ?? monsterId ?? "Ukendt vaesen");
+export function monsterLibraryTitle(monsterId, language = "en") {
+  return getMonsterDisplayName(monsterId, language);
 }
 
 export function monsterDiscoveryStage(entry = {}) {
@@ -35,23 +36,25 @@ export function monsterDiscoveryStage(entry = {}) {
   return "unknown";
 }
 
-export function getBestiaryEntries(worldState) {
+export function getBestiaryEntries(worldState, language = "en") {
   const discovery = getMonsterDiscovery(worldState);
   return Object.entries(MONSTER_DEFS)
     .map(([monsterId, def]) => {
       const entry = discovery[monsterId] ?? {};
       const stage = monsterDiscoveryStage(entry);
+      const catalogEntry = getMonsterCatalogEntry(monsterId, language);
       return {
         id: monsterId,
         def,
         stats: MONSTER_STATS[monsterId] ?? def.stats ?? {},
         discovery: entry,
         stage,
-        title: stage === "unknown" ? "Ukendt vaesen" : monsterLibraryTitle(monsterId, def),
-        sortTitle: monsterLibraryTitle(monsterId, def).toLocaleLowerCase("da-DK"),
+        catalogEntry,
+        title: stage === "unknown" ? (language === "da" ? "Ukendt væsen" : "Unknown creature") : catalogEntry.title,
+        sortTitle: catalogEntry.title.toLocaleLowerCase(language === "da" ? "da-DK" : "en-US"),
       };
     })
-    .sort((a, b) => a.sortTitle.localeCompare(b.sortTitle, "da-DK"));
+    .sort((a, b) => a.sortTitle.localeCompare(b.sortTitle, language === "da" ? "da-DK" : "en-US"));
 }
 
 export function bestiarySpriteSheet(monsterId) {
@@ -79,12 +82,12 @@ export function bestiaryRegionRows(entry = {}) {
     .sort((a, b) => a.regionId.localeCompare(b.regionId, "da-DK"));
 }
 
-export function bestiaryMetadataRows(entry = {}) {
+export function bestiaryMetadataRows(entry = {}, language = "en") {
   const { stage, stats = {} } = entry;
   const fought = stage === "fought" || stage === "killed";
   const killed = stage === "killed";
   const rows = [];
-  if (fought && stats.speciesId) rows.push({ key: "species", label: "Species", value: speciesLabel(stats.speciesId) });
+  if (fought && stats.speciesId) rows.push({ key: "species", label: "Species", value: speciesLabel(stats.speciesId, language) });
   if (killed && stats.factionId) rows.push({ key: "faction", label: "Faction", value: FACTIONS[stats.factionId]?.label ?? stats.factionId });
   if (fought && Array.isArray(stats.tags) && stats.tags.length) {
     rows.push({ key: "tags", label: "Tags", value: stats.tags.map(tagLabel).join(", ") });

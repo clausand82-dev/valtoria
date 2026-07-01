@@ -40,7 +40,8 @@ kun en farm, resten er bare areas der hedder farm!
 - startet to do some wall code, but deactivated for now as it's not finish
 - building you will get by quest can't be bought (bank, mechant, sanctury and blacksmith)
 - items can now get destroyWhenDurabilityDepleted - when set to true item will disaperar when reaching 0% durability
-
+- added beginning of multi lang system (started at quest, unique and named items, classes, most of ui in city) - changed lang in city settings
+- added helping system
 
 *V. 0.84
 - fixed ale brewing didn't cost and give citystat water
@@ -162,7 +163,7 @@ kun en farm, resten er bare areas der hedder farm!
 - added new player class system
 - 
 
-* V. 0.72
+*V. 0.72
 - added a new particle system, visuel better and can use png's
 - new city stats added, some old one removed and other replaced
 - regions now have a 10 level corruption system
@@ -172,7 +173,7 @@ kun en farm, resten er bare areas der hedder farm!
 - new building: Armory - use to convert items (weapon and armor) to weaponPoint and armorPoints to be uses at payment for units
 - added durability visual effect to city (smoke, flames and ruin pictures of buildings)
 
-- V 0.71
+*V. 0.71
 - added new quest and quest types (npc can now have startNpcIds and turnInNpcIds)
 - changed a bit i particle system (leaves works on tree now also, not just as weather)
 - added new mobs (Spawn of Hydra, Hellhound, Gigant Troll, Mountain Troll, Shadwo Dragon, Infernus Minions, Spawn of Archnogrim, Flesheater)
@@ -183,7 +184,7 @@ kun en farm, resten er bare areas der hedder farm!
 - opdated shadows (same, but more blurred so more realistic)
 
 
-* V. 0.70
+*V. 0.70
 - removed old legacy biodome use (a fragment is still there to make system works with old saves, but it's less used)
 - changed prefabs to use new decay system instead of lagacy
 - made a better popup for city mobs attack (more prety, but can still use more work)
@@ -193,14 +194,14 @@ kun en farm, resten er bare areas der hedder farm!
 - repair list now shows if item is equept or i back pack
 - city menu bottom now have texture picture (background)
 
-* V. 0.63
+*V. 0.63
 - added a new back pack/charater sheet - more graphic
 - changed default back pack slot count from 30 to 42
 - added settings for auto pickup (combine type of item with rarity)
 - repairlist i blacksmith will now show both equipt and items in back pack and have symbol for each
 - made a menu city mode menu at bottom instead of same quick iron menu as in battle maps
 
-* V. 0.62
+*V. 0.62
 - added wolf\_cub og wolf\_fenris (last as boss)
 - moved food barrel recipes from code to config file
 - loading battle maps now only loads nessacery assets and base core, next map will load not allready nessecary assets
@@ -214,7 +215,7 @@ kun en farm, resten er bare areas der hedder farm!
 - added magic damage to weapons
 - a small prefeb system is implemented, is a light version and can be more advandced later
 
-* V. 0.61
+*V. 0.61
 - app.jsx is reduced more
 - shared.jsx is split into smaller files and deleted
 - fixed bank stacking
@@ -226,7 +227,7 @@ kun en farm, resten er bare areas der hedder farm!
 - use of resources now draw from every inventory slot (back pack first)
 - redesigned army system (now you buy different army unit to use defending city)
 
-* V. 0.60
+*V. 0.60
 - total new city map look
 - area are introduced i city
 - city stats is introduced (population, provision, water, housing, health, city defence aso ...)
@@ -235,7 +236,7 @@ kun en farm, resten er bare areas der hedder farm!
 - items now have durability (won't save still)
 - app.jsx was a big 6000+ lines files, it has been split to more managed files
 
-* V. 0.50
+*V. 0.50
 - added armor slot for belt, cape, relic and shoulders
 - loottable added for new items
 - added lord kealand unique items
@@ -248,12 +249,12 @@ kun en farm, resten er bare areas der hedder farm!
 - foilage can now have fixed scale
 - added more foilage sets
 
-* V. 0.40
+*V. 0.40
 - removed hero movement fra city mode - using mouse clikc instead
 - change a lot behind the scenes (rearranged files)
 - added boss system, socket system and many function to houses
 
-* V. 0.31
+*V. 0.31
 - changed quest system (added quest demands)
 - NPC are now permanent placed in city
 - NPC can give more quest at a time
@@ -263,7 +264,7 @@ kun en farm, resten er bare areas der hedder farm!
 - changed label color on open region on map
 - added visualization to quests
 
-* V. 0.30
+*V. 0.30
 - change a bit in map layout
 - locked all regions off and make my way by making quest as I'm unlocking it
 - introduced new foilage, object, decay, tileset, mapSize options on region setting (old one is still in effect but are legazy forward on)
@@ -271,7 +272,7 @@ kun en farm, resten er bare areas der hedder farm!
 - added more new graphic (foilage, tileset, decay, object)
 - added more mobs based on spider mob (MiniSpider, MediumSpider and LargeSpider)
 
-* V. 0.20
+*V. 0.20
 - added NPC and quest
 - added new icon in bottom menu
 - added big map and character view modals
@@ -282,7 +283,7 @@ kun en farm, resten er bare areas der hedder farm!
 - region is the main source for controlling mobs, biodome and loot lock
 - world map and region can be locked (region maybe still can't)
 
-* V. 0.10
+*V. 0.10
 - added more foilage for each biodome
 - added resources to collect
 - changed stone and crystal as destructable objects
@@ -294,6 +295,6 @@ kun en farm, resten er bare areas der hedder farm!
 - added hero picture at stats bars
 - added city map with 9 buildings (function will be added later)
 
-* V. 0.01
+*V. 0.01
 - first working edition
 

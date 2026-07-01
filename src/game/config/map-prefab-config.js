@@ -4,6 +4,7 @@ export const MAP_PREFABS = {
   small_camp: {
     id: "small_camp",
     label: "Small Camp",
+    i18n: { da: { label: "Lille lejr" } },
     w: 7,
     h: 6,
     tags: ["camp", "forest", "early"],
@@ -35,6 +36,7 @@ export const MAP_PREFABS = {
   broken_wagon_ambush: {
     id: "broken_wagon_ambush",
     label: "Broken Wagon Ambush",
+    i18n: { da: { label: "Baghold ved smadret vogn" } },
     w: 8,
     h: 5,
     tags: ["ambush", "road", "forest"],
@@ -66,6 +68,7 @@ export const MAP_PREFABS = {
   ruined_shrine: {
     id: "ruined_shrine",
     label: "Ruined Shrine",
+    i18n: { da: { label: "Forfalden helligdom" } },
     w: 7,
     h: 7,
     tags: ["ruin", "shrine", "forest"],
@@ -101,6 +104,7 @@ export const MAP_PREFABS = {
   old_well_clearing: {
     id: "old_well_clearing",
     label: "Old Well Clearing",
+    i18n: { da: { label: "Lysning ved gammel broend" } },
     w: 5,
     h: 5,
     tags: ["well", "clearing", "forest", "early"],
@@ -134,6 +138,7 @@ export const MAP_PREFABS = {
   spider_nest: {
     id: "spider_nest",
     label: "Spider Nest",
+    i18n: { da: { label: "Edderkopperede" } },
     w: 7,
     h: 6,
     tags: ["spider", "nest", "forest"],
@@ -166,6 +171,7 @@ export const MAP_PREFABS = {
   inn_cellar_crack: {
     id: "inn_cellar_crack",
     label: "Inn Cellar Crack",
+    i18n: { da: { label: "Kroens kaeldersproekke" } },
     w: 5,
     h: 5,
     tags: ["inn", "cellar", "quest"],
@@ -215,6 +221,7 @@ export const MAP_PREFABS = {
   smithy_repair_station: {
     id: "smithy_repair_station",
     label: "Smithy Repair Station",
+    i18n: { da: { label: "Smedjens reparationsstation" } },
     w: 7,
     h: 6,
     tags: ["smithy", "quest", "repair"],
@@ -251,6 +258,7 @@ export const MAP_PREFABS = {
   blacksmith_boar_cave_entrance: {
     id: "blacksmith_boar_cave_entrance",
     label: "Bloodied Cave Entrance",
+    i18n: { da: { label: "Blodig huleindgang" } },
     w: 6,
     h: 5,
     tags: ["cave", "quest", "boar"],
@@ -282,6 +290,7 @@ export const MAP_PREFABS = {
   forest_mine_entrance: {
     id: "forest_mine_entrance",
     label: "Forest Mine Entrance",
+    i18n: { da: { label: "Skovminens indgang" } },
     w: 6,
     h: 5,
     tags: ["cave", "mine", "quest", "forest"],
@@ -309,7 +318,8 @@ export const MAP_PREFABS = {
 
     labyrint: {
     id: "labyrint",
-    label: "Labyrint",
+      label: "Labyrinth",
+      i18n: { da: { label: "Labyrint" } },
     w: 10,
     h: 10,
     tags: ["labyrint", "clearing", "forest", "early"],
