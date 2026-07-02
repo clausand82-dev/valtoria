@@ -143,7 +143,10 @@ export const questsMethods = {
       const total = Math.max(targetTotal, Math.max(0, Math.floor(Number(quest.progress?.total) || 0)));
       quest.progress = { ...(quest.progress ?? {}), targets, total, done };
       changed = true;
-      if (done >= total) this.addToast?.(`${quest.title} klar til indlevering`);
+      if (done >= total) this.addToast?.(`${quest.title} ready to turn in`, {
+        kind: "quest",
+        localization: { type: "questReady", questId: quest.questId ?? quest.id },
+      });
     }
     return changed;
   },
@@ -1021,8 +1024,16 @@ export const questsMethods = {
       }
     }
     this.addToast(source === "readable"
-      ? `${quest.title} startet fra ${quest.sourceLabel ?? "readable"}`
-      : `${QUEST_NPCS[quest.npcId]?.name ?? "NPC"}: ${quest.acceptText}`);
+      ? `${quest.title} started from ${quest.sourceLabel ?? "readable"}`
+      : `${QUEST_NPCS[quest.npcId]?.name ?? "NPC"}: ${quest.acceptText}`, {
+      kind: "quest",
+      localization: {
+        type: source === "readable" ? "questStartedFromReadable" : "questAccepted",
+        questId: quest.questId ?? quest.id,
+        npcId: quest.npcId,
+        sourceLabel: quest.sourceLabel ?? "readable",
+      },
+    });
     this.publishSnapshot();
     this.saveProgress({ force: true });
     return true;
@@ -1080,6 +1091,18 @@ export const questsMethods = {
     if (!offer) return null;
     const accepted = this.acceptQuestOffer(offer, "readable");
     return accepted ? offer : null;
+  },
+
+  startQuestFromAction(start = {}) {
+    const questId = String(start.questId ?? start.id ?? "").trim();
+    const def = resolveQuestDefById(questId);
+    const npcId = String(start.npcId ?? getQuestStartNpcIds(def)?.[0] ?? getQuestTurnInNpcIds(def)?.[0] ?? "");
+    if (!def || !npcId || !this.questDefinitionCanOffer(def, npcId, "readable")) return false;
+    const offer = this.buildQuestOffer(def, npcId, {
+      source: "action",
+      sourceLabel: start.sourceLabel ?? "World discovery",
+    });
+    return Boolean(offer && this.acceptQuestOffer(offer, "readable"));
   },
 
   setQuestTracked(instanceId, tracked) {
@@ -1185,7 +1208,10 @@ export const questsMethods = {
               quest.progress = { ...(quest.progress ?? {}), killObjectives: nextKills };
             }
             changed = true;
-            if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
+            if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} ready to turn in`, {
+              kind: "quest",
+              localization: { type: "questReady", questId: quest.questId ?? quest.id },
+            });
           }
         }
       }
@@ -1210,7 +1236,10 @@ export const questsMethods = {
       if (current >= needed) continue;
       quest.progress = { ...(quest.progress ?? {}), kills: Math.min(needed, current + 1) };
       changed = true;
-      if (quest.progress.kills >= needed) this.addToast(`${quest.title} klar til indlevering`);
+      if (quest.progress.kills >= needed) this.addToast(`${quest.title} ready to turn in`, {
+        kind: "quest",
+        localization: { type: "questReady", questId: quest.questId ?? quest.id },
+      });
     }
     if (changed) this.publishSnapshot();
   },
@@ -1340,7 +1369,10 @@ export const questsMethods = {
   applyQuestItemPickup(item) {
     const quest = this.questState.active.find((entry) => entry.id === item.questInstanceId);
     if (!quest || quest.type !== "collect_quest_item") return;
-    if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} klar til indlevering`);
+    if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} ready to turn in`, {
+      kind: "quest",
+      localization: { type: "questReady", questId: quest.questId ?? quest.id },
+    });
   },
 
   completeQuest(instanceId, npcId = null, options = {}) {

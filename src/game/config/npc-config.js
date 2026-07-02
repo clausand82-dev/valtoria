@@ -1,4 +1,17 @@
 export const QUEST_NPCS = {
+  grieving_mother: {
+    name: "Mara",
+    title: "Grieving Mother",
+    i18n: { da: { title: "Sørgende mor" } },
+    imageUrl: "/assets/generated/npc/npc_lady.png",
+    cityLocation: "random",
+    cityHint: "Near the quiet edge of the city",
+    wildernessText: "Mara waits in the city for her husband and son.",
+    dialogue: {
+      active: "Please... if there is anything left to learn, do not leave him forgotten.",
+      completed: "I waited for their footsteps. Now I will remember their courage instead.",
+    },
+  },
   mayor: {
     name: "Mayor",
     title: "Mayor",

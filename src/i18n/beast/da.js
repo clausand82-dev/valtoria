@@ -1,4 +1,11 @@
 export const BEAST_DA = {
+  arachnogrim_offspring: {
+    title: "Arachnogrim-yngel",
+    text: "Et ondskabsfuldt ungt væsen fra en unaturlig yngel, hurtigt nok til at overmande isolerede byttedyr.",
+    strengths: ["Hurtig", "Farlig i grupper"],
+    weaknesses: ["Lav udholdenhed", "Kort rækkevidde"],
+    habitatText: "Findes i forseglede, spinddækkede grotter."
+  },
   fallen: {
     title: "Faldne",
     text: "En svækket dæmonskikkelse, der stadig bærer rester af mørk kraft. Den angriber hurtigt og uden omtanke, men kan fældes, hvis man ikke lader den presse sig tæt på.",

@@ -1,4 +1,5 @@
 import { NAMED_ITEM_TEMPLATES, UNIQUE_ITEMS } from "../game/config/item-config.js";
+import { READABLE_DEF_BY_ID } from "../game/config/readable-config.js";
 import { RESOURCE_DEFS } from "../game/config/resource-config.js";
 import { potionDefById } from "../game/config/potion-config.js";
 
@@ -8,6 +9,7 @@ const NAMED_ITEM_BY_ID = new Map(NAMED_ITEM_TEMPLATES.map((item) => [String(item
 export function itemLocalizationEntity(item) {
   if (item?.resourceId) return RESOURCE_DEFS[String(item.resourceId)] ?? item;
   if (item?.potionId || item?.potionType) return potionDefById(item.potionId ?? item.potionType) ?? item;
+  if (item?.readableId) return READABLE_DEF_BY_ID[String(item.readableId)] ?? item;
   if (item?.uniqueId) return UNIQUE_ITEM_BY_ID.get(String(item.uniqueId)) ?? item;
   if (item?.namedId) return NAMED_ITEM_BY_ID.get(String(item.namedId)) ?? item;
   return item;
@@ -15,7 +17,8 @@ export function itemLocalizationEntity(item) {
 
 export function localizeItemField(item, field, localize) {
   const entity = itemLocalizationEntity(item);
-  return localize?.(entity, field) || item?.[field] || "";
+  const entityField = item?.readableId && field === "name" ? "title" : field;
+  return localize?.(entity, entityField) || entity?.[entityField] || item?.[field] || "";
 }
 
 const SUMMARY_REPLACEMENTS = {

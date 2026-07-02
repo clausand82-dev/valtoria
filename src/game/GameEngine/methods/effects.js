@@ -895,6 +895,9 @@ export const effectsMethods = {
       id,
       text: textValue,
       title: opts.title ? String(opts.title) : "",
+      localization: opts.localization && typeof opts.localization === "object"
+        ? { ...opts.localization }
+        : null,
       kind: isQuestToast ? (requestedKind || "quest") : (requestedKind || "info"),
       important,
       life,

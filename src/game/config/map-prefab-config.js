@@ -1,6 +1,43 @@
 export const DEBUG_MAP_PREFABS = false;
 
 export const MAP_PREFABS = {
+  young_boys_father_cave_entrance: {
+    id: "young_boys_father_cave_entrance",
+    label: "Webbed Cave",
+    i18n: { da: { label: "Spinddækket grotte" } },
+    w: 7,
+    h: 6,
+    tags: ["cave", "quest", "spider"],
+    anchor: "clearing",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 10,
+    avoidExit: 8,
+    objects: [{ id: "object_caves", x: 3, y: 2, blocking: false, actionId: "enter_young_boys_father_cave" }],
+    decals: [{ decayId: "decay_spiderweb", x: 3, y: 3, cell: 6, size: 1.4 }],
+  },
+  young_boys_body_site: {
+    id: "young_boys_body_site",
+    label: "A Silent Place",
+    i18n: { da: { label: "Et stille sted" } },
+    w: 7,
+    h: 6,
+    tags: ["quest", "corpse", "hidden-encounter"],
+    anchor: "clearing",
+    rotate: true,
+    mirror: true,
+    clearArea: true,
+    avoidStart: 9,
+    avoidExit: 7,
+    foliage: [
+      { fileName: "foilage/foilage_deadvillages.png", x: 3, y: 3, cell: 14, size: 1.15, actionId: "inspect_young_boys_body" },
+      { fileName: "foilage/foilage_boneparts.png", x: 4, y: 3, variant: 2, size: 0.38 },
+    ],
+    decals: [
+      { decayId: "decay_dust", x: 3, y: 3, cell: 5, size: 1.1 },
+    ],
+  },
   small_camp: {
     id: "small_camp",
     label: "Small Camp",

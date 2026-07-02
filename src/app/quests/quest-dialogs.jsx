@@ -99,7 +99,7 @@ function collectQuestTargets(quest, localize) {
     if (!resourceId) continue;
     rows.push({
       key: `resource-${resourceId}`,
-      label: `${entry.count ?? 1}x ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`,
+      label: `${entry.count ?? 1}x ${localize(RESOURCE_DEFS[resourceId], "name") || resourceId}`,
       iconUrl: iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId })),
     });
   }
@@ -168,7 +168,7 @@ function QuestRewardList({ quest }) {
         </span>
       ))}
       {(rewards.resources ?? []).map((r) => (
-        <span className="diff-good" key={`res-${r.resource ?? r.id}`}>+ {r.count}x {r.name ?? RESOURCE_DEFS[r.resource ?? r.id]?.name ?? r.resource ?? r.id}</span>
+        <span className="diff-good" key={`res-${r.resource ?? r.id}`}>+ {r.count}x {r.name ?? localize(RESOURCE_DEFS[r.resource ?? r.id], "name") ?? r.resource ?? r.id}</span>
       ))}
       {(rewards.items ?? []).map((item, index) => (
         <span className="diff-good" key={`reward-item-${item.id ?? index}`}>+ {localizeItemField(item, "name", localize)}</span>

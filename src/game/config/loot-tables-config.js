@@ -222,9 +222,31 @@ export const LOOT_TABLES = {
     { type: "readable", id: "blizzard_spellbook", readableId: "blizzard_spellbook", chance: 0.009 }
   ],
   readable_fire_spellbooks: [
-    { type: "readable", id: "explosion_spellbook", readableId: "explosion_spellbook", chance: 0.01 },
-    { type: "readable", id: "firerain_spellbook", readableId: "firerain_spellbook", chance: 0.01 }
+    { type: "readable", id: "explosion_spellbook", readableId: "explosion_spellbook", chance: 0.001 },
+    { type: "readable", id: "firerain_spellbook", readableId: "firerain_spellbook", chance: 0.001 },
+    { type: "readable", id: "firerain_spell_fragment_1", readableId: "firerain_spell_fragment_1", chance: 0.01 },
+    { type: "readable", id: "firerain_spell_fragment_2", readableId: "firerain_spell_fragment_2", chance: 0.01 },
   ],
+
+  readable_lore: [
+    { type: "readable", id: "demon_note_1", readableId: "demon_note_1", chance: 0.01 },
+    { type: "readable", id: "demon_note_2", readableId: "demon_note_2", chance: 0.01 },
+    { type: "readable", id: "demon_note_3", readableId: "demon_note_3", chance: 0.01 },
+    { type: "readable", id: "sam_tylion_lion_gold_idol_note", readableId: "sam_tylion_lion_gold_idol_note", chance: 0.001 },
+    { type: "readable", id: "note_nethrendor_black_decree", readableId: "note_nethrendor_black_decree", chance: 0.001 },
+    { type: "readable", id: "note_mirrorwater_lydrendor_hint", readableId: "note_mirrorwater_lydrendor_hint", chance: 0.001 },
+    { type: "readable", id: "note_half_shadow", readableId: "note_half_shadow", chance: 0.001 },
+    { type: "readable", id: "letter_evan_to_maren", readableId: "letter_evan_to_maren", chance: 0.001 },
+    { type: "readable", id: "demon_notes_compiled", readableId: "demon_notes_compiled", chance: 0.001 },
+    { type: "readable", id: "lord_kealands_missing_daughter", readableId: "lord_kealands_missing_daughter", chance: 0.001 },
+    { type: "readable", id: "lore_innkeeper_first_evening", readableId: "lore_innkeeper_first_evening", chance: 0.001 },
+    { type: "readable", id: "lore_nethrendor_first_light", readableId: "lore_nethrendor_first_light", chance: 0.001 },
+    { type: "readable", id: "lore_aeliriel_eldiria_testimony", readableId: "lore_aeliriel_eldiria_testimony", chance: 0.001 },
+    { type: "readable", id: "lore_unnamed_city_foldrik", readableId: "lore_unnamed_city_foldrik", chance: 0.001 },
+    { type: "readable", id: "lore_path_to_eldiriadalen", readableId: "lore_path_to_eldiriadalen", chance: 0.001 },
+    { type: "readable", id: "lore_arachnogrim_origin", readableId: "lore_arachnogrim_origin", chance: 0.001 },
+  ],
+
   // Other loot
   destroyed_item_poor_scrap: [
     { type: "resource", id: "junk", min: 1, max: 2, chance: 1 },

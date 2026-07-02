@@ -1,4 +1,52 @@
 export const ACTION_CONFIG = {
+  inspect_young_boys_body: {
+    id: "inspect_young_boys_body",
+    type: "inspect",
+    label: "Examine the boy",
+    text: "The boy is beyond help. In his cold hand is a mud-stained letter, protected all this way for the mother who was still waiting.",
+    i18n: { da: { label: "Undersøg drengen", text: "Drengen står ikke til at redde. I hans kolde hånd ligger et mudret brev, beskyttet hele vejen for den mor, der stadig ventede." } },
+    requires: {
+      all: [
+        { questCompleted: "confront_veldor_with_truth" },
+        { not: { questCompleted: "the_young_boys_letter" } },
+        { notFlag: "young_boys_letter_taken" },
+      ],
+    },
+    rewards: { items: { young_boys_fathers_letter: 1 } },
+    questStart: { questId: "the_young_boys_letter", npcId: "grieving_mother" },
+    setFlags: ["young_boys_letter_taken"],
+    removeTarget: true,
+    once: true,
+  },
+
+  enter_young_boys_father_cave: {
+    id: "enter_young_boys_father_cave",
+    type: "enterSubregion",
+    label: "Enter the webbed cave",
+    i18n: { da: { label: "Gå ind i den spinddækkede grotte" } },
+    targetSubregionId: "young_boys_father_cave",
+    instanceScope: "sourceObject",
+    persistence: "whileRootRegionActive",
+    requires: { questStepActive: { questId: "the_young_boys_letter", stepId: "search_fathers_cave" } },
+  },
+
+  inspect_young_boys_father: {
+    id: "inspect_young_boys_father",
+    type: "inspect",
+    label: "Examine the father",
+    text: "The spiders found him before help could. Beside him lies a final page: he sent his son home with the warning, then stayed to keep the brood inside the cave.",
+    i18n: { da: { label: "Undersøg faderen", text: "Edderkopperne fandt ham før hjælpen. Ved hans side ligger en sidste side: Han sendte sin søn hjem med advarslen og blev selv tilbage for at holde ynglen inde i grotten." } },
+    readableId: "young_boys_fathers_last_page",
+    requires: {
+      questStepActive: { questId: "the_young_boys_letter", stepId: "search_fathers_cave" },
+      flag: "young_boys_father_cave_cleared",
+      notFlag: "young_boys_father_found",
+    },
+    rewards: { items: { young_boys_fathers_last_page: 1 } },
+    setFlags: ["young_boys_father_found"],
+    removeTarget: true,
+    once: true,
+  },
   inspect_random_ruin: {
     id: "inspect_random_ruin",
     type: "inspect",

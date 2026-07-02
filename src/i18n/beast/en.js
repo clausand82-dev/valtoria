@@ -1,4 +1,11 @@
 export const BEAST_EN = {
+  arachnogrim_offspring: {
+    title: "Arachnogrim Offspring",
+    text: "A vicious juvenile from an unnatural brood, fast enough to overwhelm isolated prey.",
+    strengths: ["Fast", "Dangerous in groups"],
+    weaknesses: ["Low endurance", "Short range"],
+    habitatText: "Found in sealed, web-choked caves."
+  },
   fallen: {
     title: "Fallen",
     text: "A weakened demonic figure still carrying traces of dark power. It attacks quickly and without thought, but can be brought down if it is not allowed to press in close.",

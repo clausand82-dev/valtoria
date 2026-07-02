@@ -6,11 +6,11 @@ import { InventoryIcon } from "../ui/icons.jsx";
 import { useLocalization } from "../../i18n/index.js";
 
 export function MergeChoiceDialog({ choice, onCancel, onChoose }) {
-  const { t } = useLocalization();
-  const mergeTitle = choice?.type === "readable-choice" ? "Choose assembled item" : "Choose merge result";
+  const { localize, t } = useLocalization();
+  const mergeTitle = choice?.type === "readable-choice" ? t("inventory.mergeChoice.readableTitle") : t("inventory.mergeChoice.title");
   const mergeBody = choice?.type === "readable-choice"
-    ? "These fragments can assemble more than one item."
-    : "This resource can be used in more than one recipe.";
+    ? t("inventory.mergeChoice.readableBody")
+    : t("inventory.mergeChoice.body");
   return (
     <div className="confirm-backdrop" role="presentation">
       <section className="confirm-dialog merge-choice-dialog" role="dialog" aria-modal="true" aria-labelledby="merge-choice-title">
@@ -22,7 +22,7 @@ export function MergeChoiceDialog({ choice, onCancel, onChoose }) {
               <InventoryIcon iconIndex={option.iconIndex} iconSheet={option.iconSheet} iconUrl={option.iconUrl} />
               <span>
                 <b>{option.name}</b>
-                <em>{formatMergeInputs(option.inputs, choice?.type)}</em>
+                <em>{formatMergeInputs(option.inputs, choice?.type, localize)}</em>
               </span>
             </button>
           ))}
@@ -35,12 +35,15 @@ export function MergeChoiceDialog({ choice, onCancel, onChoose }) {
   );
 }
 
-function formatMergeInputs(inputs, type = "resource-choice") {
+function formatMergeInputs(inputs, type = "resource-choice", localize = null) {
   return Object.entries(inputs)
     .map(([resourceId, count]) => {
-      if (type === "readable-choice") return `${count} ${READABLE_DEF_BY_ID[resourceId]?.title ?? resourceId}`;
-      if (type === "potion-choice") return `${count} ${potionDefById(resourceId)?.name ?? RESOURCE_DEFS[resourceId]?.name ?? resourceId}`;
-      return `${count} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`;
+      if (type === "readable-choice") return `${count} ${localize?.(READABLE_DEF_BY_ID[resourceId], "title") || resourceId}`;
+      if (type === "potion-choice") {
+        const def = potionDefById(resourceId) ?? RESOURCE_DEFS[resourceId];
+        return `${count} ${localize?.(def, "name") || resourceId}`;
+      }
+      return `${count} ${localize?.(RESOURCE_DEFS[resourceId], "name") || resourceId}`;
     })
     .join(" + ");
 }

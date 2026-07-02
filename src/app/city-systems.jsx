@@ -3111,11 +3111,12 @@ function cityCostAvailable(snapshot, resourceId, progress = null) {
   return resourceCountFromSnapshot(snapshot, resourceId) + cityStoredResourceCount(progress, resourceId);
 }
 
-function cityCostLabel(resourceId) {
+function cityCostLabel(resourceId, localize = null) {
   if (resourceId === "gold") return "Gold";
   if (resourceId === "weaponPoints") return "weaponPoints";
   if (resourceId === "armorPoints") return "armorPoints";
-  return RESOURCE_DEFS[resourceId]?.name ?? resourceId;
+  const resource = RESOURCE_DEFS[resourceId];
+  return localize?.(resource, "name") || resource?.name || resourceId;
 }
 
 

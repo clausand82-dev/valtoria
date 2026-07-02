@@ -26,9 +26,9 @@ export function ResourceBar({ type, value, label }) {
 }
 
 export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   return (
-    <div className="city-top-stat-bar" aria-label="City stats">
+    <div className="city-top-stat-bar" aria-label={t("city.stat.topBar")}>
       {stats.map((stat) => (
         <div
           className={`city-top-stat city-top-stat-${stat.classId}`}
@@ -58,16 +58,16 @@ export function CityStatsTopBar({ stats, onHoverStat = null, onSelectStat = null
 }
 
 export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, events = {} }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const activeEvents = cityEventEntries(events);
   return (
-    <div className="city-side-stats" aria-label="City summary stats">
-      <CitySideStat icon={CITY_STAT_ICON_URLS.gold} label="Gold" value={Math.max(0, Math.floor(Number(gold) || 0))} />
-      <CitySideStat icon="/assets/generated/icon/icon_threat.png" label="Threat" value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
-      <CitySideStat icon={CITY_STAT_ICON_URLS.popularity} label="Popularity" value={`${Math.max(0, Math.min(100, Math.floor(Number(popularity) || 0)))}%`} />
+    <div className="city-side-stats" aria-label={t("city.summaryStats")}>
+      <CitySideStat icon={CITY_STAT_ICON_URLS.gold} label={t("ui.gold")} value={Math.max(0, Math.floor(Number(gold) || 0))} />
+      <CitySideStat icon="/assets/generated/icon/icon_threat.png" label={t("city.threat")} value={`${Math.max(0, Math.min(100, Math.floor(Number(threatLevel) || 0)))}%`} />
+      <CitySideStat icon={CITY_STAT_ICON_URLS.popularity} label={t("city.popularity")} value={`${Math.max(0, Math.min(100, Math.floor(Number(popularity) || 0)))}%`} />
       {activeEvents.length > 0 && (
-        <div className="city-side-events" aria-label="Active city events">
-          <b>EVENT</b>
+        <div className="city-side-events" aria-label={t("city.events.active")}>
+          <b>{t("city.events.short")}</b>
           {activeEvents.map((event) => (
             <span className="city-side-event-entry" key={event.id} tabIndex={0}>
               {localize(event, "label")}
@@ -75,7 +75,7 @@ export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, event
                 <strong>{localize(event, "label")}</strong>
                 {event.detail ? <small>{localize(event, "detail")}</small> : null}
                 {event.solution ? <small>{localize(event, "solution")}</small> : null}
-                {citySideEventModifierText(event.modifiers) ? <em>{citySideEventModifierText(event.modifiers)}</em> : null}
+                {citySideEventModifierText(event.modifiers, t) ? <em>{citySideEventModifierText(event.modifiers, t)}</em> : null}
               </span>
             </span>
           ))}
@@ -95,22 +95,22 @@ function CitySideStat({ icon = null, label, value }) {
   );
 }
 
-function citySideEventModifierText(modifiers = {}) {
+function citySideEventModifierText(modifiers = {}, t = (key) => key) {
   const parts = [];
   const pct = (value) => `${Math.round((Number(value) || 1) * 100)}%`;
-  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(`Max HP ${pct(modifiers.heroMaxHpMultiplier)}`);
-  if (modifiers.goldDropMultiplier !== undefined) parts.push(`Gold drops ${pct(modifiers.goldDropMultiplier)}`);
-  if (modifiers.potionDropMultiplier !== undefined) parts.push(`Potion drops ${pct(modifiers.potionDropMultiplier)}`);
-  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(`Health potions ${pct(modifiers.healthPotionHealMultiplier)}`);
-  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(`City mob spawn ${pct(modifiers.cityMobSpawnChanceMultiplier)}`);
-  if (modifiers.repairCostMultiplier !== undefined) parts.push(`Repair cost ${pct(modifiers.repairCostMultiplier)}`);
-  if (modifiers.craftingCostMultiplier !== undefined) parts.push(`Crafting cost ${pct(modifiers.craftingCostMultiplier)}`);
-  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(`Buy prices ${pct(modifiers.merchantBuyPriceMultiplier)}`);
-  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(`Sell prices ${pct(modifiers.merchantSellPriceMultiplier)}`);
-  if (modifiers.merchantStockMultiplier !== undefined) parts.push(`Merchant stock ${pct(modifiers.merchantStockMultiplier)}`);
-  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(`Quest gold ${pct(modifiers.questGoldRewardMultiplier)}`);
-  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(`City decay chance ${pct(modifiers.cityDurabilityDegradeChanceMultiplier)}`);
-  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(`City damage ${pct(modifiers.cityDurabilityDamageMultiplier)}`);
+  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(t("city.eventModifier.heroMaxHp", { value: pct(modifiers.heroMaxHpMultiplier) }));
+  if (modifiers.goldDropMultiplier !== undefined) parts.push(t("city.eventModifier.goldDrops", { value: pct(modifiers.goldDropMultiplier) }));
+  if (modifiers.potionDropMultiplier !== undefined) parts.push(t("city.eventModifier.potionDrops", { value: pct(modifiers.potionDropMultiplier) }));
+  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(t("city.eventModifier.healthPotions", { value: pct(modifiers.healthPotionHealMultiplier) }));
+  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(t("city.eventModifier.cityMobSpawn", { value: pct(modifiers.cityMobSpawnChanceMultiplier) }));
+  if (modifiers.repairCostMultiplier !== undefined) parts.push(t("city.eventModifier.repairCost", { value: pct(modifiers.repairCostMultiplier) }));
+  if (modifiers.craftingCostMultiplier !== undefined) parts.push(t("city.eventModifier.craftingCost", { value: pct(modifiers.craftingCostMultiplier) }));
+  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(t("city.eventModifier.buyPrices", { value: pct(modifiers.merchantBuyPriceMultiplier) }));
+  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(t("city.eventModifier.sellPrices", { value: pct(modifiers.merchantSellPriceMultiplier) }));
+  if (modifiers.merchantStockMultiplier !== undefined) parts.push(t("city.eventModifier.merchantStock", { value: pct(modifiers.merchantStockMultiplier) }));
+  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(t("city.eventModifier.questGold", { value: pct(modifiers.questGoldRewardMultiplier) }));
+  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(t("city.eventModifier.cityDecayChance", { value: pct(modifiers.cityDurabilityDegradeChanceMultiplier) }));
+  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(t("city.eventModifier.cityDamage", { value: pct(modifiers.cityDurabilityDamageMultiplier) }));
   return parts.join(" | ");
 }
 

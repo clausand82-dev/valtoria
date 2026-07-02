@@ -299,6 +299,12 @@ function applyQuestAdvance(engine, action) {
   return changed;
 }
 
+function applyQuestStart(engine, action) {
+  if (!action.questStart) return { ok: true, changed: false };
+  const started = engine.startQuestFromAction?.(action.questStart);
+  return { ok: Boolean(started), changed: Boolean(started) };
+}
+
 function removeOrReplaceTarget(engine, action, target, sourceType) {
   let changed = false;
   if (sourceType !== "object") return changed;
@@ -345,7 +351,15 @@ function showActionText(engine, action) {
       || action.blockedBy?.questStepActive
       || action.blockedBy?.questStepCompleted,
   );
-  engine.addToast?.(clean, { kind: isQuestAction ? "quest_action" : "action", title });
+  engine.addToast?.(clean, {
+    kind: isQuestAction ? "quest_action" : "action",
+    title,
+    localization: {
+      type: "actionText",
+      actionId: action.id,
+      readableId: action.readableId ?? null,
+    },
+  });
   engine.addFloater?.(engine.player?.x ?? 0, engine.player?.y ?? 0, title ?? clean, "#f4da96", 1.05);
   return true;
 }
@@ -434,6 +448,9 @@ export function runAction({
 
   let changed = Boolean(result.changed);
   changed = applyCosts(engine, action.costs) || changed;
+  const questStart = applyQuestStart(engine, action);
+  if (!questStart.ok) return { ok: false, changed, reason: "quest_start" };
+  changed = questStart.changed || changed;
   changed = applyRewards(engine, action.rewards) || changed;
   changed = applyFlags(engine, action) || changed;
   changed = applyCounters(engine, action) || changed;

@@ -20,7 +20,7 @@ export const CHEAT_SETTINGS = {
   defaultDurability: 100,
   // Test-only city bootstrap. When false, config `prebuilt` is ignored and only
   // entries marked `ownedFromStart: true` are treated as owned at game start.
-  respectPrebuiltCityConfig: true,
+  respectPrebuiltCityConfig: false,
   questResetFlags: {
     check_inn_infestation: [
       "inn_crack_found",

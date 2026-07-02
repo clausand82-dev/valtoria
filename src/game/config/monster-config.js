@@ -28,7 +28,7 @@ export const MONSTER_DEFS = {
     speciesId: "demon",
     tags: ["demon", "medium"],
     stats: { hp: 35, damage: 7, speed: 1.62, range: 0.52, radius: 0.26, color: "#b84d43", xp: 12 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   "Thorn Husk": {
     sprite: monsterSprite({
@@ -39,7 +39,7 @@ export const MONSTER_DEFS = {
     speciesId: "plant",
     tags: ["plant", "medium"],
     stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   "Mire Brute": {
     sprite: monsterSprite({
@@ -50,7 +50,7 @@ export const MONSTER_DEFS = {
     speciesId: "plant",
     tags: ["plant", "large"],
     stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Hollow: {
     sprite: monsterSprite({
@@ -61,7 +61,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
   },
   "Shard Crawler": {
     sprite: monsterSprite({
@@ -72,7 +72,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
   },
   "Deep Guard": {
     sprite: monsterSprite({
@@ -83,7 +83,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Raider: {
     sprite: monsterSprite({
@@ -94,7 +94,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Ashbound: {
     sprite: monsterSprite({
@@ -105,7 +105,7 @@ export const MONSTER_DEFS = {
     speciesId: "demon",
     tags: ["demon", "medium"],
     stats: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   "Gate Warden": {
     sprite: monsterSprite({
@@ -116,7 +116,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   "Bone Warden": {
     sprite: monsterSprite({
@@ -127,7 +127,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "medium"],
     stats: { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Knight: {
     sprite: monsterSprite({
@@ -139,7 +139,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 96, damage: 17, speed: 1.18, range: 0.68, radius: 0.34, color: "#b8a06f", xp: 34, blockChance: 0.1 },
     popularity: { change: 0.9 },
-    lootTables: ["gold_medium", "material_humanoid", "monster_profile_humanoid", "equipment_defender_rare", "monster_special_global"]
+    lootTables: ["gold_medium", "material_humanoid", "monster_profile_humanoid", "equipment_defender_rare", "monster_special_global", "readable_lore"]
   },
   "Wild Boar": {
     sprite: monsterSprite({
@@ -250,7 +250,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
     popularity: { change: 0.35 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village02: {
     sprite: monsterSprite({
@@ -262,7 +262,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
     popularity: { change: 0.4 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Peasant: {
     sprite: monsterSprite({
@@ -274,7 +274,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 60, damage: 11, speed: 1.35, range: 0.58, radius: 0.3, color: "#8a7657", xp: 20 },
     popularity: { change: 0.3 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   Village03: {
     sprite: monsterSprite({
@@ -286,7 +286,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
     popularity: { change: 0.35 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village04: {
     sprite: monsterSprite({
@@ -298,7 +298,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
     popularity: { change: 0.38 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village05: {
     sprite: monsterSprite({
@@ -310,7 +310,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
     popularity: { change: 0.36 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village06: {
     sprite: monsterSprite({
@@ -322,7 +322,7 @@ export const MONSTER_DEFS = {
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
     popularity: { change: 0.4 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Wizard: {
     sprite: monsterSprite({
@@ -335,7 +335,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 64, damage: 16, speed: 1.12, range: 3.4, radius: 0.3, color: "#6f68c7", xp: 32, magic: 1.1 },
     spells: ["fireball", "energy_beam"],
     popularity: { change: 0.6 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "material_magic"]
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "material_magic", "readable_lore"]
   },
   "Spawn of Hydra": {
     sprite: monsterSprite({
@@ -454,7 +454,7 @@ export const MONSTER_DEFS = {
     stats: { hp: 320, damage: 42, speed: 0.62, range: 0.86, radius: 0.62, color: "#8d846f", xp: 72, blockChance: 0.12 },
     popularity: { change: 1.6 },
     attackCooldown: { min: 1.45, max: 2.1 },
-    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global"]
+    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   GiantTroll: {
     sprite: monsterSprite({
@@ -468,7 +468,7 @@ export const MONSTER_DEFS = {
     popularity: { change: 2.1 },
     attackCooldown: { min: 1.75, max: 2.5 },
     meleeAreaDamage: { radius: 3.2, damageMult: 0.72, visibleOnly: true, color: "#d8c091", shake: 10 },
-    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global"]
+    lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   "Rune Shade": {
     sprite: monsterSprite({
@@ -479,7 +479,7 @@ export const MONSTER_DEFS = {
     speciesId: "spirit",
     tags: ["spirit", "medium"],
     stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
   },
   "Iron Revenant": {
     sprite: monsterSprite({
@@ -490,7 +490,7 @@ export const MONSTER_DEFS = {
     speciesId: "undead",
     tags: ["undead", "large"],
     stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Demon: {
     sprite: monsterSprite({
@@ -502,7 +502,7 @@ export const MONSTER_DEFS = {
     tags: ["demon", "medium"],
     stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
     popularity: { change: 1.7 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare"]
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
   Ghost: {
     sprite: monsterSprite({
@@ -514,7 +514,7 @@ export const MONSTER_DEFS = {
     tags: ["spirit", "medium"],
     stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
     popularity: { change: 1.35 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "monster_profile_humanoid", "monster_special_global"]
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   Skeleton: {
     sprite: monsterSprite({
@@ -526,7 +526,7 @@ export const MONSTER_DEFS = {
     tags: ["undead", "medium"],
     stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
     popularity: { change: 1.2 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "monster_profile_humanoid", "monster_special_global"]
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   Scorpion: {
     sprite: monsterSprite({
@@ -550,6 +550,25 @@ export const MONSTER_DEFS = {
     stats: { hp: 46, damage: 11, speed: 1.72, range: 0.58, radius: 0.26, color: "#6f9a45", xp: 19 },
     popularity: { change: -0.3 },
     lootTables: ["gold_low", "material_animal_medium"]
+  },
+  ArachnogrimOffspring: {
+    catalogId: "arachnogrim_offspring",
+    sprite: monsterSprite({
+      id: "arachnogrim_offspring", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.34, shadowW: 23, shadowH: 8, shadowAlpha: 0.34, shadowY: 13, yOffset: 30
+    }),
+    speciesId: "spider",
+    tags: ["spider", "arachnogrim", "beast", "offspring", "medium", "poison"],
+    stats: { hp: 52, damage: 20, speed: 2.05, range: 0.42, radius: 0.28, color: "#493354", xp: 25, spells: ["web_slow"] },
+    library: {
+      title: "Arachnogrim Offspring",
+      text: "A vicious juvenile from an unnatural brood, fast enough to overwhelm isolated prey.",
+      strengths: ["Fast", "Dangerous in groups"],
+      weaknesses: ["Low endurance", "Short range"],
+      habitatText: "Found in sealed, web-choked caves."
+    },
+    lootTables: ["gold_low", "material_bone"],
   },
   Spider: {
     sprite: monsterSprite({
@@ -695,6 +714,7 @@ const MONSTER_CATALOG_IDS = {
   Shadowdragon: "shadowdragon", MountainTroll: "mountain_troll", GiantTroll: "giant_troll",
   "Rune Shade": "rune_shade", "Iron Revenant": "iron_revenant", Demon: "demon",
   Ghost: "ghost", Skeleton: "skeleton", Scorpion: "scorpion", Snake: "snake",
+  ArachnogrimOffspring: "arachnogrim_offspring",
   Spider: "spider", MiniSpider: "mini_spider", MediumSpider: "medium_spider",
   LargeSpider: "large_spider", MotherSpider: "mother_spider", WolfCub: "wolf_cub",
   Wolf: "wolf", WolfFenris: "wolf_fenris",

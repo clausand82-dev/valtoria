@@ -1,22 +1,8 @@
 STATUS:
 Små rettelse observeret igennem spil test:
 - skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
-- lad de sidste oversættelser
-
-
-HELP system
-Hjælpe systemet bliver to delt. De første 20 lvl er det en npc (npc_guide.png), der placeres midt i education området, der giver særlig adgang til systemet. Efterfølgende bliver systemet tilgængelig med et lille ? ikon nederst til venstre.
-
-Selve hjælpe systemet skal være et modal med en side menu der fylder 1/3 af modal og et indholds felt, der fylder de sidste 2/3.
-
-Menu delen er inddelt i passende overskrifter og passende underpunktet (overskift er collapsebe). Et klik på overskrifter/overpunkter åbner og lukker underpunkter. Et klik på et underpunkt åbner underpunktets indhold i indholdsfeltet.
-
-Hjælpesystemet skal være søgbart og guiderne skal benytte eksisterende billeder i sine forklaringer med mulighed for jeg kan bytte billederne ud. Alt skal matche systemets nuværende layout.
-
-HJÆLPESYSTEM IGANG MED IMPLAMANTERING
-
-
-
+- hvis en quest kan indløses skal det gule ? altid have første priotering
+- besætttelse af en bygning skal måske umuliggøre køb af addons og opgradering før city mobs er væk!
 
 
 IMPORTENT:

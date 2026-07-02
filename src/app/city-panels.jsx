@@ -123,7 +123,7 @@ import {
 } from "./city-panel-helpers.jsx";
 
 function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, purchasedAddons, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
-  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
@@ -147,9 +147,9 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
       )}
       {activeAddonId === "weapon_anvil" && (
         <BlacksmithMergeStation
-          title="Weapon Anvil"
+          title={t("city.blacksmith.weaponAnvil")}
           enabled={hasWeaponAnvil}
-          lockedText="Build Weapon Anvil to merge weapons."
+          lockedText={t("city.blacksmith.weaponAnvilLocked")}
           inventory={snapshot.inventory}
           category="weapon"
           onMerge={(indices) => engineRef.current?.mergeInventoryGearAtBlacksmith?.(indices[0], "weapon", indices)}
@@ -157,9 +157,9 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
       )}
       {activeAddonId === "armor_anvil" && (
         <BlacksmithMergeStation
-          title="Armor Anvil"
+          title={t("city.blacksmith.armorAnvil")}
           enabled={hasArmorAnvil}
-          lockedText="Build Armor Anvil to merge armor."
+          lockedText={t("city.blacksmith.armorAnvilLocked")}
           inventory={snapshot.inventory}
           category="armor"
           onMerge={(indices) => engineRef.current?.mergeInventoryGearAtBlacksmith?.(indices[0], "armor", indices)}
@@ -187,13 +187,14 @@ function durabilityColor(dur) {
 }
 
 function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
+  const { t } = useLocalization();
   const equipment = snapshot.equipment ?? [];
   const equippedItems = equipment
     .filter((slot) => slot.item != null)
     .map((slot) => ({
       id: `equipped-${slot.id}`,
       source: "equipped",
-      sourceLabel: "Equipped",
+      sourceLabel: t("inventory.equippedItem"),
       slotId: slot.id,
       label: slot.label,
       item: slot.item,
@@ -203,9 +204,9 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
     .map((item) => ({
       id: `backpack-${item.id}`,
       source: "backpack",
-      sourceLabel: "Backpack",
+      sourceLabel: t("hud.backpack"),
       inventoryIndex: item.index,
-      label: item.slot === "weapon" ? "Weapon" : item.slot === "ring" ? "Ring" : item.slot,
+      label: item.slot === "weapon" ? t("inventory.slot.weapon") : item.slot === "ring" ? t("inventory.type.ring") : item.slot,
       item,
     }));
   const repairItems = [...equippedItems, ...backpackItems];
@@ -213,8 +214,8 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
   if (repairItems.length === 0) {
     return (
       <section className="blacksmith-station">
-        <header><h4>Reparation</h4><span>Ingen udstyr udrustet</span></header>
-        <p style={{ color: "#aaa", fontSize: "0.82em" }}>Rust udstyr på for at reparere det her.</p>
+        <header><h4>{t("city.blacksmith.repair")}</h4><span>{t("city.blacksmith.noEquippedGear")}</span></header>
+        <p style={{ color: "#aaa", fontSize: "0.82em" }}>{t("city.blacksmith.equipGearToRepair")}</p>
       </section>
     );
   }
@@ -222,8 +223,8 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Reparation</h4>
-        <span>Klik på et item for at reparere det</span>
+        <h4>{t("city.blacksmith.repair")}</h4>
+        <span>{t("city.blacksmith.clickItemToRepair")}</span>
       </header>
       <div className="repair-slot-list">
         {repairItems.map((slot) => (
@@ -246,6 +247,7 @@ function BlacksmithRepairStation({ engineRef, snapshot, snapshotRef, resourceCou
 }
 
 function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resourceCount, cityEventModifiers = {}, blacksmithModifiers = {}, onRepairEquippedItem, onRepairInventoryItem }) {
+  const { localize, t } = useLocalization();
   const item = slot.item;
   const dur = Number(item.durability ?? 100);
   const missing = Math.ceil(100 - dur);
@@ -283,7 +285,7 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
         </span>
         <span className="repair-durability-pct" style={{ color }}>
           {Math.round(dur)}%{dur < ITEM_DURABILITY_PENALTY_THRESHOLD_UI && dur > 0 && " ⚠"}
-          {dur <= 0 && " ✕ Ubrugeligt"}
+          {dur <= 0 && ` - ${t("inventory.unusable")}`}
         </span>
       </div>
       {!isFullyRepaired && !isNonRepairable && (
@@ -311,21 +313,22 @@ function BlacksmithRepairSlot({ slot, snapshot, engineRef, snapshotRef, resource
                   : engineRef.current?.repairEquippedItem?.(slot.slotId)
             )}
           >
-            Reparer
+            {t("action.repair")}
           </button>
         </div>
       )}
       {!isFullyRepaired && isNonRepairable && (
-        <span className="repair-done">Kan ikke repareres</span>
+        <span className="repair-done">{t("city.blacksmith.cannotRepair")}</span>
       )}
       {isFullyRepaired && (
-        <span className="repair-done">OK</span>
+        <span className="repair-done">{t("ui.ok")}</span>
       )}
     </div>
   );
 }
 
 function BlacksmithMergeStation({ title, enabled, lockedText, inventory, category, onMerge }) {
+  const { t } = useLocalization();
   const [selectedIndices, setSelectedIndices] = useState([]);
   const relevantInventory = (inventory ?? []).filter((item) => canBlacksmithMergeItem(item, category));
   const selectedItems = selectedIndices.map((index) => inventory?.[index]).filter(Boolean);
@@ -356,7 +359,7 @@ function BlacksmithMergeStation({ title, enabled, lockedText, inventory, categor
     <section className={`blacksmith-station ${enabled ? "" : "locked"}`}>
       <header>
         <h4>{title}</h4>
-        <span>{enabled ? "Traek 3 matchende items ind" : lockedText}</span>
+        <span>{enabled ? t("city.blacksmith.dragThreeMatching") : lockedText}</span>
       </header>
       {!enabled && <p>{lockedText}</p>}
       {enabled && (
@@ -386,7 +389,7 @@ function BlacksmithMergeStation({ title, enabled, lockedText, inventory, categor
             const merged = onMerge(selectedIndices);
             if (merged !== false) setSelectedIndices([]);
           }}>
-            Merge
+            {t("inventory.merge")}
           </button>
           <div className="blacksmith-backpack">
             {relevantInventory.map((item) => {
@@ -427,15 +430,16 @@ function isForgeGear(item) {
 }
 
 function BlacksmithForgeStation({ enabled, gear, blacksmithModifiers = {}, onDestroy }) {
+  const { t } = useLocalization();
   const junkYieldMultiplier = blacksmithModifiers.forgeJunkYieldMultiplier ?? 1;
   return (
     <section className={`blacksmith-station ${enabled ? "" : "locked"}`}>
       <header>
-        <h4>Forge Addon</h4>
-        <span>{enabled ? `Destroy gear for resources${junkYieldMultiplier !== 1 ? ` | Junk yield ${Math.round(junkYieldMultiplier * 100)}%` : ""}` : "Build Forge Addon to extract gear resources."}</span>
+        <h4>{t("city.blacksmith.forge.title")}</h4>
+        <span>{enabled ? t("city.blacksmith.forge.description", { bonus: junkYieldMultiplier !== 1 ? t("city.blacksmith.forge.junkYield", { value: Math.round(junkYieldMultiplier * 100) }) : "" }) : t("city.blacksmith.forge.locked")}</span>
       </header>
-      {!enabled && <p>Build Forge Addon to destroy gear here.</p>}
-      {enabled && gear.length === 0 && <p>No gear in backpack.</p>}
+      {!enabled && <p>{t("city.blacksmith.forge.lockedBody")}</p>}
+      {enabled && gear.length === 0 && <p>{t("city.blacksmith.noGearInBackpack")}</p>}
       {enabled && gear.map((item) => (
         <div className="blacksmith-row" key={item.id}>
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
@@ -444,7 +448,7 @@ function BlacksmithForgeStation({ enabled, gear, blacksmithModifiers = {}, onDes
             <span>{item.rarityLabel} | L{item.level} | {item.slot ?? item.mode}</span>
           </div>
           <button type="button" className="danger-action" onClick={() => onDestroy(item.index)}>
-            Destroy
+            {t("action.destroy")}
           </button>
         </div>
       ))}
@@ -453,6 +457,7 @@ function BlacksmithForgeStation({ enabled, gear, blacksmithModifiers = {}, onDes
 }
 
 function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, blacksmithModifiers = {}, onSmelt, onSmeltIron }) {
+  const { t } = useLocalization();
   const unitCost = Math.max(1, Math.ceil(goldBarUnitCost(popularity) * (blacksmithModifiers.goldBarCostMultiplier ?? 1)));
   const ironPieceCost = 3 + Math.max(0, Math.floor(Number(blacksmithModifiers.metalBarInputCostBonus) || 0));
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
@@ -460,31 +465,31 @@ function CityGoldBarPanel({ gold, inventory, popularity, resourceCount, blacksmi
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Minting Furnace</h4>
-        <span>Smelt metals and mint bars.</span>
+        <h4>{t("city.minting.title")}</h4>
+        <span>{t("city.minting.description")}</span>
       </header>
       <div className="blacksmith-row">
         <InventoryIcon iconSheet="items" iconUrl="/assets/generated/item/item_res_goldbar.png" />
         <div>
-          <b>Gold Bar</b>
-          <span>{unitCost} Gold {"->"} 1 Gold Bar | Popularity {Math.round(popularity ?? 0)}% | Available: {gold}</span>
+          <b>{t("city.minting.goldBar")}</b>
+          <span>{t("city.minting.goldBarRecipe", { cost: unitCost, popularity: Math.round(popularity ?? 0), available: gold })}</span>
         </div>
-        <button type="button" disabled={gold < unitCost} onClick={onSmelt}>Smelt</button>
+        <button type="button" disabled={gold < unitCost} onClick={onSmelt}>{t("city.minting.smelt")}</button>
       </div>
       <div className="blacksmith-row">
         <InventoryIcon iconSheet="resources" iconIndex={RESOURCE_DEFS.iron_bar?.iconIndex} iconUrl={RESOURCE_DEFS.iron_bar?.iconUrl} />
         <div>
-          <b>Iron Bar</b>
-          <span>{ironPieceCost} Iron Piece {"->"} 1 Iron Bar | Available: {ironPieces}</span>
+          <b>{t("city.minting.ironBar")}</b>
+          <span>{t("city.minting.ironBarRecipe", { cost: ironPieceCost, available: ironPieces })}</span>
         </div>
-        <button type="button" disabled={ironPieces < ironPieceCost} onClick={() => onSmeltIron?.(ironPieceCost)}>Smelt</button>
+        <button type="button" disabled={ironPieces < ironPieceCost} onClick={() => onSmeltIron?.(ironPieceCost)}>{t("city.minting.smelt")}</button>
       </div>
     </section>
   );
 }
 
 function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarrel, onProduceProvision }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const foodBarrelRecipe = CITY_STATS_RULES.farmFoodBarrelRecipe ?? {};
   const foodBarrelOutputId = String(foodBarrelRecipe.outputResourceId ?? "food");
@@ -499,8 +504,8 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Food Barrels</h4>
-        <span>Raw food {"->"} 1 Food Barrel</span>
+        <h4>{t("city.farm.foodBarrels")}</h4>
+        <span>{t("city.farm.foodBarrelsDescription")}</span>
       </header>
       {foodBarrelOptions.map((option) => {
         const available = countResource(option.id);
@@ -511,21 +516,21 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
             <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.id }))} />
             <div>
               <b>{localize(option, "label")}</b>
-              <span>{foodBarrelCostValue} needed | Available: {available} | Popularity {Math.round(popularity ?? 0)}%</span>
+              <span>{t("city.farm.foodBarrelRecipe", { needed: foodBarrelCostValue, available, popularity: Math.round(popularity ?? 0) })}</span>
             </div>
             <button
               type="button"
               disabled={available < foodBarrelCostValue}
               onClick={() => onProduceFoodBarrel(option.id, foodBarrelCostValue, foodBarrelOutputId, foodBarrelOutputCount)}
             >
-              Make
+              {t("city.farm.make")}
             </button>
           </div>
         );
       })}
       <header>
-        <h4>Provision</h4>
-        <span>Convert food resources into city provision.</span>
+        <h4>{t("city.farm.provision")}</h4>
+        <span>{t("city.farm.provisionDescription")}</span>
       </header>
       {provisionOptions.map((option) => {
         const available = countResource(option.resourceId);
@@ -535,9 +540,9 @@ function CityFarmPanel({ inventory, popularity, resourceCount, onProduceFoodBarr
             <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: option.resourceId }))} />
             <div>
               <b>{option.label}</b>
-              <span>{option.cost} {"->"} +{option.provision} provision | Available: {available}</span>
+              <span>{t("city.farm.provisionRecipe", { cost: option.cost, provision: option.provision, available })}</span>
             </div>
-            <button type="button" disabled={available < option.cost} onClick={() => onProduceProvision(option.resourceId, option.cost, option.provision)}>Convert</button>
+            <button type="button" disabled={available < option.cost} onClick={() => onProduceProvision(option.resourceId, option.cost, option.provision)}>{t("city.farm.convert")}</button>
           </div>
         );
       })}
@@ -588,7 +593,7 @@ function sanctuaryDonationItem(trade) {
 }
 
 function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, effectMultiplier = 1, onDonate }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const countPotion = potionCount ?? (() => 0);
   const trades = CITY_STATS_RULES.sanctuaryDonationTrades ?? [];
@@ -596,9 +601,9 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, eff
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Donation</h4>
-        <span>Donate one resource and choose one city benefit.</span>
-        {multiplier !== 1 && <p>Donation effects x{multiplier.toFixed(2)} while Sanctuary is disrupted.</p>}
+        <h4>{t("city.sanctuary.donation")}</h4>
+        <span>{t("city.sanctuary.donationDescription")}</span>
+        {multiplier !== 1 && <p>{t("city.sanctuary.donationMultiplier", { value: multiplier.toFixed(2) })}</p>}
       </header>
       {trades.map((trade) => {
         const item = sanctuaryDonationItem(trade);
@@ -612,9 +617,9 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, eff
             <InventoryIcon iconUrl={iconUrl} />
             <div>
               <b>{localize(trade, "label") || item.def?.name || item.id}</b>
-              <span>{cost} {item.def?.name ?? item.id} {"->"} {cityRuleEffectsText(scaleCityRuleEffects(trade.effects, multiplier))} | Available: {available}</span>
+              <span>{t("city.recipe.availableLine", { input: `${cost} ${item.def?.name ?? item.id}`, output: cityRuleEffectsText(scaleCityRuleEffects(trade.effects, multiplier)), available })}</span>
             </div>
-            <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>Donate</button>
+            <button type="button" disabled={available < cost} onClick={() => onDonate(trade)}>{t("city.sanctuary.donate")}</button>
           </div>
         );
       })}
@@ -623,6 +628,8 @@ function CitySanctuaryDonationPanel({ inventory, resourceCount, potionCount, eff
 }
 
 function CityFarmAlePanel({ inventory, cityStats, resourceCount, onBrewAle }) {
+  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const recipe = CITY_STATS_RULES.farmAleRecipe ?? {};
   const inputs = Object.entries(recipe.inputs ?? {});
@@ -633,36 +640,36 @@ function CityFarmAlePanel({ inventory, cityStats, resourceCount, onBrewAle }) {
   const hasResources = inputs.every(([resourceId, amount]) => countResource(resourceId) >= Math.max(1, Math.floor(Number(amount) || 1)));
   const hasStats = statCosts.every(([statId, amount]) => Math.max(0, Math.floor(Number(cityStats?.[statId]) || 0)) >= Math.max(1, Math.floor(Number(amount) || 1)));
   const inputText = inputs
-    .map(([resourceId, amount]) => `${Math.max(1, Math.floor(Number(amount) || 1))} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`)
+    .map(([resourceId, amount]) => `${Math.max(1, Math.floor(Number(amount) || 1))} ${localize(RESOURCE_DEFS[resourceId], "name") || resourceId}`)
     .concat(statCosts.map(([statId, amount]) => `${Math.max(1, Math.floor(Number(amount) || 1))} ${cityRuleStatLabel(statId)}`))
     .join(" + ");
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Ale Brewing</h4>
-        <span>{inputText} {"->"} {outputCount} {outputDef?.name ?? outputResourceId}</span>
+        <h4>{t("city.ale.brewing")}</h4>
+        <span>{inputText} {"->"} {outputCount} {localize(outputDef, "name") || outputResourceId}</span>
       </header>
       <div className="blacksmith-row">
         <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: outputResourceId }))} />
         <div>
-          <b>{outputDef?.name ?? outputResourceId}</b>
-          <span>Water: {Math.max(0, Math.floor(Number(cityStats?.water) || 0))} | Wheat: {countResource("wheat")} | Wood Plank: {countResource("wood_plank")}</span>
+          <b>{localize(outputDef, "name") || outputResourceId}</b>
+          <span>{t("city.ale.inputsStatus", { water: Math.max(0, Math.floor(Number(cityStats?.water) || 0)), wheat: countResource("wheat"), wood: countResource("wood_plank") })}</span>
         </div>
-        <button type="button" disabled={!hasResources || !hasStats} onClick={() => onBrewAle(recipe)}>Brew</button>
+        <button type="button" disabled={!hasResources || !hasStats} onClick={() => onBrewAle(recipe)}>{t("city.ale.brew")}</button>
       </div>
     </section>
   );
 }
 
 function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(inventory, resourceId));
   const trades = CITY_STATS_RULES.innAleTrades ?? [];
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Ale Sales</h4>
-        <span>Sell ale to improve city mood and water service.</span>
+        <h4>{t("city.ale.sales")}</h4>
+        <span>{t("city.ale.salesDescription")}</span>
       </header>
       {trades.map((trade) => {
         const resourceId = String(trade.resourceId ?? "ale");
@@ -674,9 +681,9 @@ function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
             <InventoryIcon iconUrl={def?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId }))} />
             <div>
               <b>{localize(trade, "label") || def?.name || resourceId}</b>
-              <span>{cost} {def?.name ?? resourceId} {"->"} {cityRuleEffectsText(trade.effects)} | Available: {available}</span>
+              <span>{t("city.recipe.availableLine", { input: `${cost} ${def?.name ?? resourceId}`, output: cityRuleEffectsText(trade.effects), available })}</span>
             </div>
-            <button type="button" disabled={available < cost} onClick={() => onServeAle(trade)}>Sell</button>
+            <button type="button" disabled={available < cost} onClick={() => onServeAle(trade)}>{t("action.sell")}</button>
           </div>
         );
       })}
@@ -685,14 +692,16 @@ function CityInnAlePanel({ inventory, resourceCount, onServeAle }) {
 }
 
 function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe, onMerge }) {
+  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const bought = new Set(buildingState.recipes ?? []);
   const recipes = cityResearchRecipes();
   const countResource = resourceCount ?? ((resourceId) => cityResourceCount(snapshot.inventory, resourceId));
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Research Lab</h4>
-        <span>Gemstone recipes are researched and merged here.</span>
+        <h4>{t("city.research.title")}</h4>
+        <span>{t("city.research.description")}</span>
       </header>
       {recipes.map((recipe) => {
         const key = researchRecipeKey(recipe);
@@ -701,20 +710,20 @@ function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe
         const hasInputs = Object.entries(recipe.inputs ?? {}).every(([resourceId, count]) => countResource(resourceId) >= count);
         const outputDef = RESOURCE_DEFS[recipe.output];
         const inputText = Object.entries(recipe.inputs ?? {})
-          .map(([resourceId, count]) => `${count} ${RESOURCE_DEFS[resourceId]?.name ?? resourceId}`)
+          .map(([resourceId, count]) => `${count} ${localize(RESOURCE_DEFS[resourceId], "name") || resourceId}`)
           .join(" + ");
         return (
           <div className="blacksmith-row" key={key}>
             <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: recipe.output }))} />
             <div>
-              <b>{outputDef?.name ?? recipe.output}</b>
-              <span>{inputText} {"->"} {recipe.count ?? 1} {outputDef?.name ?? recipe.output}</span>
+              <b>{localize(outputDef, "name") || recipe.output}</b>
+              <span>{inputText} {"->"} {recipe.count ?? 1} {localize(outputDef, "name") || recipe.output}</span>
             </div>
             {unlocked ? (
-              <button type="button" disabled={!hasInputs} onClick={() => onMerge(recipe)}>Merge</button>
+              <button type="button" disabled={!hasInputs} onClick={() => onMerge(recipe)}>{t("inventory.merge")}</button>
             ) : (
               <button type="button" disabled={(snapshot.player?.gold ?? 0) < cost} onClick={() => onBuyRecipe(key)}>
-                Research {cost} G
+                {t("city.research.buy", { cost })}
               </button>
             )}
           </div>
@@ -725,23 +734,26 @@ function CityResearchPanel({ buildingState, snapshot, resourceCount, onBuyRecipe
 }
 
 function CityPotionLabPanel({ countIngredient, onMix }) {
+  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const recipes = potionRecipesForStation("alchemy_bench");
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Alchemy Bench</h4>
-        <span>Mix backpack recipes and rarer bench-only brews.</span>
+        <h4>{t("city.alchemy.title")}</h4>
+        <span>{t("city.alchemy.description")}</span>
       </header>
       {recipes.map((recipe) => {
         const outputDef = potionDefById(recipe.output);
-        const outputName = outputDef?.name ?? recipe.output;
+        const outputName = localize(outputDef, "name") || recipe.output;
         const inputEntries = Object.entries(recipe.inputs ?? {});
         const hasInputs = inputEntries.every(([inputId, count]) => (
           (countIngredient?.(inputId) ?? 0) >= Math.max(1, Math.floor(Number(count) || 1))
         ));
         const inputText = inputEntries
           .map(([inputId, count]) => {
-            const name = potionDefById(inputId)?.name ?? RESOURCE_DEFS[inputId]?.name ?? inputId;
+            const inputDef = potionDefById(inputId) ?? RESOURCE_DEFS[inputId];
+            const name = localize(inputDef, "name") || inputId;
             const available = countIngredient?.(inputId) ?? 0;
             return `${count} ${name} (${available})`;
           })
@@ -751,10 +763,10 @@ function CityPotionLabPanel({ countIngredient, onMix }) {
             <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "potion", potionId: recipe.output }))} />
             <div>
               <b>{outputName}</b>
-              <span>{inputText} {"->"} {recipe.count ?? 1} {outputName} | {hasInputs ? "Ready" : "Missing inputs"}</span>
+              <span>{inputText} {"->"} {recipe.count ?? 1} {outputName} | {hasInputs ? t("ui.ready") : t("status.missingInputs")}</span>
             </div>
             <button type="button" disabled={!hasInputs} onClick={() => onMix?.(recipe)}>
-              Mix
+              {t("city.alchemy.mix")}
             </button>
           </div>
         );
@@ -764,6 +776,8 @@ function CityPotionLabPanel({ countIngredient, onMix }) {
 }
 
 function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
+  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const tonicBoosts = progress?.cityTonicBoosts ?? {};
   const tonicStatIds = new Set(
     CITY_TONIC_RECIPES.flatMap((recipe) => Object.keys(recipe.cityStatEffects ?? {}))
@@ -778,13 +792,13 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>City Tonic Lab</h4>
-        <span>Repeatable recipes for permanent settlement boosts.</span>
+        <h4>{t("city.tonic.title")}</h4>
+        <span>{t("city.tonic.description")}</span>
       </header>
       <div className="city-area-costs city-chip-grid">
-        <b>Current tonic boosts</b>
+        <b>{t("city.tonic.currentBoosts")}</b>
         {boostEntries.length === 0 ? (
-          <span>None yet</span>
+          <span>{t("city.tonic.noneYet")}</span>
         ) : boostEntries.map(([statId, amount]) => (
           <span key={statId}>{cityRuleStatLabel(statId)} +{Math.floor(Number(amount) || 0)}</span>
         ))}
@@ -797,7 +811,7 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
         ));
         const inputText = inputEntries
           .map(([inputId, count]) => {
-            const name = RESOURCE_DEFS[inputId]?.name ?? cityRuleStatLabel(inputId);
+            const name = localize(RESOURCE_DEFS[inputId], "name") || cityRuleStatLabel(inputId);
             const available = countInput?.(inputId) ?? 0;
             return `${count} ${name} (${available})`;
           })
@@ -814,10 +828,10 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
             <div>
               <b>{recipe.title}</b>
               <span>{recipe.description}</span>
-              <span>{inputText} {"->"} {effectText} | {hasInputs ? "Ready" : "Missing inputs"}</span>
+              <span>{inputText} {"->"} {effectText} | {hasInputs ? t("ui.ready") : t("status.missingInputs")}</span>
             </div>
             <button type="button" disabled={!hasInputs} onClick={() => onMix?.(recipe)}>
-              Mix
+              {t("city.alchemy.mix")}
             </button>
           </div>
         );
@@ -827,14 +841,14 @@ function CityTonicLabPanel({ cityStats, progress, countInput, onMix }) {
 }
 
 function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArtifact, onBuy }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const bought = new Set(progress?.artifacts?.boughtIds ?? []);
   const hoverState = useFloatingProgressionHover();
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Monumenter</h4>
-        <span>Koebes en gang og giver permanente byeffekter.</span>
+        <h4>{t("city.artifacts.title")}</h4>
+        <span>{t("city.artifacts.description")}</span>
       </header>
       <div className="city-progression-grid city-artifact-grid">
         {CITY_ARTIFACTS.map((artifact) => {
@@ -866,7 +880,7 @@ function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArti
             <>
               <header>
                 <b>{localize(artifact, "title")}</b>
-                <span>{owned ? "Aktiv" : buyCheck.canBuy ? "Klar" : "Laast"}</span>
+                <span>{owned ? t("ui.active") : buyCheck.canBuy ? t("ui.ready") : t("ui.locked")}</span>
               </header>
               <p>{localize(artifact, "description")}</p>
               <div className="city-effect-list">
@@ -877,7 +891,7 @@ function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArti
               </div>
               <CityArtifactCostList artifact={artifact} countResource={countResource} countItem={countItem} />
               <button type="button" disabled={owned || !buyCheck.canBuy} onClick={() => onBuy?.(artifact)}>
-                {owned ? "Koebt" : "Koeb"}
+                {owned ? t("status.owned") : t("action.buy")}
               </button>
             </>
           );
@@ -888,6 +902,8 @@ function CityArtifactPanel({ progress = {}, countResource, countItem, canBuyArti
 }
 
 function CityArtifactCostList({ artifact, countResource, countItem }) {
+  const { localize } = useLocalization();
+  const { t } = useLocalization();
   const resourceEntries = [
     ...(artifact.cost?.gold ? [["gold", artifact.cost.gold]] : []),
     ...Object.entries(artifact.cost?.resources ?? {}),
@@ -895,13 +911,13 @@ function CityArtifactCostList({ artifact, countResource, countItem }) {
   const itemEntries = artifact.cost?.items ?? [];
   return (
     <div className="city-area-costs city-chip-grid city-artifact-costs">
-      {resourceEntries.length === 0 && itemEntries.length === 0 && <span>Gratis</span>}
+      {resourceEntries.length === 0 && itemEntries.length === 0 && <span>{t("city.free")}</span>}
       {resourceEntries.map(([resourceId, amount]) => {
         const available = countResource?.(resourceId) ?? 0;
         return (
           <span className={available >= amount ? "met" : "missing"} key={resourceId}>
             <InventoryIcon iconUrl={resourceId === "gold" ? ITEM_GOLD_ICON_URL : RESOURCE_DEFS[resourceId]?.iconUrl} />
-            <b>{available}/{amount} {RESOURCE_DEFS[resourceId]?.name ?? resourceId}</b>
+            <b>{available}/{amount} {localize(RESOURCE_DEFS[resourceId], "name") || resourceId}</b>
           </span>
         );
       })}
@@ -996,7 +1012,7 @@ function FloatingProgressionHover({ hoverState, className = "", width = 320, est
 }
 
 function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, onToggle }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const active = new Set(progress?.policies?.activeIds ?? []);
   const hoverState = useFloatingProgressionHover();
   const grouped = CITY_POLICIES.reduce((map, policy) => {
@@ -1007,8 +1023,8 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
   return (
     <section className="blacksmith-station city-policy-panel">
       <header>
-        <h4>Politik</h4>
-        <span>Aktive regler taeller med i byens stats.</span>
+        <h4>{t("city.policy.title")}</h4>
+        <span>{t("city.policy.description")}</span>
       </header>
       <div className="city-policy-group-grid">
         {Object.entries(grouped).map(([category, policies]) => (
@@ -1058,13 +1074,13 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
             <>
               <header>
                 <b>{localize(policy, "title")}</b>
-                <span>{category} | {blocked ? "Blokeret" : locked ? "Krav mangler" : enabled ? "Aktiv" : "Inaktiv"}</span>
+                <span>{category} | {blocked ? t("status.blocked") : locked ? t("status.missingRequirements") : enabled ? t("ui.active") : t("ui.inactive")}</span>
               </header>
               <p>{localize(policy, "description")}</p>
               {blocked && (
                 <div className="city-policy-requirements">
                   {exclusives.map((entry) => (
-                    <span className="missing" key={entry.key}>Blokeret af aktiv policy: {localize(entry, "title") || entry.label}</span>
+                    <span className="missing" key={entry.key}>{t("city.policy.blockedByActive", { policy: localize(entry, "title") || entry.label })}</span>
                   ))}
                 </div>
               )}
@@ -1081,7 +1097,7 @@ function CityPolicyPanel({ progress = {}, requirementEntries, exclusiveEntries, 
                 </div>
               )}
               <CityEffectChips effects={policy.effects?.cityStats} />
-              <small>{blocked ? `Deaktiver ${exclusives.map((entry) => localize(entry, "title") || entry.label).join(", ")} for at aktivere denne policy.` : locked && !enabled ? "Krav mangler." : `Klik for at ${enabled ? "slukke" : "taende"}.`}</small>
+              <small>{blocked ? t("city.policy.disableToEnable", { list: exclusives.map((entry) => localize(entry, "title") || entry.label).join(", ") }) : locked && !enabled ? t("status.missingRequirements") : t(enabled ? "city.policy.clickDisable" : "city.policy.clickEnable")}</small>
             </>
           );
         }}
@@ -1099,12 +1115,12 @@ function policyIconUrl(policy) {
 }
 
 function CityAchievementPanel({ progress = {}, snapshot = emptySnapshot, unlockedLevels = {} }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Bedrifter</h4>
-        <span>Hall of Deeds</span>
+        <h4>{t("city.achievements.title")}</h4>
+        <span>{t("city.achievements.description")}</span>
       </header>
       <div className="city-progression-grid city-achievement-list">
         {CITY_ACHIEVEMENTS.map((achievement) => {
@@ -1290,6 +1306,7 @@ function achievementIconUrl(achievement) {
 }
 
 function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
+  const { t } = useLocalization();
   const [selectedItemIndex, setSelectedItemIndex] = useState(null);
   const socketItems = (inventory ?? []).filter((item) => itemCanHaveSockets(item));
   const gems = (inventory ?? []).filter((item) => item?.mode === "resource" && GEM_SOCKET_BONUSES[item.resourceId]);
@@ -1299,13 +1316,13 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Socket Workbench</h4>
-        <span>Max {MAX_ITEM_SOCKETS} sockets. Socketed gems are consumed.</span>
+        <h4>{t("city.socket.title")}</h4>
+        <span>{t("city.socket.description", { max: MAX_ITEM_SOCKETS })}</span>
       </header>
       <div className="city-bank-panel">
         <div className="city-bank-column">
-          <h4>Gear</h4>
-          {socketItems.length === 0 && <p>No socketable gear in backpack.</p>}
+          <h4>{t("city.socket.gear")}</h4>
+          {socketItems.length === 0 && <p>{t("city.socket.noGear")}</p>}
           {socketItems.map((item) => (
             <div className={`blacksmith-row ${selectedItemIndex === item.index ? "selected-row" : ""}`} key={item.id}>
               <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
@@ -1313,13 +1330,13 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
                 <CityItemName item={item} />
                 <span>{socketText(item)}</span>
               </div>
-              <button type="button" onClick={() => setSelectedItemIndex(item.index)}>Select</button>
+              <button type="button" onClick={() => setSelectedItemIndex(item.index)}>{t("ui.select")}</button>
             </div>
           ))}
         </div>
         <div className="city-bank-column">
-          <h4>Selected</h4>
-          {!selectedItem && <p>Select gear first.</p>}
+          <h4>{t("city.socket.selected")}</h4>
+          {!selectedItem && <p>{t("city.socket.selectFirst")}</p>}
           {selectedItem && (
             <>
               <div className="blacksmith-row">
@@ -1329,10 +1346,10 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
                   <span>{socketText(selectedItem)}</span>
                 </div>
                 <button type="button" disabled={selectedSockets.length >= MAX_ITEM_SOCKETS || gold < addCost} onClick={() => onAddSocket(selectedItemIndex)}>
-                  Add {addCost} G
+                  {t("city.socket.addSocket", { cost: addCost })}
                 </button>
               </div>
-              {gems.length === 0 && <p>No socket gemstones in backpack.</p>}
+              {gems.length === 0 && <p>{t("city.socket.noGems")}</p>}
               {gems.map((gem) => (
                 <div className="blacksmith-row" key={gem.id}>
                   <InventoryIcon iconIndex={gem.iconIndex} iconSheet={gem.iconSheet} iconUrl={gem.iconUrl} />
@@ -1341,7 +1358,7 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
                     <span>{socketBonusText(gem.resourceId)} | x{gem.count ?? 1}</span>
                   </div>
                   <button type="button" disabled={!selectedSockets.some((socket) => !socket)} onClick={() => onSocketGem(selectedItemIndex, gem.index)}>
-                    Insert
+                    {t("city.socket.insert")}
                   </button>
                 </div>
               ))}
@@ -1354,7 +1371,7 @@ function CitySocketPanel({ inventory, gold, onAddSocket, onSocketGem }) {
 }
 
 function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifiers = {}, onSell, onBuy }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const [tradeDraft, setTradeDraft] = useState(null);
   const sellable = (inventory ?? []).filter(merchantItemCanTrade);
   const openTrade = (mode, item, index) => {
@@ -1373,27 +1390,27 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Merchant</h4>
-        <span>Gold {gold} | Popularity {Math.round(popularity ?? 0)}%</span>
+        <h4>{t("city.merchant.title")}</h4>
+        <span>{t("city.merchant.summary", { gold, popularity: Math.round(popularity ?? 0) })}</span>
       </header>
       <div className="city-bank-panel">
         <div className="city-bank-column">
-          <h4>Sell</h4>
-          {sellable.length === 0 && <p>No sellable items in backpack.</p>}
+          <h4>{t("city.merchant.sell")}</h4>
+          {sellable.length === 0 && <p>{t("city.merchant.noSellable")}</p>}
           {sellable.map((item) => (
             <div className="blacksmith-row" key={item.id}>
               <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
               <div>
                 <CityItemName item={item} />
-                <span>{merchantSellPrice(item, popularity, cityEventModifiers)} G each | have {merchantTradeMax(item)} | value {item.value ?? itemValue(item)}</span>
+                <span>{t("city.merchant.sellLine", { price: merchantSellPrice(item, popularity, cityEventModifiers), have: merchantTradeMax(item), value: item.value ?? itemValue(item) })}</span>
               </div>
-              <button type="button" onClick={() => openTrade("sell", item, item.index)}>Sell</button>
+              <button type="button" onClick={() => openTrade("sell", item, item.index)}>{t("city.merchant.sell")}</button>
             </div>
           ))}
         </div>
         <div className="city-bank-column">
-          <h4>Buy <span>sold items stay here</span></h4>
-          {(stock ?? []).length === 0 && <p>No stock this visit.</p>}
+          <h4>{t("city.merchant.buy")} <span>{t("city.merchant.soldItemsStay")}</span></h4>
+          {(stock ?? []).length === 0 && <p>{t("city.merchant.noStock")}</p>}
           {(stock ?? []).map((item, index) => {
             const price = merchantBuyPrice(item, popularity, cityEventModifiers);
             return (
@@ -1401,9 +1418,9 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
                 <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
                 <div>
                   <CityItemName item={item} />
-                  <span>{price} G each | stock {merchantTradeMax(item)} | {item.mode === "resource" ? `resource` : item.rarityLabel}</span>
+                  <span>{t("city.merchant.buyLine", { price, stock: merchantTradeMax(item), type: item.mode === "resource" ? t("inventory.type.resource") : item.rarityLabel })}</span>
                 </div>
-                <button type="button" disabled={gold < price} onClick={() => openTrade("buy", item, index)}>Buy</button>
+                <button type="button" disabled={gold < price} onClick={() => openTrade("buy", item, index)}>{t("city.merchant.buy")}</button>
               </div>
             );
           })}
@@ -1411,11 +1428,11 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
       </div>
       {tradeDraft && (
         <div className="confirm-backdrop" role="presentation" onClick={() => setTradeDraft(null)}>
-          <section className="confirm-card merchant-trade-modal" role="dialog" aria-modal="true" aria-label="Confirm trade" onClick={(event) => event.stopPropagation()}>
-            <h3>{tradeDraft.mode === "buy" ? "Buy" : "Sell"} {localizeItemField(tradeDraft.item, "name", localize)}</h3>
-            <p>{tradeDraft.unitPrice} G each | max {tradeDraft.max}</p>
+          <section className="confirm-card merchant-trade-modal" role="dialog" aria-modal="true" aria-label={t("city.merchant.confirmTrade")} onClick={(event) => event.stopPropagation()}>
+            <h3>{tradeDraft.mode === "buy" ? t("city.merchant.buy") : t("city.merchant.sell")} {localizeItemField(tradeDraft.item, "name", localize)}</h3>
+            <p>{t("city.merchant.unitPriceMax", { price: tradeDraft.unitPrice, max: tradeDraft.max })}</p>
             <label>
-              Quantity
+              {t("city.merchant.quantity")}
               <input
                 type="number"
                 min="1"
@@ -1453,14 +1470,14 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
                   quantity: current.max,
                 }))}
               >
-                All
+                {t("inventory.all")}
               </button>
             </div>
-            <b>Total: {tradeDraft.unitPrice * tradeDraft.quantity} G</b>
+            <b>{t("city.merchant.total", { total: tradeDraft.unitPrice * tradeDraft.quantity })}</b>
             <div>
-              <button type="button" onClick={() => setTradeDraft(null)}>Cancel</button>
+              <button type="button" onClick={() => setTradeDraft(null)}>{t("ui.cancel")}</button>
               <button type="button" disabled={tradeDraft.mode === "buy" && gold < tradeDraft.unitPrice * tradeDraft.quantity} onClick={confirmTrade}>
-                Accept
+                {t("action.accept")}
               </button>
             </div>
           </section>
@@ -1668,22 +1685,23 @@ function CityClassPanel({ player, progress, onChooseClass, onResetClass, onUnloc
 }
 
 function CityArcaneExtractorPanel({ inventory, onExtract }) {
+  const { t } = useLocalization();
   const candidates = (inventory ?? []).filter(canExtractArcaneEssence);
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Arcane Extractor</h4>
-        <span>Green+ non-unique gear {"->"} Magic Essence</span>
+        <h4>{t("city.arcaneExtractor.title")}</h4>
+        <span>{t("city.arcaneExtractor.description")}</span>
       </header>
-      {candidates.length === 0 && <p>No extractable gear in backpack.</p>}
+      {candidates.length === 0 && <p>{t("city.arcaneExtractor.noGear")}</p>}
       {candidates.map((item) => (
         <div className="blacksmith-row" key={item.id}>
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
           <div>
             <CityItemName item={item} />
-            <span>{item.rarityLabel} | becomes normal and loses rarity stats</span>
+            <span>{t("city.arcaneExtractor.resultLine", { rarity: item.rarityLabel })}</span>
           </div>
-          <button type="button" onClick={() => onExtract(item.index)}>Extract</button>
+          <button type="button" onClick={() => onExtract(item.index)}>{t("city.arcaneExtractor.extract")}</button>
         </div>
       ))}
     </section>
@@ -1691,6 +1709,7 @@ function CityArcaneExtractorPanel({ inventory, onExtract }) {
 }
 
 function CityReadableMergePanel({ inventory, kind, salvageEntries = [], paperCount = 0, salvageRecipes = READABLE_SALVAGE_CONFIG.craftRecipes, onMerge, onRecycleReadable, onCraftReadableRecipe }) {
+  const { t } = useLocalization();
   const parts = (inventory ?? []).filter((item) => (
     isReadableItem(item)
     && item.readableStatus === "mergeable"
@@ -1705,10 +1724,10 @@ function CityReadableMergePanel({ inventory, kind, salvageEntries = [], paperCou
     <>
       <section className="blacksmith-station">
         <header>
-          <h4>{kind === "spellbook" ? "Spellbook Assembly" : "Lorebook Assembly"}</h4>
-          <span>{kind === "spellbook" ? "Merge spellbook fragments here" : "Merge lore notes here"}</span>
+          <h4>{kind === "spellbook" ? t("city.readable.spellbookAssembly") : t("city.readable.lorebookAssembly")}</h4>
+          <span>{kind === "spellbook" ? t("city.readable.spellbookDescription") : t("city.readable.lorebookDescription")}</span>
         </header>
-        {parts.length === 0 && <p>No matching readable fragments in backpack.</p>}
+        {parts.length === 0 && <p>{t("city.readable.noFragments")}</p>}
         {parts.map((item) => (
           <div className="blacksmith-row" key={item.id}>
             <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={item.iconUrl} />
@@ -1716,40 +1735,40 @@ function CityReadableMergePanel({ inventory, kind, salvageEntries = [], paperCou
               <CityItemName item={item} />
               <span>{item.summaryText ?? item.readableStatus}</span>
             </div>
-            <button type="button" onClick={() => onMerge(item.index)}>Merge</button>
+            <button type="button" onClick={() => onMerge(item.index)}>{t("inventory.merge")}</button>
           </div>
         ))}
       </section>
       <section className="blacksmith-station">
         <header>
-          <h4>Recycle Readables</h4>
-          <span>Old notes and books {"->"} {paperDef?.name ?? "Paper"}</span>
+          <h4>{t("city.readable.recycleTitle")}</h4>
+          <span>{t("city.readable.recycleDescription", { paper: paperDef?.name ?? t("city.readable.paper") })}</span>
         </header>
-        {salvageEntries.length === 0 && <p>Du har ingen readables, der kan laves om til paper.</p>}
+        {salvageEntries.length === 0 && <p>{t("city.readable.noRecycle")}</p>}
         {salvageEntries.map((entry) => (
           <div className="blacksmith-row" key={entry.key}>
             <InventoryIcon iconIndex={entry.item.iconIndex} iconSheet={entry.item.iconSheet} iconUrl={entry.item.iconUrl} />
             <div>
               <CityItemName item={entry.item} />
-              <span>{entry.sourceLabel} | gives {entry.paperValue} {paperDef?.name ?? "Paper"}</span>
+              <span>{t("city.readable.givesPaper", { source: entry.sourceLabel, count: entry.paperValue, paper: paperDef?.name ?? t("city.readable.paper") })}</span>
             </div>
-            <button type="button" onClick={() => onRecycleReadable?.(entry)}>Recycle</button>
+            <button type="button" onClick={() => onRecycleReadable?.(entry)}>{t("city.readable.recycle")}</button>
           </div>
         ))}
       </section>
       <section className="blacksmith-station">
         <header>
-          <h4>Craft Scrolls</h4>
-          <span>Paper owned: {paperCount}</span>
+          <h4>{t("city.readable.craftScrolls")}</h4>
+          <span>{t("city.readable.paperOwned", { count: paperCount })}</span>
         </header>
         <div className="blacksmith-row">
           <InventoryIcon iconUrl={outputDef?.iconUrl ?? iconUrlFromKey(deriveIconKey({ mode: "resource", resourceId: scrollRecipe?.output?.itemId ?? "scroll" }))} />
           <div>
-            <b>{scrollRecipe?.label ?? "Craft Scroll"}</b>
-            <span>{inputCount} {paperDef?.name ?? "Paper"} {"->"} {outputCount} {outputDef?.name ?? "Scroll"}</span>
+            <b>{scrollRecipe?.label ?? t("city.readable.craftScroll")}</b>
+            <span>{inputCount} {paperDef?.name ?? t("city.readable.paper")} {"->"} {outputCount} {outputDef?.name ?? t("city.readable.scroll")}</span>
           </div>
           <button type="button" disabled={paperCount < inputCount} onClick={() => onCraftReadableRecipe?.(scrollRecipe)}>
-            Craft
+            {t("action.craft")}
           </button>
         </div>
       </section>

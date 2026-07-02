@@ -62,7 +62,8 @@ function downloadJsonFile(fileName, data) {
 }
 
 function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
-  const ms = (value) => Number.isFinite(Number(value)) ? `${value} ms` : "n/a";
+  const { t } = useLocalization();
+  const ms = (value) => Number.isFinite(Number(value)) ? t("debug.performance.ms", { value }) : t("ui.notApplicable");
   const saveTime = liveStats?.save?.savedAt
     ? new Date(liveStats.save.savedAt).toLocaleTimeString()
     : "n/a";
@@ -86,61 +87,61 @@ function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
     downloadJsonFile(`valtoria-performance-${profile}-${stamp}.json`, payload);
   };
   const totals = [
-    ["Objekter", stats?.objects?.total ?? 0],
-    ["Monsters", stats?.monsters?.total ?? 0],
-    ["Foliage", stats?.foliage?.total ?? 0],
-    ["Decals", stats?.decals?.total ?? 0],
-    ["Tiles", stats?.tiles?.total ?? "-"],
+    [t("debug.performance.objects"), stats?.objects?.total ?? 0],
+    [t("debug.performance.monsters"), stats?.monsters?.total ?? 0],
+    [t("debug.performance.foliage"), stats?.foliage?.total ?? 0],
+    [t("debug.performance.decals"), stats?.decals?.total ?? 0],
+    [t("debug.performance.tiles"), stats?.tiles?.total ?? "-"],
   ];
   const liveTotals = [
     ["FPS", `${liveStats?.averageFps ?? 0} / ${liveStats?.targetFps ?? "-"}`],
-    ["Update FPS", liveStats?.updateFps ?? 0],
-    ["Render FPS", liveStats?.renderFps ?? 0],
+    [t("debug.performance.updateFps"), liveStats?.updateFps ?? 0],
+    [t("debug.performance.renderFps"), liveStats?.renderFps ?? 0],
     ["RAF/s", liveStats?.rafCallbacksPerSecond ?? 0],
-    ["Skipped renders", liveStats?.skippedRenderFrames ?? 0],
-    ["Dirty", liveStats?.renderDirty ? "ja" : "nej"],
-    ["Visual active", liveStats?.visualActivity ? "ja" : "nej"],
-    ["Activity level", liveStats?.visualActivityLevel ?? "idle"],
-    ["Activity reasons", compactReasons(liveStats?.visualActivityReasons)],
-    ["Debug reasons", compactReasons(liveStats?.visualDebugReasons)],
-    ["Ambient FPS", liveStats?.ambientRenderFps ?? 0],
-    ["Dirty reasons", compactReasons(liveStats?.lastRenderDirtyReasons)],
-    ["Canvas MP", liveStats?.canvasMegapixels ?? 0],
-    ["Frame", ms(liveStats?.frameMs)],
-    ["Render", ms(liveStats?.render?.totalMs)],
-    ["Tiles", ms(liveStats?.render?.tilesMs)],
-    ["Drawables", `${liveStats?.counts?.drawables ?? 0} (${ms(liveStats?.render?.objectsMs)})`],
-    ["Fog", ms(liveStats?.render?.fogMs)],
-    ["Particle ms", ms(liveStats?.render?.particlesMs)],
-    ["Minimap", ms(liveStats?.render?.minimapMs)],
-    ["Minimap cache", `${liveStats?.render?.minimapCacheHit ? "hit" : "rebuild"}${liveStats?.render?.minimapRebuildReason ? ` (${liveStats.render.minimapRebuildReason})` : ""}`],
-    ["Minimap clear/blit/fog", `${ms(liveStats?.render?.minimapClearMs)} / ${ms(liveStats?.render?.minimapBlitStaticMs)} / ${ms(liveStats?.render?.minimapFogOverlayMs)}`],
-    ["Minimap markers/draw", `${ms(liveStats?.render?.minimapDynamicMarkersMs)} / ${ms(liveStats?.render?.minimapTotalDrawMs)}`],
-    ["Monster motion", `${liveStats?.counts?.visibleCombatMovingMonsters ?? 0} combat / ${liveStats?.counts?.visiblePassiveMovingMonsters ?? 0} passive`],
-    ["Objects", liveStats?.counts?.objects ?? 0],
-    ["Monsters", liveStats?.counts?.monsters ?? 0],
-    ["Effects", liveStats?.counts?.particles ?? 0],
-    ["Terrain cache", liveStats?.counts?.cachedTerrainLayers ?? 0],
-    ["Terrain cleared", liveStats?.counts?.terrainLayersCleared ?? 0],
-    ["Save", `${liveStats?.save?.status ?? "n/a"} ${liveStats?.save?.sizeKb ?? "n/a"} KB ${saveTime}`],
-    ["Particles", `${liveStats?.particles?.active ?? 0} / ${liveStats?.particles?.max ?? 0}`],
-    ["Emitters", liveStats?.particles?.emitters ?? 0],
-    ["Legacy particles", liveStats?.particles?.legacy ?? 0],
-    ["Projectiles", liveStats?.runtime?.projectiles ?? 0],
-    ["Hazards", liveStats?.runtime?.groundHazards ?? 0],
-    ["Loot", liveStats?.runtime?.loots ?? 0],
-    ["Critters", liveStats?.runtime?.critters ?? 0],
+    [t("debug.performance.skippedRenders"), liveStats?.skippedRenderFrames ?? 0],
+    [t("debug.performance.dirty"), liveStats?.renderDirty ? t("ui.yes") : t("ui.no")],
+    [t("debug.performance.visualActive"), liveStats?.visualActivity ? t("ui.yes") : t("ui.no")],
+    [t("debug.performance.activityLevel"), liveStats?.visualActivityLevel ?? "idle"],
+    [t("debug.performance.activityReasons"), compactReasons(liveStats?.visualActivityReasons)],
+    [t("debug.performance.debugReasons"), compactReasons(liveStats?.visualDebugReasons)],
+    [t("debug.performance.ambientFps"), liveStats?.ambientRenderFps ?? 0],
+    [t("debug.performance.dirtyReasons"), compactReasons(liveStats?.lastRenderDirtyReasons)],
+    [t("debug.performance.canvasMp"), liveStats?.canvasMegapixels ?? 0],
+    [t("debug.performance.frame"), ms(liveStats?.frameMs)],
+    [t("debug.performance.render"), ms(liveStats?.render?.totalMs)],
+    [t("debug.performance.tiles"), ms(liveStats?.render?.tilesMs)],
+    [t("debug.performance.drawables"), `${liveStats?.counts?.drawables ?? 0} (${ms(liveStats?.render?.objectsMs)})`],
+    [t("debug.performance.fog"), ms(liveStats?.render?.fogMs)],
+    [t("debug.performance.particleMs"), ms(liveStats?.render?.particlesMs)],
+    [t("debug.performance.minimap"), ms(liveStats?.render?.minimapMs)],
+    [t("debug.performance.minimapCache"), `${liveStats?.render?.minimapCacheHit ? t("debug.performance.cacheHit") : t("debug.performance.cacheRebuild")}${liveStats?.render?.minimapRebuildReason ? ` (${liveStats.render.minimapRebuildReason})` : ""}`],
+    [t("debug.performance.minimapClearBlitFog"), `${ms(liveStats?.render?.minimapClearMs)} / ${ms(liveStats?.render?.minimapBlitStaticMs)} / ${ms(liveStats?.render?.minimapFogOverlayMs)}`],
+    [t("debug.performance.minimapMarkersDraw"), `${ms(liveStats?.render?.minimapDynamicMarkersMs)} / ${ms(liveStats?.render?.minimapTotalDrawMs)}`],
+    [t("debug.performance.monsterMotion"), t("debug.performance.monsterMotionValue", { combat: liveStats?.counts?.visibleCombatMovingMonsters ?? 0, passive: liveStats?.counts?.visiblePassiveMovingMonsters ?? 0 })],
+    [t("debug.performance.objects"), liveStats?.counts?.objects ?? 0],
+    [t("debug.performance.monsters"), liveStats?.counts?.monsters ?? 0],
+    [t("debug.performance.effects"), liveStats?.counts?.particles ?? 0],
+    [t("debug.performance.terrainCache"), liveStats?.counts?.cachedTerrainLayers ?? 0],
+    [t("debug.performance.terrainCleared"), liveStats?.counts?.terrainLayersCleared ?? 0],
+    [t("debug.performance.save"), `${liveStats?.save?.status ?? "n/a"} ${liveStats?.save?.sizeKb ?? "n/a"} KB ${saveTime}`],
+    [t("debug.performance.particles"), `${liveStats?.particles?.active ?? 0} / ${liveStats?.particles?.max ?? 0}`],
+    [t("debug.performance.emitters"), liveStats?.particles?.emitters ?? 0],
+    [t("debug.performance.legacyParticles"), liveStats?.particles?.legacy ?? 0],
+    [t("debug.performance.projectiles"), liveStats?.runtime?.projectiles ?? 0],
+    [t("debug.performance.hazards"), liveStats?.runtime?.groundHazards ?? 0],
+    [t("debug.performance.loot"), liveStats?.runtime?.loots ?? 0],
+    [t("debug.performance.critters"), liveStats?.runtime?.critters ?? 0],
   ];
   return (
-    <section className="region-debug-panel" aria-label="Region debug manifest">
+    <section className="region-debug-panel" aria-label={t("debug.performance.regionDebugManifest")}>
       <header>
         <div>
-          <b>Region manifest</b>
-          <span>{stats?.region?.label ?? stats?.region?.id ?? "Ingen aktiv region"}</span>
+          <b>{t("debug.performance.regionManifest")}</b>
+          <span>{stats?.region?.label ?? stats?.region?.id ?? t("debug.performance.noActiveRegion")}</span>
         </div>
         <div>
-          <button type="button" onClick={onRefresh}>Refresh</button>
-          <button type="button" onClick={onClose}>Luk</button>
+          <button type="button" onClick={onRefresh}>{t("ui.refresh")}</button>
+          <button type="button" onClick={onClose}>{t("ui.close")}</button>
         </div>
       </header>
       <div className="region-debug-totals">
@@ -151,40 +152,40 @@ function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
       </div>
       <div className="region-debug-recorder">
         <div className="region-debug-recorder-head">
-          <b>Performance recorder</b>
+          <b>{t("debug.performance.recorder")}</b>
           <span>
-            Rolling 60s: update <b>{historySummary?.avgUpdateFps ?? 0}</b> / render <b>{historySummary?.avgRenderFps ?? 0}</b>
-            {" "}max render <b>{ms(historySummary?.maxRenderTotalMs)}</b>
+            {t("debug.performance.rolling60s")} <b>{historySummary?.avgUpdateFps ?? 0}</b> / {t("debug.performance.renderLower")} <b>{historySummary?.avgRenderFps ?? 0}</b>
+            {" "}{t("debug.performance.maxRender")} <b>{ms(historySummary?.maxRenderTotalMs)}</b>
           </span>
         </div>
         <div className="region-debug-recorder-grid">
-          <span>Recording <b>{recording.recording ? "yes" : "no"}</b></span>
-          <span>Remaining <b>{recording.remainingSeconds ?? 0}s</b></span>
-          <span>Samples <b>{recording.samplesCollected ?? 0}</b></span>
-          <span>Last profile <b>{recordingSummary?.profileId ?? historySummary?.profileId ?? "n/a"}</b></span>
-          <span>Idle <b>{summaryPercent(historySummary, "idle")}</b></span>
-          <span>Ambient <b>{summaryPercent(historySummary, "ambient")}</b></span>
-          <span>Active <b>{summaryPercent(historySummary, "active")}</b></span>
-          <span>History samples <b>{liveStats?.performanceHistory?.samples ?? 0}</b></span>
+          <span>{t("debug.performance.recording")} <b>{recording.recording ? t("ui.yes") : t("ui.no")}</b></span>
+          <span>{t("debug.performance.remaining")} <b>{recording.remainingSeconds ?? 0}s</b></span>
+          <span>{t("debug.performance.samples")} <b>{recording.samplesCollected ?? 0}</b></span>
+          <span>{t("debug.performance.lastProfile")} <b>{recordingSummary?.profileId ?? historySummary?.profileId ?? "n/a"}</b></span>
+          <span>{t("debug.performance.idle")} <b>{summaryPercent(historySummary, "idle")}</b></span>
+          <span>{t("debug.performance.ambient")} <b>{summaryPercent(historySummary, "ambient")}</b></span>
+          <span>{t("debug.performance.active")} <b>{summaryPercent(historySummary, "active")}</b></span>
+          <span>{t("debug.performance.historySamples")} <b>{liveStats?.performanceHistory?.samples ?? 0}</b></span>
         </div>
         <div className="region-debug-recorder-actions">
-          <button type="button" onClick={() => startRecording(30)}>Record 30s</button>
-          <button type="button" onClick={() => startRecording(60)}>Record 60s</button>
-          <button type="button" onClick={() => startRecording(120)}>Record 120s</button>
-          <button type="button" onClick={stopRecording} disabled={!recording.recording}>Stop</button>
-          <button type="button" onClick={clearRecording}>Clear</button>
-          <button type="button" onClick={exportRecording} disabled={!recording.samplesCollected}>Export JSON</button>
+          <button type="button" onClick={() => startRecording(30)}>{t("debug.performance.recordSeconds", { seconds: 30 })}</button>
+          <button type="button" onClick={() => startRecording(60)}>{t("debug.performance.recordSeconds", { seconds: 60 })}</button>
+          <button type="button" onClick={() => startRecording(120)}>{t("debug.performance.recordSeconds", { seconds: 120 })}</button>
+          <button type="button" onClick={stopRecording} disabled={!recording.recording}>{t("ui.stop")}</button>
+          <button type="button" onClick={clearRecording}>{t("ui.clear")}</button>
+          <button type="button" onClick={exportRecording} disabled={!recording.samplesCollected}>{t("debug.performance.exportJson")}</button>
         </div>
         {recordingSummary?.sampleCount > 0 && (
           <div className="region-debug-summary">
-            <span>Summary <b>{recordingSummary.profileId}</b>, {recordingSummary.durationSeconds}s, samples {recordingSummary.sampleCount}</span>
-            <span>FPS update/render <b>{recordingSummary.avgUpdateFps}</b> / <b>{recordingSummary.avgRenderFps}</b>, min/max render <b>{recordingSummary.minRenderFps}</b> / <b>{recordingSummary.maxRenderFps}</b></span>
-            <span>Render FPS avg/median <b>{recordingSummary.avgRenderFps}</b> / <b>{recordingSummary.medianRenderFps}</b>, minimap ms median/p90/max <b>{recordingSummary.medianMinimapMs}</b> / <b>{recordingSummary.p90MinimapMs}</b> / <b>{recordingSummary.maxMinimapMs}</b></span>
-            <span>Split idle/ambient/active <b>{summaryPercent(recordingSummary, "idle")}</b> / <b>{summaryPercent(recordingSummary, "ambient")}</b> / <b>{summaryPercent(recordingSummary, "active")}</b></span>
-            <span>Activity <b>{compactReasons(recordingSummary.topActivityReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
-            <span>Debug <b>{compactReasons(recordingSummary.topVisualDebugReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
-            <span>Dirty <b>{compactReasons(recordingSummary.topDirtyReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
-            <span>Worst <b>{recordingSummary.worstSample?.renderTotalMs ?? "n/a"} ms</b> {compactReasons(recordingSummary.worstSample?.activityReasons)}</span>
+            <span>{t("debug.performance.summaryLine", { profile: recordingSummary.profileId, seconds: recordingSummary.durationSeconds, samples: recordingSummary.sampleCount })}</span>
+            <span>{t("debug.performance.fpsUpdateRender")} <b>{recordingSummary.avgUpdateFps}</b> / <b>{recordingSummary.avgRenderFps}</b>, {t("debug.performance.minMaxRender")} <b>{recordingSummary.minRenderFps}</b> / <b>{recordingSummary.maxRenderFps}</b></span>
+            <span>{t("debug.performance.renderFpsAvgMedian")} <b>{recordingSummary.avgRenderFps}</b> / <b>{recordingSummary.medianRenderFps}</b>, {t("debug.performance.minimapMedianP90Max")} <b>{recordingSummary.medianMinimapMs}</b> / <b>{recordingSummary.p90MinimapMs}</b> / <b>{recordingSummary.maxMinimapMs}</b></span>
+            <span>{t("debug.performance.splitIdleAmbientActive")} <b>{summaryPercent(recordingSummary, "idle")}</b> / <b>{summaryPercent(recordingSummary, "ambient")}</b> / <b>{summaryPercent(recordingSummary, "active")}</b></span>
+            <span>{t("debug.performance.activity")} <b>{compactReasons(recordingSummary.topActivityReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>{t("debug.performance.debug")} <b>{compactReasons(recordingSummary.topVisualDebugReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>{t("debug.performance.dirty")} <b>{compactReasons(recordingSummary.topDirtyReasons?.map((entry) => `${entry.reason}:${entry.count}`))}</b></span>
+            <span>{t("debug.performance.worst")} <b>{recordingSummary.worstSample?.renderTotalMs ?? "n/a"} ms</b> {compactReasons(recordingSummary.worstSample?.activityReasons)}</span>
           </div>
         )}
       </div>
@@ -212,6 +213,7 @@ function CooldownClock({ progress }) {
 }
 
 function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker, onOpenPicker, onClosePicker }) {
+  const { t } = useLocalization();
   const hoverTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
   const options = slot.kind === "potion" ? (quickActions.potions ?? []) : (quickActions.spells ?? []);
@@ -229,7 +231,7 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
   const disabled = cityOpen || !selected || (isPotion ? count <= 0 : false);
   const title = selected
     ? `${selected.name ?? selected.title}${isPotion ? ` (${count})` : selected.manaCost ? ` (${selected.manaCost} mana)` : ""}`
-    : "Empty slot";
+    : t("hud.emptySlot");
   const hoverMs = Math.max(0, Number(quickActions.pickerHoverMs) || 3000);
   const closeMs = Math.max(0, Number(quickActions.pickerCloseMs) || 1800);
 
@@ -271,7 +273,7 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
       <button
         type="button"
         className={`quickslot ${isPotion ? "potion-slot" : "spell-slot"} ${(isPotion ? potionCooldown : spellCooldown) > 0 ? "cooling" : ""}`}
-        title={cityOpen ? "Ikke tilgaengelig i byen" : title}
+        title={cityOpen ? t("hud.unavailableInCity") : title}
         disabled={disabled}
         onPointerDown={(event) => {
           if (!isChanneledSpell) return;
@@ -305,7 +307,7 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
         <CooldownClock progress={isPotion ? potionCooldown : spellCooldown} />
       </button>
       {isOpen && options.length > 0 && (
-        <div className="quickslot-picker" role="menu" aria-label={`Choose slot ${slotId}`} onPointerDown={(event) => event.stopPropagation()}>
+        <div className="quickslot-picker" role="menu" aria-label={t("hud.chooseSlot", { slot: slotId })} onPointerDown={(event) => event.stopPropagation()}>
           {options.map((option) => (
             <button
               type="button"
@@ -330,7 +332,7 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
 }
 
 function HeroModifierList({ events = {}, statusEffects = [] }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const activeOrderRef = useRef(new Map());
   const nextOrderRef = useRef(0);
   const [hoveredTooltip, setHoveredTooltip] = useState(null);
@@ -340,7 +342,7 @@ function HeroModifierList({ events = {}, statusEffects = [] }) {
       label: localize(event, "label"),
       detail: localize(event, "detail"),
       solution: localize(event, "solution"),
-      effectText: cityEventModifierText(event.modifiers),
+      effectText: cityEventModifierText(event.modifiers, t),
       kind: event.positive ? "positive" : "negative",
       iconText: heroModifierIconText(event.id),
       iconUrl: event.iconUrl,
@@ -388,7 +390,7 @@ function HeroModifierList({ events = {}, statusEffects = [] }) {
   const hideTooltip = () => setHoveredTooltip(null);
   return (
     <>
-      <div className="hero-modifier-list" aria-label="Active hero and loot modifiers">
+      <div className="hero-modifier-list" aria-label={t("hud.activeHeroModifiers")}>
         {entries.map((event) => (
           <div
             className={`hero-modifier ${event.kind}`}
@@ -411,9 +413,9 @@ function HeroModifierList({ events = {}, statusEffects = [] }) {
       {hoveredTooltip && (
         <div className="hero-modifier-tooltip" role="tooltip" style={hoveredTooltip.style}>
           <b>{hoveredTooltip.event.label}</b>
-          {hoveredTooltip.event.effectText ? <section><strong>Effect</strong><p>{hoveredTooltip.event.effectText}</p></section> : null}
-          {hoveredTooltip.event.detail ? <section><strong>Info</strong><p>{hoveredTooltip.event.detail}</p></section> : null}
-          {hoveredTooltip.event.solution ? <section><strong>Solution</strong><p>{hoveredTooltip.event.solution}</p></section> : null}
+          {hoveredTooltip.event.effectText ? <section><strong>{t("hud.modifier.effect")}</strong><p>{hoveredTooltip.event.effectText}</p></section> : null}
+          {hoveredTooltip.event.detail ? <section><strong>{t("hud.modifier.info")}</strong><p>{hoveredTooltip.event.detail}</p></section> : null}
+          {hoveredTooltip.event.solution ? <section><strong>{t("hud.modifier.solution")}</strong><p>{hoveredTooltip.event.solution}</p></section> : null}
         </div>
       )}
     </>
@@ -451,26 +453,26 @@ function heroStatusIconText(type) {
   return "FX";
 }
 
-function cityEventModifierText(modifiers = {}) {
+function cityEventModifierText(modifiers = {}, t = (key) => key) {
   const parts = [];
   const pct = (value) => `${Math.round((Number(value) || 1) * 100)}%`;
-  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(`Max HP ${pct(modifiers.heroMaxHpMultiplier)}`);
-  if (modifiers.goldDropMultiplier !== undefined) parts.push(`Gold drops ${pct(modifiers.goldDropMultiplier)}`);
-  if (modifiers.potionDropMultiplier !== undefined) parts.push(`Potion drops ${pct(modifiers.potionDropMultiplier)}`);
-  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(`Health potions ${pct(modifiers.healthPotionHealMultiplier)}`);
-  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(`City mob spawn ${pct(modifiers.cityMobSpawnChanceMultiplier)}`);
-  if (modifiers.repairCostMultiplier !== undefined) parts.push(`Repair cost ${pct(modifiers.repairCostMultiplier)}`);
-  if (modifiers.craftingCostMultiplier !== undefined) parts.push(`Crafting cost ${pct(modifiers.craftingCostMultiplier)}`);
-  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(`Buy prices ${pct(modifiers.merchantBuyPriceMultiplier)}`);
-  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(`Sell prices ${pct(modifiers.merchantSellPriceMultiplier)}`);
-  if (modifiers.merchantStockMultiplier !== undefined) parts.push(`Merchant stock ${pct(modifiers.merchantStockMultiplier)}`);
-  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(`Quest gold ${pct(modifiers.questGoldRewardMultiplier)}`);
-  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(`City decay chance ${pct(modifiers.cityDurabilityDegradeChanceMultiplier)}`);
-  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(`City damage ${pct(modifiers.cityDurabilityDamageMultiplier)}`);
+  if (modifiers.heroMaxHpMultiplier !== undefined) parts.push(t("city.eventModifier.heroMaxHp", { value: pct(modifiers.heroMaxHpMultiplier) }));
+  if (modifiers.goldDropMultiplier !== undefined) parts.push(t("city.eventModifier.goldDrops", { value: pct(modifiers.goldDropMultiplier) }));
+  if (modifiers.potionDropMultiplier !== undefined) parts.push(t("city.eventModifier.potionDrops", { value: pct(modifiers.potionDropMultiplier) }));
+  if (modifiers.healthPotionHealMultiplier !== undefined) parts.push(t("city.eventModifier.healthPotions", { value: pct(modifiers.healthPotionHealMultiplier) }));
+  if (modifiers.cityMobSpawnChanceMultiplier !== undefined) parts.push(t("city.eventModifier.cityMobSpawn", { value: pct(modifiers.cityMobSpawnChanceMultiplier) }));
+  if (modifiers.repairCostMultiplier !== undefined) parts.push(t("city.eventModifier.repairCost", { value: pct(modifiers.repairCostMultiplier) }));
+  if (modifiers.craftingCostMultiplier !== undefined) parts.push(t("city.eventModifier.craftingCost", { value: pct(modifiers.craftingCostMultiplier) }));
+  if (modifiers.merchantBuyPriceMultiplier !== undefined) parts.push(t("city.eventModifier.buyPrices", { value: pct(modifiers.merchantBuyPriceMultiplier) }));
+  if (modifiers.merchantSellPriceMultiplier !== undefined) parts.push(t("city.eventModifier.sellPrices", { value: pct(modifiers.merchantSellPriceMultiplier) }));
+  if (modifiers.merchantStockMultiplier !== undefined) parts.push(t("city.eventModifier.merchantStock", { value: pct(modifiers.merchantStockMultiplier) }));
+  if (modifiers.questGoldRewardMultiplier !== undefined) parts.push(t("city.eventModifier.questGold", { value: pct(modifiers.questGoldRewardMultiplier) }));
+  if (modifiers.cityDurabilityDegradeChanceMultiplier !== undefined) parts.push(t("city.eventModifier.cityDecayChance", { value: pct(modifiers.cityDurabilityDegradeChanceMultiplier) }));
+  if (modifiers.cityDurabilityDamageMultiplier !== undefined) parts.push(t("city.eventModifier.cityDamage", { value: pct(modifiers.cityDurabilityDamageMultiplier) }));
   const resourceMultipliers = Object.entries(modifiers.resourceDropMultiplierById ?? {});
   if (resourceMultipliers.length) {
     const values = [...new Set(resourceMultipliers.map(([, value]) => pct(value)))];
-    parts.push(`Food resources ${values.join("/")}`);
+    parts.push(t("city.eventModifier.foodResources", { value: values.join("/") }));
   }
   return parts.join(" | ");
 }
@@ -578,7 +580,7 @@ export function GameHud({
         )}
         {!cityOpen && (
           <div className="stat-chip">
-            <span>Guld</span>
+            <span>{t("ui.gold")}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <ImageIcon src={ITEM_MONEY_ICON_URL} />
               <b>{player.gold}</b>
@@ -590,11 +592,11 @@ export function GameHud({
       <section className="hud hud-right">
         <div className="zone-panel">
           <div className="zone-header">
-            <b>{cityOpen ? "City" : snapshot.zone.name}</b>
+            <b>{cityOpen ? t("hud.city") : snapshot.zone.name}</b>
           </div>
           {!cityOpen && (
             <span>
-              Weather: {snapshot.zone.weather?.label ?? "No weather"}
+              {t("hud.weather")}: {snapshot.zone.weather?.label ?? t("hud.noWeather")}
             </span>
           )}
         </div>
@@ -628,11 +630,11 @@ export function GameHud({
 
       {!cityOpen && (
         <section className="combat-card">
-          <span>Skade {player.damage}</span>
-          <span>Armor {player.armor}</span>
+          <span>{t("inventory.stat.damage")} {player.damage}</span>
+          <span>{t("inventory.stat.armor")} {player.armor}</span>
           <span>{player.mode}</span>
           {snapshot.regionRun && snapshot.mobs?.total > 0 && (
-            <span>Mobs {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
+            <span>{t("hud.mobs")} {snapshot.mobs.killed} / {snapshot.mobs.total}</span>
           )}
         </section>
       )}
@@ -740,7 +742,7 @@ export function GameHud({
         <button
           type="button"
           className="skill"
-          title={snapshot.regionRun ? "Forlad map til byen" : "Aaben world map"}
+          title={snapshot.regionRun ? t("hud.leaveMapToCity") : t("hud.openWorldMap")}
           onClick={() => {
             if (snapshot.regionRun) {
               setConfirmMapAbandonOpen(true);

@@ -53,7 +53,10 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
 
   while (region.prefabInstances.length < maxTotal && attempts < maxAttempts) {
     attempts += 1;
-    const poolEntry = chooseWeighted(() => rng(10000 + attempts * 17), pool);
+    // Required entries are attempted before weighted ambient prefabs. This is
+    // reusable for quest-critical entrances and one-off hidden encounters.
+    const requiredEntry = pool.find((entry) => entry?.required === true && (counts.get(entry.id) ?? 0) < Math.max(1, Number(entry.max) || 1));
+    const poolEntry = requiredEntry ?? chooseWeighted(() => rng(10000 + attempts * 17), pool);
     const prefab = MAP_PREFABS[poolEntry?.id];
     if (!prefab) {
       skipped.push({ id: poolEntry?.id ?? null, reason: "unknown_prefab" });

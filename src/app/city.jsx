@@ -604,7 +604,7 @@ function CityPage({
       .map(([resourceId, amount]) => ({ resourceId, amount, available: cityCostAvailable(snapshotRef.current, resourceId, progressState) }))
       .filter((entry) => entry.available < entry.amount);
     if (deficits.length > 0) {
-      const parts = deficits.map((d) => `${cityCostLabel(d.resourceId)} ${d.amount} (du har ${d.available})`);
+      const parts = deficits.map((d) => `${cityCostLabel(d.resourceId, localize)} ${d.amount} (du har ${d.available})`);
       engineRef.current?.addToast?.(`Kan ikke reparere: mangler ${parts.join(", ")}`);
       return;
     }
@@ -858,7 +858,7 @@ function CityPage({
       return false;
     }
     if (cityResourceAvailable(inputResourceId) < cost) {
-      engineRef.current?.addToast?.(`Kraever ${cost}x ${RESOURCE_DEFS[inputResourceId]?.name ?? inputResourceId}`);
+      engineRef.current?.addToast?.(`Kraever ${cost}x ${localize(RESOURCE_DEFS[inputResourceId], "name") || inputResourceId}`);
       return false;
     }
     if (!backpackResourceCanAccept(outputId, outCount, [[inputResourceId, cost]])) {
@@ -1158,7 +1158,7 @@ function CityPage({
           onClose={onCloseStorage}
         />
       )}
-      <p className="city-help">ESC: aaben kort.</p>
+      <p className="city-help">{t("city.help.openMap")}</p>
     </section>
   );
 }
@@ -1413,7 +1413,7 @@ function CityBuildingHoverPopover({ building, snapshot, progress, cityStats }) {
                   <span>{owned ? t("status.owned") : unlocked ? t("city.building.canBuy") : t("status.locked")} | {cityBuildingFeatureLabel(addon.panel)}</span>
                   {localize(addon, "help") && <span>{localize(addon, "help")}</span>}
                   {slots > 0 && <span>{cityInventoryTypeLabel(inventory.type)}: {slots} slots</span>}
-                  {cost.length > 0 && <span>{cost.map(([id, amount]) => `${amount} ${cityCostLabel(id)}`).join(", ")}</span>}
+                  {cost.length > 0 && <span>{cost.map(([id, amount]) => `${amount} ${cityCostLabel(id, localize)}`).join(", ")}</span>}
                   {reqs.length > 0 && <span>{reqs.map((entry) => entry.label).join(", ")}</span>}
                   {Object.keys(addon.statEffects ?? {}).length > 0 && (
                     <span>{Object.entries(addon.statEffects).map(([id, amount]) => `${cityStatLabel(id)} ${amount}`).join(", ")}</span>
@@ -1471,7 +1471,7 @@ function CityRequirementGrid({ entries, emptyText = "No requirements" }) {
 }
 
 function CityCostGrid({ entries, snapshot, progress, emptyText = "No price configured" }) {
-  const { t } = useLocalization();
+  const { localize, t } = useLocalization();
   const resolvedEmptyText = emptyText === "No price configured" ? t("city.noPriceConfigured") : emptyText;
   if (!entries?.length) {
     return <div className="city-area-costs city-chip-grid"><span>{resolvedEmptyText}</span></div>;
@@ -1484,7 +1484,7 @@ function CityCostGrid({ entries, snapshot, progress, emptyText = "No price confi
           <span
             className={available >= amount ? "met" : "missing"}
             key={resourceId}
-            title={`${cityCostLabel(resourceId)} ${amount}/${available}`}
+            title={`${cityCostLabel(resourceId, localize)} ${amount}/${available}`}
           >
             <CityCostIcon resourceId={resourceId} />
             <b>{amount}/{available}</b>
@@ -1653,7 +1653,7 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
         return (
           <button
             type="button"
-            className={`city-map-action-icon building ${owned ? "owned" : "locked"} ${questStatus.hasOffer ? "offer" : questStatus.hasComplete ? "complete" : questStatus.hasActive ? "active-quest" : ""}`}
+            className={`city-map-action-icon building ${owned ? "owned" : "locked"} ${questStatus.hasComplete ? "complete" : questStatus.hasOffer ? "offer" : questStatus.hasActive ? "active-quest" : ""}`}
             style={cityMapPositionStyle(x, y)}
             title={localize(building, "title")}
             aria-label={localize(building, "title")}
@@ -1673,7 +1673,7 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
             <b>{localize(building, "title")}</b>
             {(questStatus.hasComplete || questStatus.hasOffer || questStatus.hasActive) && (
               <i className="city-quest-status" aria-hidden="true">
-                {questStatus.hasOffer ? "!" : questStatus.hasComplete ? "?" : "?"}
+                {questStatus.hasComplete ? "?" : questStatus.hasOffer ? "!" : "?"}
               </i>
             )}
           </button>
@@ -1682,7 +1682,7 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
       {npcRefs.map((npc) => (
         <button
           type="button"
-          className={`city-map-action-icon npc ${npc.hasOffer ? "offer" : npc.hasComplete ? "complete" : npc.hasActive ? "active-quest" : ""}`}
+          className={`city-map-action-icon npc ${npc.hasComplete ? "complete" : npc.hasOffer ? "offer" : npc.hasActive ? "active-quest" : ""}`}
           style={cityMapPositionStyle(npc.x, npc.y)}
           title={npc.action ?? npc.name}
           aria-label={npc.action ?? npc.name}
@@ -1697,7 +1697,7 @@ function CityMapHoverIcons({ area, buildingRefs, progress, npcRefs, npcImageUrls
           </span>
           {(npc.hasComplete || npc.hasOffer || npc.hasActive) && (
             <i className="city-npc-quest-marker" aria-hidden="true">
-              {npc.hasOffer ? "!" : npc.hasComplete ? "?" : "?"}
+              {npc.hasComplete ? "?" : npc.hasOffer ? "!" : "?"}
             </i>
           )}
           <b>{npc.name}</b>
@@ -1936,28 +1936,29 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
 }
 
 function CityArmyBattleResultModal({ result, onClose }) {
+  const { t } = useLocalization();
   const lossText = Object.entries(result.losses ?? {})
     .map(([unitId, count]) => `${CITY_ARMY_UNIT_DEFS[unitId]?.label ?? unitId}: ${count}`)
-    .join(", ") || "None";
+    .join(", ") || t("ui.none");
   return (
     <div className="city-popup-backdrop">
-      <section className="city-popup city-army-result-modal" role="dialog" aria-modal="true" aria-label="Army battle result">
+      <section className="city-popup city-army-result-modal" role="dialog" aria-modal="true" aria-label={t("city.army.battleResult")}>
         <header className="city-popup-header">
           <div>
-            <h3>{result.won ? "Army victory" : "Army defeated"}</h3>
+            <h3>{result.won ? t("city.army.victory") : t("city.army.defeated")}</h3>
             <span>{result.mob?.mobType} Lv.{result.mob?.level}</span>
           </div>
           <button type="button" className="city-popup-close" onClick={onClose}>X</button>
         </header>
         <div className="city-popup-summary">
           <div>
-            <p>{result.won ? "Mob group removed from the city map." : "Mob group remains active."}</p>
-            <p>Win chance: {Math.round((result.winChance ?? 0) * 100)}% | Morale x{Number(result.morale || 1).toFixed(2)}</p>
-            <p>Army losses: {lossText}</p>
+            <p>{result.won ? t("city.army.mobRemoved") : t("city.army.mobRemains")}</p>
+            <p>{t("city.army.winChanceMorale", { chance: Math.round((result.winChance ?? 0) * 100), morale: Number(result.morale || 1).toFixed(2) })}</p>
+            <p>{t("city.army.losses", { losses: lossText })}</p>
           </div>
         </div>
         <div className="city-popup-actions">
-          <button type="button" onClick={onClose}>Close</button>
+          <button type="button" onClick={onClose}>{t("ui.close")}</button>
         </div>
       </section>
     </div>
@@ -2322,7 +2323,7 @@ function drawCityQuestStatusMarker(ctx, marker, camera, time) {
 }
 
 function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, onChangeProgress, onClose, onQuestCompleted }) {
-  const { localize, renderTemplate } = useLocalization();
+  const { localize, renderTemplate, t } = useLocalization();
   const questText = (quest, field) => localizeQuestField(quest, field, localize, renderTemplate);
   const npc = QUEST_NPCS[npcId];
   const state = (npcStates ?? []).find((entry) => entry.npcId === npcId) ?? { active: [], offers: [] };
@@ -2389,15 +2390,15 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     const cityComplete = isQuestComplete(quest, completionInventory);
     if (!backpackComplete && cityComplete) {
       if (!engine?.questRewardsCanFit?.(quest)) {
-        setActionMessage("Rygsaekken er fuld. Lav plads foer questen indleveres.");
-        engine?.addToast?.("Rygsaekken er fuld");
+        setActionMessage(t("city.quest.inventoryFullTurnIn"));
+        engine?.addToast?.(t("city.quest.inventoryFullToast"));
         engine?.publishSnapshot?.();
         return;
       }
       const resourceEntries = questResourceEntries(quest);
       if (resourceEntries.length > 0 && !payCityCostEntries(resourceEntries, engine, snapshotRef?.current, progress, onChangeProgress)) {
-        setActionMessage("Questen kunne ikke indleveres. Tjek city storage eller locked storage.");
-        engine?.addToast?.("Quest resources mangler");
+        setActionMessage(t("city.quest.turnInStorageFailed"));
+        engine?.addToast?.(t("city.quest.resourcesMissingToast"));
         engine?.publishSnapshot?.();
         return;
       }
@@ -2412,8 +2413,8 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       setQuestCompletionResult(result);
       engine?.publishSnapshot?.();
     } else {
-      setActionMessage("Questen kunne ikke indleveres. Tjek krav, plads i rygsaekken eller om save-state er for gammel.");
-      engine?.addToast?.("Quest kunne ikke indleveres");
+      setActionMessage(t("city.quest.turnInFailed"));
+      engine?.addToast?.(t("city.quest.turnInFailedToast"));
       engine?.publishSnapshot?.();
     }
   };
@@ -2426,8 +2427,8 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       engine?.publishSnapshot?.();
       onClose?.();
     } else {
-      setActionMessage("Questen kunne ikke tages. Tjek plads i rygsaekken eller om kravene stadig er opfyldt.");
-      engine?.addToast?.("Quest kunne ikke tages");
+      setActionMessage(t("city.quest.acceptFailed"));
+      engine?.addToast?.(t("city.quest.acceptFailedToast"));
       engine?.publishSnapshot?.();
     }
   };
@@ -2491,7 +2492,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
             <article className="quest-card quest-status-offer" key={`offer-${quest.id}`}>
               <header>
                 <b>{questText(quest, "title")}</b>
-                <span>Ny quest</span>
+                <span>{t("city.quest.newQuest")}</span>
               </header>
               <p>{questText(quest, "story")}</p>
               <QuestObjectiveMeta quest={quest} />
@@ -2500,7 +2501,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
                 onPointerUp={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "offer", quest }), true)}
                 onClick={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "offer", quest }))}
               >
-                Aaben quest
+                {t("city.quest.openQuest")}
               </button>
             </article>
           ))}
@@ -2520,12 +2521,12 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
                 onPointerUp={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "active", quest }), true)}
                 onClick={(event) => runButtonAction(event, () => setSelectedQuest({ mode: "active", quest }))}
               >
-                Aaben quest
+                {t("city.quest.openQuest")}
               </button>
             </article>
             );
           })}
-          {!npcOffers.length && !npcQuests.length && <p>{npcDialogue || "Ingen quests tilgaengelige lige nu."}</p>}
+          {!npcOffers.length && !npcQuests.length && <p>{npcDialogue || t("city.quest.noneAvailable")}</p>}
         </main>
       </section>}
       {selectedQuest && (
@@ -2535,13 +2536,13 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
           onClose={closeSelectedQuest}
           footer={(
             <>
-              <button type="button" onClick={closeSelectedQuest}>{skipQuestList ? "Luk" : "Tilbage"}</button>
+              <button type="button" onClick={closeSelectedQuest}>{skipQuestList ? t("ui.close") : t("ui.back")}</button>
               {selectedQuest.mode === "offer" ? (
-                <button type="button" onClick={() => acceptQuest(selectedQuest.quest)}>Tag quest</button>
+                <button type="button" onClick={() => acceptQuest(selectedQuest.quest)}>{t("city.quest.accept")}</button>
               ) : (
                 <>
-                  <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest.quest)}>Opgiv quest</button>
-                  <button type="button" disabled={!selectedQuestCanTurnInAtNpc} onClick={() => turnIn(selectedQuest.quest)}>Indlever quest</button>
+                  <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest.quest)}>{t("city.quest.abandon")}</button>
+                  <button type="button" disabled={!selectedQuestCanTurnInAtNpc} onClick={() => turnIn(selectedQuest.quest)}>{t("city.quest.turnIn")}</button>
                 </>
               )}
             </>
@@ -2550,12 +2551,12 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       )}
       {confirmAbandonQuest && (
         <div className="confirm-backdrop" role="presentation">
-          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
-            <h3>Opgiv {questText(confirmAbandonQuest, "title")}?</h3>
-            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label={t("city.quest.abandon")}>
+            <h3>{t("city.quest.abandonTitle", { title: questText(confirmAbandonQuest, "title") })}</h3>
+            <p>{t("city.quest.abandonBody")}</p>
             <div className="confirm-actions">
-              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
-              <button type="button" onClick={abandonQuest}>Opgiv quest</button>
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>{t("ui.cancel")}</button>
+              <button type="button" onClick={abandonQuest}>{t("city.quest.abandon")}</button>
             </div>
           </section>
         </div>
@@ -2564,7 +2565,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
         <QuestDetailCard
           quest={{
             ...(questCompletionResult.questInfo ?? {}),
-            title: questCompletionResult.questTitle ?? questCompletionResult.questInfo?.title ?? "Quest reward",
+            title: questCompletionResult.questTitle ?? questCompletionResult.questInfo?.title ?? t("city.quest.reward"),
             rewards: questCompletionResult.rewards ?? questCompletionResult.questInfo?.rewards ?? {},
           }}
           npc={QUEST_NPCS[questCompletionResult.questInfo?.turnInNpcId ?? questCompletionResult.questInfo?.npcId]}
@@ -2589,9 +2590,9 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [confirmAbandonQuest, setConfirmAbandonQuest] = useState(null);
   const offers = board?.offers ?? [];
-  const title = localize(fallbackConfig, "title") || board?.title || "Quest Board";
+  const title = localize(fallbackConfig, "title") || board?.title || t("city.questBoard.title");
   const subtitle = localize(fallbackConfig, "subtitle") || board?.subtitle || "";
-  const emptyText = localize(fallbackConfig, "emptyText") || board?.emptyText || "No quests are available right now.";
+  const emptyText = localize(fallbackConfig, "emptyText") || board?.emptyText || t("city.questBoard.noQuestsAvailable");
   const acceptSelectedQuest = () => {
     if (!selectedQuest) return;
     const accepted = onAcceptQuest?.(selectedQuest);
@@ -2628,17 +2629,17 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
           <article className="quest-card quest-status-offer" key={`board-${quest.questId}`}>
             <header>
               <b>{questText(quest, "title")}</b>
-              <span>{quest.kind ?? quest.category ?? "Quest"}</span>
+              <span>{quest.kind ?? quest.category ?? t("city.quest.quest")}</span>
             </header>
             <p>{questText(quest, "story")}</p>
             {quest.acceptText && <p>{questText(quest, "acceptText")}</p>}
             <QuestObjectiveMeta quest={quest} />
-            <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
+            <button type="button" onClick={() => setSelectedQuest(quest)}>{t("city.quest.openQuest")}</button>
           </article>
         ))}
         {activeQuests.length > 0 && (
           <>
-            <p>Aktive quests:</p>
+            <p>{t("city.quest.activeQuests")}</p>
             {activeQuests.map((quest) => (
               <article className={`quest-card ${quest.complete ? "complete quest-status-ready" : "quest-status-active"}`} key={`board-active-${quest.id}`}>
                 <header>
@@ -2647,7 +2648,7 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
                 </header>
                 <p>{questText(quest, quest.complete ? "turnInText" : "story")}</p>
                 <QuestObjectiveMeta quest={quest} />
-                <button type="button" onClick={() => setSelectedQuest(quest)}>Aaben quest</button>
+                <button type="button" onClick={() => setSelectedQuest(quest)}>{t("city.quest.openQuest")}</button>
               </article>
             ))}
           </>
@@ -2661,11 +2662,11 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
           onClose={() => setSelectedQuest(null)}
           footer={(
             <>
-              <button type="button" onClick={() => setSelectedQuest(null)}>Tilbage</button>
+              <button type="button" onClick={() => setSelectedQuest(null)}>{t("ui.back")}</button>
               {selectedQuestIsActive ? (
-                <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>Opgiv quest</button>
+                <button type="button" onClick={() => setConfirmAbandonQuest(selectedQuest)}>{t("city.quest.abandon")}</button>
               ) : (
-                <button type="button" onClick={acceptSelectedQuest}>Tag quest</button>
+                <button type="button" onClick={acceptSelectedQuest}>{t("city.quest.accept")}</button>
               )}
             </>
           )}
@@ -2673,12 +2674,12 @@ function CityQuestBoardPanel({ board, fallbackConfig, activeQuests = [], disable
       )}
       {confirmAbandonQuest && (
         <div className="confirm-backdrop" role="presentation">
-          <section className="confirm-card" role="dialog" aria-modal="true" aria-label="Opgiv quest">
-            <h3>Opgiv {confirmAbandonQuest.title}?</h3>
-            <p>Questen fjernes fra aktive quests og kan tages igen hos questgiveren. Quest items for denne quest fjernes fra rygsaekken.</p>
+          <section className="confirm-card" role="dialog" aria-modal="true" aria-label={t("city.quest.abandon")}>
+            <h3>{t("city.quest.abandonTitle", { title: questText(confirmAbandonQuest, "title") })}</h3>
+            <p>{t("city.quest.abandonBody")}</p>
             <div className="confirm-actions">
-              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>Annuller</button>
-              <button type="button" onClick={abandonSelectedQuest}>Opgiv quest</button>
+              <button type="button" onClick={() => setConfirmAbandonQuest(null)}>{t("ui.cancel")}</button>
+              <button type="button" onClick={abandonSelectedQuest}>{t("city.quest.abandon")}</button>
             </div>
           </section>
         </div>
@@ -2837,7 +2838,7 @@ function cityAreaRequirementEntries(source = {}, progress = {}) {
   });
 }
 
-function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats = {}) {
+function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats = {}, localize = null) {
   if (!addon?.id) return { canBuy: false, reasons: ["Missing addon id"] };
   if (!isCityBuildingOwned(progress, building)) return { canBuy: false, reasons: ["Build the building first."] };
   if (cityBuildingAddonOwned(progress, building, addon)) return { canBuy: false, reasons: ["Already owned."] };
@@ -2852,7 +2853,7 @@ function cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats 
     ...areaRequirementEntries.filter((entry) => !entry.met).map((entry) => entry.label),
     ...costEntries
       .filter(([resourceId, amount]) => cityCostAvailable(snapshot, resourceId, progress) < amount)
-      .map(([resourceId, amount]) => `${cityCostLabel(resourceId)} ${cityCostAvailable(snapshot, resourceId, progress)}/${amount}`),
+      .map(([resourceId, amount]) => `${cityCostLabel(resourceId, localize)} ${cityCostAvailable(snapshot, resourceId, progress)}/${amount}`),
   ];
   return { canBuy: reasons.length === 0, reasons };
 }
@@ -3186,7 +3187,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     if (cityArtifactBoughtIds(progress).has(artifact.id)) return { canBuy: false, reasons: ["Already bought"] };
     const resourceReasons = cityCostResourceEntries(artifact.cost)
       .filter(([resourceId, amount]) => buildingResourceAvailable(resourceId) < amount)
-      .map(([resourceId, amount]) => `${cityCostLabel(resourceId)} ${buildingResourceAvailable(resourceId)}/${amount}`);
+      .map(([resourceId, amount]) => `${cityCostLabel(resourceId, localize)} ${buildingResourceAvailable(resourceId)}/${amount}`);
     const itemReasons = cityCostItemEntries(artifact.cost)
       .filter((entry) => cityItemCostAvailable(snapshotRef?.current ?? snapshot, entry) < entry.count)
       .map((entry) => `${cityItemCostLabel(entry)} ${cityItemCostAvailable(snapshotRef?.current ?? snapshot, entry)}/${entry.count}`);
@@ -3415,7 +3416,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
   };
 
   const repairBuilding = (percent = null) => {
-    if (!building) return;
+    if (!building || !owned) return;
     const progressState = progress ?? {};
     const state = getCityBuildingState(progressState, building);
     const currentDur = Math.max(0, Math.min(100, Number(state.durability ?? DURABILITY_DEFAULT)));
@@ -3431,7 +3432,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       })
       .filter((entry) => entry.available < entry.amount);
     if (deficits.length > 0) {
-      const parts = deficits.map((d) => `${cityCostLabel(d.resourceId)} ${d.amount} (du har ${d.available})`);
+      const parts = deficits.map((d) => `${cityCostLabel(d.resourceId, localize)} ${d.amount} (du har ${d.available})`);
       engineRef.current?.addToast?.(`Kan ikke reparere: mangler ${parts.join(", ")}`);
       return;
     }
@@ -3582,7 +3583,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         engineRef.current?.publishSnapshot?.();
         return;
       }
-      engineRef.current?.addToast?.(`Recycled ${removed.name ?? "readable"} into ${paperValue} ${RESOURCE_DEFS[output.resourceId]?.name ?? output.resourceId}.`);
+      engineRef.current?.addToast?.(`Recycled ${removed.name ?? "readable"} into ${paperValue} ${localize(RESOURCE_DEFS[output.resourceId], "name") || output.resourceId}.`);
       engineRef.current?.publishSnapshot?.();
       engineRef.current?.saveProgress?.({ force: true });
       return;
@@ -3603,7 +3604,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         engineRef.current?.addToast?.("Rygsaekken er fuld");
         return;
       }
-      engineRef.current?.addToast?.(`Recycled ${result.removed.name ?? "readable"} into ${paperValue} ${RESOURCE_DEFS[output.resourceId]?.name ?? output.resourceId}.`);
+      engineRef.current?.addToast?.(`Recycled ${result.removed.name ?? "readable"} into ${paperValue} ${localize(RESOURCE_DEFS[output.resourceId], "name") || output.resourceId}.`);
       engineRef.current?.publishSnapshot?.();
       engineRef.current?.saveProgress?.({ force: true });
     }
@@ -3617,7 +3618,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const output = makeResourceItem(outputId, outputCount);
     if (!inputId || !output) return;
     if (buildingResourceAvailable(inputId) < inputCount) {
-      engineRef.current?.addToast?.(`Kraever ${inputCount}x ${RESOURCE_DEFS[inputId]?.name ?? inputId}`);
+      engineRef.current?.addToast?.(`Kraever ${inputCount}x ${localize(RESOURCE_DEFS[inputId], "name") || inputId}`);
       return;
     }
     const simulated = (snapshotRef?.current?.inventory ?? snapshot.inventory ?? []).map((item) => item ? { ...item } : item);
@@ -3631,7 +3632,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       engineRef.current?.addToast?.("Kunne ikke tilfoeje scroll til rygsaekken.");
       return;
     }
-    engineRef.current?.addToast?.(`Crafted ${outputCount} ${RESOURCE_DEFS[outputId]?.name ?? outputId} from ${inputCount} ${RESOURCE_DEFS[inputId]?.name ?? inputId}.`);
+    engineRef.current?.addToast?.(`Crafted ${outputCount} ${localize(RESOURCE_DEFS[outputId], "name") || outputId} from ${inputCount} ${localize(RESOURCE_DEFS[inputId], "name") || inputId}.`);
     engineRef.current?.publishSnapshot?.();
     engineRef.current?.saveProgress?.({ force: true });
   };
@@ -3736,7 +3737,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const taken = engineRef.current?.takeInventoryItemCount?.(inventoryIndex, conversion.amount);
     if (!taken) return;
     onChangeProgress((current) => addCityArmoryPoints(current, conversion.target, conversion.points));
-    engineRef.current?.addToast?.(`Armory +${conversion.points} ${cityCostLabel(conversion.target)}`);
+    engineRef.current?.addToast?.(`Armory +${conversion.points} ${cityCostLabel(conversion.target, localize)}`);
     engineRef.current?.saveProgress?.({ force: true });
   };
 
@@ -3869,7 +3870,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     const missing = inputs
       .map(([inputId, amount]) => {
         const available = cityTonicInputAvailable(inputId);
-        return available < amount ? `${cityCostLabel(inputId)} ${available}/${amount}` : "";
+        return available < amount ? `${cityCostLabel(inputId, localize)} ${available}/${amount}` : "";
       })
       .filter(Boolean);
     if (missing.length > 0) {
@@ -4202,7 +4203,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
           {featureAddons.map((addon) => {
             const bought = purchasedAddons.has(addon.id);
             const unlocked = cityAddonIsUnlocked(addon, snapshot, cityStats);
-            const buyCheck = cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats);
+            const buyCheck = cityBuildingAddonCanBuy(progress, building, addon, snapshot, cityStats, localize);
             const iconSprite = cityImageForAddon(houseImages, building, addon, progress);
             const addonIconUrl = cityImageElementSrc(iconSprite, addon.imageUrl ?? buildingImageSrc);
             return (
@@ -4263,7 +4264,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                   {computeRepairCostEntries(building.cost ?? {}, Math.max(0, Math.ceil(100 - (buildingState.durability ?? DURABILITY_DEFAULT)))).map(([resourceId, amount]) => (
                     <span key={resourceId} className={buildingResourceAvailable(resourceId) >= amount ? "met" : "missing"}>
                       <CityCostIcon resourceId={resourceId} />
-                      {amount} {cityCostLabel(resourceId)} {buildingResourceAvailable(resourceId) !== undefined && `(${t("city.availableCount", { count: buildingResourceAvailable(resourceId) })})`}
+                      {amount} {cityCostLabel(resourceId, localize)} {buildingResourceAvailable(resourceId) !== undefined && `(${t("city.availableCount", { count: buildingResourceAvailable(resourceId) })})`}
                     </span>
                   ))}
                 </div>
@@ -4292,7 +4293,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                     {nextBuildingLevelCostEntries.map(([resourceId, amount]) => (
                       <span className={buildingResourceAvailable(resourceId) >= amount ? "met" : "missing"} key={resourceId}>
                         <CityCostIcon resourceId={resourceId} />
-                        {amount} {cityCostLabel(resourceId)}
+                        {amount} {cityCostLabel(resourceId, localize)}
                       </span>
                     ))}
                   </div>
@@ -4338,7 +4339,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
               <button type="button" onClick={upgradeBuilding} disabled={!owned || !nextBuildingLevel || !canUpgradeBuilding}>
                 {t("action.upgrade")}
               </button>
-              <button type="button" onClick={() => repairBuilding()} disabled={(buildingState.durability ?? 100) >= 100}>{t("action.repair")}</button>
+              <button type="button" onClick={() => repairBuilding()} disabled={!owned || (buildingState.durability ?? 100) >= 100}>{t("action.repair")}</button>
             </div>
           </div>
         </div>}
@@ -4378,9 +4379,9 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
                         <CityCostGrid entries={cityBuildingAddonCostEntries(activeAddon)} snapshot={snapshot} progress={progress} emptyText={t("city.free")} />
                         <button
                           type="button"
-                          disabled={!cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).canBuy}
+                          disabled={!cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats, localize).canBuy}
                           onClick={() => buyAddon(activeAddon)}
-                          title={cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats).reasons.join(" ") || undefined}
+                          title={cityBuildingAddonCanBuy(progress, building, activeAddon, snapshot, cityStats, localize).reasons.join(" ") || undefined}
                         >
                           {t("city.buyAddon")}
                         </button>
@@ -4451,15 +4452,15 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
       )}
       {confirmStoreItem && (
         <div className="confirm-backdrop" role="presentation">
-          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label="Confirm storage">
-            <h2>Aflever bogen?</h2>
-            <p>{confirmStoreItem.itemName} bliver placeret permanent i denne samling.</p>
+          <section className="confirm-dialog" role="dialog" aria-modal="true" aria-label={t("city.storage.confirmStorage")}>
+            <h2>{t("city.storage.storeBookTitle")}</h2>
+            <p>{t("city.storage.storeBookBody", { item: confirmStoreItem.itemName })}</p>
             <div>
-              <button type="button" onClick={() => setConfirmStoreItem(null)}>Cancel</button>
+              <button type="button" onClick={() => setConfirmStoreItem(null)}>{t("ui.cancel")}</button>
               <button type="button" onClick={() => {
                 depositInventoryItem(confirmStoreItem.inventoryIndex, confirmStoreItem.sectionKey, confirmStoreItem.slotIndex, true);
                 setConfirmStoreItem(null);
-              }}>Confirm</button>
+              }}>{t("ui.confirm")}</button>
             </div>
           </section>
         </div>
@@ -4789,7 +4790,10 @@ function cityInventoryTypeLabel(type) {
 
 function fixedReadableDefsForInventoryType(type) {
   if (type === "fixed_lorebook") {
-    return READABLE_ITEM_DEFS.filter((def) => def.kind === "lorebook" && def.status !== "mergeable");
+    return READABLE_ITEM_DEFS.filter((def) => (
+      (def.kind === "lorebook" || def.kind === "lorenote")
+      && def.status !== "mergeable"
+    ));
   }
   if (type === "fixed_spellbook") {
     return READABLE_ITEM_DEFS.filter((def) => def.kind === "spellbook" && def.status !== "mergeable");
@@ -4967,7 +4971,11 @@ function itemMatchesCityInventoryType(item, type) {
   if (type === "weapon") return item.slot === "weapon";
   if (type === "armor") return item.mode === "armor";
   if (type === "readable") return isReadableItem(item);
-  if (type === "fixed_lorebook") return isReadableItem(item) && item.readableKind === "lorebook" && item.readableStatus !== "mergeable";
+  if (type === "fixed_lorebook") {
+    return isReadableItem(item)
+      && (item.readableKind === "lorebook" || item.readableKind === "lorenote")
+      && item.readableStatus !== "mergeable";
+  }
   if (type === "fixed_spellbook") return isReadableItem(item) && item.readableKind === "spellbook" && item.readableStatus !== "mergeable";
   return item.mode === type || item.slot === type;
 }
@@ -4997,6 +5005,7 @@ function itemMatchesCityInventoryType(item, type) {
 
 
 function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
+  const { localize } = useLocalization();
   if (!costEntries.length) return null;
   return (
     <div className="city-cost-summary">
@@ -5006,7 +5015,7 @@ function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
         return (
           <span key={resourceId}>
             <CityCostIcon resourceId={resourceId} />
-            {paid}/{needed} {cityCostLabel(resourceId)}
+            {paid}/{needed} {cityCostLabel(resourceId, localize)}
             {remaining > 0 && ` (${cityCostAvailable(snapshot, resourceId, progress)} available)`}
           </span>
         );
@@ -5016,7 +5025,7 @@ function CityCostSummary({ costEntries, buildingState, snapshot, progress }) {
 }
 
 function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costMultiplier = 1, onTrain }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const recipes = armyTrainingRecipesForAddon(addon?.id);
   const armyUnits = normalizeArmyUnits(progress?.armyUnits);
   const used = cityArmyUnitCount(armyUnits);
@@ -5026,15 +5035,15 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
     <section className="blacksmith-station">
       <header>
         <h4>{localize(addon, "title")}</h4>
-        <span>Soldiers {used} / {capacity} usable citizens</span>
-        {trainingCostMultiplier !== 1 && <p>Recruitment costs x{trainingCostMultiplier.toFixed(2)} while Barracks are disrupted.</p>}
+        <span>{t("city.army.soldiersUsable", { used, capacity })}</span>
+        {trainingCostMultiplier !== 1 && <p>{t("city.army.recruitmentMultiplier", { value: trainingCostMultiplier.toFixed(2) })}</p>}
       </header>
       {Object.entries(CITY_ARMY_UNIT_DEFS).map(([unitId, def]) => (
         <div className="blacksmith-row" key={`owned-${unitId}`}>
           {def.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
           <div>
             <b>{localize(def, "label")}</b>
-            <span>Owned: {armyUnits[unitId] ?? 0} | Power: {def.armyValue}</span>
+            <span>{t("city.army.ownedPower", { owned: armyUnits[unitId] ?? 0, power: def.armyValue })}</span>
           </div>
         </div>
       ))}
@@ -5050,23 +5059,23 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
           <div className="blacksmith-row" key={recipe.id}>
             {def?.imageUrl ? <img src={def.imageUrl} alt="" draggable="false" /> : <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />}
             <div>
-              <b>Train {localize(def, "label") || recipe.unitId}</b>
+              <b>{t("city.army.trainNamed", { unit: localize(def, "label") || recipe.unitId })}</b>
               <div className="city-area-costs city-army-training-costs">
                 {costEntries.map(([resourceId, count]) => {
                   const available = cityCostAvailable(snapshot, resourceId, progress);
                   return (
                     <span className={available >= count ? "met" : "missing"} key={resourceId}>
                       <CityCostIcon resourceId={resourceId} />
-                      {count} {cityCostLabel(resourceId)} ({available})
+                      {count} {cityCostLabel(resourceId, localize)} ({available})
                     </span>
                   );
                 })}
                 <span className={hasCapacity ? "met" : "missing"}>
-                  Citizens {used}/{capacity}
+                  {t("city.army.citizens", { used, capacity })}
                 </span>
               </div>
             </div>
-            <button type="button" disabled={!hasResources || !hasCapacity} onClick={() => onTrain(recipe)}>Train</button>
+            <button type="button" disabled={!hasResources || !hasCapacity} onClick={() => onTrain(recipe)}>{t("city.army.train")}</button>
           </div>
         );
       })}
@@ -5075,7 +5084,7 @@ function CityBarracksTrainingPanel({ addon, progress, cityStats, snapshot, costM
 }
 
 function CityArmoryPanel({ inventory, progress, onConvert }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const points = cityArmoryPoints(progress);
   const convertibleItems = (inventory ?? [])
     .map((item, index) => ({ item, index }))
@@ -5083,15 +5092,15 @@ function CityArmoryPanel({ inventory, progress, onConvert }) {
   return (
     <section className="blacksmith-station">
       <header>
-        <h4>Armory</h4>
+        <h4>{t("city.armory.title")}</h4>
         <span>weaponPoints {points.weaponPoints} | armorPoints {points.armorPoints}</span>
       </header>
       {convertibleItems.length === 0 && (
         <div className="blacksmith-row">
           <InventoryIcon iconSheet="items" iconUrl="/assets/generated/icon/icon_army.png" />
           <div>
-            <b>No convertible equipment</b>
-            <span>Only weapon and armor loot can be sent to the Armory.</span>
+            <b>{t("city.armory.noConvertible")}</b>
+            <span>{t("city.armory.onlyWeaponArmor")}</span>
           </div>
         </div>
       )}
@@ -5106,11 +5115,11 @@ function CityArmoryPanel({ inventory, progress, onConvert }) {
           <div className="blacksmith-row armory-item-row" style={{ "--item-quality": rarityColor }} key={item.id ?? index}>
             <InventoryIcon iconSheet="items" iconUrl={item.iconUrl ?? iconUrl} />
             <div>
-              <b>{localizeItemField(item, "name", localize) || "Unnamed item"}</b>
-              <span><i>{rarityLabel}</i> | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? ` each, ${quantity} available` : ""}</span>
+              <b>{localizeItemField(item, "name", localize) || t("inventory.unnamedItem")}</b>
+              <span><i>{rarityLabel}</i> | {item.type ?? (target === "weaponPoints" ? "weapon" : "armor")} | +{pointsPerItem} {target}{quantity > 1 ? t("city.armory.eachAvailable", { quantity }) : ""}</span>
             </div>
-            <button type="button" onClick={() => onConvert(index, 1)}>Convert</button>
-            {quantity > 1 && <button type="button" onClick={() => onConvert(index, quantity)}>Convert all</button>}
+            <button type="button" onClick={() => onConvert(index, 1)}>{t("city.armory.convert")}</button>
+            {quantity > 1 && <button type="button" onClick={() => onConvert(index, quantity)}>{t("city.armory.convertAll")}</button>}
           </div>
         );
       })}
@@ -5138,12 +5147,12 @@ function CityStatEffectsSummary({ title, effects }) {
 }
 
 function CityCampStats({ cityStats }) {
-  const { localize } = useLocalization();
+  const { localize, t } = useLocalization();
   const events = cityStats.events ?? {};
   const activeEntries = cityEventEntries(events, { includeRisk: true });
   return (
     <div className="city-stat-effects">
-      <b>City events</b>
+      <b>{t("city.events.title")}</b>
       <div>
         {activeEntries.length ? activeEntries.map((event) => (
           <span
@@ -5152,12 +5161,12 @@ function CityCampStats({ cityStats }) {
             key={event.id}
           >
             <b>{localize(event, "label")}</b>
-            {event.positive ? <em>Positive</em> : Number(event.risk) > 0 ? <em>Risk {Math.round(Number(event.risk))}%</em> : null}
+            {event.positive ? <em>{t("city.events.positive")}</em> : Number(event.risk) > 0 ? <em>{t("city.events.risk", { risk: Math.round(Number(event.risk)) })}</em> : null}
             {event.detail ? <small>{localize(event, "detail")}</small> : null}
           </span>
-        )) : <span><b>Stable</b></span>}
+        )) : <span><b>{t("city.events.stable")}</b></span>}
       </div>
-      <p>Events are derived from current city stats and apply runtime modifiers without changing base values.</p>
+      <p>{t("city.events.description")}</p>
     </div>
   );
 }
@@ -5196,14 +5205,15 @@ function CityFactionPanel({ factionRep }) {
 }
 
 function CityBuildPaymentModal({ building, buildingState, snapshot, progress, costEntries, canFinish, canPayAll, statRequirementsMet = true, areaRequirementsMet = true, areaRequirementEntries = [], parentAreaUnlocked = true, parentAreaLockText = "", onApplyResource, onPayAll, onFinish, onClose }) {
+  const { localize, t } = useLocalization();
   const canApplyPayment = statRequirementsMet && areaRequirementsMet && parentAreaUnlocked;
   return (
     <div className="city-build-payment-backdrop" role="presentation">
-      <section className="city-build-payment-modal" role="dialog" aria-modal="true" aria-label={`Build ${building.title}`}>
+      <section className="city-build-payment-modal" role="dialog" aria-modal="true" aria-label={t("city.buildPayment.aria", { building: building.title })}>
         <header>
           <div>
             <h4>{building.title}</h4>
-            <span>Pay construction cost</span>
+            <span>{t("city.buildPayment.title")}</span>
           </div>
           <button type="button" onClick={onClose}>X</button>
         </header>
@@ -5216,29 +5226,29 @@ function CityBuildPaymentModal({ building, buildingState, snapshot, progress, co
           </div>
         )}
         <div className="city-cost-list">
-          {costEntries.length === 0 && <span>No cost configured yet.</span>}
+          {costEntries.length === 0 && <span>{t("city.buildPayment.noCost")}</span>}
           {costEntries.map(([resourceId, needed]) => {
             const paid = Math.max(0, buildingState.paid?.[resourceId] ?? 0);
             const remaining = Math.max(0, needed - paid);
             const available = cityCostAvailable(snapshot, resourceId, progress);
-            const label = cityCostLabel(resourceId);
+            const label = cityCostLabel(resourceId, localize);
             return (
               <div className="city-cost-row" key={resourceId}>
                 <CityCostIcon resourceId={resourceId} />
                 <span>{label}</span>
                 <b>{paid} / {needed}</b>
-                <em>Available {available}</em>
+                <em>{t("ui.available")} {available}</em>
                 <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, 1)}>+1</button>
                 <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, Math.min(10, remaining))}>+10</button>
-                <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, remaining)}>Max</button>
+                <button type="button" disabled={!canApplyPayment || !remaining || !available} onClick={() => onApplyResource(resourceId, remaining)}>{t("ui.max")}</button>
               </div>
             );
           })}
         </div>
         <footer>
-          <button type="button" onClick={onClose}>Close</button>
-          <button type="button" disabled={!canApplyPayment || !canPayAll} onClick={onPayAll}>Pay all</button>
-          <button type="button" disabled={!canApplyPayment || !canFinish} onClick={onFinish}>Build</button>
+          <button type="button" onClick={onClose}>{t("ui.close")}</button>
+          <button type="button" disabled={!canApplyPayment || !canPayAll} onClick={onPayAll}>{t("city.buildPayment.payAll")}</button>
+          <button type="button" disabled={!canApplyPayment || !canFinish} onClick={onFinish}>{t("action.build")}</button>
         </footer>
       </section>
     </div>

@@ -1,9 +1,15 @@
 History over changes
 
-TO DO:
-kun en farm, resten er bare areas der hedder farm!
+*V. 1.01
+- some small ui translation fixes
+- yellow ? when quest is ready to turn in, will now always be show instead of gray ! or ?
+- edited city-inn-taproom (ongoing)
+- added foilage_glass and foilage_bottles
+- added 10 new lorebooks and notes
+- lore hover now use selected lang
+- resource chips now use translated names
 
-*V. 0.90
+*V. 1.00
 - added artifact/monuments, archivments and policy rules (all can improve city stats)
 - added configuredLoot (for more special case for loot)
 - new loottable system (more simple when adjusted)
@@ -40,7 +46,7 @@ kun en farm, resten er bare areas der hedder farm!
 - startet to do some wall code, but deactivated for now as it's not finish
 - building you will get by quest can't be bought (bank, mechant, sanctury and blacksmith)
 - items can now get destroyWhenDurabilityDepleted - when set to true item will disaperar when reaching 0% durability
-- added beginning of multi lang system (started at quest, unique and named items, classes, most of ui in city) - changed lang in city settings
+- complete (99%) translation done - denglish and danish is now supported - changed lang in city settings
 - added helping system
 
 *V. 0.84

@@ -1,4 +1,57 @@
 export const SUBREGION_CONFIG = {
+  young_boys_father_cave: {
+    id: "young_boys_father_cave",
+    label: "The Arachnogrim Brood Cave",
+    i18n: { da: { label: "Arachnogrim-ynglens grotte" } },
+    kind: "cave",
+    generator: "mapRegion",
+    mapSize: "small",
+    width: 50,
+    height: 50,
+    persistence: "whileRootRegionActive",
+    tileset: [
+      { fileName: "tileset/tileset_rock.png", weight: 1, lockedVariant: 2 },
+      { fileName: "tileset/tileset_debriswithblood.png", weight: 0.4, lockedVariant: 1 },
+    ],
+    objects: [
+      { id: "object_caves", weight: 1, actionId: "exit_subregion", placementRole: "entryArea", blocking: false },
+      { id: "object_stone_cluster", weight: 6 },
+      { id: "object_bones", weight: 5, scale: 0.7 },
+    ],
+    foliageSets: [
+      { fileName: "foilage/foilage_boneparts.png", weight: 5, scale: 0.7 },
+      { fileName: "foilage/foilage_deadanimal_small.png", weight: 2, scale: 0.45 },
+    ],
+    foliage: [
+      {
+        fileName: "foilage/foilage_deadvillages.png",
+        weight: 1,
+        placementRole: "farFromEntry",
+        scale: 1.4,
+        cell: 10,
+        actionId: "inspect_young_boys_father",
+        conditions: { questStepActive: { questId: "the_young_boys_letter", stepId: "search_fathers_cave" }, notFlag: "young_boys_father_found" },
+      },
+    ],
+    decay: [
+      { id: "decay_spiderweb", weight: 22 },
+      { id: "decay_blood", weight: 8 },
+      { id: "decay_cracks", weight: 10 },
+    ],
+    mobs: [{ type: "ArachnogrimOffspring", weight: 1 }],
+    monsters: [],
+    chests: [],
+    prefabRules: {},
+    spawnCounts: { objects: 8, foliage: 7, decals: 18, monsters: { min: 12, max: 15 } },
+    onClear: {
+      once: true,
+      conditions: { questStepActive: { questId: "the_young_boys_letter", stepId: "search_fathers_cave" } },
+      setFlags: ["young_boys_father_cave_cleared"],
+      addCounters: { subregionsCleared: 1 },
+      message: "The Arachnogrim offspring are dead. The deepest chamber is quiet.",
+      i18n: { da: { message: "Arachnogrim-ynglen er død. Det inderste kammer er stille." } },
+    },
+  },
   cave01_lvl1: {
     id: "cave01_lvl1",
     label: "Old Cave",

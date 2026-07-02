@@ -441,6 +441,23 @@ export const UNIQUE_ITEMS = [
 
 export const NAMED_ITEM_TEMPLATES = [
   {
+    id: "maras_keepsake",
+    name: "Mara's Keepsake",
+    baseName: "Keepsake",
+    slot: "relic",
+    mode: "relic",
+    type: "relic",
+    levelMin: 1,
+    sources: [],
+    dropChance: 0,
+    rarityIds: ["epic"],
+    iconUrl: "/assets/generated/item/item_quest_silverring.png",
+    description: "A family keepsake entrusted to you by Mara. It grants steady protection and helps you endure disabling effects.",
+    i18n: { da: { name: "Maras minde", description: "Et familieminde, som Mara betroede dig. Det giver stabil beskyttelse og hjælper dig med at modstå hæmmende effekter." } },
+    scaleWithLevel: false,
+    stats: { armorFlat: 6, maxHp: 30, statusDurationBonus: -0.08 },
+  },
+  {
     id: "worn_sandals",
     name: "Worn Sandals",
     baseName: "Boots",

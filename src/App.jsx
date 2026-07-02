@@ -5,13 +5,14 @@ import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
 import { CITY_AREAS } from "./game/config/city-areas-config.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
-import { WORLD_MAP } from "./game/config/map-region-config.js";
+import { MAP_REGION_SETS, WORLD_MAP } from "./game/config/map-region-config.js";
 import { incrementWorldCounter } from "./game/world-state.js";
 import { CHEAT_SETTINGS, cheatGiveOptions, installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
 import { QUEST_DEFS } from "./game/config/quest-config.js";
 import { ACTION_CONFIG } from "./game/config/action-config.js";
+import { READABLE_DEF_BY_ID } from "./game/config/readable-config.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import { useLocalization } from "./i18n/index.js";
 import { HelpDialog } from "./app/help/index.js";
@@ -182,6 +183,84 @@ function cityAddonIds() {
   return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label, "da"));
 }
 
+function localizedRegionNames(text, localize) {
+  let result = String(text ?? "");
+  const regions = Object.values(MAP_REGION_SETS ?? {}).flat();
+  for (const region of regions) {
+    const localizedLabel = localize(region, "label") || region?.label || region?.id;
+    if (!localizedLabel) continue;
+    for (const source of [region?.id, region?.label]) {
+      if (!source || String(source).toLocaleLowerCase() === String(localizedLabel).toLocaleLowerCase()) continue;
+      const escaped = String(source).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      result = result.replace(new RegExp(`(?<![\\p{L}\\p{N}_-])${escaped}(?![\\p{L}\\p{N}_-])`, "giu"), localizedLabel);
+    }
+  }
+  return result;
+}
+
+function localizedToastText(toast, localize, t) {
+  const fallback = String(toast?.text ?? "");
+  const localization = toast?.localization;
+  if (localization?.type === "ui" && localization.key) {
+    return t(localization.key, localization.params ?? {}) || fallback;
+  }
+
+  const questId = String(localization?.questId ?? "");
+  const questDef = questId
+    ? QUEST_DEFS?.[questId] ?? Object.values(QUEST_DEFS ?? {}).find((quest) => String(quest?.id ?? "") === questId)
+    : null;
+  if (localization?.type === "questAccepted" && questDef) {
+    const npc = QUEST_NPCS[localization.npcId ?? questDef.npcId];
+    return t("messages.questAccepted", {
+      npc: localize(npc, "name") || npc?.name || "NPC",
+      instruction: localizedRegionNames(
+        localize(questDef, "acceptText") || questDef.acceptText || localize(questDef, "title") || questId,
+        localize,
+      ),
+    });
+  }
+  if (localization?.type === "questStartedFromReadable" && questDef) {
+    return t("messages.questStartedFromReadable", {
+      quest: localize(questDef, "title") || questDef.title || questId,
+      source: localization.sourceLabel || t("inventory.type.readable"),
+    });
+  }
+  if (localization?.type === "questReady" && questDef) {
+    return t("messages.questReady", {
+      quest: localize(questDef, "title") || questDef.title || questId,
+    });
+  }
+  if (localization?.type === "actionText") {
+    const readable = READABLE_DEF_BY_ID[localization.readableId];
+    const action = ACTION_CONFIG[localization.actionId];
+    return localize(readable, "story") || localize(action, "text") || fallback;
+  }
+
+  if (fallback === "Progression indlaest" || fallback === "Progress loaded") {
+    return t("messages.progressLoaded");
+  }
+
+  for (const def of Object.values(QUEST_DEFS ?? {})) {
+    const npcId = def?.npcId ?? def?.npcIds?.[0];
+    const npc = QUEST_NPCS[npcId];
+    if (def?.acceptText && fallback === `${npc?.name ?? "NPC"}: ${def.acceptText}`) {
+      return t("messages.questAccepted", {
+        npc: localize(npc, "name") || npc?.name || "NPC",
+        instruction: localizedRegionNames(localize(def, "acceptText") || def.acceptText, localize),
+      });
+    }
+    if (fallback === `${def?.title} klar til indlevering` || fallback === `${def?.title} ready to turn in`) {
+      return t("messages.questReady", { quest: localize(def, "title") || def.title });
+    }
+  }
+  for (const action of Object.values(ACTION_CONFIG ?? {})) {
+    if (action?.text && fallback === String(action.text)) {
+      return localize(action, "text") || fallback;
+    }
+  }
+  return fallback;
+}
+
 export default function App() {
   const {
     language,
@@ -248,8 +327,8 @@ export default function App() {
   const [appLoading, setAppLoading] = useState({
     active: true,
     percent: 0,
-    title: "Loading",
-    label: "Starting...",
+    title: t("loading.title"),
+    label: t("loading.starting"),
     detail: "",
     error: "",
   });
@@ -277,19 +356,19 @@ export default function App() {
 
     const preloadMenu = async () => {
       try {
-        update({ active: true, percent: 5, title: "Loading", label: "Loading menu", detail: "Menu artwork" });
+        update({ active: true, percent: 5, title: t("loading.title"), label: t("loading.menu"), detail: t("loading.detail.menuArtwork") });
         await loadUiImage("/assets/generated/menu.png").catch(() => null);
-        update({ percent: 20, label: "Loading city", detail: "Map, buildings, addons and NPCs" });
+        update({ percent: 20, label: t("loading.city"), detail: t("loading.detail.cityAssets") });
         await loadCityAssetsOnce();
-        update({ percent: 100, label: "Ready", detail: "Menu ready" });
+        update({ percent: 100, label: t("ui.ready"), detail: t("loading.detail.menuReady") });
         window.setTimeout(() => update({ active: false }), 120);
       } catch (error) {
         update({
           active: false,
           percent: 100,
-          label: "Menu ready",
+          label: t("loading.detail.menuReady"),
           detail: "",
-          error: error instanceof Error ? error.message : "Load failed",
+          error: error instanceof Error ? error.message : t("loading.failed"),
         });
       }
     };
@@ -310,20 +389,20 @@ export default function App() {
     update({
       active: true,
       percent: 0,
-      title: "Loading game",
-      label: "Preparing session",
+      title: t("loading.game"),
+      label: t("loading.preparingSession"),
       detail: "",
       error: "",
     });
 
-    update({ percent: 18, label: "Loading city", detail: "Map, buildings, addons and NPCs" });
+    update({ percent: 18, label: t("loading.city"), detail: t("loading.detail.cityAssets") });
     await loadCityAssetsOnce();
     preloadedGameAssetsRef.current = { atlas: null, animationSheets: null };
-    update({ percent: 92, label: "Preparing UI", detail: "Save data and city state" });
+    update({ percent: 92, label: t("loading.preparingUi"), detail: t("loading.detail.saveData") });
     return token;
   };
 
-  const preloadWildernessAssets = async (title = "Loading map", region = null) => {
+  const preloadWildernessAssets = async (title = t("loading.map"), region = null) => {
     const token = loadTokenRef.current + 1;
     loadTokenRef.current = token;
     const update = (patch) => {
@@ -335,12 +414,12 @@ export default function App() {
         active: true,
         percent: 0,
         title,
-        label: "Loading wilderness",
-        detail: "Terrain, objects and overlays",
+        label: t("loading.wilderness"),
+        detail: t("loading.detail.wilderness"),
         error: "",
       });
       const atlas = await loadGeneratedAtlas(region);
-      update({ percent: 68, label: "Loading combat", detail: "Hero and monster animations" });
+      update({ percent: 68, label: t("loading.combat"), detail: t("loading.detail.combat") });
       const animationSheets = await loadAnimationSheets(region);
       preloadedGameAssetsRef.current = { atlas, animationSheets };
       if (engineRef.current) {
@@ -350,7 +429,7 @@ export default function App() {
           chunk.terrainLayer = null;
         }
       }
-      update({ percent: 100, label: "Ready", detail: "Entering map" });
+      update({ percent: 100, label: t("ui.ready"), detail: t("loading.detail.enteringMap") });
       window.setTimeout(() => {
         if (loadTokenRef.current === token) setAppLoading((current) => ({ ...current, active: false }));
       }, 120);
@@ -367,8 +446,8 @@ export default function App() {
       ...current,
       active: true,
       percent: 100,
-      label: "Ready",
-      detail: "Entering city",
+      label: t("ui.ready"),
+      detail: t("loading.detail.enteringCity"),
       error: "",
     }));
     window.setTimeout(() => {
@@ -384,9 +463,9 @@ export default function App() {
       ...current,
       active: true,
       percent: 100,
-      label: "Load failed",
-      detail: "Could not start game",
-      error: error instanceof Error ? error.message : "Unknown load error",
+      label: t("loading.failed"),
+      detail: t("loading.detail.couldNotStart"),
+      error: error instanceof Error ? error.message : t("loading.unknownError"),
     }));
   };
 
@@ -856,7 +935,7 @@ export default function App() {
     if (!areaMapId || !region?.id) return;
     const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
     const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
-    const ready = await preloadWildernessAssets("Loading map", preparedRegion);
+    const ready = await preloadWildernessAssets(t("loading.map"), preparedRegion);
     if (!ready) return;
     const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return;
@@ -870,7 +949,7 @@ export default function App() {
     if (!areaMapId || !region?.id) return false;
     const corrupted = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region) > 0;
     const preparedRegion = engineRef.current?.prepareMapRegionConfig?.(areaMapId, region, { corrupted }) ?? region;
-    const ready = await preloadWildernessAssets("Loading battle", preparedRegion);
+    const ready = await preloadWildernessAssets(t("loading.battle"), preparedRegion);
     if (!ready) return false;
     const started = engineRef.current?.startMapRegion?.(areaMapId, preparedRegion);
     if (!started) return false;
@@ -1015,11 +1094,11 @@ export default function App() {
       {confirmMapAbandonOpen && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="abandon-map-title">
-            <h2 id="abandon-map-title">Tilbage til byen?</h2>
-            <p>Hvis du forlader dette map nu, bruges abandon-configen til at afgore hvilke dele af run-progress der nulstilles.</p>
+            <h2 id="abandon-map-title">{t("map.abandon.title")}</h2>
+            <p>{t("map.abandon.body")}</p>
             <div>
               <button type="button" onClick={() => setConfirmMapAbandonOpen(false)}>
-                Bliv her
+                {t("map.abandon.stay")}
               </button>
               <button
                 type="button"
@@ -1034,7 +1113,7 @@ export default function App() {
                   }
                 }}
               >
-                Forlad til by
+                {t("map.abandon.leave")}
               </button>
             </div>
           </section>
@@ -1045,7 +1124,7 @@ export default function App() {
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
             <h2 id="city-settings-title">{t("panel.settings.title")}</h2>
-            <p className="city-settings-note">Vaelg en performance-profil eller brug custom for finjustering. Aendringer aktiveres ved OK.</p>
+            <p className="city-settings-note">{t("settings.performance.note")}</p>
             <div className="city-settings-section">
               <h3>{localize(LANGUAGE_SETTING, "label")}</h3>
               <p>{localize(LANGUAGE_SETTING, "description")}</p>
@@ -1060,9 +1139,9 @@ export default function App() {
               </select>
             </div>
             <div className="city-settings-section">
-              <h3>Performance profil</h3>
+              <h3>{t("settings.performance.profileTitle")}</h3>
               <label>
-                Profil
+                {t("settings.performance.profile")}
                 <select
                   value={settingsDraft.mode}
                   onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
@@ -1084,15 +1163,15 @@ export default function App() {
                     useCustom: event.target.checked,
                   }))}
                 />
-                Brug custom profil
+                {t("settings.performance.useCustom")}
               </label>
             </div>
 
             {settingsDraft.useCustom && (
               <div className="city-settings-section city-settings-grid">
-                <h3>Custom profil</h3>
+                <h3>{t("settings.performance.customTitle")}</h3>
                 <label>
-                  Target FPS
+                  {t("settings.performance.targetFps")}
                   <input
                     type="number"
                     min="30"
@@ -1106,7 +1185,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  Ambient FPS
+                  {t("settings.performance.ambientFps")}
                   <input
                     type="number"
                     min="4"
@@ -1120,7 +1199,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  Minimap FPS
+                  {t("settings.performance.minimapFps")}
                   <input
                     type="number"
                     min="1"
@@ -1134,7 +1213,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  Max DPR
+                  {t("settings.performance.maxDpr")}
                   <input
                     type="number"
                     min="1"
@@ -1148,7 +1227,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  Fog Scale
+                  {t("settings.performance.fogScale")}
                   <input
                     type="number"
                     min="0.3"
@@ -1162,7 +1241,7 @@ export default function App() {
                   />
                 </label>
                 <label>
-                  Particle quality
+                  {t("settings.performance.particleQuality")}
                   <select
                     value={resolvedDraft.particleQuality}
                     onChange={(event) => setSettingsDraft((current) => normalizePerformanceSettings({
@@ -1170,13 +1249,13 @@ export default function App() {
                       custom: { ...current.custom, particleQuality: event.target.value },
                     }))}
                   >
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
+                    <option value="low">{t("settings.performance.quality.low")}</option>
+                    <option value="medium">{t("settings.performance.quality.medium")}</option>
+                    <option value="high">{t("settings.performance.quality.high")}</option>
                   </select>
                 </label>
                 <label>
-                  Max particles
+                  {t("settings.performance.maxParticles")}
                   <input
                     type="number"
                     min="64"
@@ -1198,7 +1277,7 @@ export default function App() {
                       custom: { ...current.custom, particlesEnabled: event.target.checked },
                     }))}
                   />
-                  Partikler enabled
+                  {t("settings.performance.particlesEnabled")}
                 </label>
                 <label className="city-settings-check">
                   <input
@@ -1209,7 +1288,7 @@ export default function App() {
                       custom: { ...current.custom, disableAmbientCritters: event.target.checked },
                     }))}
                   />
-                  Disable ambient critters
+                  {t("settings.performance.disableAmbientCritters")}
                 </label>
                 <label className="city-settings-check">
                   <input
@@ -1220,7 +1299,7 @@ export default function App() {
                       custom: { ...current.custom, lowPowerMode: event.target.checked },
                     }))}
                   />
-                  Low power mode
+                  {t("settings.performance.lowPowerMode")}
                 </label>
               </div>
             )}
@@ -1355,16 +1434,16 @@ export default function App() {
             </header>
             <div className="toast-log-list">
               {(snapshot.toastLog ?? []).length <= 0 ? (
-                <p>Ingen beskeder endnu.</p>
+                <p>{t("messages.noneYet")}</p>
               ) : (snapshot.toastLog ?? []).map((toast) => (
                 <div className={`toast-log-row ${String(toast.kind ?? "").startsWith("quest") ? "quest" : ""}`} key={toast.id}>
                   <time>
                     {toast.createdAt
-                      ? new Date(toast.createdAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                      ? new Date(toast.createdAt).toLocaleTimeString(language === "da" ? "da-DK" : "en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
                       : "--.--.--"}
                   </time>
                   <span>-</span>
-                  <p>{toast.text}</p>
+                  <p>{localizedToastText(toast, localize, t)}</p>
                 </div>
               ))}
             </div>
@@ -1391,7 +1470,7 @@ export default function App() {
       <div className="toast-stack">
         {snapshot.toasts.map((toast) => (
           <div className={`toast ${String(toast.kind ?? "").startsWith("quest") ? "quest" : ""}`} key={toast.id}>
-            {toast.text}
+            {localizedToastText(toast, localize, t)}
           </div>
         ))}
       </div>
@@ -1425,22 +1504,22 @@ export default function App() {
 
       {snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
-          Press <b>E</b> to speak with {QUEST_NPCS[snapshot.quests.nearbyQuestgiver.npcId]?.name ?? "questgiver"}
+          {t("prompt.pressE")} <b>E</b> {t("prompt.toSpeakWith")} {QUEST_NPCS[snapshot.quests.nearbyQuestgiver.npcId]?.name ?? t("prompt.questgiver")}
         </div>
       )}
 
       {snapshot.nearbyActionTarget && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
-          Press <b>E</b> to {localize(ACTION_CONFIG[snapshot.nearbyActionTarget.actionId], "label") || snapshot.nearbyActionTarget.label}
+          {t("prompt.pressE")} <b>E</b> {localize(ACTION_CONFIG[snapshot.nearbyActionTarget.actionId], "label") || snapshot.nearbyActionTarget.label}
           {snapshot.nearbyActionTarget.targetCount > 1 && (
-            <span> · <b>Tab</b> skift {snapshot.nearbyActionTarget.targetIndex}/{snapshot.nearbyActionTarget.targetCount}</span>
+            <span> · <b>Tab</b> {t("prompt.switchTarget")} {snapshot.nearbyActionTarget.targetIndex}/{snapshot.nearbyActionTarget.targetCount}</span>
           )}
         </div>
       )}
 
       {snapshot.nearbyFoliageLoot && !snapshot.quests?.nearbyQuestgiver && !snapshot.nearbyActionTarget && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
-          Press <b>E</b> to gather {snapshot.nearbyFoliageLoot.label}
+          {t("prompt.pressE")} <b>E</b> {t("prompt.toGather")} {snapshot.nearbyFoliageLoot.label}
         </div>
       )}
 
@@ -1457,7 +1536,7 @@ export default function App() {
               quest: { ...quest, npcId: quest.npcId ?? questOffer.npcId },
             });
             if (accepted) setAcceptedQuestNotice({ npcId: questOffer.npcId, quest });
-            else engineRef.current?.addToast?.("Quest kunne ikke tages");
+            else engineRef.current?.addToast?.(t("city.quest.acceptFailedToast"));
             engineRef.current?.publishSnapshot?.();
             setQuestOffer(null);
           }}
@@ -1467,7 +1546,7 @@ export default function App() {
               setQuestRewardModal(result);
               setQuestOffer(null);
             } else {
-              engineRef.current?.addToast?.("Quest kunne ikke indleveres");
+              engineRef.current?.addToast?.(t("city.quest.turnInFailedToast"));
               engineRef.current?.publishSnapshot?.();
             }
           }}
@@ -1492,14 +1571,14 @@ export default function App() {
       {acceptedQuestNotice && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog quest-parchment-dialog quest-accepted-dialog" role="dialog" aria-modal="true" aria-labelledby="quest-city-title">
-            <h2 id="quest-city-title">Quest taget</h2>
-            <h3>{acceptedQuestNotice.quest?.title ?? "Ny quest"}</h3>
+            <h2 id="quest-city-title">{t("quest.accepted.title")}</h2>
+            <h3>{acceptedQuestNotice.quest?.title ?? t("city.quest.newQuest")}</h3>
             {acceptedQuestNotice.quest?.story && <p>{acceptedQuestNotice.quest.story}</p>}
             {acceptedQuestNotice.quest?.acceptText && <p>{acceptedQuestNotice.quest.acceptText}</p>}
             <QuestObjectiveMeta quest={acceptedQuestNotice.quest} />
-            <p>{QUEST_NPCS[acceptedQuestNotice.quest?.turnInNpcId ?? acceptedQuestNotice.npcId]?.name ?? "Questgiver"} kan findes i byen, naar questen skal indleveres.</p>
+            <p>{t("quest.accepted.turnInNpcHint", { npc: QUEST_NPCS[acceptedQuestNotice.quest?.turnInNpcId ?? acceptedQuestNotice.npcId]?.name ?? t("prompt.questgiver") })}</p>
             <div>
-              <button type="button" onClick={() => setAcceptedQuestNotice(null)}>OK</button>
+              <button type="button" onClick={() => setAcceptedQuestNotice(null)}>{t("ui.ok")}</button>
             </div>
           </section>
         </div>
@@ -1509,12 +1588,12 @@ export default function App() {
         <QuestDetailCard
           quest={{
             ...(questRewardModal.questInfo ?? {}),
-            title: questRewardModal.questTitle ?? questRewardModal.questInfo?.title ?? "Quest reward",
+            title: questRewardModal.questTitle ?? questRewardModal.questInfo?.title ?? t("city.quest.reward"),
             rewards: questRewardModal.rewards ?? questRewardModal.questInfo?.rewards ?? {},
           }}
           npc={QUEST_NPCS[questRewardModal.questInfo?.turnInNpcId ?? questRewardModal.questInfo?.npcId]}
           onClose={() => setQuestRewardModal(null)}
-          footer={<button type="button" onClick={() => setQuestRewardModal(null)}>OK</button>}
+          footer={<button type="button" onClick={() => setQuestRewardModal(null)}>{t("ui.ok")}</button>}
         />
       )}
 

@@ -196,11 +196,31 @@ export const REGION_OBJECT_DEFS = {
     sortAnchor: { x: 0.5, y: 0.9 },
     particles: [{ type: "dust", count: [2, 5], radius: 16, heightOffset: -36, chance: 1 }]
   },
+  object_table: {
+    spawnTypes: [{ type: "object_table", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "furniture"],
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_table.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_chair: {
+    spawnTypes: [{ type: "object_chair", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "furniture"],
+    destructible: { hp: 36, damageStages: 3, particleColor: "#c99b5d", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_chair.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
   object_shelfs: {
     spawnTypes: [{ type: "object_shelfs", weight: 1 }],
     defaultDestructible: true,
     tags: ["object", "destructible", "wood", "container"],
-    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_shelfs_loot", "material_gemstones"] },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["object_shelfs_loot", "material_gemstones", "readable_lore"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_shelfs.png",
     depthMode: "dynamic",
@@ -210,7 +230,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "object_chests_ground", weight: 1 }],
     defaultDestructible: true,
     renderBiomeId: "mainland",
-    destructible: { hp: 52, damageStages: 3, particleColor: "#ff9100", lootTables: ["object_container_common","material_gemstones"], },
+    destructible: { hp: 52, damageStages: 3, particleColor: "#ff9100", lootTables: ["object_container_common","material_gemstones", ], },
     graphicsRef: "object/object_chests_ground.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },

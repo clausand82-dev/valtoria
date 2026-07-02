@@ -511,7 +511,9 @@ export const persistenceMethods = {
     }
     if (maxSeenId > 0) ensureNextId(maxSeenId);
 
-    this.addToast("Progression indlaest");
+    this.addToast("Progress loaded", {
+      localization: { type: "ui", key: "messages.progressLoaded" },
+    });
   },
 
   saveProgress(options = {}) {

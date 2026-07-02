@@ -131,6 +131,7 @@ function CityItemName({ item, equipment = [] }) {
 }
 
 function CityItemSlot({ item, equipment = [], placeholder, locked, lockLabel = "LOCK", draggable, accepted, muted, onClick, onDoubleClick, onDragStart, onDrop }) {
+  const { localize } = useLocalization();
   const [hoverPointer, setHoverPointer] = useState(null);
   const slotRef = useRef(null);
   const rarityClass = cityItemRarityClass(item);
@@ -164,7 +165,11 @@ function CityItemSlot({ item, equipment = [], placeholder, locked, lockLabel = "
           if (!locked && item) setHoverPointer({ x: Number(event.clientX) || 0, y: Number(event.clientY) || 0 });
         }}
         onMouseLeave={() => setHoverPointer(null)}
-        title={locked ? lockLabel : item?.name ?? placeholder?.title ?? "Empty"}
+        title={locked
+          ? lockLabel
+          : item
+            ? localizeItemField(item, "name", localize)
+            : localize(placeholder, "title") || "Empty"}
       >
         {locked ? <span className="city-slot-lock-label">{lockLabel}</span> : item ? (
           <InventoryIcon iconIndex={item.iconIndex} iconSheet={item.iconSheet} iconUrl={itemIconUrl} />
@@ -396,7 +401,10 @@ function applyDurabilityDegradationForVisit(progress, cityStats = {}) {
   }
   for (const building of CITY_BUILDINGS) {
     if (!building?.id || !next[building.id]) continue;
-    next[building.id] = degradeState(next[building.id]);
+    const state = next[building.id];
+    const built = cityConfigEntryOwnedFromStart(building) || Number(state?.level) > 0;
+    if (!built) continue;
+    next[building.id] = degradeState(state);
   }
   return next;
 }

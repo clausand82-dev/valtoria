@@ -107,10 +107,17 @@ export function createVillageOutskirtsMapRegions(region) {
     region({
       id: "river-creek", label: "River Creek", i18n: { da: { label: "Elvbaekken" } }, color: "#7fb6d6",
       unlock: {
-        questStepCompleted: { questId: "annelise_document_chain", stepId: "ring_for_noble" },
-        text: "Requires Noble to have opened River Creek.",
-        i18n: { da: { text: "Kraever, at Noble har aabnet Elvbaekken." } },
+      any: [
+        {questStepCompleted: {questId: "annelise_document_chain", stepId: "ring_for_noble",},},
+        {questActive: "blacksmith_boar_hunt",}, {questCompleted: "blacksmith_boar_hunt",},
+      ],
+      text: "Requires Noble to have opened River Creek or the boar hunt to be accepted.",
+      i18n: {
+        da: {
+          text: "Kræver, at Noble har åbnet Elvbækken, eller at vildsvinejagten er accepteret.",
+        },
       },
+    },
       labelX: 49, labelY: 79,
       mapSize: "small",
       cityStats: {
@@ -781,6 +788,7 @@ export function createVillageOutskirtsMapRegions(region) {
         anchors: ["clearing", "room", "pathSide"],
         pool: [
           { id: "forest_mine_entrance", weight: 12, max: 1, questActive: "find_veldors_wife" },
+          { id: "young_boys_father_cave_entrance", weight: 100, max: 1, required: true, questStepActive: { questId: "the_young_boys_letter", stepId: "search_fathers_cave" } },
         ],
       },
       objects: [

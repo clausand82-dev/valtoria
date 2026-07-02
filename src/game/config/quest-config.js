@@ -3,6 +3,12 @@ import { QUEST_NPCS } from "./npc-config.js";
 export { QUEST_NPCS };
 
 export const QUEST_ITEM_DEFS = {
+  quest_item_boysletterfromfather: {
+    name: "Boy's Letter from His Father",
+    iconUrl: "/assets/generated/item/item_quest_letter.png",
+    placeholderColor: "#d5c59e",
+    i18n: { da: { name: "Drengens brev fra sin far" } },
+  },
   note: {
     name: "Sealed Note",
     iconUrl: "/assets/generated/item/item_quest_document.png",
@@ -119,7 +125,7 @@ export const QUEST_ITEM_DEFS = {
     stackable: true,
     stackMax: 50,
 
-    i18n: { da: { name: "Lion Gold Idol" } },
+    i18n: { da: { name: "Løve Guldidol" } },
   },
   rusk_gold_nugget: {
     name: "Gold Nugget",

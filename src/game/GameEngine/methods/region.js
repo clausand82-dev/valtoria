@@ -21,6 +21,7 @@ import {
   regionWorldStateKey,
   worldEntryAllowed,
 } from "../../world-state.js";
+import { addHiddenEncounterPrefabs, lockHiddenEncountersForRegion } from "../../config/hidden-encounter-config.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
 
 function cloneAbandonValue(value) {
@@ -223,6 +224,16 @@ export const regionMethods = {
     this.worldState = options.markVisit === false
       ? currentWorldState
       : withRegionVisitWorldState(currentWorldState, areaMapId, regionConfig, { corrupted: options.corrupted });
+    if (options.markVisit !== false) {
+      const lock = lockHiddenEncountersForRegion(this.worldState, regionConfig.id, {
+        regionId: regionConfig.id,
+        regionConfig,
+        questState: this.questState,
+        player: this.player,
+        inventory: this.player?.inventory,
+      });
+      this.worldState = lock.worldState;
+    }
     if (options.markVisit !== false) this.saveProgress({ force: true });
     const conditionContext = {
         areaMapId,
@@ -245,8 +256,9 @@ export const regionMethods = {
           worldState: this.worldState,
         },
       };
+    const encounterRegionConfig = addHiddenEncounterPrefabs(regionConfig, this.worldState, conditionContext);
     return {
-      ...resolveMapRegionConfig(regionConfig, this.worldState, conditionContext),
+      ...resolveMapRegionConfig(encounterRegionConfig, this.worldState, conditionContext),
       __worldStateResolved: true,
       __conditionContext: conditionContext,
     };
@@ -301,7 +313,10 @@ export const regionMethods = {
       }).length;
       if (remaining <= 0 && !quest.progress?.cleared) {
         quest.progress = { ...(quest.progress ?? {}), cleared: true };
-        this.addToast(`${quest.title} klar til indlevering`);
+        this.addToast(`${quest.title} ready to turn in`, {
+          kind: "quest",
+          localization: { type: "questReady", questId: quest.questId ?? quest.id },
+        });
       }
     }
     this.mapReturn = {
