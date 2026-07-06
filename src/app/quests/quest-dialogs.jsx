@@ -153,6 +153,27 @@ function signedRewardValue(value) {
   return amount > 0 ? `+ ${amount}` : `- ${Math.abs(amount)}`;
 }
 
+const QUEST_PERCENT_STAT_KEYS = new Set([
+  "maxHpPct", "maxManaPct", "armorPct", "damagePct", "speedPct", "attackSpeed",
+  "critChance", "critDamage", "blockChance", "dodgeChance", "lifeSteal",
+  "magicFind", "goldFind", "resourceFind", "xpGain",
+]);
+
+function questStatBonusLabel(statId) {
+  return String(statId)
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function questStatBonusValue(statId, value) {
+  const amount = Number(value) || 0;
+  const isPercent = QUEST_PERCENT_STAT_KEYS.has(statId)
+    || statId.endsWith("DamageBonus")
+    || statId.endsWith("DurationBonus");
+  const displayed = isPercent ? Number((amount * 100).toFixed(2)) : Number(amount.toFixed(2));
+  return `${displayed >= 0 ? "+" : ""}${displayed}${isPercent ? "%" : ""}`;
+}
+
 function QuestRewardList({ quest }) {
   const { localize, t } = useLocalization();
   const rewards = questDisplayRewards(quest);
@@ -165,6 +186,11 @@ function QuestRewardList({ quest }) {
       {Object.entries(rewards.factionRep ?? {}).map(([factionId, amount]) => (
         <span className={Number(amount) >= 0 ? "diff-good" : "diff-bad"} key={`faction-${factionId}`}>
           {signedRewardValue(amount)} {t("city.faction.reputation")}: {localize(FACTIONS[factionId], "label") || FACTIONS[factionId]?.label || factionId}
+        </span>
+      ))}
+      {Object.entries(rewards.statBonuses ?? {}).map(([statId, amount]) => (
+        <span className={Number(amount) >= 0 ? "diff-good" : "diff-bad"} key={`stat-bonus-${statId}`}>
+          {questStatBonusValue(statId, amount)} {questStatBonusLabel(statId)}
         </span>
       ))}
       {(rewards.resources ?? []).map((r) => (

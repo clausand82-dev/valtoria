@@ -3,11 +3,21 @@ History over changes
 *V. 1.01
 - some small ui translation fixes
 - yellow ? when quest is ready to turn in, will now always be show instead of gray ! or ?
-- edited city-inn-taproom (ongoing)
+- edited city-inn-taproom
 - added foilage_glass and foilage_bottles
 - added 10 new lorebooks and notes
 - lore hover now use selected lang
 - resource chips now use translated names
+- added alots of new quest
+- non repair able items will disapper when reaching 0 in durability
+- price on sell in mechant is now more clear
+- when only have one of an item, select how many to sell modal, is skipped
+- made some changes to item durability to balance durability out (it was way to hard)
+- bad event are still red, but good events are now green
+- changed a bit in statistic view
+- board and inn quest now use completed maps as countdowns (completed map is a map where all mobs are killed - city mobs mattack map dosn't count)
+- added 32 new named items (STILL NEED TO DO PIC FOR LAST 16)
+- added more item name prefixes (for bigger variation on random generated items in drops)
 
 *V. 1.00
 - added artifact/monuments, archivments and policy rules (all can improve city stats)

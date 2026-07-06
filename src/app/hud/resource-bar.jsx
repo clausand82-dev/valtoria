@@ -69,7 +69,7 @@ export function CitySideStats({ gold = 0, threatLevel = 0, popularity = 0, event
         <div className="city-side-events" aria-label={t("city.events.active")}>
           <b>{t("city.events.short")}</b>
           {activeEvents.map((event) => (
-            <span className="city-side-event-entry" key={event.id} tabIndex={0}>
+            <span className={`city-side-event-entry ${event.positive ? "positive" : "negative"}`} key={event.id} tabIndex={0}>
               {localize(event, "label")}
               <span className="city-side-event-tooltip" role="tooltip">
                 <strong>{localize(event, "label")}</strong>

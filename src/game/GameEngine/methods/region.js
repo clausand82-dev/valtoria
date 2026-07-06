@@ -23,6 +23,7 @@ import {
 } from "../../world-state.js";
 import { addHiddenEncounterPrefabs, lockHiddenEncountersForRegion } from "../../config/hidden-encounter-config.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
+import { rebuildCountBasedRegionDecorators } from "../../region-object-decorators.js";
 
 function cloneAbandonValue(value) {
   if (value === null || value === undefined) return value;
@@ -61,6 +62,7 @@ function captureAbandonState(engine) {
       },
       potions: cloneAbandonValue(engine.player.potions),
       readableBonuses: cloneAbandonValue(engine.player.readableBonuses),
+      questStatBonuses: cloneAbandonValue(engine.player.questStatBonuses),
       skillTree: cloneAbandonValue(engine.player.skillTree),
       spells: {
         unlockedSpells: cloneAbandonValue(engine.player.unlockedSpells),
@@ -92,6 +94,7 @@ function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESE
   if (playerCfg.vitalsAndCooldowns === false) Object.assign(engine.player, currentPlayer.vitalsAndCooldowns);
   if (playerCfg.potions === false) engine.player.potions = cloneAbandonValue(currentPlayer.potions);
   if (playerCfg.readableBonuses === false) engine.player.readableBonuses = cloneAbandonValue(currentPlayer.readableBonuses);
+  if (playerCfg.questStatBonuses === false) engine.player.questStatBonuses = cloneAbandonValue(currentPlayer.questStatBonuses);
   if (playerCfg.skillTree === false) engine.player.skillTree = cloneAbandonValue(currentPlayer.skillTree);
   if (playerCfg.spells === false) {
     engine.player.unlockedSpells = cloneAbandonValue(currentPlayer.spells.unlockedSpells);
@@ -180,6 +183,7 @@ export const regionMethods = {
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();
+    this.rebuildCountBasedRegionDecorators();
     this.ensureWorldAroundPlayer();
     this.spawnAmbientCritters?.();
     this.updateFogOfWar(true);
@@ -338,7 +342,6 @@ export const regionMethods = {
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "cleared"), cleared);
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "corrupted"), !cleared);
-    this.advanceQuestBoardCooldowns?.(1);
     this.activeMapRegion = null;
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
@@ -384,7 +387,6 @@ export const regionMethods = {
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
     if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
-    this.advanceQuestBoardCooldowns?.(1);
     this.addToast(`${active.label} forladt. Progression blev nulstillet, og du er tilbage i byen.`);
     this.saveProgress({ force: true });
     this.markRenderDirty?.("region-change");
@@ -394,6 +396,7 @@ export const regionMethods = {
 
   resetRegionRuntime() {
     this.currentRegionStats = null;
+    this.regionDecoratorPlans = new Map();
     this.chunks.clear();
     this.monsters.clear();
     this.resetCritterRuntime?.();
@@ -450,6 +453,10 @@ export const regionMethods = {
         this.getChunk(cx, cy);
       }
     }
+  },
+
+  rebuildCountBasedRegionDecorators() {
+    return rebuildCountBasedRegionDecorators(this);
   },
 
   allRegionMonstersCleared() {

@@ -1,3 +1,14 @@
+const WOODEN_WHEEL_FOLIAGE = {
+  fileName: "foilage/foilage_woodwheels.png",
+  weight: 0.25,
+  actionId: "collect_merchant_wooden_wheel",
+};
+
+const MAINLAND_PATH_FOLIAGE = [
+  { fileName: "foilage/foilage_plants_mainland.png", weight: 40, lootTables: ["material_plant"] },
+  WOODEN_WHEEL_FOLIAGE,
+];
+
 export function createVillageOutskirtsMapRegions(region) {
   return {
   "village-outskirts": [
@@ -18,6 +29,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "29.90,4.25 47.85,4.25 41.87,17.00 31.10,14.88",
     }),
     region({
@@ -38,6 +50,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "31.10,14.88 41.87,17.00 41.87,31.88 34.69,36.13 23.92,29.76",
     }),
     region({
@@ -81,6 +94,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "78.95,4.25 95.69,4.25 98.09,25.50 83.73,17.00",
     }),
     region({
@@ -88,19 +102,28 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Southern Fields",
       i18n: { da: { label: "Soendre marker" } },
       color: "#b4c46f",
-      cityStats: { population: 5 },
-      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
+      cityStats: { population: 5, provision: 15 },
+      unlock: {
+        any: [{ questActive: "more_scarecrows" }, { questCompleted: "more_scarecrows" }],
+        text: "Unlock by accepting More Scarecrows from the Farmer.",
+        i18n: { da: { text: "Lås op ved at tage questen Flere fugleskræmsler hos Farmeren." } },
+      },
+      tileset: { fileName: "tileset/tileset_field.png" },
+      foliageSet: [
+        { fileName: "foilage/foilage_field.png", weight: 45, lootTables: ["material_plant"] },
+        { fileName: "foilage/foilage_plants_mainland.png", weight: 10, lootTables: ["material_fruit"] },
+        { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5 },
+      ],
+      decay: [
+        { id: "decay_field", weight: 20 },
+        { id: "decay_cracks", weight: 8 },
+      ],
       labelX: 70,
       labelY: 73,
-      // TODO:DELETE: weights: { tree: 3, rock: 1, foilage: 6, house: 1, fireplace: 1 }
-      weights: { foilage: 6 },
+      mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
-        { id: "object_tree_mainland", weight: 3 },
-        { id: "object_house_mainland", weight: 1 },
-        { id: "object_stone_cluster", weight: 1 },
-        { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
-        { id: "object_fireplace_mainland", weight: 1 },
+        { id: "object_hay", weight: 3 },
+        { id: "object_sacks_ground", weight: 5, destructible: true },
       ],
       points: "66.99,87.14 87.32,72.26 70.57,57.39 56.22,74.39",
     }),
@@ -183,6 +206,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_plants_mainland.png", lootTables: ["material_plant", "material_magic_plants"]},
         { fileName: "foilage/foilage_roots.png", scale: 0.75, lootTables: ["foliage_bone_dust_roots"] /*particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } */},
         { fileName: "foilage/foilage_boneparts.png", scale: 0.75 },
+        WOODEN_WHEEL_FOLIAGE,
         //{ fileName: "foilage/foilage_deadanimal_small.png", scale: 0.5, particles: { type: "flies", chance: 0.75, count: [4, 10], radius: 24, heightOffset: -14, onlyWhenOnScreen: true } },
         //{ fileName: "foilage/foilage_deadanimal_verysmall.png", scale: 0.25, particles: { type: "flies", chance: 0.45, count: [2, 5], radius: 16, heightOffset: -8, onlyWhenOnScreen: true } },
       ],
@@ -230,6 +254,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "35.89,85.02 13.16,87.14 14.35,68.01 35.89,68.01",
     }),
     region({
@@ -507,7 +532,23 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       labelX: 58,
       labelY: 59,
-      mobs: [{ type: "Rat", weight: 4 }, { type: "SickRat", weight: 1.4 }, { type: "Skeleton", weight: 5 }, "Spider", "Wolf",  ],
+      mobs: [
+        { type: "Rat", weight: 4 },
+        { type: "SickRat", weight: 1.4 },
+        { type: "Skeleton", weight: 5 },
+        { type: "Knight", weight: 15 },
+        //{ type: "Bandit", weight: 15 },
+        "Spider",
+        "Wolf",
+        {
+        type: "Skeleton",
+        weight: 20,
+        any: [
+          { questActive: "lost_anvil" },
+          { questActive: "lost_hammer" },
+        ],
+      },
+      ],
       antiDrops: { allPotions: true, categories: ["weapon"], rarities: ["rare"], allUniques: true, allResources: false },
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
@@ -530,6 +571,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "70.57,57.39 81.34,44.63 94.50,55.26 87.32,72.26",
     }),
     region({
@@ -550,6 +592,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { id: "object_ruin_mainland", weight: 1 },
         { id: "object_fireplace_mainland", weight: 1 },
       ],
+      foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "81.34,44.63 98.09,25.50 98.09,55.26 94.50,55.26",
     }),
     region({
@@ -626,6 +669,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_field.png", weight: 45, lootTables: ["material_plant"]},
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, lootTables: ["material_fruit"]},
         { fileName: "foilage/foilage_barnitems.png", weight: 2, scale: 0.5},
+        WOODEN_WHEEL_FOLIAGE,
       ],
       decay: [
         { id: "decay_field", weight: 20 },
@@ -636,8 +680,9 @@ export function createVillageOutskirtsMapRegions(region) {
       labelY: 39,
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
-        { id: "object_hay", weight: 3 },
+        { id: "object_hay", weight: 3, blockedBy: {questActive: "villager_help_collect_hay"}},
         { id: "object_sacks_ground", weight: 5, destructible: true },
+        { id: "object_hay", weight: 18, destructible: false, actionId: "collect_villager_haystack", },
       ],
       weather: {
         possible: [
@@ -768,7 +813,9 @@ export function createVillageOutskirtsMapRegions(region) {
         { fileName: "foilage/foilage_forest.png", scale: 0.7, weight: 50, lootTables: ["material_fruit"]},
         { fileName: "foilage/foilage_plants_mainland.png", weight: 10, scale: 0.2, lootTables: ["material_fruit"]},
         { fileName: "foilage/foilage_boneparts.png", weight: 10 },
-        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 }],
+        { fileName: "foilage/foilage_deadanimal_small.png", weight: 5, scale: 0.5 },
+        WOODEN_WHEEL_FOLIAGE,
+      ],
       unlock: {
         any: [
           { questActive: "find_veldors_wife" },

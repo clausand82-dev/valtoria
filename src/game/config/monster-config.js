@@ -696,7 +696,19 @@ export const MONSTER_DEFS = {
       statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 }
     },
     lootTables: ["gold_boss", "special_wolffenris_treasure", "material_animal_medium", "material_humanoid"]
-  }
+  },
+    Bandit: {
+    sprite: monsterSprite({
+      id: "bandit", url: "/assets/generated/mobs/bandit_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.48, shadowW: 32, shadowH: 10, shadowAlpha: 0.36, yOffset: 39
+    }),
+    speciesId: "bandit",
+    tags: ["humanoid", "bandit", "medium"],
+    stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
+    popularity: { change: -0.35 },
+    lootTables: ["gold_low", "material_bone", "material_animal_medium", "special_wolffenris_treasure"]
+  },
 };
 
 const MONSTER_CATALOG_IDS = {

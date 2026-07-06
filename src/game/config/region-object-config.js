@@ -1,6 +1,39 @@
 import { normalizeParticleConfigs } from "./particle-presets.js";
 
 export const REGION_OBJECT_DEFS = {
+  scarecrow: {
+    spawnTypes: [{ type: "scarecrow", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "decoration", "field"],
+    renderBiomeId: "mainland",
+    graphics: { mode: "sheet", files: ["object/object_field.png"], rows: 4, cols: 4, frameCount: 16 },
+    graphicsRef: "object/object_field.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
+  },
+  scarecrow_ghost: {
+    spawnTypes: [{ type: "scarecrow_ghost", weight: 1 }],
+    defaultDestructible: false,
+    defaultActionId: "place_scarecrow",
+    tags: ["object", "decoration", "field", "ghost"],
+    renderBiomeId: "mainland",
+    graphics: { mode: "sheet", files: ["object/object_field.png"], rows: 4, cols: 4, frameCount: 16 },
+    graphicsRef: "object/object_field.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
+  },
+  object_fallentree: {
+    spawnTypes: [{ type: "object_fallentree", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "tree", "plant"],
+    avoidSpawnTags: ["canopy"],
+    destructible: { hp: 40, damageStages: 3, particleColor: "#b88454", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_fallentree.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 },
+    particles: { type: "leaves", count: [4, 14], radius: 28, heightOffset: -36, chance: 1, onlyWhenOnScreen: true }
+  },
   object_tree_mainland: {
     spawnTypes: [{ type: "object_tree_mainland", weight: 1 }],
     defaultDestructible: true,
@@ -203,6 +236,16 @@ export const REGION_OBJECT_DEFS = {
     destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["material_wood"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_table.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_standing_table: {
+    spawnTypes: [{ type: "object_standing_table", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "furniture"],
+    destructible: { hp: 52, damageStages: 3, particleColor: "#c99b5d", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_standing_table.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 }
   },

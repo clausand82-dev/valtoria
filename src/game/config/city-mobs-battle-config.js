@@ -32,7 +32,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
     spawnZoneIds: ["NW_SPAWN_BORDER", "NW_SPAWN_CORNER", "NW_SPAWN_BRIDGE", "NW_SPAWN_CLOSE"],
     tileset: [
       { fileName: "tileset/tileset_debris.png" },
-      { fileName: "tileset/tileset_bricktiles.png" },
+      { fileName: "tileset/tileset_rock.png" },
     ],
     foliageSet: [
       { fileName: "foilage/foilage_deadvillages.png", scale: 1.5 },
@@ -40,10 +40,11 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "foilage/foilage_garbage_001.png", scale: 0.75 },
     ],
     objects: [
-      { id: "object_woodboxes_ground", weight: 6, destructible: true },
-      { id: "object_barrels_ground", weight: 4, destructible: true },
-      { id: "object_chests_ground", weight: 1, destructible: true },
-      { id: "object_pillar_stone", weight: 1, destructible: false },
+      { id: "object_tree", weight: 6, destructible: true },
+      { id: "object_fallentree", weight: 4, destructible: true },
+      { id: "object_pillar", weight: 1, destructible: true },
+      { id: "object_tree_dead", weight: 1, destructible: false },
+      { id: "object_wagons", weight: 1, destructible: true },
     ],
     decay: [
       { id: "decay_blood", weight: 8 },
@@ -183,9 +184,12 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "foilage/foilage_village_items.png", weight: 1, scale: 0.65 },
       { fileName: "foilage/foilage_bottles.png", weight: 6, scale: 0.5 },
       { fileName: "foilage/foilage_glass.png", weight: 5, scale: 0.4 },
+      { fileName: "foilage/foilage_beermugs_standing.png", weight: 4, scale: 0.4 },
+      { fileName: "foilage/foilage_beermugs_tipped.png", weight: 4, scale: 0.4 },
     ],
     objects: [
-      { id: "object_table", weight: 10, destructible: true },
+      { id: "object_table", weight: 4, destructible: true },
+      { id: "object_standing_table", weight: 14, destructible: true, spawnDamage: "damaged" },
       { id: "object_chair", weight: 12, destructible: true },
       { id: "object_barrels_ground", weight: 12, destructible: true },
       { id: "object_shelfs", weight: 8, destructible: true },

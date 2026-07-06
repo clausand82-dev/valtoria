@@ -403,6 +403,8 @@ export function makeQuestInstance(def, npcId, context = {}) {
           ? { kills: 0, total: null, cleared: false }
           : def.type === "action_targets"
             ? { done: 0, total: null, targets: {} }
+          : def.type === "region_object_count"
+            ? { [String(def.target?.progressField ?? "count")]: 0 }
           : def.type === "talk_to_npc"
             ? { talked: false }
             : {},
@@ -440,6 +442,10 @@ export function isQuestComplete(quest, inventory = []) {
     const total = Math.max(0, Math.floor(Number(quest.progress?.total) || 0));
     const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
     return quest.progress?.total !== null && quest.progress?.total !== undefined && total > 0 && done >= total;
+  }
+  if (quest.type === "region_object_count") {
+    const field = String(quest.target?.progressField ?? "count");
+    return Math.max(0, Math.floor(Number(quest.progress?.[field]) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));
   }
   if (quest.type === "kill_monsters") {
     return Math.max(0, Math.floor(Number(quest.progress?.kills) || 0)) >= Math.max(1, Math.floor(Number(quest.target?.count) || 1));
@@ -583,6 +589,12 @@ export function questProgressText(quest, inventory = []) {
     const done = Math.max(0, Math.floor(Number(quest.progress?.done) || 0));
     const total = quest.progress?.total ?? "?";
     return `${done} / ${total} ${quest.target?.label ?? "maal repareret"}`;
+  }
+  if (quest.type === "region_object_count") {
+    const field = String(quest.target?.progressField ?? "count");
+    const done = Math.max(0, Math.floor(Number(quest.progress?.[field]) || 0));
+    const total = Math.max(1, Math.floor(Number(quest.target?.count) || 1));
+    return `${done} / ${total} ${quest.target?.label ?? "placed"}`;
   }
   if (quest.type === "kill_monsters") {
     return `${Math.max(0, Math.floor(Number(quest.progress?.kills) || 0))} / ${Math.max(1, Math.floor(Number(quest.target?.count) || 1))} ${quest.target?.monster ?? "kills"}`;

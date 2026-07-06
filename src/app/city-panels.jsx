@@ -1375,9 +1375,11 @@ function CityMerchantPanel({ inventory, stock, gold, popularity, cityEventModifi
   const [tradeDraft, setTradeDraft] = useState(null);
   const sellable = (inventory ?? []).filter(merchantItemCanTrade);
   const openTrade = (mode, item, index) => {
-    const max = mode === "buy"
-      ? merchantTradeMax(item)
-      : merchantTradeMax(item);
+    const max = merchantTradeMax(item);
+    if (mode === "sell" && max === 1) {
+      onSell(index, 1);
+      return;
+    }
     const unitPrice = mode === "buy" ? merchantBuyPrice(item, popularity, cityEventModifiers) : merchantSellPrice(item, popularity, cityEventModifiers);
     setTradeDraft({ mode, item, index, quantity: 1, max, unitPrice });
   };

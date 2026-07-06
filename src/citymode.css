@@ -1931,6 +1931,22 @@
   color: #ffd94a;
 }
 
+/* Quest marker priority: ready to turn in must stay above every other state. */
+.city-map-action-icon.npc.active-quest,
+.city-map-action-icon.building.active-quest {
+  z-index: 1;
+}
+
+.city-map-action-icon.npc.offer,
+.city-map-action-icon.building.offer {
+  z-index: 2;
+}
+
+.city-map-action-icon.npc.complete,
+.city-map-action-icon.building.complete {
+  z-index: 3;
+}
+
 .city-map-action-icon.npc.active-quest,
 .city-map-action-icon.building.active-quest {
   border-color: rgba(172, 180, 188, 0.9);

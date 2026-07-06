@@ -53,6 +53,7 @@ import { normalizeWorldEnergy } from "../../world-energy.js";
 import { normalizeActionState } from "../../actions/action-runner.js";
 import { normalizeCurrentExpedition } from "./subregions.js";
 import { normalizeFactionRep } from "../../config/faction-config.js";
+import { normalizePlayerStatBonuses } from "../../config/player-stat-bonus-config.js";
 
 function normalizeItemEffects(effects) {
   if (!effects || typeof effects !== "object") return undefined;
@@ -377,6 +378,12 @@ export const persistenceMethods = {
     }
     if (!itemCanHaveSockets(normalized)) normalized.sockets = [];
     normalized.value = Math.max(1, Math.floor(Number(item.value) || itemValue(normalized)));
+    const durability = Number(normalized.durability);
+    if (
+      (normalized.nonRepairable || normalized.destroyWhenDurabilityDepleted)
+      && Number.isFinite(durability)
+      && durability <= 0
+    ) return null;
     return withItemIcon(withItemFlags(normalized));
   },
 
@@ -403,6 +410,7 @@ export const persistenceMethods = {
     };
     this.player.quickSlots = normalizeQuickSlots(savedPlayer.quickSlots);
     this.player.readableBonuses = normalizeReadableBonuses(savedPlayer.readableBonuses);
+    this.player.questStatBonuses = normalizePlayerStatBonuses(savedPlayer.questStatBonuses);
     this.player.skillTree = normalizeSkillTree(savedPlayer.skillTree);
     this.player.classId = normalizeClassId(savedPlayer.classId ?? DEFAULT_CLASS_ID);
     this.player.classPoints = Math.max(0, Math.floor(Number(savedPlayer.classPoints) || 0));
@@ -558,6 +566,7 @@ export const persistenceMethods = {
         ...(cfg.player.potions ? { potions: { ...this.player.potions } } : {}),
         quickSlots: normalizeQuickSlots(this.player.quickSlots),
         ...(cfg.player.readableBonuses ? { readableBonuses: { ...this.player.readableBonuses } } : {}),
+        ...(cfg.player.questStatBonuses ? { questStatBonuses: normalizePlayerStatBonuses(this.player.questStatBonuses) } : {}),
         ...(cfg.player.skillTree ? { skillTree: normalizeSkillTree(this.player.skillTree) } : {}),
         classId: normalizeClassId(this.player.classId),
         classPoints: Math.max(0, Math.floor(Number(this.player.classPoints) || 0)),

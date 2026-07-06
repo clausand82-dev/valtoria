@@ -65,6 +65,7 @@ export const lifecycleMethods = {
       potions: { health: 0, mana: 0 },
       quickSlots: normalizeQuickSlots(),
       readableBonuses: createReadableBonuses(),
+      questStatBonuses: {},
       skillTree: normalizeSkillTree(),
       classId: DEFAULT_CLASS_ID,
       classPoints: 0,

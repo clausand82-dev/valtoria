@@ -449,13 +449,14 @@ function cityMobTypeEffectDef(mobType) {
   return CITY_MOB_TYPE_EFFECTS[mobType] ?? CITY_MOB_TYPE_EFFECTS.default ?? {};
 }
 
-function cityMobDisplayName(mob) {
-  return cityMobTypeEffectDef(mob?.mobType).label ?? String(mob?.mobType || "City threat");
+function cityMobDisplayName(mob, localize = null) {
+  const definition = cityMobTypeEffectDef(mob?.mobType);
+  return localize?.(definition, "label") ?? definition.label ?? String(mob?.mobType || "City threat");
 }
 
-function cityMobAreaLabel(mob) {
+function cityMobAreaLabel(mob, localize = null) {
   const area = CITY_AREAS.find((entry) => entry.id === mob?.areaId);
-  return area?.title ?? String(mob?.areaId || "Unknown area");
+  return localize?.(area, "title") ?? area?.title ?? String(mob?.areaId || "Unknown area");
 }
 
 function cityMobZoneKind(areaId = "") {

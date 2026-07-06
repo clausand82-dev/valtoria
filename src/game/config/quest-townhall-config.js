@@ -152,4 +152,96 @@ sail_to_tornvalhed: {
 
   i18n: { da: { title: "Sejl til Tornvalhed", story: "Kaptajn Varlo kan faa dig over vandet til Tornvalhed, men skibet mangler et ror, sejl, planker og proviant. Han har set brugbare vragrester ved Fisherman's Fall.", acceptText: "Bring mig 1 ror, 2 sejl, 25 traeplanker og 10 fruit. Saa kan vi sejle mod Tornvalhed.", turnInText: "Det holder. Tornvalhed er ikke laengere uden for raekkevidde." } },
 },
+villager_help_fix_the_house: {
+    id: "villager_help_fix_the_house",
+    source: "townHall",
+    kind: "side",
+    category: "village_help",
+    title: "Patch the Cold Roof",
+    repeatable: false,
+    npcIds: ["lady"],
+    regionIds: ["city"],
+    cooldownMapRuns: 5,
+    demands: {
+      level: 20,
+    },
+
+    spawnChance: 1,
+
+    type: "collect_quest_item",
+    target: {
+      questItemId: "villager_roof_tile",
+      count: 12,
+      source: "monster",
+      dropChance: 0.22,
+      monsterTypes: [ "Village01", "Village02", "Village03", "Village04", "Village05", "Village06", "Peasant", "Wizard", "Knight", "MountainTroll", "GiantTroll", ],
+    },
+
+    story:
+      "A family in the living quarters is trying to repair their roof before winter. They need sturdy roof tiles before the cold sets in.",
+    acceptText:
+      "Find 12 roof tiles from humanoid enemies while this request is active.",
+    turnInText:
+      "These will keep the winter wind out. The family will sleep warmer because of you.",
+
+    rewards: { xp: 1350, gold: 260, lydra: 2, factionRep: { village_outskirt: 2 }, },
+
+    i18n: {
+      da: {
+        title: "Lap det kolde tag",
+        story:
+          "En familie i boligområdet forsøger at få repareret deres tag inden vinter. De mangler solide tagsten, før kulden sætter ind.",
+        acceptText:
+          "Find 12 tagsten fra humanoide fjender, mens opgaven er aktiv.",
+        turnInText:
+          "De her kan holde vintervinden ude. Familien kommer til at sove varmere på grund af dig.",
+      },
+    },
+  },
+
+  villager_help_collect_hay: {
+    id: "villager_help_collect_hay",
+    source: "townHall",
+    kind: "side",
+    category: "village_help",
+    title: "Gather the Hay",
+    repeatable: false,
+    npcIds: ["oneleggedman"],
+    regionIds: ["city"],
+    cooldownMapRuns: 5,
+    demands: { completedQuests: ["the_young_boys_letter"], },
+
+    spawnChance: 1,
+
+    type: "collect_quest_item",
+    target: {
+      questItemId: "villager_haystack",
+      count: 24,
+      source: "object",
+      sourceObjectIds: ["object_hay"],
+      dropChance: 1,
+      dropRegionIds: ["northern-fields"],
+    },
+
+    story:
+      "An old villager from the living quarters can no longer gather hay himself. He asks for help collecting the hay from the northern fields before it is ruined.",
+    acceptText:
+      "Collect 24 haystacks from the northern fields.",
+    turnInText:
+      "Twenty-four bundles. That will help more than you know. Thank you for helping an old villager.",
+
+    rewards: { xp: 1100, gold: 180, lydra: 2, factionRep: { village_outskirt: 2 }, },
+
+    i18n: {
+      da: {
+        title: "Saml høet",
+        story:
+          "En ældre landsbyboer fra boligområdet kan ikke længere selv samle hø. Han beder om hjælp til at få høet samlet på nordmarken, før det bliver ødelagt.",
+        acceptText:
+          "Saml 24 høstakke på nordmarken.",
+        turnInText:
+          "Fireogtyve bundter. Det hjælper mere, end du aner. Tak fordi du hjalp en gammel landsbyboer.",
+      },
+    },
+  },
 };

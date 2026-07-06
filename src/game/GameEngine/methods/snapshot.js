@@ -231,6 +231,7 @@ export const snapshotMethods = {
         dotDurationBonus: stats.dotDurationBonus,
         statusDurationBonus: stats.statusDurationBonus,
         readableBonuses: { ...normalizeReadableBonuses(this.player.readableBonuses) },
+        questStatBonuses: { ...(this.player.questStatBonuses ?? {}) },
         skillTree: normalizeSkillTree(this.player.skillTree),
         skillPoints: skillTreeAvailablePoints(this.player.level, this.player.skillTree),
         classId: normalizeClassId(this.player.classId),

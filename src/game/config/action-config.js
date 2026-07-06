@@ -1,4 +1,42 @@
 export const ACTION_CONFIG = {
+  place_scarecrow: {
+    id: "place_scarecrow",
+    type: "activate",
+    label: "Place scarecrow",
+    text: "The scarecrow is secured in the field.",
+    i18n: { da: { label: "Placér fugleskræmsel", text: "Fugleskræmslet er sat fast i marken." } },
+    requires: { questActive: "place_scarecrows", inventory: { questItemId: "scarecrow", count: 1 } },
+    costs: { items: { scarecrow: 1 } },
+    addCounters: { farmer_scarecrows_placed: 1 },
+    questCounterProgress: {
+      questId: "place_scarecrows",
+      counter: "farmer_scarecrows_placed",
+      progressField: "placed",
+      max: 7,
+    },
+    refreshRegionDecorators: true,
+  },
+  place_southern_scarecrow: {
+    id: "place_southern_scarecrow",
+    type: "activate",
+    label: "Place scarecrow",
+    text: "The new scarecrow is secured in the southern field.",
+    i18n: { da: { label: "Placér fugleskræmsel", text: "Det nye fugleskræmsel er sat fast på den sydlige mark." } },
+    requires: {
+      questStepActive: { questId: "more_scarecrows", stepId: "place_southern_scarecrows" },
+      inventory: { questItemId: "scarecrow", count: 1 },
+    },
+    costs: { items: { scarecrow: 1 } },
+    addCounters: { farmer_southern_scarecrows_placed: 1 },
+    questCounterProgress: {
+      questId: "more_scarecrows",
+      stepId: "place_southern_scarecrows",
+      counter: "farmer_southern_scarecrows_placed",
+      progressField: "placed",
+      max: 7,
+    },
+    refreshRegionDecorators: true,
+  },
   inspect_young_boys_body: {
     id: "inspect_young_boys_body",
     type: "inspect",
@@ -77,6 +115,23 @@ export const ACTION_CONFIG = {
     removeTarget: true,
     once: true,
     setFlags: ["item.note.collected"],
+  },
+
+  collect_merchant_wooden_wheel: {
+    id: "collect_merchant_wooden_wheel",
+    type: "collect",
+    label: "Pick up wooden wheel",
+    text: "You recover one of the merchant's scattered wagon wheels.",
+    i18n: {
+      da: {
+        label: "Saml træhjul op",
+        text: "Du finder et af handelsmandens spredte vognhjul.",
+      },
+    },
+    requires: { questActive: "merchant_recover_wagon_wheels" },
+    rewards: { items: { merchant_wooden_wheel: 1 } },
+    removeTarget: true,
+    once: true,
   },
 
   harvest_rare_pink_flower: {
@@ -520,5 +575,27 @@ export const ACTION_CONFIG = {
     },
     setFlags: ["noble.received_ring"],
     once: true,
+  },
+  collect_villager_haystack: {
+    id: "collect_villager_haystack",
+    type: "collect",
+    label: "Collect hay",
+    prompt: "Collect haystack",
+    requires: {
+      questActive: "villager_help_collect_hay",
+    },
+    rewards: {
+      items: {
+        villager_haystack: 1,
+      },
+    },
+    removeTarget: true,
+    once: true,
+    i18n: {
+      da: {
+        label: "Saml hø",
+        prompt: "Saml høstak",
+      },
+    },
   },
 };

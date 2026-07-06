@@ -87,7 +87,7 @@ import { ReadableDialog } from "./inventory/readable-dialog.jsx";
 import { InventorySortSelect } from "./inventory/inventory-sort-select.jsx";
 import { BestiaryViewer } from "./bestiary-viewer.jsx";
 import { QuestDetailCard, QuestObjectiveMeta } from "./quests/quest-dialogs.jsx";
-import { localizeItemField, useLocalization } from "../i18n/index.js";
+import { getMonsterDisplayName, localizeItemField, useLocalization } from "../i18n/index.js";
 import { localizeQuestField } from "../i18n/quest-localization.js";
 import {
   HELP_ACCESS_CONFIG,
@@ -349,8 +349,14 @@ function CityPage({
     interactiveAreas.filter((area) => isCityAreaUnlocked(cityProgress, area))
   ), [interactiveAreas, cityProgress]);
   const cityMapNpcs = useMemo(() => {
+    const cityNpcStates = (snapshot.quests?.cityNpcStates ?? []).map((state) => ({
+      ...state,
+      hasComplete: Boolean(state.hasComplete) || (state.active ?? []).some((quest) => (
+        isQuestComplete(quest, buildCityQuestCompletionInventory(quest, snapshot, cityProgress))
+      )),
+    }));
     const questNpcs = getCityMapQuestNpcs(
-      snapshot.quests?.cityNpcStates ?? [],
+      cityNpcStates,
       SHOW_INACTIVE_CITY_NPCS,
       npcPlacementSeedRef.current,
     );
@@ -369,7 +375,7 @@ function CityPage({
         hasComplete: false,
       },
     ];
-  }, [localize, snapshot, snapshot.quests?.cityNpcStates]);
+  }, [cityProgress, localize, snapshot, snapshot.quests?.cityNpcStates]);
   const cityStats = useMemo(() => calculateCityStats(cityProgress, snapshot, regionCorruption), [cityProgress, snapshot, regionCorruption]);
   const cityEventModifiers = useMemo(() => cityRuntimeModifiers(cityStats), [cityStats]);
   const cityMobs = useMemo(() => normalizeCityMobs(cityProgress?.cityMobs), [cityProgress?.cityMobs]);
@@ -1769,20 +1775,22 @@ function CityThreatMeter({ threatLevel }) {
 }
 
 function CityMapMobIcons({ mobRefs, attackableMobIds, onAttack, onHover }) {
-  const { t } = useLocalization();
+  const { localize, t } = useLocalization();
   return (
     <div className="city-map-hover-icons city-map-mob-icons" aria-label="City mobs">
       {mobRefs.map((mob) => {
         const attackable = attackableMobIds.has(mob.id);
         const occupationStatus = mob.breachState === "inside" ? cityMobOccupationStatusText(mob, t) : "";
         const markerStatus = occupationStatus ? ` - ${occupationStatus}` : "";
+        const displayName = cityMobDisplayName(mob, localize);
+        const attackStatus = attackable ? t("city.mob.hover.attackable") : t("city.mob.hover.blocked");
         return (
           <button
             type="button"
             className={`city-map-mob-mini ${attackable ? "attackable" : "blocked"}`}
             style={cityMapPositionStyle(mob.x, mob.y, 27)}
-            title={`${mob.mobType} Lv.${mob.level}${markerStatus}${attackable ? " - attackable" : " - clear closer threats before attacking"}`}
-            aria-label={`${mob.mobType} level ${mob.level}${occupationStatus ? `, ${occupationStatus}` : ""}${attackable ? ", attackable" : ", clear closer threats before attacking"}`}
+            title={`${displayName} Lv.${mob.level}${markerStatus} - ${attackStatus}`}
+            aria-label={`${displayName}, Lv.${mob.level}${occupationStatus ? `, ${occupationStatus}` : ""}, ${attackStatus}`}
             onMouseEnter={() => onHover?.(mob.id)}
             onMouseLeave={() => onHover?.(null)}
             onFocus={() => onHover?.(mob.id)}
@@ -1826,7 +1834,7 @@ function CityStatInfoPanel({ stat, onClose }) {
 }
 
 function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, onHeroBattle, onArmyBattle, onClose }) {
-  const { t } = useLocalization();
+  const { language, localize, t } = useLocalization();
   const armyUnits = normalizeArmyUnits(cityProgress?.armyUnits);
   const [sentUnits, setSentUnits] = useState(() => Object.fromEntries(
     Object.entries(armyUnits).map(([unitId, count]) => [unitId, Math.min(1, count)]),
@@ -1848,9 +1856,9 @@ function CityMobActionPopup({ mob, attackable = false, cityProgress, cityStats, 
             {mob.iconUrl ? <img src={mob.iconUrl} alt="" draggable="false" /> : <span>{String(mob.mobType || "M").slice(0, 1)}</span>}
           </div>
           <div>
-            <b>{cityMobDisplayName(mob)}</b>
+            <b>{cityMobDisplayName(mob, localize)}</b>
             <span>
-              {mob.mobType} Lv.{mob.level} | {cityMobAreaLabel(mob)} | {t("city.mob.activeVisits", { count: Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) })}
+              {getMonsterDisplayName(mob.mobType, language)} Lv.{mob.level} | {cityMobAreaLabel(mob, localize)} | {t("city.mob.activeVisits", { count: Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) })}
             </span>
           </div>
         </div>
@@ -2322,6 +2330,29 @@ function drawCityQuestStatusMarker(ctx, marker, camera, time) {
   ctx.restore();
 }
 
+function questResourceEntries(quest) {
+  return Array.isArray(quest?.target?.resources)
+    ? quest.target.resources
+      .map((entry) => [String(entry.resource ?? entry.resourceId ?? ""), Math.max(1, Math.floor(Number(entry.count) || 1))])
+      .filter(([resourceId]) => resourceId)
+    : [];
+}
+
+function buildCityQuestCompletionInventory(quest, snapshot = {}, progress = null, fallbackInventory = []) {
+  const inventory = (snapshot.inventory ?? fallbackInventory).map((item) => (
+    item && typeof item === "object" ? { ...item } : item
+  ));
+  for (const [resourceId] of questResourceEntries(quest)) {
+    const backpackCount = cityResourceCount(inventory, resourceId);
+    const available = cityCostAvailable(snapshot, resourceId, progress);
+    const cityOnlyCount = Math.max(0, available - backpackCount);
+    if (cityOnlyCount <= 0) continue;
+    const item = makeResourceItem(resourceId, cityOnlyCount);
+    if (item) inventory.push(item);
+  }
+  return inventory;
+}
+
 function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, onChangeProgress, onClose, onQuestCompleted }) {
   const { localize, renderTemplate, t } = useLocalization();
   const questText = (quest, field) => localizeQuestField(quest, field, localize, renderTemplate);
@@ -2349,28 +2380,9 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
   const skipQuestList = Boolean(singleQuestSelection);
   if (!npc) return null;
 
-  const questResourceEntries = (quest) => (
-    Array.isArray(quest?.target?.resources)
-      ? quest.target.resources
-        .map((entry) => [String(entry.resource ?? entry.resourceId ?? ""), Math.max(1, Math.floor(Number(entry.count) || 1))])
-        .filter(([resourceId]) => resourceId)
-      : []
-  );
-
   const cityQuestCompletionInventory = (quest) => {
     const snapshot = snapshotRef?.current ?? {};
-    const inventory = (snapshot.inventory ?? engineRef.current?.player?.inventory ?? []).map((item) => (
-      item && typeof item === "object" ? { ...item } : item
-    ));
-    for (const [resourceId] of questResourceEntries(quest)) {
-      const backpackCount = cityResourceCount(inventory, resourceId);
-      const available = cityCostAvailable(snapshot, resourceId, progress);
-      const cityOnlyCount = Math.max(0, available - backpackCount);
-      if (cityOnlyCount <= 0) continue;
-      const item = makeResourceItem(resourceId, cityOnlyCount);
-      if (item) inventory.push(item);
-    }
-    return inventory;
+    return buildCityQuestCompletionInventory(quest, snapshot, progress, engineRef.current?.player?.inventory ?? []);
   };
 
   const cityQuestDisplay = (quest) => {

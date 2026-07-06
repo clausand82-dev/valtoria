@@ -27,6 +27,9 @@ export const MAP_ABANDON_RESET_CONFIG = {
     // Permanent readable-book stat bonuses gained during the run.
     readableBonuses: false,
 
+    // Permanent stat bonuses granted by quests completed during the run.
+    questStatBonuses: false,
+
     // Skill tree ranks bought during the run.
     skillTree: false,
 

@@ -24,9 +24,15 @@ import {
 import { skillTreeBonuses } from "../../config/skill-tree-config.js";
 import { socketBonusesForItem } from "../../config/socket-config.js";
 import { getClassNodeBonuses } from "../../config/class-config.js";
+import { normalizePlayerStatBonuses } from "../../config/player-stat-bonus-config.js";
 import {
   ITEM_DURABILITY_WEAPON_PER_ATTACK,
   ITEM_DURABILITY_ARMOR_PER_HIT,
+  ITEM_DURABILITY_ARMOR_HIT_SLOT_MIN,
+  ITEM_DURABILITY_ARMOR_HIT_SLOT_MAX,
+  ITEM_DURABILITY_ARMOR_HIT_CHANCE,
+  ITEM_DURABILITY_SPECIAL_ARMOR_SLOTS,
+  ITEM_DURABILITY_SPECIAL_ARMOR_HIT_CHANCE,
   ITEM_DURABILITY_PENALTY_THRESHOLD,
   ITEM_DURABILITY_DEATH_MIN_PCT,
   ITEM_DURABILITY_DEATH_MAX_PCT,
@@ -1949,6 +1955,7 @@ export const combatMethods = {
       this.applyStatBonuses(stats, socketBonusesForItem(item));
     }
 
+    this.applyStatBonuses(stats, normalizePlayerStatBonuses(this.player.questStatBonuses));
     this.applyStatBonuses(stats, skillBonus);
     this.applyStatBonuses(stats, classBonus);
     for (const effect of this.player.statusEffects ?? []) {
@@ -1974,7 +1981,8 @@ export const combatMethods = {
   // ─── Item durability helpers ─────────────────────────────────────────────────
 
   destroyEquipmentAtZeroDurability(slotId, item) {
-    if (!slotId || !item?.destroyWhenDurabilityDepleted || Number(item.durability) > 0) return false;
+    const isDestroyedAtZero = Boolean(item?.nonRepairable || item?.destroyWhenDurabilityDepleted);
+    if (!slotId || !isDestroyedAtZero || Number(item.durability) > 0) return false;
     if (this.player.equipment?.[slotId] !== item) return false;
     this.player.equipment[slotId] = null;
     this.addToast(`${item.name} forsvandt.`);
@@ -1995,16 +2003,41 @@ export const combatMethods = {
   },
 
   drainArmorDurability() {
-    let changed = false;
+    const specialSlots = new Set(ITEM_DURABILITY_SPECIAL_ARMOR_SLOTS.map(String));
+    const normalArmor = [];
+    const specialArmor = [];
     for (const [slotId, item] of Object.entries(this.player.equipment ?? {})) {
       if (!item || slotId === "weapon") continue;
+      const logicalSlot = String(item.slot ?? slotId).replace(/\d+$/, "");
+      const entry = { slotId, item };
+      if (specialSlots.has(logicalSlot) || specialSlots.has(String(slotId))) specialArmor.push(entry);
+      else normalArmor.push(entry);
+    }
+
+    const configuredMin = Math.max(0, Math.floor(Number(ITEM_DURABILITY_ARMOR_HIT_SLOT_MIN) || 0));
+    const configuredMax = Math.max(configuredMin, Math.floor(Number(ITEM_DURABILITY_ARMOR_HIT_SLOT_MAX) || 0));
+    const selectionMin = Math.min(configuredMin, normalArmor.length);
+    const selectionMax = Math.min(configuredMax, normalArmor.length);
+    const selectionCount = selectionMin + Math.floor(Math.random() * (selectionMax - selectionMin + 1));
+    for (let index = 0; index < selectionCount; index += 1) {
+      const swapIndex = index + Math.floor(Math.random() * (normalArmor.length - index));
+      [normalArmor[index], normalArmor[swapIndex]] = [normalArmor[swapIndex], normalArmor[index]];
+    }
+
+    const damageCandidates = [
+      ...normalArmor.slice(0, selectionCount).map((entry) => ({ ...entry, chance: ITEM_DURABILITY_ARMOR_HIT_CHANCE })),
+      ...specialArmor.map((entry) => ({ ...entry, chance: ITEM_DURABILITY_SPECIAL_ARMOR_HIT_CHANCE })),
+    ];
+    let changed = false;
+    for (const { slotId, item, chance } of damageCandidates) {
+      if (Math.random() >= clamp(Number(chance) || 0, 0, 1)) continue;
       const before = Number(item.durability ?? 100);
       item.durability = Math.max(0, parseFloat((before - ITEM_DURABILITY_ARMOR_PER_HIT).toFixed(2)));
+      if (item.durability !== before) changed = true;
       if (before > 0 && item.durability === 0) {
         if (!this.destroyEquipmentAtZeroDurability(slotId, item)) {
           this.addToast(`${item.name} er brudt! Reparer det hos smeden.`);
         }
-        changed = true;
       }
     }
     if (changed) this.publishSnapshot();

@@ -1,8 +1,9 @@
 STATUS:
 Små rettelse observeret igennem spil test:
 - skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
-- hvis en quest kan indløses skal det gule ? altid have første priotering
-- besætttelse af en bygning skal måske umuliggøre køb af addons og opgradering før city mobs er væk!
+- man skal kunne skyde spells udover sorte huller 
+- en para til at bestemme afstand imellem objects (på object eller generelt)
+
 
 
 IMPORTENT:
@@ -41,11 +42,7 @@ Vandings system: -water, +provision
 
 
 NEW QUEST:
-Efter quest med poorgirl, poorminer og richman, får man adgang til flere nye quest:
 
-Mechant mangler hjul til sine vogne (de er blevet ødelagte, da mobs hærgede marketplace og village). Han ved at der ligger hjul spredt rundt i regionerne (river-creak, nordlige marker, the forest). Hjulene er foilage med hjul (foilage_woodwheels.png) og ved action tryk på E samler man et hjul op (item_quest_wodden_wheel.png). Foilage droprate på hjul der kan samles op (drop) er meget lav. De nævnte regioner skal have en lav weight på disse træ hjul foilage, og når quest er aktiv, skal action være mulig. Der skal samles 12 hjul.
-
-Smeden har fået til opgave at lave en gave til kongen. Derfor skal han bruge 12 ironbar og 4 gold bar.
 
 Dark Wizard ber om at man tager til Village og ødelægger huse (under denne quest skal huse være destruable igen). Han vil gerne man ødelægger 8 huse. Man har muligheden for at ødelægge husene og gennemføre - hvilket koster lydra og giver netdra, men man kan også vælge at lade være og istedet sladre til borgmesteren. Vælger man at ødelægge husene får man en quest fra borgmester, hvor han er pæn sur på en og det koster village outskirt fractions point (20) samt giver en del netdra. Vælger man at sladre til borgmesteren afsluttes Dark Wizards quest og man får god rep og lydra.
 Wizard quest --> ødelægger huse --> sur borgmester --> reward: -20 rep og giver 2% netdra.

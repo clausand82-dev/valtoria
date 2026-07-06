@@ -868,9 +868,22 @@ button {
   pointer-events: auto;
 }
 
-.city-side-event-entry:hover,
-.city-side-event-entry:focus-visible {
+.city-side-event-entry.negative {
+  color: #ff5f57;
+}
+
+.city-side-event-entry.positive {
+  color: #58d96d;
+}
+
+.city-side-event-entry.negative:hover,
+.city-side-event-entry.negative:focus-visible {
   color: #ffcbc7;
+}
+
+.city-side-event-entry.positive:hover,
+.city-side-event-entry.positive:focus-visible {
+  color: #abf0b5;
 }
 
 .city-side-event-tooltip {
@@ -6440,6 +6453,33 @@ button {
   overflow: auto;
 }
 
+.hero-combat {
+  min-height: 0;
+  overflow: auto;
+}
+
+.hero-combat > .hero-stat-grid {
+  max-height: none;
+  overflow: visible;
+}
+
+.hero-combat > .hero-quest-section {
+  max-height: none;
+  overflow: visible;
+}
+
+.hero-quests {
+  min-height: 0;
+  padding: 14px 16px;
+  overflow: auto;
+}
+
+.hero-quests > .hero-quest-section {
+  margin: 0;
+  max-height: none;
+  overflow: visible;
+}
+
 .hero-overview .hero-stat-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 0;
@@ -6477,12 +6517,11 @@ button {
 }
 
 .hero-stat em {
-  overflow: hidden;
   color: var(--muted);
   font-size: 11px;
   font-style: normal;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .hero-tabs {
@@ -6526,6 +6565,12 @@ button {
   margin: 4px 0;
   color: var(--muted);
   font-size: 13px;
+}
+
+.hero-detail-grid.columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
 }
 
 .city-addon-list {
@@ -7454,6 +7499,10 @@ button {
 
   .hero-vital-bars {
     grid-column: 1 / -1;
+  }
+
+  .hero-detail-grid.columns {
+    grid-template-columns: 1fr;
   }
 
   .hero-portrait-ring {

@@ -15,6 +15,7 @@ export const SAVE_PERSIST_CONFIG = {
     economy: true,
     potions: true,
     readableBonuses: true,
+    questStatBonuses: true,
     skillTree: true,
     spells: true,
     stats: true,

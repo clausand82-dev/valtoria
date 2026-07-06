@@ -570,6 +570,15 @@ export default function App() {
     let nextProgress = loadCityProgress(cityStorageKey);
     let cityProgressChanged = false;
 
+    const completedPlayableMapRun = mapReturn.cleared === true
+      && mapReturn.reachedExit === true
+      && mapReturn.abandoned !== true
+      && mapReturn.playerDied !== true
+      && !isCityMobBattle;
+    if (completedPlayableMapRun) {
+      engineRef.current?.advanceQuestBoardCooldowns?.(1);
+    }
+
     if (mapReturn.cleared) {
       const threatFall = calcThreatFallOnMapExit(mapReturn.mapSize);
       if (threatFall > 0) {

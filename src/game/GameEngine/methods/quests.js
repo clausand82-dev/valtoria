@@ -50,6 +50,7 @@ import {
 } from "../helpers.js";
 import { applyWorldEnergy } from "../../world-energy.js";
 import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-config.js";
+import { addPlayerStatBonuses, normalizePlayerStatBonuses } from "../../config/player-stat-bonus-config.js";
 import { applyCityProgressEffects, cityRequirementContext, normalizeCityProgressEffect } from "../../config/city-state-helpers.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
 
@@ -761,6 +762,7 @@ export const questsMethods = {
       if (!def || String(def.source ?? "") !== String(config.source)) return false;
       if (this.questState.active.some((quest) => String(quest.questId) === String(questId))) return false;
       if (!def.repeatable && this.questState.completed.includes(String(questId))) return false;
+      if (def.repeatable && this.questBoardCooldownRemaining(boardState, questId) > 0) return false;
       return this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides);
     });
     const boardMultiplier = boardId === "inn"
@@ -798,7 +800,11 @@ export const questsMethods = {
     const boardState = this.questBoardState(boardId);
     const offers = (boardState.availableQuestIds ?? [])
       .map((questId) => resolveQuestDefById(questId))
-      .filter((def) => def && this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides))
+      .filter((def) => (
+        def
+        && (!def.repeatable || this.questBoardCooldownRemaining(boardState, def.id) <= 0)
+        && this.questDefinitionCanOffer(def, this.questBoardNpcId(def), boardId, contextOverrides)
+      ))
       .map((def) => this.buildQuestOffer(def, this.questBoardNpcId(def), {
         source: config.source,
         boardId,
@@ -1461,6 +1467,7 @@ export const questsMethods = {
   },
 
   applyQuestBoardCompletionCooldown(quest) {
+    if (!quest?.repeatable) return;
     const source = String(quest?.source ?? "");
     const boardId = Object.keys(QUEST_BOARD_CONFIG ?? {}).find((id) => String(QUEST_BOARD_CONFIG[id]?.source ?? "") === source);
     if (!boardId) return;
@@ -1503,6 +1510,7 @@ export const questsMethods = {
       resources: [],
       items: [],
       cityProgress: [],
+      statBonuses: {},
     };
     if (rewards.lydra || rewards.netdra) {
       applyWorldEnergy(this, { lydra: rewards.lydra, netdra: rewards.netdra });
@@ -1514,6 +1522,11 @@ export const questsMethods = {
     if (rewards.factionRep && typeof rewards.factionRep === "object") {
       applyFactionRepEffects(this.player, rewards.factionRep);
       summary.factionRep = { ...rewards.factionRep };
+    }
+    const statBonuses = normalizePlayerStatBonuses(rewards.statBonuses);
+    if (Object.keys(statBonuses).length > 0) {
+      this.player.questStatBonuses = addPlayerStatBonuses(this.player.questStatBonuses, statBonuses);
+      summary.statBonuses = statBonuses;
     }
     if (xp) {
       this.player.xp += xp;

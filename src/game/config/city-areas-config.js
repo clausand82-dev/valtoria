@@ -447,6 +447,10 @@ export const CITY_AREAS = [
     builtLayer: `${CITY_LAYER_BASE}/city_housing.png`,
     statEffects: { population: 50 },
     unlock: { cost: { gold: 800, wood_plank: 30, wheat: 15 } },
+    levels: [
+      { level: 2, title: "Upgraded Housing Area", i18n: { da: { title: "Opgraderet boligområde" } }, stageId: "housing_area_lvl2", cost: { gold: 800, wood_plank: 25 }, statEffects: { housing: 75 }, statRequirements: { city_defence: 50 }, /*builtLayer: `${CITY_LAYER_BASE}/city_outer15_lvl2.png`*/ },
+      { level: 3, title: "Improved Upgraded Housing Area", i18n: { da: { title: "Forbedret opgraderet boligområde" } }, stageId: "housing_area_lvl3", cost: { gold: 1200, wood_plank: 40 }, statEffects: { housing: 250 }, statRequirements: { city_defence: 100 }, /*builtLayer: `${CITY_LAYER_BASE}/city_outer15_lvl3.png`*/ },
+    ],
   },
   {
     id: "park",

@@ -61,8 +61,8 @@ export const CITY_ARMY_UNIT_DEFS = {
     range: 4,
   },
     james_gray: {
-    label: "Legendary James Gray",
-    i18n: { da: { label: "Legendariske James Gray" } },
+    label: "Legendary James Gray (only for test)",
+    i18n: { da: { label: "Legendariske James Gray (kun til test)" } },
     imageUrl: "",
     category: "melee",
     populationCost: 1,

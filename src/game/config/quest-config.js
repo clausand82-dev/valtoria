@@ -3,6 +3,14 @@ import { QUEST_NPCS } from "./npc-config.js";
 export { QUEST_NPCS };
 
 export const QUEST_ITEM_DEFS = {
+  scarecrow: {
+    name: "Scarecrow",
+    iconUrl: "/assets/generated/item/item_quest_doll.png",
+    placeholderColor: "#c99b5d",
+    stackable: true,
+    stackMax: 7,
+    i18n: { da: { name: "Fugleskræmsel" } },
+  },
   quest_item_boysletterfromfather: {
     name: "Boy's Letter from His Father",
     iconUrl: "/assets/generated/item/item_quest_letter.png",
@@ -143,6 +151,39 @@ export const QUEST_ITEM_DEFS = {
 
     i18n: { da: { name: "Veldors hemmelige brev" } },
   },
+  merchant_wooden_wheel: {
+    name: "Wooden Wagon Wheel",
+    iconUrl: "/assets/generated/item/item_quest_wodden_wheel.png",
+    placeholderColor: "#9b6a3f",
+    stackable: true,
+    stackMax: 12,
+    i18n: { da: { name: "Træhjul til handelsmandens vogn" } },
+  },
+  villager_roof_tile: {
+    name: "Roof Tile",
+    iconUrl: "/assets/generated/item/item_quest_rooftiles.png",
+    placeholderColor: "#b9704a",
+    stackable: true,
+    stackMax: 50,
+    i18n: {
+      da: {
+        name: "Tagsten",
+      },
+    },
+  },
+
+  villager_haystack: {
+    name: "Haystack",
+    iconUrl: "/assets/generated/item/item_res_wheat.png",
+    placeholderColor: "#d8b85c",
+    stackable: true,
+    stackMax: 50,
+    i18n: {
+      da: {
+        name: "Høstak",
+      },
+    },
+  },
 };
 
 /*
@@ -244,6 +285,7 @@ Rewards:
 - rewards.resources: Resource rewards, for example [{ resource: "red_gemstone", count: 1 }].
 - rewards.randomItem: Gives a random equipment item. Current support uses { minRarity: "upgraded" } as a hint.
 - rewards.namedItems: Gives named equipment rewards, for example [{ namedId: "devils_judge" }].
+- rewards.statBonuses: Permanently adds player stats. Percentage bonuses use decimals, for example { arcaneDamageBonus: 0.05 } gives +5% Arcane damage.
 - rewards.xpPerKill / rewards.goldPerKill: Used by kill quests to scale reward from target.count.
 - rewards.cityProgress or rewards.cityRewards: Applies city progress without paying normal city UI costs.
   The same cityProgress/cityRewards shape also works on quest.onComplete, step.onComplete, and step.rewards.

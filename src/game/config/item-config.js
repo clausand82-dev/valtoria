@@ -1,10 +1,117 @@
 export const PREFIXES = {
-  poor: ["Cracked", "Bent", "Frayed", "Defect"],
-  normal: ["Iron", "Oaken", "Plain", "Common"],
-  upgraded: ["Tempered", "Verdant", "Hunter"],
-  rare: ["Sunforged", "Kingsguard", "Storm"],
-  epic: ["Voidmarked", "Moonlit", "Warborn"],
-  legendary: ["Dragonwake", "Bloodstar", "Eternal"],
+  poor: [
+    "Cracked",
+    "Bent",
+    "Frayed",
+    "Defective",
+    "Rusted",
+    "Splintered",
+    "Dented",
+    "Worn",
+    "Chipped",
+    "Torn",
+    "Moldy",
+    "Loose",
+    "Crooked",
+    "Faded",
+    "Weathered",
+    "Shabby",
+  ],
+
+  normal: [
+    "Iron",
+    "Oaken",
+    "Plain",
+    "Common",
+    "Bronze",
+    "Leather",
+    "Sturdy",
+    "Hardened",
+    "Field",
+    "Village",
+    "Militia",
+    "Traveling",
+    "Huntsman",
+    "Roadworn",
+    "Wellmade",
+    "Practical",
+  ],
+
+  upgraded: [
+    "Tempered",
+    "Verdant",
+    "Hunter",
+    "Reinforced",
+    "Polished",
+    "Balanced",
+    "Sharpened",
+    "Guarded",
+    "Runed",
+    "Blessed",
+    "Steady",
+    "Steelbound",
+    "Oakheart",
+    "Wolfhide",
+    "Fieldwarden",
+    "Emberlit",
+  ],
+
+  rare: [
+    "Sunforged",
+    "Kingsguard",
+    "Storm",
+    "Frostbitten",
+    "Ashen",
+    "Silvered",
+    "Thornbound",
+    "Moonsteel",
+    "Dawnkeeper",
+    "Wolfsbane",
+    "Ironroot",
+    "Starfall",
+    "Battleworn",
+    "Oathbound",
+    "Ravenmarked",
+    "Glimmering",
+  ],
+
+  epic: [
+    "Voidmarked",
+    "Moonlit",
+    "Warborn",
+    "Shadowforged",
+    "Stormcarved",
+    "Bloodoath",
+    "Spiritbound",
+    "Nightfallen",
+    "Frostveined",
+    "Sunblessed",
+    "Eldergrove",
+    "Arcane",
+    "Ghostwrought",
+    "Trollscarred",
+    "Duskfang",
+    "Soulguard",
+  ],
+
+  legendary: [
+    "Dragonwake",
+    "Bloodstar",
+    "Eternal",
+    "Worldroot",
+    "Doomforged",
+    "Starcrowned",
+    "Fatebound",
+    "Godscarred",
+    "Ancient",
+    "Mythborn",
+    "Stormheart",
+    "Sunbreaker",
+    "Moonshard",
+    "Kingsbane",
+    "Lightforged",
+    "Netherwrought",
+  ],
 };
 
 // Stats i UNIQUE_ITEMS og NAMED_ITEM_TEMPLATES:
@@ -630,6 +737,1000 @@ export const NAMED_ITEM_TEMPLATES = [
       range: 5.8,
       cooldown: 0.62,
       armor: 2,
+    },
+  },
+    {
+    id: "mayors_oath_chain",
+    name: "Mayor's Oath Chain",
+    baseName: "Amulet",
+    slot: "amulet",
+    mode: "armor",
+    type: "amulet",
+    levelMin: 8,
+    levelReq: 8,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_mayors_oath_chain.png",
+    description:
+      "A heavy village chain worn during old oaths of protection. It strengthens resolve when the outskirts fall into danger.",
+    i18n: {
+      da: {
+        name: "Borgmesterens edskæde",
+        description:
+          "En tung landsbykæde båret under gamle beskyttelseseder. Den styrker viljen, når udkanten falder i fare.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 3,
+      maxHp: 18,
+      magic: 2,
+      allResist: 2,
+      factionRep: 1,
+    },
+  },
+
+  {
+    id: "roofmenders_buckle",
+    name: "Roofmender's Buckle",
+    baseName: "Belt",
+    slot: "belt",
+    mode: "armor",
+    type: "belt",
+    levelMin: 6,
+    levelReq: 6,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_roofmenders_buckle.png",
+    description:
+      "A sturdy tool-belt buckle from a villager who patched roofs after the war. Practical, ugly, and dependable.",
+    i18n: {
+      da: {
+        name: "Taglapperens bæltespænde",
+        description:
+          "Et solidt værktøjs-bæltespænde fra en landsbyboer, der lappede tage efter krigen. Praktisk, grimt og pålideligt.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 5,
+      maxHp: 12,
+      resourceFind: 0.04,
+      armorPct: 0.03,
+    },
+  },
+
+  {
+    id: "wintertile_charm",
+    name: "Wintertile Charm",
+    baseName: "Relic",
+    slot: "relic",
+    mode: "relic",
+    type: "charm",
+    levelMin: 10,
+    levelReq: 10,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_wintertile_charm.png",
+    description:
+      "A cracked roof tile tied with old twine. Villagers believed it kept winter spirits outside the door.",
+    i18n: {
+      da: {
+        name: "Vintertagstenens amulet",
+        description:
+          "En revnet tagsten bundet med gammelt sejlgarn. Landsbyboere troede, den holdt vinterånder ude af døren.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 2,
+      maxMana: 14,
+      magic: 4,
+      iceResist: 6,
+      arcaneDamageBonus: 0.03,
+    },
+  },
+
+  {
+    id: "fieldwardens_quiver",
+    name: "Fieldwarden's Quiver",
+    baseName: "Quiver",
+    slot: "offhand",
+    mode: "offhand",
+    type: "quiver",
+    levelMin: 7,
+    levelReq: 7,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_fieldwardens_quiver.png",
+    description:
+      "A patched quiver once carried by the watcher of the northern fields. It is still filled with dry straw and sharp memories.",
+    i18n: {
+      da: {
+        name: "Markvogterens pilekogger",
+        description:
+          "Et lappet pilekogger båret af nordmarkens gamle vogter. Det er stadig fyldt med tørt halm og skarpe minder.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 2,
+      damageMin: 2,
+      damageMax: 5,
+      critChance: 0.03,
+      resourceFind: 0.03,
+    },
+  },
+
+  {
+    id: "old_mill_sickle",
+    name: "Old Mill Sickle",
+    baseName: "Dagger",
+    slot: "weapon",
+    mode: "melee",
+    type: "sickle",
+    hands: 1,
+    levelMin: 5,
+    levelReq: 5,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_old_mill_sickle.png",
+    description:
+      "A farmer's sickle sharpened after too many hungry beasts wandered into the fields.",
+    i18n: {
+      da: {
+        name: "Den gamle mølles segl",
+        description:
+          "En bondes segl slebet skarp, efter alt for mange sultne bæster vandrede ind på markerne.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 8,
+      damageMax: 15,
+      range: 1.08,
+      cooldown: 0.37,
+      critChance: 0.04,
+      natureDamageBonus: 0.04,
+    },
+  },
+
+  {
+    id: "rusk_miner_pick",
+    name: "Rusk's Miner Pick",
+    baseName: "Spear",
+    slot: "weapon",
+    mode: "melee",
+    type: "pickaxe",
+    hands: 2,
+    levelMin: 12,
+    levelReq: 12,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_rusk_miner_pick.png",
+    description:
+      "A heavy miner's pick associated with Rusk and the dark stories beneath the village well.",
+    i18n: {
+      da: {
+        name: "Rusks minehakke",
+        description:
+          "En tung minehakke forbundet med Rusk og de mørke historier under landsbyens brønd.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 15,
+      damageMax: 28,
+      range: 1.42,
+      cooldown: 0.78,
+      armorFlat: 3,
+      physicalDamageBonus: 0.05,
+    },
+  },
+
+  {
+    id: "miris_lantern_focus",
+    name: "Miri's Lantern Focus",
+    baseName: "Focus",
+    slot: "offhand",
+    mode: "offhand",
+    type: "focus",
+    levelMin: 12,
+    levelReq: 12,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_miris_lantern_focus.png",
+    description:
+      "A small lantern-focus said to have guided a frightened child through the mine-dark.",
+    i18n: {
+      da: {
+        name: "Miris lygtefokus",
+        description:
+          "Et lille lygtefokus, der siges at have ledt et bange barn gennem minens mørke.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 1,
+      magic: 8,
+      maxMana: 18,
+      spellDamageBonus: 0.04,
+      arcaneDamageBonus: 0.04,
+    },
+  },
+
+  {
+    id: "wellkeepers_gorget",
+    name: "Wellkeeper's Gorget",
+    baseName: "Gorget",
+    slot: "neck",
+    mode: "armor",
+    type: "gorget",
+    levelMin: 9,
+    levelReq: 9,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_wellkeepers_gorget.png",
+    description:
+      "A damp iron gorget from the old well path. It hums faintly when underground magic is near.",
+    i18n: {
+      da: {
+        name: "Brøndvogterens halskrave",
+        description:
+          "En fugtig jernhalskrave fra den gamle brøndsti. Den summer svagt, når underjordisk magi er nær.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 5,
+      maxMana: 16,
+      magicResist: 4,
+      poisonResist: 5,
+    },
+  },
+
+  {
+    id: "boarhide_pathfinders",
+    name: "Boarhide Pathfinders",
+    baseName: "Boots",
+    slot: "feet",
+    mode: "armor",
+    type: "boots",
+    levelMin: 4,
+    levelReq: 4,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_boarhide_pathfinders.png",
+    description:
+      "Tough boots stitched from boarhide. They were made for muddy paths, thorny fields, and quick retreats.",
+    i18n: {
+      da: {
+        name: "Vildsvineskinds stifindere",
+        description:
+          "Seje støvler syet af vildsvineskind. De er lavet til mudrede stier, tornede marker og hurtige tilbagetog.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 6,
+      speedPct: 0.06,
+      dodgeChance: 0.02,
+      physicalResist: 3,
+    },
+  },
+
+  {
+    id: "fenris_tail_talisman",
+    name: "Fenris Tail Talisman",
+    baseName: "Relic",
+    slot: "relic",
+    mode: "relic",
+    type: "talisman",
+    levelMin: 14,
+    levelReq: 14,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_fenris_tail_talisman.png",
+    description:
+      "A wolf-tail talisman made by hunters who feared the old Fenris stories but followed the tracks anyway.",
+    i18n: {
+      da: {
+        name: "Fenrishalens talisman",
+        description:
+          "En ulvehale-talisman lavet af jægere, der frygtede de gamle Fenris-sagn, men fulgte sporene alligevel.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      magic: 5,
+      maxHp: 10,
+      speedPct: 0.03,
+      critChance: 0.03,
+      goldFind: 0.05,
+    },
+  },
+
+  {
+    id: "ashen_hearth_gloves",
+    name: "Ashen Hearth Gloves",
+    baseName: "Gloves",
+    slot: "hands",
+    mode: "armor",
+    type: "gloves",
+    levelMin: 6,
+    levelReq: 6,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_ashen_hearth_gloves.png",
+    description:
+      "Soot-dark gloves rescued from a ruined home. They still remember the warmth of a village hearth.",
+    i18n: {
+      da: {
+        name: "Askeildens handsker",
+        description:
+          "Sodmørke handsker reddet fra et ødelagt hjem. De husker stadig varmen fra et landsbyildsted.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 5,
+      damageMin: 2,
+      damageMax: 4,
+      fireResist: 5,
+      resourceFind: 0.03,
+    },
+  },
+
+  {
+    id: "broken_watch_shield",
+    name: "Broken Watch Shield",
+    baseName: "Wooden Shield",
+    slot: "offhand",
+    mode: "shield",
+    type: "shield",
+    levelMin: 8,
+    levelReq: 8,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_broken_watch_shield.png",
+    description:
+      "A repaired village watch shield. The old cracks were filled with resin, iron nails, and stubborn hope.",
+    i18n: {
+      da: {
+        name: "Den brudte vagtpostens skjold",
+        description:
+          "Et repareret landsbyvagtskjold. De gamle revner er fyldt med harpiks, jernsøm og stædigt håb.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 11,
+      blockChance: 0.06,
+      blockAmount: 5,
+      maxHp: 14,
+    },
+  },
+
+  {
+    id: "tavernkeepers_token",
+    name: "Tavernkeeper's Token",
+    baseName: "Relic",
+    slot: "relic",
+    mode: "relic",
+    type: "token",
+    levelMin: 3,
+    levelReq: 3,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_tavernkeepers_token.png",
+    description:
+      "A worn tavern token traded for warm stew, rumours, and one more chance at tomorrow.",
+    i18n: {
+      da: {
+        name: "Kromandens mønttegn",
+        description:
+          "Et slidt kromønttegn byttet for varm stuvning, rygter og endnu en chance i morgen.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      maxHp: 8,
+      maxMana: 8,
+      xpGain: 0.04,
+      goldFind: 0.04,
+    },
+  },
+
+  {
+    id: "young_boys_tin_soldier",
+    name: "Young Boy's Tin Soldier",
+    baseName: "Relic",
+    slot: "relic",
+    mode: "relic",
+    type: "charm",
+    levelMin: 11,
+    levelReq: 11,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_young_boys_tin_soldier.png",
+    description:
+      "A tiny battered soldier carried by a village child. It feels far heavier than it should.",
+    i18n: {
+      da: {
+        name: "Den unge drengs tinsoldat",
+        description:
+          "En lille medtaget soldat båret af et landsbybarn. Den føles langt tungere, end den burde.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 2,
+      maxHp: 20,
+      holyResist: 4,
+      shadowResist: 4,
+      statusDurationBonus: 0.04,
+    },
+  },
+
+  {
+    id: "haybound_wristwrap",
+    name: "Haybound Wristwrap",
+    baseName: "Bracelet",
+    slot: "bracelet",
+    mode: "armor",
+    type: "bracelet",
+    levelMin: 5,
+    levelReq: 5,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_haybound_wristwrap.png",
+    description:
+      "A leather wristwrap bound with field straw. It carries the rhythm of harvest work and tired hands.",
+    i18n: {
+      da: {
+        name: "Høbundne håndledsrem",
+        description:
+          "En læderrem bundet med markhalm. Den bærer rytmen fra høstarbejde og trætte hænder.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 4,
+      damageMin: 2,
+      damageMax: 3,
+      resourceFind: 0.05,
+      natureDamageBonus: 0.03,
+    },
+  },
+
+  {
+    id: "outskirt_scout_ring",
+    name: "Outskirt Scout Ring",
+    baseName: "Ring",
+    slot: "ring",
+    mode: "armor",
+    type: "ring",
+    levelMin: 9,
+    levelReq: 9,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_outskirt_scout_ring.png",
+    description:
+      "A plain scout ring marked with tiny scratches showing safe paths around the village outskirts.",
+    i18n: {
+      da: {
+        name: "Udkantsspejderens ring",
+        description:
+          "En simpel spejderring mærket med små ridser, der viser sikre stier omkring landsbyens udkant.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 2,
+      magic: 3,
+      speedPct: 0.03,
+      dodgeChance: 0.02,
+      magicFind: 0.04,
+    },
+  },
+    {
+    id: "militia_watchblade",
+    name: "Militia Watchblade",
+    baseName: "Sword",
+    slot: "weapon",
+    mode: "melee",
+    type: "sword",
+    hands: 1,
+    levelMin: 5,
+    levelReq: 5,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_militia_watchblade.png",
+    description:
+      "A village militia blade once carried on the outer watch paths. Plain, sturdy, and sharpened through years of unease.",
+    i18n: {
+      da: {
+        name: "Militsens vagtklinge",
+        description:
+          "En landsbymilitsklinge båret på de ydre vagtstier. Enkel, solid og slebet gennem mange års uro.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 9,
+      damageMax: 16,
+      cooldown: 0.34,
+      critChance: 0.03,
+      physicalDamageBonus: 0.03,
+    },
+  },
+
+  {
+    id: "briarthorn_longbow",
+    name: "Briarthorn Longbow",
+    baseName: "Bow",
+    slot: "weapon",
+    mode: "ranged",
+    type: "bow",
+    hands: 2,
+    levelMin: 6,
+    levelReq: 6,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_briarthorn_longbow.png",
+    description:
+      "A hunter's longbow wrapped in living briars. It was favored by those who guarded the fields from wolves and raiders.",
+    i18n: {
+      da: {
+        name: "Briarthorn-langbuen",
+        description:
+          "En jægerlangbue omviklet af levende torne. Den var foretrukket af dem, der bevogtede markerne mod ulve og røvere.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 10,
+      damageMax: 18,
+      critChance: 0.05,
+      range: 0.08,
+      cooldown: 0.28,
+      natureDamageBonus: 0.04,
+    },
+  },
+
+  {
+    id: "wintergate_bulwark",
+    name: "Wintergate Bulwark",
+    baseName: "Wooden Shield",
+    slot: "offhand",
+    mode: "shield",
+    type: "shield",
+    levelMin: 7,
+    levelReq: 7,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_wintergate_bulwark.png",
+    description:
+      "A battered shield from the gate watch, marked by winter storms and desperate last stands.",
+    i18n: {
+      da: {
+        name: "Vinterportens bolværk",
+        description:
+          "Et medtaget skjold fra portvagten, mærket af vinterstorme og desperate sidste stande.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 11,
+      blockChance: 0.07,
+      blockAmount: 6,
+      maxHp: 16,
+      physicalResist: 4,
+    },
+  },
+
+  {
+    id: "stonefield_maul",
+    name: "Stonefield Maul",
+    baseName: "Hammer",
+    slot: "weapon",
+    mode: "melee",
+    type: "hammer",
+    hands: 2,
+    levelMin: 8,
+    levelReq: 8,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_stonefield_maul.png",
+    description:
+      "A crushing field-maul once used to break stone and skull alike when the outskirts were overrun.",
+    i18n: {
+      da: {
+        name: "Stenmarkens stridshammer",
+        description:
+          "En knusende markhammer, engang brugt til at bryde både sten og kranier, da udkanten blev overrendt.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 16,
+      damageMax: 30,
+      cooldown: 0.8,
+      armorFlat: 3,
+      physicalDamageBonus: 0.05,
+      stunChance: 0.03,
+    },
+  },
+
+  {
+    id: "frostwatch_helm",
+    name: "Frostwatch Helm",
+    baseName: "Helmet",
+    slot: "head",
+    mode: "armor",
+    type: "helmet",
+    levelMin: 6,
+    levelReq: 6,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_frostwatch_helm.png",
+    description:
+      "A dark iron helm worn during the cold watches around the village outskirts.",
+    i18n: {
+      da: {
+        name: "Frostvagtens hjelm",
+        description:
+          "En mørk jernhjelm båret under de kolde vagter omkring landsbyens udkant.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 8,
+      maxHp: 10,
+      iceResist: 6,
+      allResist: 2,
+    },
+  },
+
+  {
+    id: "fieldwarden_brigandine",
+    name: "Fieldwarden Brigandine",
+    baseName: "Chestplate",
+    slot: "chest",
+    mode: "armor",
+    type: "chestplate",
+    levelMin: 9,
+    levelReq: 9,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_fieldwarden_brigandine.png",
+    description:
+      "A reinforced brigandine worn by the wardens of the northern fields. Built for long marches and sudden violence.",
+    i18n: {
+      da: {
+        name: "Markvogterens brigandine",
+        description:
+          "En forstærket brigandine båret af nordmarkens vogtere. Bygget til lange marcher og pludselig vold.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 16,
+      maxHp: 28,
+      armorPct: 0.04,
+      physicalResist: 5,
+    },
+  },
+
+  {
+    id: "duskfang_blade",
+    name: "Duskfang Blade",
+    baseName: "Sword",
+    slot: "weapon",
+    mode: "melee",
+    type: "sword",
+    hands: 1,
+    levelMin: 11,
+    levelReq: 11,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_duskfang_blade.png",
+    description:
+      "A shadow-dark blade whispered to have been drawn against creatures that prowled after sunset.",
+    i18n: {
+      da: {
+        name: "Skumringshugstanden",
+        description:
+          "En skyggemørk klinge, som siges at være trukket mod væsner, der strejfede omkring efter solnedgang.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 13,
+      damageMax: 24,
+      critChance: 0.04,
+      cooldown: 0.33,
+      shadowDamageBonus: 0.05,
+    },
+  },
+
+  {
+    id: "northfield_pike",
+    name: "Northfield Pike",
+    baseName: "Spear",
+    slot: "weapon",
+    mode: "melee",
+    type: "spear",
+    hands: 2,
+    levelMin: 7,
+    levelReq: 7,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_northfield_pike.png",
+    description:
+      "A long village pike used to hold the line against beasts charging across open farmland.",
+    i18n: {
+      da: {
+        name: "Nordmarkens pike",
+        description:
+          "En lang landsbypike brugt til at holde linjen mod bæster, der stormede ind over åbne marker.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 12,
+      damageMax: 22,
+      range: 0.18,
+      cooldown: 0.42,
+      critChance: 0.02,
+      physicalDamageBonus: 0.03,
+    },
+  },
+
+  {
+    id: "boartrail_boots",
+    name: "Boartrail Boots",
+    baseName: "Boots",
+    slot: "feet",
+    mode: "armor",
+    type: "boots",
+    levelMin: 4,
+    levelReq: 4,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_boartrail_boots.png",
+    description:
+      "Heavy boots hardened by mud, tusks, and hard ground near the village trails.",
+    i18n: {
+      da: {
+        name: "Vildsvinestiens støvler",
+        description:
+          "Tunge støvler hærdet af mudder, stødtænder og hård jord ved landsbyens stier.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 7,
+      speedPct: 0.05,
+      dodgeChance: 0.02,
+      physicalResist: 3,
+    },
+  },
+
+  {
+    id: "emberhearth_gauntlets",
+    name: "Emberhearth Gauntlets",
+    baseName: "Gloves",
+    slot: "hands",
+    mode: "armor",
+    type: "gauntlets",
+    levelMin: 7,
+    levelReq: 7,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_emberhearth_gauntlets.png",
+    description:
+      "Gauntlets blackened by hearthfire and battle. Warm to the touch even in bitter weather.",
+    i18n: {
+      da: {
+        name: "Glødesmedens handsker",
+        description:
+          "Handsker svedet af ildsted og kamp. De føles varme at røre ved, selv i bidende kulde.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 7,
+      damageMin: 2,
+      damageMax: 5,
+      fireResist: 6,
+      fireDamageBonus: 0.04,
+    },
+  },
+
+  {
+    id: "rusks_tunnel_pick",
+    name: "Rusk's Tunnel Pick",
+    baseName: "Pickaxe",
+    slot: "weapon",
+    mode: "melee",
+    type: "pickaxe",
+    hands: 2,
+    levelMin: 12,
+    levelReq: 12,
+    sources: ["chest", "boss", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_rusks_tunnel_pick.png",
+    description:
+      "A brutal tunnel pick tied to the mine below the well and to the name Rusk.",
+    i18n: {
+      da: {
+        name: "Rusks tunnelhakke",
+        description:
+          "En brutal tunnelhakke knyttet til minen under brønden og til navnet Rusk.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 17,
+      damageMax: 31,
+      cooldown: 0.76,
+      armorFlat: 3,
+      physicalDamageBonus: 0.05,
+    },
+  },
+
+  {
+    id: "roadwardens_sabre",
+    name: "Roadwarden's Sabre",
+    baseName: "Sabre",
+    slot: "weapon",
+    mode: "melee",
+    type: "sabre",
+    hands: 1,
+    levelMin: 8,
+    levelReq: 8,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_roadwardens_sabre.png",
+    description:
+      "A curved sabre carried by those who kept the roads around the village barely safe.",
+    i18n: {
+      da: {
+        name: "Vejvogterens sabel",
+        description:
+          "En buet sabel båret af dem, der holdt vejene omkring landsbyen nogenlunde sikre.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 11,
+      damageMax: 20,
+      cooldown: 0.31,
+      critChance: 0.05,
+      speedPct: 0.03,
+    },
+  },
+
+  {
+    id: "ruinwatch_pauldrons",
+    name: "Ruinwatch Pauldrons",
+    baseName: "Shoulder Guard",
+    slot: "shoulder",
+    mode: "armor",
+    type: "pauldrons",
+    levelMin: 9,
+    levelReq: 9,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_ruinwatch_pauldrons.png",
+    description:
+      "Scarred pauldrons taken from a sentry who watched the ruined edges of the settlement.",
+    i18n: {
+      da: {
+        name: "Ruinvagtens skulderplader",
+        description:
+          "Arrede skulderplader taget fra en skildvagt, der overvågede bebyggelsens ødelagte udkant.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 9,
+      maxHp: 12,
+      allResist: 2,
+      armorPct: 0.03,
+    },
+  },
+
+  {
+    id: "crowfeather_mantle",
+    name: "Crowfeather Mantle",
+    baseName: "Cloak",
+    slot: "cape",
+    mode: "armor",
+    type: "cloak",
+    levelMin: 8,
+    levelReq: 8,
+    sources: ["chest", "monster"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_crowfeather_mantle.png",
+    description:
+      "A scout's mantle of feathered cloth, suited for silent movement through brush and broken ground.",
+    i18n: {
+      da: {
+        name: "Krågefjerkappen",
+        description:
+          "En spejderkappe af fjerklædt stof, skabt til lydløs bevægelse gennem krat og ujævnt terræn.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 7,
+      speedPct: 0.05,
+      dodgeChance: 0.03,
+      magicFind: 0.03,
+    },
+  },
+
+  {
+    id: "bridgeguard_greaves",
+    name: "Bridgeguard Greaves",
+    baseName: "Greaves",
+    slot: "legs",
+    mode: "armor",
+    type: "greaves",
+    levelMin: 10,
+    levelReq: 10,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic"],
+    iconUrl: "/assets/generated/item/item_named_bridgeguard_greaves.png",
+    description:
+      "Solid greaves worn by the bridge guards when the outskirts still had enough defenders to station there.",
+    i18n: {
+      da: {
+        name: "Brovagtens benskinner",
+        description:
+          "Solide benskinner båret af brovagterne, dengang udkanten stadig havde nok forsvarere til at bemande stedet.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      armor: 13,
+      maxHp: 18,
+      physicalResist: 5,
+      speedPct: 0.02,
+    },
+  },
+
+  {
+    id: "trollsplitter_axe",
+    name: "Trollsplitter Axe",
+    baseName: "Axe",
+    slot: "weapon",
+    mode: "melee",
+    type: "axe",
+    hands: 1,
+    levelMin: 10,
+    levelReq: 10,
+    sources: ["chest", "monster", "boss"],
+    rarityIds: ["rare", "epic", "legendary"],
+    iconUrl: "/assets/generated/item/item_named_trollsplitter_axe.png",
+    description:
+      "A brutal one-handed axe forged to bite deep into hide, bone, and trollflesh.",
+    i18n: {
+      da: {
+        name: "Troldekløveren",
+        description:
+          "En brutal enhåndsøks fremstillet til at bide dybt i skind, knogle og troldekød.",
+      },
+    },
+    scaleWithLevel: true,
+    stats: {
+      damageMin: 14,
+      damageMax: 25,
+      cooldown: 0.38,
+      critChance: 0.03,
+      physicalDamageBonus: 0.05,
     },
   },
 ];

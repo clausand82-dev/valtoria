@@ -183,7 +183,7 @@ function applyCosts(engine, costs = {}) {
       for (let i = engine.player.inventory.length - 1; i >= 0 && needed > 0; i -= 1) {
         const item = engine.player.inventory[i];
         if (!itemMatchesId(item, itemId)) continue;
-        if (item.mode === "resource") {
+        if (item.mode === "resource" || (item.flags?.stackable && Math.max(1, Math.floor(Number(item.count) || 1)) > 1)) {
           const count = Math.max(1, Math.floor(Number(item.count) || 1));
           const used = Math.min(count, needed);
           item.count = count - used;
@@ -273,6 +273,32 @@ function applyCounters(engine, action) {
   }
   engine.worldState = next;
   return changed;
+}
+
+function applyQuestCounterProgress(engine, action) {
+  const config = action.questCounterProgress;
+  if (!config?.questId || !config?.counter) return false;
+  const quest = (engine.questState?.active ?? []).find((entry) => String(entry.questId) === String(config.questId));
+  if (!quest) return false;
+  const raw = Math.max(0, Math.floor(Number(engine.worldState?.counters?.[config.counter]) || 0));
+  const value = Number.isFinite(Number(config.max)) ? Math.min(Math.max(0, Math.floor(Number(config.max))), raw) : raw;
+  const field = String(config.progressField ?? "count");
+  if (config.stepId) {
+    const stepId = String(config.stepId);
+    const current = quest.progress?.stepProgress?.[stepId] ?? {};
+    if (Number(current[field]) === value) return false;
+    quest.progress = {
+      ...(quest.progress ?? {}),
+      stepProgress: {
+        ...(quest.progress?.stepProgress ?? {}),
+        [stepId]: { ...current, [field]: value },
+      },
+    };
+    return true;
+  }
+  if (Number(quest.progress?.[field]) === value) return false;
+  quest.progress = { ...(quest.progress ?? {}), [field]: value };
+  return true;
 }
 
 function applyWorldEnergyIfAvailable(engine, worldEnergy) {
@@ -454,11 +480,15 @@ export function runAction({
   changed = applyRewards(engine, action.rewards) || changed;
   changed = applyFlags(engine, action) || changed;
   changed = applyCounters(engine, action) || changed;
+  changed = applyQuestCounterProgress(engine, action) || changed;
   changed = applyQuestAdvance(engine, action) || changed;
   changed = Boolean(engine.advanceActionTargetQuestProgress?.(target, 1)) || changed;
   changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy) || changed;
   changed = applyFactionRepIfAvailable(engine, action.factionRep) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;
+  if (action.refreshRegionDecorators) {
+    changed = Boolean(engine.rebuildCountBasedRegionDecorators?.()) || changed;
+  }
 
   if (action.once) {
     markActionCompleted(engine, completionKey);
