@@ -9,6 +9,7 @@ import { deriveIconKey, iconUrlFromKey } from "../../game/item-system.js";
 import { ITEM_STANDARD_ICON_URL } from "../ui/icons.jsx";
 import { MONSTER_STATS, monsterSpriteId } from "../../game/config/monster-config.js";
 import { NAMED_ITEM_TEMPLATES } from "../../game/config/item-config.js";
+import { CITY_ACHIEVEMENTS } from "../../game/config/city-achievement-config.js";
 import { useLocalization } from "../../i18n/index.js";
 import { localizeQuestField } from "../../i18n/quest-localization.js";
 import { localizeItemField } from "../../i18n/item-localization.js";
@@ -206,7 +207,12 @@ function QuestRewardList({ quest }) {
       ))}
       {(rewards.namedItems ?? []).map((item, index) => (
         <span className="diff-good" key={`reward-named-item-${item.namedId ?? index}`}>
-          + {NAMED_ITEM_TEMPLATES.find((entry) => entry.id === item.namedId)?.name ?? item.namedId}
+          + {localize(NAMED_ITEM_TEMPLATES.find((entry) => entry.id === item.namedId), "name") || item.namedId}
+        </span>
+      ))}
+      {(rewards.achievements ?? []).map((achievementId) => (
+        <span className="diff-good" key={`reward-achievement-${achievementId}`}>
+          + {localize(CITY_ACHIEVEMENTS.find((entry) => entry.id === achievementId), "title") || achievementId}
         </span>
       ))}
     </div>

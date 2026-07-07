@@ -1,7 +1,7 @@
 const WOODEN_WHEEL_FOLIAGE = {
   fileName: "foilage/foilage_woodwheels.png",
   weight: 0.25,
-  actionId: "collect_merchant_wooden_wheel",
+  actionId: "collect_merchant_wooden_wheel", scale: 0.75,
 };
 
 const MAINLAND_PATH_FOLIAGE = [
@@ -74,6 +74,20 @@ export function createVillageOutskirtsMapRegions(region) {
       ambientCritters: [
         { id: "ambient_spider", mobId: "spider", count: { min: 2, max: 5 }, scale: 0.3, behavior: "wander", hp: 1, canTakeAreaDamage: true },
       ],
+      prefabRules: {
+        maxTotal: 1,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          {
+            id: "hunter_sacred_flower_site",
+            weight: 100,
+            max: 1,
+            required: true,
+            questStepActive: { questId: "help_hunter_find_flower", stepId: "find_sacred_flower" },
+            blockedBy: { inventory: { questItemId: "quest_hunters_love_flower", count: 1 } },
+          },
+        ],
+      },
       points: "78.95,4.25 65.79,4.25 61.00,17.00 72.97,27.63 83.73,17.00",
     }),
     region({
@@ -171,35 +185,8 @@ export function createVillageOutskirtsMapRegions(region) {
       water: [ { fileName: "tileset/tileset_water.png", x: 2, y: 2, weight: 5 },],
       ambient: {
         particles: [
-            {
-            type: "smoke",
-            density: 0.52,
-            movement: "drift",
-            color: "#a9aaa0",
-            size: [110, 260],
-            alpha: [0.12, 0.24],
-            lifetime: [12, 20],
-            speed: [0.01, 0.05],
-            ambientScale: 1,
-            renderLayer: "aboveEntities",
-            avoidPlayerRadius: 1.8,
-            avoidPlayerMinAlpha: 0.12,
-            chance: 1,
-          },
-          {
-            type: "fogWisps",
-            density: 0.28,
-            movement: "drift",
-            color: "#d0d0c4",
-            size: [44, 118],
-            alpha: [0.08, 0.18],
-            lifetime: [6, 12],
-            speed: [0.04, 0.12],
-            renderLayer: "aboveEntities",
-            avoidPlayerRadius: 1.4,
-            avoidPlayerMinAlpha: 0.16,
-            chance: 1,
-          },
+            { type: "smoke", density: 0.52, movement: "drift", color: "#a9aaa0", size: [110, 260], alpha: [0.12, 0.24], lifetime: [12, 20], speed: [0.01, 0.05], ambientScale: 1, renderLayer: "aboveEntities", avoidPlayerRadius: 1.8, avoidPlayerMinAlpha: 0.12, chance: 1, },
+          { type: "fogWisps", density: 0.28, movement: "drift", color: "#d0d0c4", size: [44, 118], alpha: [0.08, 0.18], lifetime: [6, 12], speed: [0.04, 0.12], renderLayer: "aboveEntities", avoidPlayerRadius: 1.4, avoidPlayerMinAlpha: 0.16, chance: 1, },
         ],
       },
       foliageSet: [
@@ -536,7 +523,7 @@ export function createVillageOutskirtsMapRegions(region) {
         { type: "Rat", weight: 4 },
         { type: "SickRat", weight: 1.4 },
         { type: "Skeleton", weight: 5 },
-        { type: "Knight", weight: 15 },
+        //{ type: "Knight", weight: 15 },
         //{ type: "Bandit", weight: 15 },
         "Spider",
         "Wolf",

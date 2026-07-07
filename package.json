@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "validate": "node scripts/validate-config.js",
+    "test:hunter-questline": "node scripts/test-hunter-questline.js",
     "test:tile-edge-walls": "node scripts/test-tile-edge-walls.js",
     "check": "npm run validate && npm run build",
     "preview": "vite preview --host 127.0.0.1"

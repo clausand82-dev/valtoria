@@ -658,6 +658,7 @@ export const inventoryMethods = {
     this.publishSnapshot();
     return {
       type: "readable-text",
+      readableId: item.readableId ?? null,
       title: String(readableDef?.title ?? item.name ?? ""),
       text,
       questStarted: startedQuest ? {

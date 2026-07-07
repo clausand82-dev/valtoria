@@ -13,6 +13,7 @@ import {
   normalizeRegionDecaySets,
 } from "./config/decay-config.js";
 import { getRegionObjectFamily, normalizeRegionObjects, REGION_OBJECT_DEFS, REGION_OBJECT_SHEETS } from "./config/region-object-config.js";
+import { REGION_OBJECT_DECORATORS } from "./config/region-object-decorator-config.js";
 import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
 import { MAP_PREFABS } from "./config/map-prefab-config.js";
@@ -313,6 +314,14 @@ export function buildRegionAssetManifest(input) {
       }
     }
   }
+  for (const decorator of REGION_OBJECT_DECORATORS) {
+    if (String(decorator?.regionId) !== String(regionConfig.id)) continue;
+    const type = String(decorator?.renderObjectType ?? "").trim();
+    if (!type) continue;
+    objectTypes.add(type);
+    const family = getRegionObjectFamily(type);
+    if (family) objectTypes.add(family);
+  }
 
   const decayIds = new Set(normalizeRegionDecaySets(regionConfig).map((entry) => entry.id));
   for (const prefab of prefabDefs) {
@@ -334,7 +343,7 @@ export function buildRegionAssetManifest(input) {
   };
 }
 
-function buildAnimationAssetManifest(input) {
+export function buildAnimationAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return { monsterIds: new Set(MONSTER_SHEETS.map((cfg) => cfg.id)) };
   const monsterIds = new Set();
@@ -355,6 +364,13 @@ function buildAnimationAssetManifest(input) {
       const base = MONSTER_STATS[type];
       if (base?.sprite) monsterIds.add(base.sprite);
     }
+  }
+  // Special encounters are selected independently of a region's regular mob
+  // pool, so their sheets must be available in every region they can reach.
+  for (const [type, base] of Object.entries(MONSTER_STATS)) {
+    if (!base?.specialSpawn) continue;
+    monsterIds.add(monsterSpriteId(type));
+    if (base.sprite) monsterIds.add(base.sprite);
   }
   if (!monsterIds.size) monsterIds.add("wolf");
   return { monsterIds };

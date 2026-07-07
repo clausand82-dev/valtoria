@@ -55,6 +55,7 @@ export const emptySnapshot = {
   exitPrompt: false,
   nearbyFoliageLoot: null,
   nearbyActionTarget: null,
+  nearbyInteractionMode: "action",
   inventory: [],
   equipment: [],
   autoLoot: {

@@ -32,32 +32,11 @@ Town Hall quests:
 
 
 NPC
-help_hunter_kill_wolfs
-Jægeren har haft et uheld og kan derfor ikke selv hjælpe til med en opgave han har fået af borgmesteren. Han har sagt ja til at minimere den voksende bestand af ulve og skal derfor dræbe ulve og finbde 12 gode ulve haler som bevis. Quest kan ikke gentages. Questen kræver at man har åbnet mindst 5 regioner. Man får 6 skind i reward. Han lover desuden at man senere får en ulve kappe af ham.
 
-help_hunter_kill_boars
-Jægeren har brug for hjælp. Hans kone er gravid og skal snart føde, så derfor vil han gerne have man laver en opgave for ham. Man skal dræbe vildsvin og komme tilbage med 9 perfekte vildsvin tænder. Quest kan ikke gentages. Questen kræver at man har åbnet mindst 7 regioner og at help_hunter_kill_wolfs er completed. Man får 6 kød i reward + ulvekappen af ulvehalerne fra før. Han lover desuden at man kan få en halskæde af vindsvin tænder næsten gang man har hjulpet ham.
-
-help_hunter_find_bow
-Jægeren har brug for hjælp til at finde hans særlige bue - kræver et quest item (quest_hunters_bow). Den kan droppes fra alle skeleter, villages (1-6), demons og ghosts. Quest kan ikke gentages. Questen kræver at man har åbnet mindst 9 regioner og at help_hunter_kill_boars er completed. Man får archivement (hunter friend lvl 1 - new archivement). Man får også vindsvins tand halskæden som tidligere lovet.
-
-help_hunter_find_weddingring
-Jægeren har tabt sin weddingring (new quest item) og han tror at enten ulve eller boars har spist den (hemmeligheden er at det er ulve, men det skal man ikke vide - hvis koden tillader vi skjuler det). Quest kan ikke gentages. Questen kræver at man har åbnet mindst 9 regioner og at help_hunter_find_bow er completed. Man får archivement (hunter friend lvl 2 - new archivement).
-
-help_hunter_find_flower
-Denne quest består af flere steps. Først bliver man bedt om at afleverer 12 røde roser. Når man gør det viser det sig at konen ikke er tilfreds og man bliver derfor bedt om at hjælpe den desperate jæger. Han vil prøve med 12 rare flowers - heller ikke dette er konen tilfreds med. Som sidste forsøg bliver man bedt om at bringe en hellig blomst (new quest_item) fra region old_shine (som låses op ved dette quest step, hvis ikke allerede låst op). Denne bliver den krævende kone glad for og jægeren er ovenud lykkelig. Han giver en, en særlig named bue i reward.Quest kan ikke gentages. Questen kræver at man har åbnet mindst 9 regioner og at help_hunter_find_weddingring er completed. Man får også archivement (hunter friend lvl 3 - new archivement). Denne quest låser op til path to hunters hut og hunter trail to the forest
 
 INN quests:
 Kvinde leder efter sit tabte hårsmykke (new quest item). only once quest. Smykke kan droppe fra banditter (ny mobs).
 
 
 NEW ITEMS:
-quest_hunters_bow
-quest_hunters_love_flower
-quest_hunters_weddingring
-named_hunters_bow
-tagsten
-ulvehale
-vildsvinstand
-kappe af ulveskind og ulvehaler
-halskæde af vildsvinstænder
+

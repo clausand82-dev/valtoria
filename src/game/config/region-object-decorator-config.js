@@ -9,6 +9,7 @@ export const REGION_OBJECT_DECORATORS = [
     progressField: "placed",
     placedObjectId: "scarecrow",
     ghostObjectId: "scarecrow_ghost",
+    renderObjectType: "object_field",
     placement: {
       avoidWater: true,
       avoidBlockedTiles: true,
@@ -29,6 +30,7 @@ export const REGION_OBJECT_DECORATORS = [
     progressStepId: "place_southern_scarecrows",
     placedObjectId: "scarecrow",
     ghostObjectId: "scarecrow_ghost",
+    renderObjectType: "object_field",
     ghostActionId: "place_southern_scarecrow",
     placement: {
       avoidWater: true,

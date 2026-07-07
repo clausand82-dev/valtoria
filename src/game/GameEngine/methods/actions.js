@@ -19,6 +19,13 @@ import {
 
 const OBJECT_ACTION_INTERACT_RANGE = 1.15;
 
+function normalizeRuntimeActionObjectStates(engine) {
+  if (!engine.runtimeActionObjectStates || typeof engine.runtimeActionObjectStates !== "object") {
+    engine.runtimeActionObjectStates = {};
+  }
+  return engine.runtimeActionObjectStates;
+}
+
 function actionContextForTarget(engine, extra = {}) {
   return {
     region: engine.region,
@@ -142,6 +149,7 @@ export const actionsMethods = {
     if (!candidates.length) {
       if (!this.nearbyActionTarget) return;
       this.nearbyActionTarget = null;
+      this.nearbyInteractionMode = "action";
       this.actionTargetCycleId = null;
       this.markRenderDirty?.("action-target");
       this.publishSnapshot();
@@ -167,6 +175,9 @@ export const actionsMethods = {
       && (next?.targetCount ?? 0) === (this.nearbyActionTarget?.targetCount ?? 0)
       && (next?.targetIndex ?? 0) === (this.nearbyActionTarget?.targetIndex ?? 0)
     ) return;
+    if ((next?.id ?? null) !== (this.nearbyActionTarget?.id ?? null)) {
+      this.nearbyInteractionMode = "action";
+    }
     this.nearbyActionTarget = next;
     this.markRenderDirty?.("action-target");
     this.publishSnapshot();
@@ -240,6 +251,22 @@ export const actionsMethods = {
     return true;
   },
 
+  hasOverlappingActionAndFoliageLoot() {
+    return Boolean(
+      this.nearbyActionTarget?.id
+      && this.nearbyFoliageLoot?.id
+      && this.nearbyActionTarget.id === this.nearbyFoliageLoot.id,
+    );
+  },
+
+  toggleOverlappingActionAndFoliageLoot() {
+    if (!this.hasOverlappingActionAndFoliageLoot()) return false;
+    this.nearbyInteractionMode = this.nearbyInteractionMode === "loot" ? "action" : "loot";
+    this.markRenderDirty?.("interaction-mode");
+    this.publishSnapshot();
+    return true;
+  },
+
   interactNearbyAction() {
     const snapshotTarget = this.nearbyActionTarget?.id
       ? this.findActionTargetById(this.nearbyActionTarget.id, this.nearbyActionTarget.sourceType)
@@ -292,9 +319,20 @@ export const actionsMethods = {
     return null;
   },
 
-  recordActionObjectState(object, patch) {
+  recordActionObjectState(object, patch, options = {}) {
     const key = objectStateKey(object);
     if (!key) return false;
+
+    const scope = options.targetStateScope ?? options.scope ?? "persistent";
+    if (scope === "runtime") {
+      const runtimeStates = normalizeRuntimeActionObjectStates(this);
+      runtimeStates[key] = {
+        ...(runtimeStates[key] ?? {}),
+        ...patch,
+      };
+      return true;
+    }
+
     this.actionState = normalizeActionState(this.actionState);
     this.actionState.objectStates[key] = {
       ...(this.actionState.objectStates[key] ?? {}),
@@ -303,13 +341,13 @@ export const actionsMethods = {
     return true;
   },
 
-  removeActionTargetObject(object) {
+  removeActionTargetObject(object, options = {}) {
     if (!object) return false;
     object.removed = true;
     object.actionRemoved = true;
     object.blocking = false;
     this.player.attackObjectId = this.player.attackObjectId === object.id ? null : this.player.attackObjectId;
-    this.recordActionObjectState(object, { removed: true });
+    this.recordActionObjectState(object, { removed: true }, options);
     for (const chunk of this.nearbyChunks(2)) {
       const index = chunk.objects.findIndex((entry) => entry.id === object.id);
       if (index >= 0) {
@@ -331,11 +369,15 @@ export const actionsMethods = {
       this.addToast?.("Replacement object mangler config");
       return false;
     }
-    this.recordActionObjectState(object, {
-      replaceWith: objectDefId,
-      ...(completedQuestTargetKey ? { completedQuestTargetKey } : {}),
-      ...(typeof options.destructible === "boolean" ? { destructible: options.destructible } : {}),
-    });
+    this.recordActionObjectState(
+      object,
+      {
+        replaceWith: objectDefId,
+        ...(completedQuestTargetKey ? { completedQuestTargetKey } : {}),
+        ...(typeof options.destructible === "boolean" ? { destructible: options.destructible } : {}),
+      },
+      options,
+    );
     this.markRenderDirty?.("object-replace");
     return true;
   },
@@ -357,10 +399,14 @@ export const actionsMethods = {
     };
     this.particleEngine?.removeEmittersByOwner(object.id);
     if (!applyFoliageReplacementShape(object, replacement)) return false;
-    this.recordActionObjectState(object, {
-      replaceFoliageWith: fileName,
-      ...replacement,
-    });
+    this.recordActionObjectState(
+      object,
+      {
+        replaceFoliageWith: fileName,
+        ...replacement,
+      },
+      options,
+    );
     this.markRenderDirty?.("object-replace");
     return true;
   },
@@ -417,7 +463,15 @@ export const actionsMethods = {
 
   applySavedActionObjectStates(chunk) {
     this.actionState = normalizeActionState(this.actionState);
-    const states = this.actionState.objectStates;
+    const runtimeStates = normalizeRuntimeActionObjectStates(this);
+    const isTransientCityMobMap = String(
+      this.activeMapRegion?.regionId ?? this.region?.mapRegion?.id ?? "",
+    ).startsWith("citymob:");
+    const persistentStates = isTransientCityMobMap ? {} : this.actionState.objectStates;
+    const states = {
+      ...persistentStates,
+      ...runtimeStates,
+    };
     if (!chunk || !Array.isArray(chunk.objects) || !Object.keys(states).length) return;
     chunk.objects = chunk.objects.filter((object) => {
       const state = states[object.runtimeId];

@@ -134,6 +134,7 @@ export class GameEngine {
     this.potionCooldown = 0;
     this.nearbyFoliageLoot = null;
     this.nearbyActionTarget = null;
+    this.nearbyInteractionMode = "action";
     this.fogExploredTiles = new Set();
     this.fogVisibleTiles = new Set();
     this.fogExploredPoints = [];
@@ -172,6 +173,7 @@ export class GameEngine {
     this.worldState = normalizeWorldState();
     this.worldEnergy = normalizeWorldEnergy();
     this.actionState = { completedActions: {}, objectStates: {} };
+    this.runtimeActionObjectStates = {};
     this.currentExpedition = null;
     this.currentMapInstanceId = null;
     if (!this.newGame) this.loadProgress();

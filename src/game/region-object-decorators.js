@@ -65,7 +65,7 @@ function candidatePositions(engine, config) {
 
 function runtimeObject(config, objectId, position, index) {
   const def = REGION_OBJECT_DEFS[objectId];
-  const type = def?.spawnTypes?.[0]?.type ?? objectId;
+  const type = config.renderObjectType ?? def?.spawnTypes?.[0]?.type ?? objectId;
   return {
     id: createId(),
     runtimeId: `region-decorator:${config.id}:${index}`,
@@ -108,7 +108,9 @@ export function rebuildCountBasedRegionDecorators(engine) {
   if (!configs.length || !engine.chunks?.size) return false;
   let changed = false;
   for (const config of configs) {
+    const previousObjects = [];
     for (const chunk of engine.chunks.values()) {
+      previousObjects.push(...(chunk.objects ?? []).filter((object) => object.regionDecoratorId === config.id));
       const before = chunk.objects?.length ?? 0;
       chunk.objects = (chunk.objects ?? []).filter((object) => object.regionDecoratorId !== config.id);
       changed = changed || chunk.objects.length !== before;
@@ -116,20 +118,47 @@ export function rebuildCountBasedRegionDecorators(engine) {
     const counts = decoratorCounts(engine, config);
     const needed = counts.placed + counts.ghosts;
     if (!needed) continue;
-    const positions = candidatePositions(engine, config).slice(0, needed);
+    engine.regionDecoratorPlans ??= new Map();
+    const previousPlan = engine.regionDecoratorPlans.get(config.id);
+    const restoredPositions = previousObjects
+      .sort((a, b) => Number(a.regionDecoratorIndex) - Number(b.regionDecoratorIndex))
+      .map((object) => ({ x: object.x, y: object.y }));
+    const positions = (previousPlan?.positions?.length >= needed
+      ? previousPlan.positions
+      : restoredPositions.length >= needed
+        ? restoredPositions
+        : candidatePositions(engine, config)
+    ).slice(0, needed);
     if (positions.length < needed && import.meta.env?.DEV) {
       console.warn(`[region-decorators] ${config.id} found ${positions.length}/${needed} valid positions`);
     }
+    const placedIndices = new Set(previousPlan?.placedIndices ?? previousObjects
+      .filter((object) => object.objectDefId === config.placedObjectId)
+      .map((object) => Number(object.regionDecoratorIndex)));
+    for (let index = 0; placedIndices.size < counts.placed && index < positions.length; index += 1) {
+      placedIndices.add(index);
+    }
     positions.forEach((position, index) => {
-      const objectId = index < counts.placed ? config.placedObjectId : config.ghostObjectId;
+      const objectId = placedIndices.has(index) ? config.placedObjectId : config.ghostObjectId;
       const { cx, cy } = chunkCoords(position.x, position.y);
       const chunk = engine.getChunk(cx, cy);
       chunk.objects.push(runtimeObject(config, objectId, position, index));
       changed = true;
     });
-    engine.regionDecoratorPlans ??= new Map();
-    engine.regionDecoratorPlans.set(config.id, { positions, ...counts });
+    engine.regionDecoratorPlans.set(config.id, { positions, placedIndices, ...counts });
   }
   if (changed) engine.markRenderDirty?.("region-decorators");
   return changed;
+}
+
+export function markRegionDecoratorPlaced(engine, target) {
+  const decoratorId = String(target?.regionDecoratorId ?? "").trim();
+  const index = Number(target?.regionDecoratorIndex);
+  if (!decoratorId || !Number.isInteger(index) || index < 0) return false;
+  engine.regionDecoratorPlans ??= new Map();
+  const plan = engine.regionDecoratorPlans.get(decoratorId) ?? { positions: [] };
+  const placedIndices = new Set(plan.placedIndices ?? []);
+  placedIndices.add(index);
+  engine.regionDecoratorPlans.set(decoratorId, { ...plan, placedIndices });
+  return true;
 }

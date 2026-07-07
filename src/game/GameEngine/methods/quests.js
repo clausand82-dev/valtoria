@@ -546,6 +546,12 @@ export const questsMethods = {
     const level = Math.max(0, Math.floor(Number(demands.level) || 0));
     if (level > 0 && this.player.level < level) return false;
     if (demands.cityLevel !== undefined && !this.demandNumberMet(context.cityStats?.cityLevel ?? context.cityStats?.level ?? 1, demands.cityLevel)) return false;
+    if (demands.unlockedRegionCount !== undefined) {
+      const unlockedRegionCount = Object.entries(context.worldState?.flags ?? {}).reduce((count, [key, value]) => (
+        value === true && /^region\..+\.unlocked$/.test(key) ? count + 1 : count
+      ), 0);
+      if (!this.demandNumberMet(unlockedRegionCount, demands.unlockedRegionCount)) return false;
+    }
 
     const factionRepDemands = demands.factionRep && typeof demands.factionRep === "object" && !Array.isArray(demands.factionRep)
       ? demands.factionRep
@@ -1509,6 +1515,7 @@ export const questsMethods = {
       netdra: 0,
       resources: [],
       items: [],
+      achievements: [],
       cityProgress: [],
       statBonuses: {},
     };
@@ -1564,6 +1571,7 @@ export const questsMethods = {
         summary.items.push({ id: item.id, name: item.name, rarity: item.rarity });
       }
     }
+    summary.achievements = Array.isArray(rewards.achievements) ? [...new Set(rewards.achievements.map(String))] : [];
     // grant quest items if present in rewards
     if (Array.isArray(rewards.questItems) && rewards.questItems.length > 0) {
       for (const q of rewards.questItems) {

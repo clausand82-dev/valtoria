@@ -1105,6 +1105,7 @@ export const subregionMethods = {
   },
 
   clearSubregionExpedition(options = {}) {
+    this.runtimeActionObjectStates = {};
     if (!this.currentExpedition) return false;
     this.currentExpedition = null;
     this.currentMapInstanceId = null;

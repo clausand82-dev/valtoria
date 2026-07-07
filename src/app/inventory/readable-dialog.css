@@ -27,7 +27,7 @@
 .readable-overlay {
   position: absolute;
   inset: 0;
-  padding: 100px 120px 100px 140px;
+  padding: 100px 150px 130px 140px;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   z-index: 1;
@@ -47,6 +47,7 @@
   column-gap: 112px;
   column-fill: auto;
   overflow: hidden;
+  scroll-behavior: auto;
   min-height: 0;
 }
 
@@ -75,13 +76,35 @@
 
 .readable-controls {
   position: absolute;
-  right: 122px;
-  bottom: 92px;
+  left: auto;
+  right: 150px;
+  bottom: 82px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
   padding-top: 0;
+}
+
+.readable-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.readable-pagination span {
+  min-width: 48px;
+  color: var(--quest-ink-soft);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+  text-align: center;
+}
+
+.readable-pagination button {
+  width: 34px;
+  padding: 0;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .readable-controls button {

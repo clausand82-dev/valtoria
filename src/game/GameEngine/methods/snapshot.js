@@ -291,6 +291,7 @@ export const snapshotMethods = {
         resources: this.nearbyFoliageLoot.resources.map((entry) => ({ ...entry })),
       } : null,
       nearbyActionTarget: this.nearbyActionTarget ? { ...this.nearbyActionTarget } : null,
+      nearbyInteractionMode: this.nearbyInteractionMode ?? "action",
       inventory: this.player.inventory.map((item, index) => {
         const resourceMergeRecipe = isResourceItem(item)
           ? resourceMergeRecipeFor(item, this.player.inventory)

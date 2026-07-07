@@ -37,6 +37,8 @@ import {
   normalizeHeroStats,
   normalizeQuestBoards,
   normalizeSavedQuestState,
+  makeQuestItem,
+  questItemCount,
   questItemCanStack,
   questItemStackMax,
   questSavePayload,
@@ -99,6 +101,28 @@ function cleanupObsoleteQuestItems(player, questState) {
     item?.mode === "quest"
     && String(item.questItemId ?? "") === "ring"
   ));
+}
+
+function repairActiveScarecrowPlacementItems(engine) {
+  const quest = (engine.questState?.active ?? [])
+    .find((entry) => String(entry?.questId ?? "") === "place_scarecrows");
+  if (!quest) return false;
+  const total = Math.max(0, Math.floor(Number(quest.target?.count) || 7));
+  const progressField = String(quest.target?.progressField ?? "placed");
+  const placed = Math.max(0, Math.floor(Number(
+    quest.progress?.[progressField]
+      ?? engine.worldState?.counters?.[quest.target?.counter]
+  ) || 0));
+  const requiredRemaining = Math.max(0, total - placed);
+  const current = questItemCount(engine.player.inventory, quest.id, "scarecrow");
+  let missing = Math.max(0, requiredRemaining - current);
+  if (!missing) return false;
+  while (missing > 0) {
+    const item = makeQuestItem("scarecrow", quest.id);
+    if (!item || !engine.addInventoryItem(item)) break;
+    missing -= 1;
+  }
+  return missing < requiredRemaining - current;
 }
 
 function savedWeaponHands(item) {
@@ -287,6 +311,10 @@ export const persistenceMethods = {
       normalized.count = questItemCanStack(normalized.questItemId)
         ? clamp(Math.floor(Number(normalized.count) || 1), 1, questItemStackMax(normalized.questItemId))
         : undefined;
+      normalized.flags = {
+        ...(normalized.flags ?? {}),
+        stackable: questItemCanStack(normalized.questItemId),
+      };
     }
     if (isReadableItem(normalized)) {
       const def = READABLE_DEF_BY_ID[normalized.readableId];
@@ -464,6 +492,7 @@ export const persistenceMethods = {
         .slice(0, MAX_INVENTORY);
       this.compactPotionStacks?.();
       cleanupObsoleteQuestItems(this.player, this.questState);
+      repairActiveScarecrowPlacementItems(this);
     }
     for (const [legacyType, count] of Object.entries(this.player.potions ?? {})) {
       const amount = Math.max(0, Math.floor(Number(count) || 0));
@@ -493,6 +522,7 @@ export const persistenceMethods = {
     // Older saves may contain later completed steps while an earlier automatic
     // step is missing because refresh used to overwrite the new completion.
     for (let pass = 0; pass < 100 && this.refreshQuestStepProgress?.(); pass += 1) {}
+    this.rebuildCountBasedRegionDecorators?.();
 
     if (Array.isArray(payload.loots)) {
       // If we're replacing active loots during load, ensure any existing loots

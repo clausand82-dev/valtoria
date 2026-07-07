@@ -11,6 +11,7 @@ import { READABLE_ITEM_DEFS } from "../src/game/config/readable-config.js";
 import { RARITIES } from "../src/game/config/rarity-config.js";
 import { LOOT_TABLES } from "../src/game/config/loot-tables-config.js";
 import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
+import { CITY_ACHIEVEMENTS } from "../src/game/config/city-achievement-config.js";
 import { validateBeastLocalization } from "../src/i18n/beast/monster-localization.js";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
@@ -228,6 +229,7 @@ function main() {
   const readableIds = new Set((READABLE_ITEM_DEFS ?? []).map((item) => String(item.id)).filter(Boolean));
   const rarityIds = new Set((RARITIES ?? []).map((rarity) => String(rarity.id)).filter(Boolean));
   const lootTableIds = new Set(Object.keys(LOOT_TABLES ?? {}));
+  const achievementIds = new Set((CITY_ACHIEVEMENTS ?? []).map((achievement) => String(achievement.id)).filter(Boolean));
   const usedLootTableIds = new Set([...RUNTIME_LOOT_TABLE_REFS].filter((tableId) => lootTableIds.has(tableId)));
 
   for (const [tableId, entries] of Object.entries(LOOT_TABLES ?? {})) {
@@ -312,6 +314,14 @@ function main() {
       quest[key].forEach((npcId, index) => {
         if (!npcIds.has(String(npcId))) addError(`unknown NPC id "${npcId}" referenced by quest "${questId}".${key}[${index}]`);
       });
+    }
+    for (const [owner, rewards] of [
+      [`quest "${questId}".rewards`, quest.rewards],
+      ...(quest.steps ?? []).map((step) => [`quest "${questId}" step "${step?.id ?? "?"}".rewards`, step?.rewards]),
+    ]) {
+      for (const achievementId of rewards?.achievements ?? []) {
+        if (!achievementIds.has(String(achievementId))) addError(`unknown achievement id "${achievementId}" referenced by ${owner}`);
+      }
     }
   }
 

@@ -1046,6 +1046,13 @@ export default function App() {
     setCityOpen(true);
   };
 
+  const overlappingActionAndLoot = Boolean(
+    snapshot.nearbyActionTarget?.id
+    && snapshot.nearbyFoliageLoot?.id
+    && snapshot.nearbyActionTarget.id === snapshot.nearbyFoliageLoot.id,
+  );
+  const showingOverlappingLoot = overlappingActionAndLoot && snapshot.nearbyInteractionMode === "loot";
+
   return (
     <main className={`game-shell ${gameSession ? "game-active" : "menu-active"} ${cityOpen ? "city-open" : ""}`}>
       {!gameSession && !appLoading.active && (
@@ -1517,18 +1524,19 @@ export default function App() {
         </div>
       )}
 
-      {snapshot.nearbyActionTarget && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
+      {snapshot.nearbyActionTarget && !showingOverlappingLoot && !snapshot.quests?.nearbyQuestgiver && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
           {t("prompt.pressE")} <b>E</b> {localize(ACTION_CONFIG[snapshot.nearbyActionTarget.actionId], "label") || snapshot.nearbyActionTarget.label}
-          {snapshot.nearbyActionTarget.targetCount > 1 && (
-            <span> · <b>Tab</b> {t("prompt.switchTarget")} {snapshot.nearbyActionTarget.targetIndex}/{snapshot.nearbyActionTarget.targetCount}</span>
+          {(snapshot.nearbyActionTarget.targetCount > 1 || overlappingActionAndLoot) && (
+            <span> · <b>Tab</b> {t("prompt.switchTarget")} {overlappingActionAndLoot ? "1/2" : `${snapshot.nearbyActionTarget.targetIndex}/${snapshot.nearbyActionTarget.targetCount}`}</span>
           )}
         </div>
       )}
 
-      {snapshot.nearbyFoliageLoot && !snapshot.quests?.nearbyQuestgiver && !snapshot.nearbyActionTarget && !cityOpen && !questOffer && (
+      {snapshot.nearbyFoliageLoot && !snapshot.quests?.nearbyQuestgiver && (!snapshot.nearbyActionTarget || showingOverlappingLoot) && !cityOpen && !questOffer && (
         <div className="city-interact-prompt wilderness-prompt">
           {t("prompt.pressE")} <b>E</b> {t("prompt.toGather")} {snapshot.nearbyFoliageLoot.label}
+          {showingOverlappingLoot && <span> · <b>Tab</b> {t("prompt.switchTarget")} 2/2</span>}
         </div>
       )}
 

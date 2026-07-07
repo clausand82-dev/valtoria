@@ -3,6 +3,7 @@
 import { monsterSpriteId } from "./config/monster-config.js";
 
 const tintCache = new WeakMap();
+const missingMonsterSheetWarnings = new Set();
 
 export function drawMonster(ctx, screen, monster, atlas, time = 0, sheets) {
 	if (drawAnimatedMonsterSheet(ctx, screen, monster, time, sheets?.monsters)) {
@@ -17,7 +18,13 @@ function drawAnimatedMonsterSheet(ctx, screen, monster, time, monsters) {
 
 	const monsterId = monsterSpriteId(monster.typeName);
 	const entry = monsters[monsterId];
-	if (!entry) return false;
+	if (!entry) {
+		if (import.meta.env?.DEV && !missingMonsterSheetWarnings.has(monsterId)) {
+			missingMonsterSheetWarnings.add(monsterId);
+			console.warn(`Missing monster animation sheet for ${monster.typeName ?? "unknown"} / ${monsterId}`);
+		}
+		return false;
+	}
 
 	const { sheet, cfg } = entry;
 	const view = visualDirection(monster.facingX, monster.facingY);

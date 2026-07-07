@@ -18,6 +18,12 @@ History over changes
 - board and inn quest now use completed maps as countdowns (completed map is a map where all mobs are killed - city mobs mattack map dosn't count)
 - added 32 new named items (STILL NEED TO DO PIC FOR LAST 16)
 - added more item name prefixes (for bigger variation on random generated items in drops)
+- added temporary city-mob burials that grant Lydra without saving grave markers (new runtime-only options on action).
+- fixed some action loot and bury errors
+- added navigation on long lore books
+- lore books now use selected lang
+- shadowdragon should not be invisiable no more
+- fixed bug in scarecrow quest
 
 *V. 1.00
 - added artifact/monuments, archivments and policy rules (all can improve city stats)

@@ -140,6 +140,12 @@ export const inputMethods = {
       if (this.nearbyQuestgiver) {
         event.preventDefault();
         this.publishSnapshot();
+      } else if (
+        this.nearbyInteractionMode === "loot"
+        && this.hasOverlappingActionAndFoliageLoot?.()
+      ) {
+        event.preventDefault();
+        this.lootNearbyFoliage();
       } else if (this.nearbyActionTarget) {
         event.preventDefault();
         this.interactNearbyAction();
@@ -148,7 +154,10 @@ export const inputMethods = {
         this.lootNearbyFoliage();
       }
     }
-    if (key === "tab" && this.nearbyActionTarget?.targetCount > 1) {
+    if (key === "tab" && this.hasOverlappingActionAndFoliageLoot?.()) {
+      event.preventDefault();
+      this.toggleOverlappingActionAndFoliageLoot?.();
+    } else if (key === "tab" && this.nearbyActionTarget?.targetCount > 1) {
       event.preventDefault();
       this.cycleNearbyActionTarget(event.shiftKey ? -1 : 1);
     }

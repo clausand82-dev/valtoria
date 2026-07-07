@@ -17,7 +17,7 @@ import {
   makeResourceItem,
   resourceCount,
 } from "../GameEngine/helpers/items.js";
-import { makeQuestItem } from "../GameEngine/helpers/quests.js";
+import { makeQuestItem, questItemCanStack } from "../GameEngine/helpers/quests.js";
 import { inventoryUnlockedSlotCount } from "../config/game-constants-config.js";
 
 const IMPLEMENTED_TYPES = new Set([
@@ -183,7 +183,8 @@ function applyCosts(engine, costs = {}) {
       for (let i = engine.player.inventory.length - 1; i >= 0 && needed > 0; i -= 1) {
         const item = engine.player.inventory[i];
         if (!itemMatchesId(item, itemId)) continue;
-        if (item.mode === "resource" || (item.flags?.stackable && Math.max(1, Math.floor(Number(item.count) || 1)) > 1)) {
+        const stackableQuestItem = item.mode === "quest" && questItemCanStack(item.questItemId);
+        if (item.mode === "resource" || ((item.flags?.stackable || stackableQuestItem) && Math.max(1, Math.floor(Number(item.count) || 1)) > 1)) {
           const count = Math.max(1, Math.floor(Number(item.count) || 1));
           const used = Math.min(count, needed);
           item.count = count - used;
@@ -334,17 +335,20 @@ function applyQuestStart(engine, action) {
 function removeOrReplaceTarget(engine, action, target, sourceType) {
   let changed = false;
   if (sourceType !== "object") return changed;
+  const targetStateScope = action.targetStateScope ?? "persistent";
   if (action.removeTarget) {
-    changed = Boolean(engine.removeActionTargetObject?.(target)) || changed;
+    changed = Boolean(engine.removeActionTargetObject?.(target, { targetStateScope })) || changed;
   }
   if (action.replaceTargetWith) {
     changed = Boolean(engine.replaceActionTargetObject?.(target, action.replaceTargetWith, {
       destructible: action.replaceTargetDestructible,
+      targetStateScope,
     })) || changed;
   }
   if (action.replaceFoliageWith) {
     changed = Boolean(engine.replaceActionTargetFoliage?.(target, action.replaceFoliageWith, {
       size: action.replaceFoliageSize,
+      targetStateScope,
     })) || changed;
   }
   if (action.spawnObject) {
@@ -487,6 +491,7 @@ export function runAction({
   changed = applyFactionRepIfAvailable(engine, action.factionRep) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;
   if (action.refreshRegionDecorators) {
+    engine.markRegionDecoratorPlaced?.(target);
     changed = Boolean(engine.rebuildCountBasedRegionDecorators?.()) || changed;
   }
 

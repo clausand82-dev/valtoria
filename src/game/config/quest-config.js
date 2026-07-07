@@ -184,6 +184,42 @@ export const QUEST_ITEM_DEFS = {
       },
     },
   },
+  hunter_wolf_tail: {
+    name: "Good Wolf Tail",
+    iconUrl: "/assets/generated/item/item_quest_wolftale.png",
+    placeholderColor: "#8b8178",
+    stackable: true,
+    stackMax: 12,
+    stackByQuestInstance: true,
+    i18n: { da: { name: "God ulvehale" } },
+  },
+  hunter_boar_tusk: {
+    name: "Perfect Boar Tusk",
+    iconUrl: "/assets/generated/item/item_quest_boartooth.png",
+    placeholderColor: "#d7c9a5",
+    stackable: true,
+    stackMax: 9,
+    stackByQuestInstance: true,
+    i18n: { da: { name: "Perfekt vildsvinetand" } },
+  },
+  quest_hunters_bow: {
+    name: "Hunter's Lost Bow",
+    iconUrl: "/assets/generated/item/item_named_huntersbow.png",
+    placeholderColor: "#8b623d",
+    i18n: { da: { name: "Jægerens tabte bue" } },
+  },
+  quest_hunters_wedding_ring: {
+    name: "Hunter's Wedding Ring",
+    iconUrl: "/assets/generated/item/item_quest_huntersweddingring.png",
+    placeholderColor: "#d9c46f",
+    i18n: { da: { name: "Jægerens vielsesring" } },
+  },
+  quest_hunters_love_flower: {
+    name: "Sacred Love Flower",
+    iconUrl: "/assets/generated/item/item_quest_loveflower-png.png",
+    placeholderColor: "#e7a7cf",
+    i18n: { da: { name: "Hellig kærlighedsblomst" } },
+  },
 };
 
 /*
@@ -213,6 +249,7 @@ Top-level quest fields:
   Supported fields:
   - level: Minimum player level.
   - completedQuests or requiresQuests: Array of quest ids that must already be completed.
+  - unlockedRegionCount: Minimum/range check for region.*.unlocked world flags, for example { min: 5 }.
   - items: Array of required inventory checks. Supported filters include count, resourceId/resource, potionType,
     readableId, questItemId, uniqueId, namedId, mode, rarity, baseName, name, slot.
   All listed demand checks must be satisfied.
@@ -285,6 +322,7 @@ Rewards:
 - rewards.resources: Resource rewards, for example [{ resource: "red_gemstone", count: 1 }].
 - rewards.randomItem: Gives a random equipment item. Current support uses { minRarity: "upgraded" } as a hint.
 - rewards.namedItems: Gives named equipment rewards, for example [{ namedId: "devils_judge" }].
+- rewards.achievements: Declares achievement ids awarded by completion. Achievement unlock state remains derived from each achievement's questCompleted condition.
 - rewards.statBonuses: Permanently adds player stats. Percentage bonuses use decimals, for example { arcaneDamageBonus: 0.05 } gives +5% Arcane damage.
 - rewards.xpPerKill / rewards.goldPerKill: Used by kill quests to scale reward from target.count.
 - rewards.cityProgress or rewards.cityRewards: Applies city progress without paying normal city UI costs.

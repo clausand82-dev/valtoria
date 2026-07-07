@@ -134,6 +134,24 @@ export const ACTION_CONFIG = {
     once: true,
   },
 
+  collect_hunters_love_flower: {
+    id: "collect_hunters_love_flower",
+    type: "collect",
+    label: "Pick the sacred flower",
+    text: "The sacred flower comes free without losing a single petal.",
+    i18n: {
+      da: {
+        label: "Pluk den hellige blomst",
+        text: "Den hellige blomst slipper jorden uden at miste et eneste kronblad.",
+      },
+    },
+    requires: { questStepActive: { questId: "help_hunter_find_flower", stepId: "find_sacred_flower" } },
+    blockedBy: { inventory: { questItemId: "quest_hunters_love_flower", count: 1 } },
+    rewards: { items: { quest_hunters_love_flower: 1 } },
+    removeTarget: true,
+    once: true,
+  },
+
   harvest_rare_pink_flower: {
     id: "harvest_rare_pink_flower",
     type: "harvest",
@@ -597,5 +615,23 @@ export const ACTION_CONFIG = {
         prompt: "Saml høstak",
       },
     },
+  },
+  bury_city_mob_dead: {
+    id: "bury_city_mob_dead",
+    type: "cleanse",
+    label: "Bury villager",
+    i18n: {
+      da: {
+        label: "Begrav landsbyboer",
+      },
+    },
+    prompt: "Begrav den døde landsbyboer",
+    worldEnergy: {
+      lydra: 0.1,
+    },
+    replaceFoliageWith: "object/object_gravestone.png",
+    replaceFoliageSize: 0.7,
+    targetStateScope: "runtime",
+    once: false,
   },
 };

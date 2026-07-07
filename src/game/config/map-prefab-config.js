@@ -1,6 +1,23 @@
 export const DEBUG_MAP_PREFABS = false;
 
 export const MAP_PREFABS = {
+  hunter_sacred_flower_site: {
+    id: "hunter_sacred_flower_site",
+    label: "Sacred Flower",
+    i18n: { da: { label: "Hellig blomst" } },
+    w: 3,
+    h: 3,
+    tags: ["quest", "shrine", "flower"],
+    anchor: "clearing",
+    rotate: false,
+    mirror: false,
+    clearArea: true,
+    avoidStart: 5,
+    avoidExit: 5,
+    foliage: [
+      { fileName: "item/item_quest_loveflower-png.png", rows: 1, cols: 1, x: 1, y: 1, cell: 0, size: 0.7, actionId: "collect_hunters_love_flower" },
+    ],
+  },
   young_boys_father_cave_entrance: {
     id: "young_boys_father_cave_entrance",
     label: "Webbed Cave",

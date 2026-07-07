@@ -35,9 +35,12 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "tileset/tileset_rock.png" },
     ],
     foliageSet: [
-      { fileName: "foilage/foilage_deadvillages.png", scale: 1.5 },
-      { fileName: "foilage/foilage_boneparts.png", scale: 0.45 },
-      { fileName: "foilage/foilage_garbage_001.png", scale: 0.75 },
+      { fileName: "foilage/foilage_deadvillages.png", weight: 1, scale: 1.5, actionId: "bury_city_mob_dead", lootTables: ["material_humanoid"] },
+      { fileName: "foilage/foilage_deadpeasents.png", weight: 2, scale: 1.5, actionId: "bury_city_mob_dead", lootTables: ["material_humanoid","monster_profile_humanoid"] },
+      { fileName: "foilage/foilage_deadsoldiers.png", weight: 3, scale: 1.5, actionId: "bury_city_mob_dead", lootTables: ["material_humanoid","monster_profile_humanoid","monster_special_global"] },
+      { fileName: "foilage/foilage_boneparts.png", weight: 12, scale: 0.45 },
+      { fileName: "foilage/foilage_garbage_001.png", weight: 15, scale: 0.75 },
+      { fileName: "object/object_gravestone.png", weight: 0, scale: 0.7 },
     ],
     objects: [
       { id: "object_tree", weight: 6, destructible: true },
@@ -93,12 +96,13 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "foilage/foilage_roots.png" },
       { fileName: "foilage/foilage_mushrooms.png", scale: 0.65 },
       { fileName: "foilage/foilage_bones_001.png", scale: 0.45 },
+      { fileName: "foilage/foilage_plants_mainland.png", scale: 0.45 },
     ],
     objects: [
       { id: "object_tree_lava", weight: 5, destructible: true },
-      { id: "object_caves", weight: 1, destructible: false },
       { id: "object_wagons", weight: 2, destructible: true },
       { id: "object_barrels_ground", weight: 3, destructible: true },
+      { id: "object_treestumps", weight: 5, destructible: true },
     ],
     decay: [
       { id: "decay_spiderweb", weight: 7 },

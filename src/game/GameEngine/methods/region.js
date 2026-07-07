@@ -23,7 +23,7 @@ import {
 } from "../../world-state.js";
 import { addHiddenEncounterPrefabs, lockHiddenEncountersForRegion } from "../../config/hidden-encounter-config.js";
 import { normalizeWorldEnergy } from "../../world-energy.js";
-import { rebuildCountBasedRegionDecorators } from "../../region-object-decorators.js";
+import { markRegionDecoratorPlaced, rebuildCountBasedRegionDecorators } from "../../region-object-decorators.js";
 
 function cloneAbandonValue(value) {
   if (value === null || value === undefined) return value;
@@ -457,6 +457,10 @@ export const regionMethods = {
 
   rebuildCountBasedRegionDecorators() {
     return rebuildCountBasedRegionDecorators(this);
+  },
+
+  markRegionDecoratorPlaced(target) {
+    return markRegionDecoratorPlaced(this, target);
   },
 
   allRegionMonstersCleared() {
