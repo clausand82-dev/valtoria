@@ -387,6 +387,10 @@ export const renderingMethods = {
 
   render() {
     const ctx = this.ctx;
+    if (this.mapRuntimeDisposed && !this.activeMapRegion) {
+      ctx.clearRect(0, 0, this.width, this.height);
+      return;
+    }
     if (!this.assetsReady) {
       this.drawLoadingScreen(ctx);
       return;

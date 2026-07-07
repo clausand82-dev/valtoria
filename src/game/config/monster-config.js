@@ -164,7 +164,7 @@ export const MONSTER_DEFS = {
     isBoss: true,
     allowElite: false,
     stats: { hp: 420, damage: 32, speed: 3.15, range: 0.72, radius: 0.5, color: "#b32626", xp: 180, critChance: 0.12, critDamage: 1.5 },
-    popularity: { change: -0.5 },
+    popularity: { change: 5 },
     attackCooldown: { min: 0.55, max: 0.9 },
     leapAttack: { minRange: 1.35, maxRange: 3.8, speed: 11, cooldown: 2.2 },
     lootTables: ["gold_low", "material_animal_medium", "equipment_defender_rare", "material_gemstones"]
@@ -249,7 +249,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
-    popularity: { change: 0.35 },
+    popularity: { change: -0.35 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village02: {
@@ -261,7 +261,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
-    popularity: { change: 0.4 },
+    popularity: { change: -0.4 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Peasant: {
@@ -273,7 +273,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 60, damage: 11, speed: 1.35, range: 0.58, radius: 0.3, color: "#8a7657", xp: 20 },
-    popularity: { change: 0.3 },
+    popularity: { change: -0.3 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
   Village03: {
@@ -285,7 +285,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
-    popularity: { change: 0.35 },
+    popularity: { change: -0.35 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village04: {
@@ -297,7 +297,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
-    popularity: { change: 0.38 },
+    popularity: { change: -0.38 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village05: {
@@ -309,7 +309,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
-    popularity: { change: 0.36 },
+    popularity: { change: -0.36 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Village06: {
@@ -321,7 +321,7 @@ export const MONSTER_DEFS = {
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
-    popularity: { change: 0.4 },
+    popularity: { change: -0.4 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
   },
   Wizard: {

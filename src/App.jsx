@@ -38,6 +38,7 @@ import {
   QuestOverviewDialog,
   ReadableDialog,
   RegionMapDialog,
+  RunSummaryDialog,
   StartMenu,
   calculateCityStats,
   calculateCityStatBreakdown,
@@ -296,6 +297,7 @@ export default function App() {
   const [toastLogOpen, setToastLogOpen] = useState(false);
   const [lastReadImportantToastId, setLastReadImportantToastId] = useState(null);
   const [confirmMapAbandonOpen, setConfirmMapAbandonOpen] = useState(false);
+  const [runSummary, setRunSummary] = useState(null);
   const [cityStorageOpen, setCityStorageOpen] = useState(false);
   const [selectedCityStatId, setSelectedCityStatId] = useState(null);
   const [hoveredCityStatId, setHoveredCityStatId] = useState(null);
@@ -643,6 +645,7 @@ export default function App() {
     setHeroOpen(false);
     setCityOpen(true);
     setConfirmMapAbandonOpen(false);
+    setRunSummary(mapReturn.runSummary ?? null);
   }, [snapshot.mapReturn, regionCorruption]);
 
   useEffect(() => {
@@ -1702,6 +1705,7 @@ export default function App() {
           onClose={() => setHelpState({ open: false, topicId: null })}
         />
       )}
+      {runSummary && <RunSummaryDialog summary={runSummary} onClose={() => setRunSummary(null)} />}
     </main>
   );
 }

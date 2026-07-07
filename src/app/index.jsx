@@ -48,6 +48,7 @@ export {
 } from "./map/map-dialogs.jsx";
 export { HeroDialog } from "./hero/hero-dialog.jsx";
 export { StartMenu } from "./ui/start-menu.jsx";
+export { RunSummaryDialog } from "./run-summary/run-summary-dialog.jsx";
 export {
   AtlasIcon,
   ImageIcon,

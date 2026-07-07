@@ -240,12 +240,16 @@ function applyRewards(engine, rewards = {}) {
   const gold = Math.max(0, Math.floor(Number(rewards.gold ?? rewards.resources?.gold) || 0));
   if (gold > 0) {
     engine.player.gold = Math.max(0, Math.floor(Number(engine.player.gold) || 0) + gold);
+    engine.recordRunGold?.(gold);
     engine.player.stats.goldLooted = Math.max(0, Math.floor(Number(engine.player.stats.goldLooted) || 0) + gold);
     engine.player.stats.goldEarned = Math.max(0, Math.floor(Number(engine.player.stats.goldEarned) || 0) + gold);
     changed = true;
   }
   for (const item of buildRewardItems(rewards, engine)) {
-    if (engine.addInventoryItem?.(item)) changed = true;
+    if (engine.addInventoryItem?.(item)) {
+      engine.recordRunItem?.(item);
+      changed = true;
+    }
   }
   return changed;
 }
@@ -302,9 +306,16 @@ function applyQuestCounterProgress(engine, action) {
   return true;
 }
 
-function applyWorldEnergyIfAvailable(engine, worldEnergy) {
+function applyWorldEnergyIfAvailable(engine, worldEnergy, target = null) {
   if (!worldEnergy || typeof worldEnergy !== "object") return false;
-  applyWorldEnergy(engine, worldEnergy);
+  const lydra = Number(worldEnergy.lydra) || 0;
+  const netdra = Number(worldEnergy.netdra) || 0;
+  if (!lydra && !netdra) return false;
+  applyWorldEnergy(engine, { lydra, netdra });
+  const x = Number.isFinite(Number(target?.x)) ? Number(target.x) : (engine.player?.x ?? 0);
+  const y = Number.isFinite(Number(target?.y)) ? Number(target.y) : (engine.player?.y ?? 0);
+  if (lydra) engine.addFloater?.(x, y, `${lydra > 0 ? "+" : ""}${lydra} Ly'dra'thot`, "#eaf4ff", 0.95);
+  if (netdra) engine.addFloater?.(x, y, `${netdra > 0 ? "+" : ""}${netdra} Net'dra'thot`, "#b8a4ff", 0.95);
   return true;
 }
 
@@ -487,7 +498,7 @@ export function runAction({
   changed = applyQuestCounterProgress(engine, action) || changed;
   changed = applyQuestAdvance(engine, action) || changed;
   changed = Boolean(engine.advanceActionTargetQuestProgress?.(target, 1)) || changed;
-  changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy) || changed;
+  changed = applyWorldEnergyIfAvailable(engine, action.worldEnergy, target) || changed;
   changed = applyFactionRepIfAvailable(engine, action.factionRep) || changed;
   changed = removeOrReplaceTarget(engine, action, target, sourceType) || changed;
   if (action.refreshRegionDecorators) {
@@ -499,6 +510,8 @@ export function runAction({
     markActionCompleted(engine, completionKey);
     changed = true;
   }
+
+  engine.recordRunAction?.(action);
 
   if (changed) {
     engine.updateNearbyActionTarget?.();

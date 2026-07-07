@@ -292,6 +292,9 @@ export const lifecycleMethods = {
 
   update(dt) {
     this.time += dt;
+    // City UI keeps the engine instance alive. Do not regenerate or update the
+    // disposed map while no run is active.
+    if (this.mapRuntimeDisposed && !this.activeMapRegion) return;
     this.ensureWorldAroundPlayer();
     if (this.updateFogOfWar()) this.markRenderDirty("fog");
     const stats = this.calcStats();

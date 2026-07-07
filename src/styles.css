@@ -177,6 +177,18 @@ button {
   transform: translateY(34px);
 }
 
+.start-menu-version {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  z-index: 2;
+  color: rgba(244, 239, 227, 0.58);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
 .start-menu-panel h1 {
   margin: 0;
   color: #f4da96;

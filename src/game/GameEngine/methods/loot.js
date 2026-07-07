@@ -323,6 +323,7 @@ export const lootMethods = {
       if (distance(this.player, loot) < 0.62) {
         if (loot.type === "gold") {
           this.player.gold += loot.amount;
+          this.recordRunGold?.(loot.amount);
           this.player.stats.goldLooted += loot.amount;
           this.player.stats.goldEarned += loot.amount;
           this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
@@ -335,6 +336,7 @@ export const lootMethods = {
             const after = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? before + 1;
             const picked = Math.max(1, after - before);
             this.trackItemPicked(loot.item);
+            this.recordRunItem?.(loot.item, picked);
             addPickupFloater(this, loot.x, loot.y, loot.item, picked);
             this.addToast(pickupStatusText(loot.item, picked));
             this.loots.splice(i, 1);
@@ -347,6 +349,7 @@ export const lootMethods = {
         } else if (isQuestItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
           this.player.stats.itemsPicked += 1;
           this.trackItemPicked(loot.item);
+          this.recordRunItem?.(loot.item, 1);
           this.applyQuestItemPickup(loot.item);
           addPickupFloater(this, loot.x, loot.y, loot.item, 1);
           this.addToast(pickupStatusText(loot.item, 1));
@@ -355,6 +358,7 @@ export const lootMethods = {
           this.publishSnapshot();
         } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
           const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
+          this.recordRunItem?.(loot.item, picked);
           if (isResourceItem(loot.item)) this.player.stats.resourcesPicked += picked;
           else {
             this.player.stats.itemsPicked += 1;
@@ -482,6 +486,7 @@ export const lootMethods = {
       if (!this.addInventoryItem(item, { countAsCollected: true })) continue;
       const count = Math.max(1, Math.floor(Number(item.count) || 1));
       total += count;
+      this.recordRunItem?.(item, count);
     }
 
     object.foliageLooted = true;

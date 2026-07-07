@@ -1537,10 +1537,12 @@ export const questsMethods = {
     }
     if (xp) {
       this.player.xp += xp;
+      this.recordRunXp?.(xp);
       this.addFloater(this.player.x, this.player.y, `+${xp} xp`, "#e0aa3f", 1);
     }
     if (gold) {
       this.player.gold += gold;
+      this.recordRunGold?.(gold);
       this.player.stats.goldEarned += gold;
       this.addFloater(this.player.x, this.player.y, `+${gold} g`, "#f1c657", 1);
     }
@@ -1548,6 +1550,7 @@ export const questsMethods = {
       const resource = makeResourceItem(reward.resource, reward.count ?? 1);
       if (resource) {
         this.addInventoryItem(resource);
+        this.recordRunItem?.(resource);
         summary.resources.push({
           id: resource.resourceId,
           name: resource.name,
@@ -1558,6 +1561,7 @@ export const questsMethods = {
     if (rewards.randomItem) {
       const item = this.rollQuestRewardItem();
       this.addInventoryItem(item);
+      this.recordRunItem?.(item);
       summary.items.push({
         id: item.id,
         name: item.name,
@@ -1568,6 +1572,7 @@ export const questsMethods = {
       const definition = NAMED_ITEM_TEMPLATES.find((entry) => entry.id === reward.namedId);
       const item = definition ? makeNamedItem(definition, reward.level ?? this.player.level) : null;
       if (item && this.addInventoryItem(item)) {
+        this.recordRunItem?.(item);
         summary.items.push({ id: item.id, name: item.name, rarity: item.rarity });
       }
     }
@@ -1579,6 +1584,7 @@ export const questsMethods = {
         for (let i = 0; i < count; i += 1) {
           const qi = makeQuestItem(q.questItemId, null);
           if (qi && this.addInventoryItem(qi)) {
+            this.recordRunItem?.(qi);
             summary.items.push({ id: qi.id, name: qi.name, rarity: qi.rarity });
           }
         }

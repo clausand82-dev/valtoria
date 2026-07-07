@@ -10,7 +10,7 @@ Find tre forskellige personer der er begravet og tre "citater" der kan stå på 
 Quest kan kun gennemføres engang og kræver priest_veldors_letter quest er gennemført. Questen åbner ikke for uåbnede områder - så er områder ikke låst op, må man vente. Reward er forhøjet faith i byen.
 
 clear_the_lookout_post
-quest hvor borgmester sender en hen og skal rydde region udkigsposten - skal give høj defence fordel. Udkigsposten skal have træer, masser af wheels, wagons, debris osv. Monster i den region er indtil den ryddes af denne her quest skeletor, demoner og spøgelser. Efter den er ryddet er mobs ulve og boars. Så længe regionen er 0 i corruption giver den 50 i defence. Når questen er gennemført første gang forsvinde debris, vogne og wheels og erstattes af træer og blomster og grønt. Quest kræver at ??? er gennemført.
+quest hvor borgmester sender en hen og skal rydde region udkigsposten - skal give høj defence fordel. Udkigsposten skal have træer, masser af wheels, wagons, debris osv. Monster i den region er indtil den ryddes af denne her quest skeletor, demoner og spøgelser. Efter den er ryddet er mobs ulve og boars. Så længe regionen er 0 i corruption giver den 50 i defence. Når questen er gennemført første gang forsvinde debris, vogne og wheels og erstattes af træer og blomster og grønt. Quest kræver at ??? er gennemført. object_watchtowers.png findes, men måske object ikke er defineret i object config
 
 repair_look_out_towers
 Tag tilbage til look-out og fiks alle damage watchtowers

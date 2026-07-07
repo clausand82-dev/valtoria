@@ -1613,6 +1613,7 @@ export const combatMethods = {
     this.particleEngine?.removeEmittersByOwner(object.id);
     chunk.objects.splice(index, 1);
     this.player.stats.objectsDestroyed += 1;
+    this.recordRunObjectDestroyed?.(object);
     incrementStatMap(this.player.stats.objectsDestroyedByType, object.type);
     this.player.attackObjectId = null;
     this.player.target = null;
@@ -1687,6 +1688,8 @@ export const combatMethods = {
     }
     const xp = this.modifiedXp?.(monster.xp) ?? monster.xp;
     this.player.xp += xp;
+    this.recordRunXp?.(xp);
+    this.recordRunKill?.(monster);
     if (!monster.isMinion) this.applyQuestKill(monster);
     if (!monster.isMinion) this.applyCurrentSubregionClear?.();
     this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95);

@@ -216,6 +216,7 @@ export const regionMethods = {
       quest.progress = { ...(quest.progress ?? {}), targets, total, done: 0 };
     }
     this.rebuildRegionStats?.({ ensureFullRegionGenerated: false });
+    this.beginRunSummary?.(this.activeMapRegion);
     this.addToast(`${this.activeMapRegion.label} startet. Find den gyldne exit mod nordoest.`);
     this.markRenderDirty?.("region-change");
     this.publishSnapshot();
@@ -323,6 +324,7 @@ export const regionMethods = {
         });
       }
     }
+    const runSummary = this.finishRunSummary?.({ active, mobCounts, cleared, abandoned: false, reachedExit: true });
     this.mapReturn = {
       id: ++this.mapReturnSerial,
       areaMapId: active.areaMapId,
@@ -335,6 +337,7 @@ export const regionMethods = {
       reachedExit: true,
       playerDied: false,
       abandoned: false,
+      runSummary,
     };
     this.mapReturn.mapSize = active.mapSize ?? "medium";
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
@@ -349,6 +352,7 @@ export const regionMethods = {
     this.player.attackTargetId = null;
     this.player.attackObjectId = null;
     this.addToast(cleared ? `${active.label} befriet. Tilbage i byen.` : `${active.label} er stadig corrupted. Tilbage i byen.`);
+    this.cleanupMapRuntimeAfterReturn();
     this.saveProgress({ force: true });
     this.markRenderDirty?.("region-change");
     this.publishSnapshot();
@@ -359,6 +363,7 @@ export const regionMethods = {
     if (!active) return false;
     this.clearSubregionExpedition?.();
     const mobCounts = this.monsterCounterSnapshot();
+    const runSummary = this.finishRunSummary?.({ active, mobCounts, cleared: false, abandoned: true, reachedExit: false });
     const currentState = captureAbandonState(this);
     // Roll back to the forced save taken when the map run started.
     this.loadProgress();
@@ -382,19 +387,46 @@ export const regionMethods = {
       remainingMobs: mobCounts.alive,
       reachedExit: false,
       playerDied: false,
+      runSummary,
     };
     this.mapReturn.mapSize = active.mapSize ?? "medium";
     if (active.cityMobId) this.mapReturn.cityMobId = active.cityMobId;
     if (active.cityMobType) this.mapReturn.cityMobType = active.cityMobType;
     if (active.cityMobLevel) this.mapReturn.cityMobLevel = active.cityMobLevel;
     this.addToast(`${active.label} forladt. Progression blev nulstillet, og du er tilbage i byen.`);
+    this.cleanupMapRuntimeAfterReturn();
     this.saveProgress({ force: true });
     this.markRenderDirty?.("region-change");
     this.publishSnapshot();
     return true;
   },
 
+  cleanupMapRuntimeAfterReturn() {
+    const clearedCounts = import.meta.env.DEV ? {
+      chunks: this.chunks?.size ?? 0,
+      monsters: this.monsters?.size ?? 0,
+      critters: this.critters?.size ?? 0,
+      loot: this.loots?.length ?? 0,
+      projectiles: this.projectiles?.length ?? 0,
+      hazards: this.groundHazards?.length ?? 0,
+      particles: (this.particles?.length ?? 0) + (this.particleEngine?.particles?.length ?? 0),
+    } : null;
+
+    // resetRegionRuntime owns the transient chunk/combat/fog/interaction state.
+    // Run it before saving because loot despawn bookkeeping may update quest state.
+    this.resetRegionRuntime();
+    this.particleEngine?.clearAll?.();
+    this.runtimeActionObjectStates = {};
+    this.heldSpell = null;
+    this.nearbyInteractionMode = "action";
+    this.player.moving = false;
+    this.mapRuntimeDisposed = true;
+
+    if (clearedCounts) console.debug("[map-runtime] Cleared after city return", clearedCounts);
+  },
+
   resetRegionRuntime() {
+    this.mapRuntimeDisposed = false;
     this.currentRegionStats = null;
     this.regionDecoratorPlans = new Map();
     this.chunks.clear();

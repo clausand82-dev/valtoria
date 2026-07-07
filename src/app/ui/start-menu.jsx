@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { formatSaveTimestamp } from "../save/save-slots.js";
 import { useLocalization } from "../../i18n/index.js";
+import { GAME_VERSION } from "../../game/config/game-constants-config.js";
 
 export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave }) {
   const { t } = useLocalization();
@@ -108,6 +109,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
           </div>
         )}
       </div>
+      <span className="start-menu-version">v{GAME_VERSION}</span>
     </section>
   );
 }

@@ -15,6 +15,7 @@ import { snapshotMethods } from "./methods/snapshot.js";
 import { actionsMethods } from "./methods/actions.js";
 import { subregionMethods } from "./methods/subregions.js";
 import { critterMethods } from "./methods/critters.js";
+import { runSummaryMethods } from "./methods/run-summary.js";
 import { normalizeWorldState } from "../world-state.js";
 import { normalizeWorldEnergy } from "../world-energy.js";
 import { ParticleEngine } from "../particles/ParticleEngine.js";
@@ -144,9 +145,11 @@ export class GameEngine {
     // Use a stable base region at boot so reload never drops the player into a random biome.
     this.region = createRegion(this.regionIndex, WORLD_SEED, "mainland");
     this.activeMapRegion = null;
+    this.mapRuntimeDisposed = false;
     this.mapRegionCheckpoint = null;
     this.mapReturn = null;
     this.mapReturnSerial = 0;
+    this.currentRunSummary = null;
     this.lastDeath = null;
     this.deathSerial = 0;
     this.exitPromptOpen = false;
@@ -217,6 +220,7 @@ for (const methods of [
   subregionMethods,
   critterMethods,
   snapshotMethods,
+  runSummaryMethods,
 ]) {
   applyMethodGroup(GameEngine.prototype, methods);
 }

@@ -1,5 +1,10 @@
 History over changes
 
+*V. 1.10
+- added summary modal after expedition run
+- added game version number i right bottom corner in velcome screen
+- both lydra and nedra now have floating text showinbg amount in expedition runs
+
 *V. 1.01
 - some small ui translation fixes
 - yellow ? when quest is ready to turn in, will now always be show instead of gray ! or ?

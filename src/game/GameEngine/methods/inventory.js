@@ -176,6 +176,7 @@ export const inventoryMethods = {
     const xp = this.modifiedXp(amount);
     if (xp <= 0) return false;
     this.player.xp += xp;
+    this.recordRunXp?.(xp);
     this.addToast(`+${xp} XP ${label}`);
     this.levelUpIfNeeded();
     this.publishSnapshot();

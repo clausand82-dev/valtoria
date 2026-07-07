@@ -23,7 +23,7 @@ export const POPULARITY_CONFIG = {
   min: 0,
   max: 100,
 
-  defaultMonsterChange: 0,
+  defaultMonsterChange: 0.2,
   monsterRules: MONSTER_POPULARITY_RULES,
 
   monsterLevelScalePerLevel: 0.08,
