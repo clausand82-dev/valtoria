@@ -218,6 +218,28 @@ export const REGION_OBJECT_DEFS = {
       { type: "embers", count: [2, 5], radius: 16, heightOffset: -32, chance: 1 }
     ]
   },
+  object_beacon_normal: {
+    spawnTypes: [{ type: "object_beacon_normal", weight: 1 }],
+    defaultDestructible: false,
+    renderBiomeId: "mainland",
+    graphics: { mode: "sheet", files: ["object/object_beacon_normal.png"], rows: 4, cols: 4, frameCount: 16 },
+    graphicsRef: "object/object_beacon_normal.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.93 },
+  },
+  object_firebeacon_normal: {
+    spawnTypes: [{ type: "object_firebeacon_normal", weight: 1 }],
+    defaultDestructible: false,
+    renderBiomeId: "mainland",
+    graphics: { mode: "sheet", files: ["object/object_firebeacon_normal.png"], rows: 4, cols: 4, frameCount: 16 },
+    graphicsRef: "object/object_firebeacon_normal.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.93 },
+    particles: [
+      { type: "smoke", count: [2, 4], radius: 14, offsetX: 32, offsetY: -81, chance: 1, onlyWhenOnScreen: true },
+      { type: "embers", count: [4, 8], radius: 12, offsetX: 32, offsetY: -81, chance: 1, onlyWhenOnScreen: true }
+    ],
+  },
   object_woodboxes_ground: {
     spawnTypes: [{ type: "object_woodboxes_ground", weight: 1 }],
     defaultDestructible: true,
@@ -466,6 +488,80 @@ export const REGION_OBJECT_DEFS = {
     destructible: { hp: 52, damageStages: 3, particleColor: "#f2b017", lootTables: ["material_wood", "material_magic"] },
     renderBiomeId: "mainland",
     graphicsRef: "object/object_wagons.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_wagons_destroyed: {
+    spawnTypes: [{ type: "object_wagons_destroyed", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "debris"],
+    destructible: { hp: 42, damageStages: 3, particleColor: "#8c6a43", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_wagons_destroyed.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_wagons_damaged: {
+    spawnTypes: [{ type: "object_wagons_damaged", weight: 1 }],
+    defaultDestructible: true,
+    tags: ["object", "destructible", "wood", "debris"],
+    destructible: { hp: 46, damageStages: 3, particleColor: "#9b7244", lootTables: ["material_wood"] },
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_wagons_damaged.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_watchtowers: {
+    spawnTypes: [{ type: "object_watchtowers", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "wood", "defence"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_watchtowers.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 }
+  },
+  object_watchtowers_damaged: {
+    spawnTypes: [{ type: "object_watchtowers_damaged", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "wood", "defence", "damaged"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_watchtowers_damaged.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 }
+  },
+  object_watchtowers_destroyed: {
+    spawnTypes: [{ type: "object_watchtowers_destroyed", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "wood", "defence", "destroyed"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_watchtowers_destroyed.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.95 }
+  },
+  object_pillar_wood: {
+    spawnTypes: [{ type: "object_pillar_wood", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "wood", "fence"],
+    renderBiomeId: "mainland",
+    graphics: { mode: "sheet", files: ["object/object_pillar_wood_1.png", "object/object_pillar_wood_2.png"], rows: 4, cols: 4 },
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.9 }
+  },
+  object_gravestone: {
+    spawnTypes: [{ type: "object_gravestone", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "grave", "stone"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_gravestone.png",
+    depthMode: "dynamic",
+    sortAnchor: { x: 0.5, y: 0.92 }
+  },
+  object_flowers: {
+    spawnTypes: [{ type: "object_flowers", weight: 1 }],
+    defaultDestructible: false,
+    tags: ["object", "plant", "flower"],
+    renderBiomeId: "mainland",
+    graphicsRef: "object/object_flowers.png",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 }
   },

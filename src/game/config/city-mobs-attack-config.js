@@ -29,6 +29,17 @@ export const CITY_THREAT_SPAWN_THRESHOLD = 90;   // % hvorfra spawn kan ske
 export const CITY_THREAT_SPAWN_BASE_CHANCE = 10; // % chance ved præcis 90
 export const CITY_THREAT_SPAWN_CHANCE_PER_PCT = 5; // % ekstra per % over 90
 
+// Existing level 3+ city mobs can still spread below the new-spawn threshold,
+// but a safer city makes that spread increasingly unlikely.
+export const CITY_MOB_SPREAD_THREAT_MULTIPLIERS = [
+  { minThreat: 90, multiplier: 1.0 },
+  { minThreat: 70, multiplier: 0.65 },
+  { minThreat: 50, multiplier: 0.4 },
+  { minThreat: 30, multiplier: 0.2 },
+  { minThreat: 10, multiplier: 0.08 },
+  { minThreat: 0, multiplier: 0.02 },
+];
+
 export const CITY_STAT_THREAT_DELTA_MIN = -5;
 export const CITY_STAT_THREAT_DELTA_MAX = 8;
 export const CITY_STAT_THREAT_WEIGHTS = {
@@ -438,6 +449,12 @@ export function calcCitySpawnChance(threatLevel) {
   if (threatLevel < CITY_THREAT_SPAWN_THRESHOLD) return 0;
   const over = threatLevel - CITY_THREAT_SPAWN_THRESHOLD;
   return (CITY_THREAT_SPAWN_BASE_CHANCE + over * CITY_THREAT_SPAWN_CHANCE_PER_PCT) / 100;
+}
+
+export function getCityMobSpreadThreatMultiplier(threatLevel) {
+  const threat = Math.max(0, Math.min(100, Number(threatLevel) || 0));
+  const match = CITY_MOB_SPREAD_THREAT_MULTIPLIERS.find(({ minThreat }) => threat >= (Number(minThreat) || 0));
+  return Math.max(0, Math.min(1, Number(match?.multiplier) || 0));
 }
 
 export function getMaxNewCityMobsPerVisit(threatLevel) {

@@ -344,6 +344,7 @@ export const snapshotMethods = {
         potionCooldown: this.potionCooldown,
         potionCooldownMax: 0.5,
         spellCooldown: this.player.spellCooldown,
+        activeSpellId: this.player.activeSpellId,
         slots: quickSlots,
         pickerHoverMs: ACTION_BAR_CONFIG.pickerHoverMs,
         pickerCloseMs: ACTION_BAR_CONFIG.pickerCloseMs,

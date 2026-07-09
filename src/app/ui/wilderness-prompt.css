@@ -1,0 +1,15 @@
+.wilderness-prompt {
+  position: fixed;
+  left: 50%;
+  top: auto;
+  bottom: 96px;
+  z-index: 8;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 32px));
+  min-width: 0;
+  padding: 7px 11px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+  transform: translateX(-50%);
+}

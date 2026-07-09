@@ -452,13 +452,15 @@ export function QuestOfferDialog({ interaction, onDecline, onAcceptQuest, onTurn
   );
 }
 
-export function QuestDetailDialog({ quest, engineRef, onClose, onQuestCompleted, onQuestAbandoned, cityOpen }) {
+export function QuestDetailDialog({ quest, engineRef, onClose, onTurnInQuest, onQuestCompleted, onQuestAbandoned, cityOpen }) {
   const { localize, renderTemplate, t } = useLocalization();
   const [confirmAbandon, setConfirmAbandon] = useState(false);
   if (!quest) return null;
   const npc = QUEST_NPCS[quest.turnInNpcId ?? quest.npcId];
   const turnIn = async () => {
-    const result = engineRef.current?.completeQuest?.(quest.id ?? quest.questId, quest.turnInNpcId ?? quest.npcId);
+    const result = onTurnInQuest
+      ? onTurnInQuest(quest)
+      : engineRef.current?.completeQuest?.(quest.id ?? quest.questId, quest.turnInNpcId ?? quest.npcId);
     if (result?.ok) {
       onQuestCompleted?.(result);
       onClose?.();

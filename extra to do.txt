@@ -9,23 +9,7 @@ Caelen er ved at skrive en bog, men mangler tre citater fra tre gravstene, der s
 Find tre forskellige personer der er begravet og tre "citater" der kan stå på graven. Jeg tænker med flag noteres det om en sten er læst.
 Quest kan kun gennemføres engang og kræver priest_veldors_letter quest er gennemført. Questen åbner ikke for uåbnede områder - så er områder ikke låst op, må man vente. Reward er forhøjet faith i byen.
 
-clear_the_lookout_post
-quest hvor borgmester sender en hen og skal rydde region udkigsposten - skal give høj defence fordel. Udkigsposten skal have træer, masser af wheels, wagons, debris osv. Monster i den region er indtil den ryddes af denne her quest skeletor, demoner og spøgelser. Efter den er ryddet er mobs ulve og boars. Så længe regionen er 0 i corruption giver den 50 i defence. Når questen er gennemført første gang forsvinde debris, vogne og wheels og erstattes af træer og blomster og grønt. Quest kræver at ??? er gennemført. object_watchtowers.png findes, men måske object ikke er defineret i object config
 
-repair_look_out_towers
-Tag tilbage til look-out og fiks alle damage watchtowers
-
-repair_the_fences
-Farmer vil have en til at fikse alle hegn på søndremarken og dræbe alle vildsvin.
-
-
-mayor_get_the_tales
-Borgmester vil have en til at besøge tre forskellige npc'er for at høre hvordan det går ude i vildmarken:
-Et hus i forest med en npc ved. Snak med NPc giver en personlig beretning om faren ved at bo i skoven (skal være et prefab, som altid skal være der, men npc kun under denne quest og indtil quest er slut).
-Snak med npc jæger i elvbakken, som fortæller om han evige kamp imod en overflod af ikke bare onde væsner, men også vildsvin og ulve.
-Snak med  NPC Caelen som er elver og findes ved udkigsposten. Elveren fortæller om hans evige vogtning over elvindalen. Han beskytter eldiria med sit liv.
-De tre npc skal være prefabs, hvis nødvendigt. Den med huset kræver prefab, hvor betingelse er at questen er i gang for at npc er der. Benyt actions til at snakke med dem (kan action fremtvinge en modal som para, så jeg kan bestemme om toast eller modal skal benyttes - toast er standard og benyttes hvis para ikke sat?) - hvis de andre to npc'er kan dukke op uden prefab og er betinget af at quest er i gang, så gør det - ellers benyt prefab. action for at høre npc's historie kan gøres igen og igen indtil quest er slut og afleveret. Brug evt flags for at markerer om npc er snakket med.
-Når alle tre npc'er er snakket med, vender man tilbage med historierne til borgmester.
 
 
 Town Hall quests:

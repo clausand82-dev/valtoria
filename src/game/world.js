@@ -830,7 +830,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
         minDistanceBetweenPrefabs: regionConfig.prefabRules.minDistanceBetweenPrefabs,
         anchors: [...(regionConfig.prefabRules.anchors ?? [])],
         pool: Array.isArray(regionConfig.prefabRules.pool)
-          ? regionConfig.prefabRules.pool.map((entry) => ({ id: entry.id, weight: entry.weight, max: entry.max, required: entry.required === true }))
+          ? regionConfig.prefabRules.pool.map((entry) => ({ ...entry, required: entry.required === true }))
           : [],
       } : null,
       spawnCounts: {

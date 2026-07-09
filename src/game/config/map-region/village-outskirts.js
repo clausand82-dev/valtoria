@@ -17,9 +17,28 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Path to Hunter Hut",
       i18n: { da: { label: "Sti til jaegerhytten" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
+      unlock: {
+        any: [
+          { questActive: "status_on_city_defences" },
+          { questCompleted: "status_on_city_defences" },
+        ],
+        text: "Opens when the mayor asks for a status on city defences.",
+        i18n: { da: { text: "Aabnes, naar borgmesteren beder om status paa byens forsvar." } },
+      },
       labelX: 38,
       labelY: 10,
+      cityStatVariants: [
+        { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
+      ],
+      prefabRules: {
+        maxTotal: 2,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "hunter_hut_grave_fence_repair", weight: 100, max: 1, required: true },
+          { id: "defence_beacon_hunter_hut", weight: 100, max: 1, required: true },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 6, rock: 2, foilage: 8, fireplace: 1 }
       objects: [
         { id: "object_tree_mainland", weight: 6 },
@@ -37,20 +56,56 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Lookout Post",
       i18n: { da: { label: "Udkigsposten" } },
       color: "#9fca66",
-      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
+      unlock: {
+        any: [
+          { questActive: "status_on_city_defences" },
+          { questCompleted: "status_on_city_defences" },
+        ],
+        text: "Opens when the mayor asks for a status on city defences.",
+        i18n: { da: { text: "Aabnes, naar borgmesteren beder om status paa byens forsvar." } },
+      },
       labelX: 35,
       labelY: 26,
+      cityStatVariants: [
+        { questCompleted: "clear_and_repair_the_lookout_post", corruption: 0, stats: { city_defence: 50 } },
+      ],
+      prefabRules: {
+        maxTotal: 1,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "lookout_repair_post", weight: 100, max: 1, required: true },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 7, rock: 3, foilage: 7, fireplace: 1 }
       weights: { foilage: 7 },
-      objects: [
-        { id: "object_tree_mainland", weight: 7 },
-        { id: "object_stone_cluster", weight: 3 },
-        { id: "object_house_mainland", weight: 1 },
-        { id: "object_pillar_stone", weight: 1 },
-        { id: "object_ruin_mainland", weight: 1 },
-        { id: "object_fireplace_mainland", weight: 1 },
-      ],
+      objects: {
+        value: [
+          { id: "object_tree_mainland", weight: 3 },
+          { id: "object_stone_cluster", weight: 3 },
+          { id: "object_wagons_destroyed", weight: 2, blockedBy: { questCompleted: "clear_and_repair_the_lookout_post" } },
+          { id: "object_wagons_damaged", weight: 2, blockedBy: { questCompleted: "clear_and_repair_the_lookout_post" } },
+          { id: "object_ruin_mainland", weight: 2, blockedBy: { questCompleted: "clear_and_repair_the_lookout_post" } },
+        ],
+        variants: [
+          {
+            questCompleted: "clear_and_repair_the_lookout_post",
+            value: [
+              { id: "object_tree_mainland", weight: 8 },
+              { id: "object_flowers", weight: 4, size: 0.75 },
+              { id: "object_stone_cluster", weight: 2 },
+              { id: "object_fireplace_mainland", weight: 1 },
+            ],
+          },
+        ],
+      },
       foliageSet: MAINLAND_PATH_FOLIAGE,
+      mobs: {
+        value: [{ type: "Skeleton", weight: 5 }, { type: "Demon", weight: 2 }, { type: "Ghost", weight: 3 }],
+        variants: [
+          { questCompleted: "clear_and_repair_the_lookout_post", value: [{ type: "Wolf", weight: 3 }, { type: "Wild Boar", weight: 3 }] },
+        ],
+      },
       points: "31.10,14.88 41.87,17.00 41.87,31.88 34.69,36.13 23.92,29.76",
     }),
     region({
@@ -228,9 +283,27 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Trail to Inner Elvindale",
       i18n: { da: { label: "Sti mod Elvindalens indre dal" } },
       color: "#d7a85b",
-      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
+      unlock: {
+        any: [
+          { questActive: "status_on_city_defences" },
+          { questCompleted: "status_on_city_defences" },
+        ],
+        text: "Opens when the mayor asks for a status on city defences.",
+        i18n: { da: { text: "Aabnes, naar borgmesteren beder om status paa byens forsvar." } },
+      },
       labelX: 25,
       labelY: 77,
+      cityStatVariants: [
+        { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
+      ],
+      prefabRules: {
+        maxTotal: 1,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "defence_beacon_inner_elvindale", weight: 100, max: 1, required: true },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 6, rock: 2, foilage: 9, fireplace: 1 }
       weights: { foilage: 9 },
       objects: [
@@ -566,9 +639,27 @@ export function createVillageOutskirtsMapRegions(region) {
       label: "Hunter Trail to the Forest",
       i18n: { da: { label: "Jaegerstien mod skoven" } },
       color: "#9fca66",
-      unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
+      unlock: {
+        any: [
+          { questActive: "status_on_city_defences" },
+          { questCompleted: "status_on_city_defences" },
+        ],
+        text: "Opens when the mayor asks for a status on city defences.",
+        i18n: { da: { text: "Aabnes, naar borgmesteren beder om status paa byens forsvar." } },
+      },
       labelX: 93,
       labelY: 45,
+      cityStatVariants: [
+        { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
+      ],
+      prefabRules: {
+        maxTotal: 1,
+        minDistanceBetweenPrefabs: 8,
+        anchors: ["clearing", "room", "pathSide"],
+        pool: [
+          { id: "defence_beacon_hunter_trail", weight: 100, max: 1, required: true },
+        ],
+      },
       // TODO:DELETE: weights: { tree: 9, rock: 2, foilage: 10, fireplace: 1 }
       weights: { foilage: 10 },
       objects: [
@@ -589,7 +680,7 @@ export function createVillageOutskirtsMapRegions(region) {
       mapSize: "small",
       color: "#c4a86a",
       cityStats: { population: 10, trade: 10, health: 10, culture: 5 },
-      unlock: { questCompleted: ["devils_judge"] },
+      unlock: { questCompleted: ["rebuild_blacksmith"] },
       labelX: 44,
       labelY: 35,
       spawnCounts:

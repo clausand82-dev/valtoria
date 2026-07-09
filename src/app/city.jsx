@@ -10,7 +10,7 @@ import {
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue, makePotion } from "../game/world.js";
-import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemsCanStack, questItemStackMax, questProgressText, resourceStackMax } from "../game/GameEngine/helpers.js";
+import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemCount, questItemStacksByQuestInstance, questItemTargetsForQuest, questItemsCanStack, questItemStackMax, questProgressText, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
 import { RESOURCE_DEFS, RESOURCE_MERGE_RECIPES } from "../game/config/resource-config.js";
@@ -2338,10 +2338,145 @@ function questResourceEntries(quest) {
     : [];
 }
 
+function cityQuestStoredItems(progress = {}) {
+  const items = [];
+  for (const building of CITY_BUILDINGS) {
+    if (!isCityBuildingOwned(progress, building)) continue;
+    const state = getCityBuildingState(progress, building);
+    const inventories = normalizeCityInventories(state, building);
+    for (const section of cityInventorySections(building, state, true)) {
+      for (const item of inventories[section.key] ?? []) {
+        if (!item) continue;
+        items.push(item && typeof item === "object" ? { ...item } : item);
+      }
+    }
+  }
+  return items;
+}
+
+function questTargetItemMatches(item, req = {}) {
+  if (!item) return false;
+  let match = true;
+  if (req.templateId) match = match && (String(item.uniqueId) === String(req.templateId) || String(item.namedId) === String(req.templateId));
+  if (req.namePrefix) match = match && String(item.name || "").startsWith(`${req.namePrefix} `);
+  if (req.baseName) match = match && String(item.baseName || "") === String(req.baseName);
+  if (req.rarity) match = match && String(item.rarity || "") === String(req.rarity);
+  return match;
+}
+
+function questTargetItemCount(inventory = [], req = {}) {
+  return (inventory ?? []).reduce((sum, item) => (
+    questTargetItemMatches(item, req) ? sum + 1 : sum
+  ), 0);
+}
+
+function cityQuestStorageRequirementMatches(item, requirement) {
+  if (!item) return false;
+  if (requirement.type === "resource") {
+    return item.mode === "resource" && String(item.resourceId ?? "") === String(requirement.resourceId);
+  }
+  if (requirement.type === "questItem") {
+    return item.mode === "quest"
+      && String(item.questItemId ?? "") === String(requirement.questItemId)
+      && (!questItemStacksByQuestInstance(item.questItemId) || item.questInstanceId == null || String(item.questInstanceId) === String(requirement.questInstanceId));
+  }
+  if (requirement.type === "item") return questTargetItemMatches(item, requirement.req);
+  return false;
+}
+
+function consumeCityQuestStorageRequirement(progress = {}, requirement) {
+  let remaining = Math.max(0, Math.floor(Number(requirement.amount) || 0));
+  if (remaining <= 0) return { progress, consumed: 0 };
+  let consumed = 0;
+  let nextProgress = progress;
+  for (const building of CITY_BUILDINGS) {
+    if (remaining <= 0 || !isCityBuildingOwned(nextProgress, building)) continue;
+    const state = getCityBuildingState(nextProgress, building);
+    const sections = cityInventorySections(building, state, true);
+    const inventories = normalizeCityInventories(state, building);
+    let changed = false;
+    const nextInventories = { ...inventories };
+    for (const section of sections) {
+      if (remaining <= 0) break;
+      const sectionKey = section.key;
+      const items = [...(nextInventories[sectionKey] ?? [])];
+      for (let index = items.length - 1; index >= 0 && remaining > 0; index -= 1) {
+        const item = items[index];
+        if (!cityQuestStorageRequirementMatches(item, requirement)) continue;
+        const count = requirement.stackCount ? Math.max(1, Math.floor(Number(item.count) || 1)) : 1;
+        const used = Math.min(count, remaining);
+        remaining -= used;
+        consumed += used;
+        changed = true;
+        if (requirement.stackCount && count > used) items[index] = { ...item, count: count - used };
+        else items[index] = null;
+      }
+      nextInventories[sectionKey] = items;
+    }
+    if (!changed) continue;
+    nextProgress = {
+      ...nextProgress,
+      [building.id]: {
+        ...(nextProgress[building.id] ?? {}),
+        inventories: nextInventories,
+      },
+    };
+  }
+  return { progress: nextProgress, consumed };
+}
+
+function cityQuestStorageRequirementsMissingFromBackpack(quest, snapshot = {}, options = {}) {
+  const inventory = snapshot.inventory ?? [];
+  const requirements = [];
+  if (!options.skipResources && Array.isArray(quest?.target?.resources)) {
+    for (const [resourceId, count] of questResourceEntries(quest)) {
+      const missing = count - cityResourceCount(inventory, resourceId);
+      if (missing > 0) requirements.push({ type: "resource", resourceId, amount: missing, stackCount: true });
+    }
+  }
+  if (Array.isArray(quest?.target?.items)) {
+    for (const req of quest.target.items) {
+      const count = Math.max(1, Math.floor(Number(req.count) || 1));
+      const missing = count - questTargetItemCount(inventory, req);
+      if (missing > 0) requirements.push({ type: "item", req, amount: missing, stackCount: false });
+    }
+  }
+  for (const target of questItemTargetsForQuest(quest)) {
+    const questItemId = String(target.questItemId ?? "");
+    if (!questItemId) continue;
+    const count = Math.max(1, Math.floor(Number(target.count) || 1));
+    const missing = count - questItemCount(inventory, quest.id, questItemId);
+    if (missing > 0) {
+      requirements.push({
+        type: "questItem",
+        questItemId,
+        questInstanceId: quest.id,
+        amount: missing,
+        stackCount: questItemCanStack(questItemId),
+      });
+    }
+  }
+  return requirements;
+}
+
+function consumeCityQuestStorageRequirements(quest, snapshot = {}, progress = {}, options = {}) {
+  const requirements = cityQuestStorageRequirementsMissingFromBackpack(quest, snapshot, options);
+  let nextProgress = progress;
+  let consumed = 0;
+  for (const requirement of requirements) {
+    const result = consumeCityQuestStorageRequirement(nextProgress, requirement);
+    if (result.consumed < requirement.amount) return { ok: false, progress, consumed };
+    nextProgress = result.progress;
+    consumed += result.consumed;
+  }
+  return { ok: true, progress: nextProgress, consumed };
+}
+
 function buildCityQuestCompletionInventory(quest, snapshot = {}, progress = null, fallbackInventory = []) {
   const inventory = (snapshot.inventory ?? fallbackInventory).map((item) => (
     item && typeof item === "object" ? { ...item } : item
   ));
+  inventory.push(...cityQuestStoredItems(progress));
   for (const [resourceId] of questResourceEntries(quest)) {
     const backpackCount = cityResourceCount(inventory, resourceId);
     const available = cityCostAvailable(snapshot, resourceId, progress);
@@ -2420,6 +2555,14 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
       resourcesPrepaid: !backpackComplete && cityComplete,
     });
     if (result?.ok) {
+      onChangeProgress?.((current) => {
+        const storageResult = consumeCityQuestStorageRequirements(quest, snapshotRef?.current, current, {
+          skipResources: resourcesPrepaid,
+        });
+        if (storageResult.ok) return storageResult.progress;
+        engine?.addToast?.(t("city.quest.resourcesMissingToast"));
+        return current;
+      });
       setActionMessage("");
       setSelectedQuest(null);
       setQuestCompletionResult(result);
@@ -5638,6 +5781,8 @@ function drawCityPopupThumb(canvas, sprite, muted) {
 export {
   CityPage,
   CityThreatMeter,
+  buildCityQuestCompletionInventory,
+  consumeCityQuestStorageRequirements,
   loadCityAssets,
   loadCityAssetsOnce,
   loadCityProgress,

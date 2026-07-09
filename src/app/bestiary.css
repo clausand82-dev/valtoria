@@ -1,0 +1,260 @@
+.bestiary-panel {
+  margin-top: 8px;
+}
+
+.bestiary-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 250px) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 320px;
+}
+
+.bestiary-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  max-height: 430px;
+  overflow: auto;
+}
+
+.bestiary-entry {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 7px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 7px;
+  color: #f5f3ea;
+  background: rgba(0, 0, 0, 0.18);
+  text-align: left;
+}
+
+.bestiary-entry:hover,
+.bestiary-entry.active {
+  border-color: rgba(244, 218, 150, 0.42);
+  background: rgba(244, 218, 150, 0.1);
+}
+
+.bestiary-entry.unknown {
+  color: rgba(245, 243, 234, 0.62);
+}
+
+.bestiary-entry span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.bestiary-entry b {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.bestiary-sprite,
+.bestiary-sprite-placeholder {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.bestiary-sprite-placeholder {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(245, 243, 234, 0.38);
+  font-weight: 800;
+}
+
+.bestiary-detail {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.bestiary-book-page {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 300px;
+  max-height: 430px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.bestiary-detail-header {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.bestiary-detail-header .bestiary-sprite,
+.bestiary-detail-header .bestiary-sprite-placeholder {
+  width: 72px;
+  height: 72px;
+}
+
+.bestiary-book-page h4,
+.bestiary-book-page h5 {
+  margin: 0;
+  color: #f4da96;
+}
+
+.bestiary-book-page h5 {
+  font-size: 13px;
+}
+
+.bestiary-book-page p,
+.bestiary-detail-header span,
+.bestiary-detail-header small,
+.bestiary-region-list span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bestiary-chip-group,
+.bestiary-stat-grid,
+.bestiary-region-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bestiary-chip-group b {
+  width: 100%;
+  color: #f5f3ea;
+  font-size: 12px;
+}
+
+.bestiary-chip-group span,
+.bestiary-stat-grid span {
+  display: inline-grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid rgba(244, 218, 150, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f5f3ea;
+  font-size: 12px;
+}
+
+.bestiary-chip-group.weak span {
+  border-color: rgba(255, 114, 114, 0.22);
+}
+
+.bestiary-stat-grid span b {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 820px) {
+  .bestiary-layout,
+  .bestiary-detail {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bestiary-panel > .bestiary-list {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  max-height: 360px;
+}
+
+.bestiary-panel > .bestiary-list .bestiary-entry {
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  min-height: 44px;
+}
+
+.bestiary-panel > .bestiary-list .bestiary-sprite,
+.bestiary-panel > .bestiary-list .bestiary-sprite-placeholder {
+  width: 34px;
+  height: 34px;
+}
+
+.bestiary-book-overlay {
+  padding: 96px 118px 102px 138px;
+}
+
+.bestiary-book-spread {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 112px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bestiary-book-dialog .bestiary-book-page {
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--quest-ink-soft);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.bestiary-book-dialog .bestiary-detail-header {
+  grid-template-columns: 90px minmax(0, 1fr);
+  margin-bottom: 8px;
+}
+
+.bestiary-book-dialog .bestiary-detail-header .bestiary-sprite,
+.bestiary-book-dialog .bestiary-detail-header .bestiary-sprite-placeholder {
+  width: 88px;
+  height: 88px;
+  background: rgba(80, 48, 20, 0.08);
+}
+
+.bestiary-book-dialog .bestiary-book-page h4,
+.bestiary-book-dialog .bestiary-book-page h5 {
+  color: var(--quest-red);
+  font-size: 18px;
+  line-height: 1.05;
+}
+
+.bestiary-book-dialog .bestiary-book-page h5 {
+  margin-top: 8px;
+  font-size: 15px;
+}
+
+.bestiary-book-dialog .bestiary-book-page p,
+.bestiary-book-dialog .bestiary-detail-header span,
+.bestiary-book-dialog .bestiary-detail-header small,
+.bestiary-book-dialog .bestiary-region-list span {
+  color: var(--quest-ink-soft);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.bestiary-book-dialog .bestiary-chip-group b,
+.bestiary-book-dialog .bestiary-stat-grid span b {
+  color: var(--quest-gold);
+}
+
+.bestiary-book-dialog .bestiary-chip-group span,
+.bestiary-book-dialog .bestiary-stat-grid span {
+  border-color: rgba(84, 47, 19, 0.18);
+  background: rgba(84, 47, 19, 0.07);
+  color: var(--quest-ink);
+}
+
+@media (max-width: 760px) {
+  .bestiary-book-spread {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    overflow: auto;
+  }
+}

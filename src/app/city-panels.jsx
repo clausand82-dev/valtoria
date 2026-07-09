@@ -127,9 +127,18 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
   const hasWeaponAnvil = purchasedAddons.has("weapon_anvil");
   const hasArmorAnvil = purchasedAddons.has("armor_anvil");
   const hasForge = purchasedAddons.has("forge");
+  const equippedItemIds = useMemo(() => new Set(
+    (snapshot.equipment ?? [])
+      .map((slot) => slot?.item?.id)
+      .filter((id) => id != null)
+      .map(String),
+  ), [snapshot.equipment]);
   const forgeGear = useMemo(() => (
-    (snapshot.inventory ?? []).filter((item) => isForgeGear(item))
-  ), [snapshot.inventory]);
+    (snapshot.inventory ?? []).filter((item) => (
+      isForgeGear(item)
+      && (item.id == null || !equippedItemIds.has(String(item.id)))
+    ))
+  ), [snapshot.inventory, equippedItemIds]);
 
   return (
     <section className="blacksmith-panel">
@@ -170,7 +179,7 @@ function CityBlacksmithPanel({ engineRef, snapshot, snapshotRef, activeAddonId, 
           enabled={hasForge}
           gear={forgeGear}
           blacksmithModifiers={blacksmithModifiers}
-          onDestroy={(index) => engineRef.current?.forgeDestroyInventoryWeapon?.(index)}
+          onDestroy={(index, itemId) => engineRef.current?.forgeDestroyInventoryWeapon?.(index, itemId)}
         />
       )}
     </section>
@@ -447,7 +456,7 @@ function BlacksmithForgeStation({ enabled, gear, blacksmithModifiers = {}, onDes
             <CityItemName item={item} />
             <span>{item.rarityLabel} | L{item.level} | {item.slot ?? item.mode}</span>
           </div>
-          <button type="button" className="danger-action" onClick={() => onDestroy(item.index)}>
+          <button type="button" className="danger-action" onClick={() => onDestroy(item.index, item.id)}>
             {t("action.destroy")}
           </button>
         </div>

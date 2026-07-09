@@ -68,6 +68,8 @@ export { useEngineModalLock } from "./hooks/use-engine-modal-lock.js";
 export {
   CityPage,
   CityThreatMeter,
+  buildCityQuestCompletionInventory,
+  consumeCityQuestStorageRequirements,
   loadCityAssets,
   loadCityAssetsOnce,
   loadCityProgress,

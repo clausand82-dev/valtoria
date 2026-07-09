@@ -82,27 +82,6 @@ wiseman_scrolls: {
 
   i18n: { da: { title: "Gamle skriftruller", story: "Vitlias soeger gamle skrifter. Find 10 scrolls og bring dem til biblioteket.", acceptText: "Find 10 scrolls til mit bibliotek.", turnInText: "Disse vil give indsigt til mine studier. Godt fundet." } },
 },
-annelise_spider_task: {
-    id: "annelise_spider_task",
-    source: "npc",
-    kind: "side",
-    category: "bounty",
-    title: "Annelise: Slay 100 Spiders",
-    repeatable: false,
-    npcIds: ["lady"],
-    regionIds: ["city"],
-    questActive: ["vitlias_kings_relics"], //demands
-    //demands: { questActive: ["vitlias_kings_relics"] },
-    spawnChance: 1,
-    type: "kill_monsters",
-    target: { count: 100, monster: ["MiniSpider", "MediumSpider", "LargeSpider", "Spider"], allowElite: true },
-    story: "Annelise fears spiders and asks you to slay 100 of them. She promises a special reward when the task is done.",
-    acceptText: "Slay 100 spiders for me, and I may give you something valuable.",
-    turnInText: "You did it. Those creatures were dreadful. Here is the scepter I have kept until now.",
-    rewards: { xp: 800, questItems: [{ questItemId: "king_scepter", count: 1 }], factionRep: { village_outskirt: 2 } },
-
-  i18n: { da: { title: "Annelise: Dræb 100 edderkopper", story: "Annelise har en frygt for edderkopper. Hun beder dig dræbe 100 edderkopper i området. Når du har gjort det, vil hun belønne dig med noget særligt.", acceptText: "Dræb 100 edderkopper for mig, og jeg vil overveje at give dig noget værdifuldt.", turnInText: "Du gjorde det... disse kryb var ikke sjove. Her er scepteret, som jeg har holdt tilbage indtil nu." } },
-},
 himus_sell_king_orb: {
     id: "himus_sell_king_orb",
     source: "townHall",

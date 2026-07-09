@@ -13,6 +13,7 @@ import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/p
 import { QUEST_DEFS } from "./game/config/quest-config.js";
 import { ACTION_CONFIG } from "./game/config/action-config.js";
 import { READABLE_DEF_BY_ID } from "./game/config/readable-config.js";
+import { isQuestComplete, questProgressText } from "./game/GameEngine/helpers.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import { useLocalization } from "./i18n/index.js";
 import { HelpDialog } from "./app/help/index.js";
@@ -40,6 +41,8 @@ import {
   RegionMapDialog,
   RunSummaryDialog,
   StartMenu,
+  buildCityQuestCompletionInventory,
+  consumeCityQuestStorageRequirements,
   calculateCityStats,
   calculateCityStatBreakdown,
   collectSaveSlots,
@@ -832,9 +835,59 @@ export default function App() {
     Array.from({ length: MAX_INVENTORY }, (_, index) => snapshot.inventory[index] ?? null)
   ), [snapshot.inventory]);
   const activeQuests = snapshot.quests?.active ?? [];
+  const displayQuestForUi = useCallback((quest) => {
+    if (!quest) return quest;
+    const inventory = buildCityQuestCompletionInventory(quest, snapshot, cityProgressHud, snapshot.inventory ?? []);
+    return {
+      ...quest,
+      complete: Boolean(quest.complete) || isQuestComplete(quest, inventory),
+      progressText: questProgressText(quest, inventory),
+    };
+  }, [cityProgressHud, snapshot]);
+  const displayQuestInteraction = useCallback((interaction) => (
+    interaction
+      ? {
+        ...interaction,
+        active: (interaction.active ?? []).map(displayQuestForUi),
+        offers: (interaction.offers ?? []).map(displayQuestForUi),
+      }
+      : interaction
+  ), [displayQuestForUi]);
+  const displayActiveQuests = useMemo(
+    () => activeQuests.map(displayQuestForUi),
+    [activeQuests, displayQuestForUi],
+  );
+  const displayQuestOffer = useMemo(
+    () => displayQuestInteraction(questOffer),
+    [displayQuestInteraction, questOffer],
+  );
+  const completeQuestWithCityInventory = useCallback((quest, npcId, options = {}) => {
+    const engine = engineRef.current;
+    if (!engine || !quest) return false;
+    const currentSnapshot = snapshotRef.current ?? snapshot;
+    const currentProgress = cityProgressHud;
+    const completionInventory = buildCityQuestCompletionInventory(quest, currentSnapshot, currentProgress, engine.player?.inventory ?? []);
+    const result = engine.completeQuest?.(quest.id ?? quest.questId, npcId, {
+      inventoryOverride: completionInventory,
+      resourcesPrepaid: Boolean(options.resourcesPrepaid),
+    });
+    if (result?.ok) {
+      const storageResult = consumeCityQuestStorageRequirements(quest, currentSnapshot, currentProgress, {
+        skipResources: Boolean(options.resourcesPrepaid),
+      });
+      if (storageResult.ok && storageResult.consumed > 0) {
+        const cityStorageKey = gameSessionRef.current?.slot?.cityStorageKey ?? CITY_STORAGE_KEY;
+        saveCityProgress(storageResult.progress, cityStorageKey);
+        syncCityProgress(storageResult.progress, { refreshCityPage: true });
+      } else if (!storageResult.ok) {
+        engine.addToast?.(t("city.quest.resourcesMissingToast"));
+      }
+    }
+    return result;
+  }, [cityProgressHud, snapshot, syncCityProgress, t]);
   const trackedQuests = useMemo(
-    () => activeQuests.filter((quest) => quest.tracked !== false),
-    [activeQuests],
+    () => displayActiveQuests.filter((quest) => quest.tracked !== false),
+    [displayActiveQuests],
   );
   const profileOptions = useMemo(
     () => Object.values(PERFORMANCE_PROFILES),
@@ -1432,7 +1485,7 @@ export default function App() {
 
       {questOverviewOpen && (
         <QuestOverviewDialog
-          activeQuests={activeQuests}
+          activeQuests={displayActiveQuests}
           completedQuestIds={snapshot.quests?.completed ?? []}
           onClose={() => setQuestOverviewOpen(false)}
           onToggleTracked={(questId, tracked) => engineRef.current?.setQuestTracked?.(questId, tracked)}
@@ -1543,9 +1596,9 @@ export default function App() {
         </div>
       )}
 
-      {questOffer && (
+      {displayQuestOffer && (
         <QuestOfferDialog
-          interaction={questOffer}
+          interaction={displayQuestOffer}
           onDecline={() => {
             engineRef.current?.declineWildernessQuest?.();
             setQuestOffer(null);
@@ -1561,7 +1614,7 @@ export default function App() {
             setQuestOffer(null);
           }}
           onTurnInQuest={(quest) => {
-            const result = engineRef.current?.completeQuest?.(quest.id ?? quest.questId, questOffer.npcId);
+            const result = completeQuestWithCityInventory(quest, displayQuestOffer.npcId);
             if (result?.ok) {
               setQuestRewardModal(result);
               setQuestOffer(null);
@@ -1579,9 +1632,10 @@ export default function App() {
 
       {viewedQuest && (
         <QuestDetailDialog
-          quest={viewedQuest}
+          quest={displayQuestForUi(viewedQuest)}
           engineRef={engineRef}
           onClose={() => setViewedQuest(null)}
+          onTurnInQuest={(quest) => completeQuestWithCityInventory(quest, quest.turnInNpcId ?? quest.npcId)}
           onQuestCompleted={(result) => setQuestRewardModal(result)}
           onQuestAbandoned={() => setViewedQuest(null)}
           cityOpen={cityOpen}

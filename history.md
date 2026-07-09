@@ -4,6 +4,22 @@ History over changes
 - added summary modal after expedition run
 - added game version number i right bottom corner in velcome screen
 - both lydra and nedra now have floating text showinbg amount in expedition runs
+- low threat also now reduce spread from city mobs already there
+- blacksmith can no longer destroy equipt items
+- city mobs and npc chips are smaller (npc 26% smaller, city mobs 21% smaller)
+- custom text can now show IMPORTENT msg's on frontpage
+- split loading screen, start menu, and HUD CSS into feature-owned stylesheets without changing the UI
+- moved the isolated bestiary CSS block into its own feature stylesheet
+- moved the HUD performance/debug panel styles into the existing HUD stylesheet
+- moved shared quest-dialog and hero-dialog styles into feature-owned stylesheets
+- moved map-dialog, world-energy, quickslot, and skillbar styles into feature-owned stylesheets
+- moved purely city-scoped UI styles into a dedicated city stylesheet
+- restored the compact bottom wilderness interaction prompt after the CSS split
+- restored HUD action-bar and region-debug selectors after removing stray CSS patch markers
+- expanded spell quickslots to keys 3-6; number keys now select spells while mouse input casts the active spell
+- changed a bit i questlines
+- added a new questline (rebuild city defence)
+- fixed a small bug where city questlog didn't counted city storage items and resources into questlog
 
 *V. 1.01
 - some small ui translation fixes
@@ -324,4 +340,3 @@ History over changes
 
 *V. 0.01
 - first working edition
-

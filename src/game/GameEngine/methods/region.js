@@ -190,15 +190,16 @@ export const regionMethods = {
     this.prepareRegionQuestgiver();
     // Set total spawned count for active clear_map quests targeting this region
     for (const quest of this.questState.active) {
-      if (quest.type !== "clear_map") continue;
-      if (quest.target?.regionId !== preparedRegionConfig.id) continue;
-      const validTypes = quest.target?.monsters ?? [];
+      if (quest.type !== "clear_map" && quest.type !== "clear_map_and_action_targets") continue;
+      const clearTarget = quest.type === "clear_map_and_action_targets" ? (quest.target?.clearMap ?? {}) : quest.target;
+      if ((clearTarget?.regionId ?? quest.target?.regionId) !== preparedRegionConfig.id) continue;
+      const validTypes = clearTarget?.monsters ?? [];
       const total = [...this.monsters.values()].filter((m) => validTypes.includes(m.typeName)).length;
-      quest.progress = { ...(quest.progress ?? {}), total, kills: 0, cleared: false };
+      quest.progress = { ...(quest.progress ?? {}), total, killTotal: total, kills: 0, cleared: false };
     }
     // Dynamic action targets are only known after every chunk in this run exists.
     for (const quest of this.questState.active) {
-      if (quest.type !== "action_targets") continue;
+      if (quest.type !== "action_targets" && quest.type !== "clear_map_and_action_targets") continue;
       if (quest.target?.regionId !== preparedRegionConfig.id) continue;
       const groups = actionTargetGroupsForQuest(quest);
       if (!groups.length) continue;
@@ -213,7 +214,7 @@ export const regionMethods = {
       const total = Object.values(targets).reduce((sum, target) => sum + target.total, 0);
       // These targets belong to the newly generated run. Do not carry repaired
       // houses or buried villagers forward from an earlier run.
-      quest.progress = { ...(quest.progress ?? {}), targets, total, done: 0 };
+      quest.progress = { ...(quest.progress ?? {}), targets, targetTotal: total, targetDone: 0, total, done: 0 };
     }
     this.rebuildRegionStats?.({ ensureFullRegionGenerated: false });
     this.beginRunSummary?.(this.activeMapRegion);

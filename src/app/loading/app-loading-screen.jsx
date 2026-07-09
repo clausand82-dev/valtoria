@@ -1,4 +1,5 @@
 import React from "react";
+import "./app-loading-screen.css";
 import { useLocalization } from "../../i18n/index.js";
 
 export function AppLoadingScreen({ state }) {

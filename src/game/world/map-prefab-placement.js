@@ -1,5 +1,6 @@
 import { MAP_LAYOUTS } from "../config/map-layout-config.js";
 import { DEBUG_MAP_PREFABS, MAP_PREFABS } from "../config/map-prefab-config.js";
+import { worldEntryAllowed } from "../world-state.js";
 
 export function chooseWeighted(rng, pool = []) {
   const entries = Array.isArray(pool)
@@ -36,7 +37,15 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
   region.prefabInstances = [];
 
   const rules = regionConfig?.prefabRules;
-  const pool = Array.isArray(rules?.pool) ? rules.pool : [];
+  const conditionContext = regionConfig?.__conditionContext ?? {};
+  const worldState = conditionContext.worldState;
+  const pool = (Array.isArray(rules?.pool) ? rules.pool : []).filter((entry) => (
+    worldEntryAllowed(entry, worldState, {
+      ...conditionContext,
+      regionId: regionConfig?.id,
+      regionConfig,
+    })
+  ));
   if (!rules || !pool.length) {
     region.prefabDebug = { attempts: 0, placed: [], skipped: [] };
     return region.prefabInstances;

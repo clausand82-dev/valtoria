@@ -128,7 +128,7 @@ export const questsMethods = {
     if (regionIds.size <= 0 || delta <= 0) return false;
     let changed = false;
     for (const quest of this.questState.active) {
-      if (quest.type !== "action_targets") continue;
+      if (quest.type !== "action_targets" && quest.type !== "clear_map_and_action_targets") continue;
       if (!regionIds.has(String(quest.target?.regionId ?? "").trim())) continue;
       const group = actionTargetGroupsForQuest(quest).find((entry) => entry.questTargetKey === questTargetKey);
       if (!group) continue;
@@ -141,10 +141,10 @@ export const questsMethods = {
       if (nextTargetDone === targetDone) continue;
       targets[questTargetKey] = { ...targetProgress, done: nextTargetDone };
       const done = Object.values(targets).reduce((sum, entry) => sum + Math.max(0, Math.floor(Number(entry?.done) || 0)), 0);
-      const total = Math.max(targetTotal, Math.max(0, Math.floor(Number(quest.progress?.total) || 0)));
-      quest.progress = { ...(quest.progress ?? {}), targets, total, done };
+      const total = Math.max(targetTotal, Math.max(0, Math.floor(Number(quest.progress?.targetTotal ?? quest.progress?.total) || 0)));
+      quest.progress = { ...(quest.progress ?? {}), targets, targetTotal: total, targetDone: done, total, done };
       changed = true;
-      if (done >= total) this.addToast?.(`${quest.title} ready to turn in`, {
+      if (isQuestComplete(quest, this.player.inventory)) this.addToast?.(`${quest.title} ready to turn in`, {
         kind: "quest",
         localization: { type: "questReady", questId: quest.questId ?? quest.id },
       });
@@ -1227,13 +1227,18 @@ export const questsMethods = {
           }
         }
       }
-      if (quest.type === "clear_map") {
-        const validTypes = Array.isArray(quest.target?.monsters)
-          ? quest.target.monsters.map((type) => norm(type)).filter(Boolean)
+      if (quest.type === "clear_map" || quest.type === "clear_map_and_action_targets") {
+        const clearTarget = quest.type === "clear_map_and_action_targets" ? (quest.target?.clearMap ?? {}) : quest.target;
+        const validTypes = Array.isArray(clearTarget?.monsters)
+          ? clearTarget.monsters.map((type) => norm(type)).filter(Boolean)
           : [];
         if (validTypes.length > 0 && !validTypes.includes(killedType)) continue;
         const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
         quest.progress = { ...(quest.progress ?? {}), kills: kills + 1 };
+        if (isQuestComplete(quest, this.player.inventory)) this.addToast(`${quest.title} ready to turn in`, {
+          kind: "quest",
+          localization: { type: "questReady", questId: quest.questId ?? quest.id },
+        });
         changed = true;
         continue;
       }

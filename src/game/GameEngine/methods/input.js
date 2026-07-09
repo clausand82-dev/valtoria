@@ -116,21 +116,9 @@ export const inputMethods = {
       event.preventDefault();
       this.primaryAttack();
     }
-    if (key === "1" && !wasDown) {
+    if (["1", "2", "3", "4", "5", "6"].includes(key) && !wasDown) {
       event.preventDefault();
-      this.activateQuickSlot("1");
-    }
-    if (key === "2" && !wasDown) {
-      event.preventDefault();
-      this.activateQuickSlot("2");
-    }
-    if (key === "3" && !wasDown) {
-      event.preventDefault();
-      this.activateQuickSlot("3");
-    }
-    if (key === "4" && !wasDown) {
-      event.preventDefault();
-      this.activateQuickSlot("4");
+      this.activateQuickSlot(key);
     }
     if (key === "q" && !wasDown) {
       event.preventDefault();
@@ -168,10 +156,6 @@ export const inputMethods = {
     const key = event.key.toLowerCase();
     const wasDown = this.keys.delete(key);
     if (wasDown) this.markRenderDirty?.("key-up");
-    if (["3", "4", "q"].includes(key)) {
-      const slot = this.normalizeQuickSlots?.()[key];
-      if (key === "q") this.stopHeldSpell?.(this.player.activeSpellId);
-      else if (slot?.kind === "spell") this.stopHeldSpell?.(slot.id);
-    }
+    if (key === "q") this.stopHeldSpell?.(this.player.activeSpellId);
   }
 };

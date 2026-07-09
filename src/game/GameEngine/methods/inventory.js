@@ -63,6 +63,7 @@ import {
   skillTreeAvailablePoints,
   skillTreeBranchSpentPoints,
 } from "../../config/skill-tree-config.js";
+
 import {
   GEM_SOCKET_BONUSES,
   MAX_ITEM_SOCKETS,
@@ -94,6 +95,15 @@ import {
   hasCityBuilding,
 } from "../../config/city-state-helpers.js";
 import { sortInventorySlots } from "../../inventory-sort.js";
+
+function isPlayerItemEquipped(player, item) {
+  if (!item) return false;
+  const itemId = item.id == null ? "" : String(item.id);
+  return Object.values(player?.equipment ?? {}).some((equippedItem) => (
+    equippedItem === item
+    || (itemId && equippedItem?.id != null && String(equippedItem.id) === itemId)
+  ));
+}
 
 function recipeRequiresResearchLab(recipe) {
   if (recipe?.station === "research_lab") return true;
@@ -548,10 +558,7 @@ export const inventoryMethods = {
     const slot = this.normalizeQuickSlots()[String(slotId)];
     if (!slot) return false;
     if (slot.kind === "potion") return this.usePotion(slot.id);
-    if (slot.kind === "spell") {
-      this.startHeldSpell?.(slot.id, "nearest");
-      return true;
-    }
+    if (slot.kind === "spell") return this.setActiveSpell(slot.id);
     return false;
   },
 
@@ -802,6 +809,10 @@ export const inventoryMethods = {
   destroyInventoryItem(index, force = false, options = {}) {
     const item = this.player.inventory[index];
     if (!item) return;
+    if (isPlayerItemEquipped(this.player, item)) {
+      this.addToast("Equipped gear kan ikke destrueres");
+      return false;
+    }
     if (item.rarity === "legendary" && !force) {
       this.addToast("Bekraeft destroy af roedt udstyr");
       return;
@@ -814,16 +825,25 @@ export const inventoryMethods = {
     this.dropDestroyedItemResources(item, options);
     this.addToast(`Destrueret: ${item.name}`);
     this.publishSnapshot();
+    return true;
   },
 
-  forgeDestroyInventoryWeapon(index) {
+  forgeDestroyInventoryWeapon(index, expectedItemId = null) {
     const item = this.player.inventory[index];
     if (!item) return false;
+    if (expectedItemId != null && String(item.id ?? "") !== String(expectedItemId)) {
+      this.addToast("Itemet er ikke længere tilgængeligt i rygsækken");
+      return false;
+    }
+    if (isPlayerItemEquipped(this.player, item)) {
+      this.addToast("Equipped gear kan ikke destrueres");
+      return false;
+    }
     if (!isEquippableItem(item)) {
       this.addToast("Forge kan kun destruere gear");
       return false;
     }
-    this.destroyInventoryItem(index, true, { forge: true });
+    if (!this.destroyInventoryItem(index, true, { forge: true })) return false;
     this.saveProgress({ force: true });
     return true;
   },

@@ -69,6 +69,7 @@ import {
   CITY_SPAWN_SPREAD_TARGETS,
   CITY_THREAT_SPAWN_THRESHOLD,
   calcCitySpawnChance,
+  getCityMobSpreadThreatMultiplier,
   getMaxNewCityMobsPerVisit,
   pickCityMobType,
 } from "../game/config/city-mobs-attack-config.js";
@@ -809,6 +810,8 @@ function applyCityMobProgressForVisit(progress = {}, cityStats = {}) {
 
 function applyCityMobLevelAndSpread(progress = {}) {
   const currentMobs = normalizeCityMobs(progress.cityMobs);
+  const threatLevel = Math.max(0, Math.min(100, Number(progress.threatLevel) || 0));
+  const spreadThreatMultiplier = getCityMobSpreadThreatMultiplier(threatLevel);
   const activeMobs = currentMobs.map((mob) => ({
     ...mob,
     visitsActive: Math.max(0, Math.floor(Number(mob.visitsActive) || 0)) + 1,
@@ -826,10 +829,11 @@ function applyCityMobLevelAndSpread(progress = {}) {
       mob.count = cityMobCountForLevel(mob.level);
     }
     if (nextMobs.length >= maxMobs) continue;
+    const spreadChance = cityMobSpreadChance(mob) * spreadThreatMultiplier;
     if (
       mob.level < 3
       || mob.visitsActive < (Number(CITY_MOB_BALANCE.minVisitsBeforeSpread) || 0)
-      || Math.random() >= cityMobSpreadChance(mob)
+      || Math.random() >= spreadChance
     ) continue;
 
     const spreadTargets = CITY_SPAWN_SPREAD_TARGETS[mob.areaId] ?? [];
@@ -2194,6 +2198,22 @@ function getRegionCityStats(region = {}) {
   return normalized;
 }
 
+function getRegionCityStatVariantStats(region = {}, worldState = null, context = {}) {
+  const variants = Array.isArray(region?.cityStatVariants) ? region.cityStatVariants : [];
+  if (!variants.length) return {};
+  const merged = {};
+  for (const variant of variants) {
+    if (!variant || typeof variant !== "object") continue;
+    if (!worldEntryAllowed(variant, worldState, context)) continue;
+    const stats = variant.stats ?? variant.cityStats ?? variant.effects?.cityStats ?? {};
+    if (!stats || typeof stats !== "object" || Array.isArray(stats)) continue;
+    for (const [statId, amount] of Object.entries(stats)) {
+      merged[statId] = (Number(merged[statId]) || 0) + (Number(amount) || 0);
+    }
+  }
+  return merged;
+}
+
 function getRegionCityStatMultiplier(corruptionLevel) {
   return Math.max(0, Math.min(1, (10 - clampCorruptionLevel(corruptionLevel)) / 10));
 }
@@ -2229,15 +2249,36 @@ function applyRegionCityStats(stats, regionCorruption = {}, snapshot = emptySnap
     for (const region of regions ?? []) {
       if (!cityStatsRegionIsUnlocked(region, snapshot, army)) continue;
       if (region.cityImpactEnabled === false) continue;
+      const corruptionLevel = getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region);
       const regionStats = getRegionCityStats(region);
-      if (!Object.keys(regionStats).length) continue;
-      const multiplier = getRegionCityStatMultiplier(getRegionCorruptionLevel(regionCorruption, areaMapId, region.id, region));
-      if (multiplier <= 0) continue;
-      for (const [rawId, rawAmount] of Object.entries(regionStats)) {
+      const context = {
+        regionId: region?.id,
+        regionConfig: region,
+        questState: snapshot?.quests ?? {},
+        worldState: snapshot?.worldState,
+      };
+      const variantStats = getRegionCityStatVariantStats(region, snapshot?.worldState, {
+        ...context,
+        regionConfig: { ...region, corruptionLevel },
+        corruptionLevel,
+      });
+      if (!Object.keys(regionStats).length && !Object.keys(variantStats).length) continue;
+      const multiplier = getRegionCityStatMultiplier(corruptionLevel);
+      if (multiplier > 0) {
+        for (const [rawId, rawAmount] of Object.entries(regionStats)) {
+          const statId = normalizeCityStatId(rawId === "populationGain" ? "population" : rawId);
+          if (!statId) continue;
+          if (statId === "popularity") continue;
+          const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
+          if (amount === 0) continue;
+          stats[statId] = Math.max(0, Math.floor(Number(stats[statId]) || 0) + amount);
+        }
+      }
+      for (const [rawId, rawAmount] of Object.entries(variantStats)) {
         const statId = normalizeCityStatId(rawId === "populationGain" ? "population" : rawId);
         if (!statId) continue;
         if (statId === "popularity") continue;
-        const amount = Math.floor((Number(rawAmount) || 0) * multiplier);
+        const amount = Math.floor(Number(rawAmount) || 0);
         if (amount === 0) continue;
         stats[statId] = Math.max(0, Math.floor(Number(stats[statId]) || 0) + amount);
       }

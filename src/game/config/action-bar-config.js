@@ -8,6 +8,8 @@ export const ACTION_BAR_CONFIG = {
     "2": { kind: "potion", defaultId: "small_mana" },
     "3": { kind: "spell", defaultId: "ember_spark" },
     "4": { kind: "spell", defaultId: "fireball" },
+    "5": { kind: "spell", defaultId: "" },
+    "6": { kind: "spell", defaultId: "" },
   },
 };
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import "./hud.css";
 import { CHEAT_SETTINGS } from "../../game/config/cheat-config.js";
 import { CITY_STATUS_EFFECT_ICON_URLS, cityEventEntries } from "../../game/config/city-config.js";
 import {
@@ -217,9 +218,9 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
   const hoverTimerRef = useRef(null);
   const closeTimerRef = useRef(null);
   const options = slot.kind === "potion" ? (quickActions.potions ?? []) : (quickActions.spells ?? []);
-  const selected = options.find((entry) => String(entry.id) === String(slot.id)) ?? options[0] ?? null;
+  const selected = options.find((entry) => String(entry.id) === String(slot.id)) ?? null;
   const isPotion = slot.kind === "potion";
-  const isChanneledSpell = !isPotion && Boolean(selected?.channeled);
+  const isActiveSpell = !isPotion && String(selected?.id ?? "") === String(quickActions.activeSpellId ?? "");
   const isOpen = openPicker === slotId;
   const count = isPotion ? Math.max(0, Math.floor(Number(selected?.count) || 0)) : 0;
   const spellCooldown = !isPotion && selected?.cooldown
@@ -272,32 +273,11 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
     >
       <button
         type="button"
-        className={`quickslot ${isPotion ? "potion-slot" : "spell-slot"} ${(isPotion ? potionCooldown : spellCooldown) > 0 ? "cooling" : ""}`}
+        className={`quickslot ${isPotion ? "potion-slot" : "spell-slot"} ${isActiveSpell ? "active" : ""} ${(isPotion ? potionCooldown : spellCooldown) > 0 ? "cooling" : ""}`}
         title={cityOpen ? t("hud.unavailableInCity") : title}
         disabled={disabled}
-        onPointerDown={(event) => {
-          if (!isChanneledSpell) return;
-          stopQuickbarEvent(event);
-          engineRef.current?.activateQuickSlot?.(slotId);
-        }}
-        onPointerUp={(event) => {
-          if (!isChanneledSpell) return;
-          stopQuickbarEvent(event);
-          engineRef.current?.stopHeldSpell?.(slot.id);
-        }}
-        onPointerCancel={(event) => {
-          if (!isChanneledSpell) return;
-          stopQuickbarEvent(event);
-          engineRef.current?.stopHeldSpell?.(slot.id);
-        }}
-        onPointerLeave={(event) => {
-          if (!isChanneledSpell) return;
-          stopQuickbarEvent(event);
-          engineRef.current?.stopHeldSpell?.(slot.id);
-        }}
         onClick={(event) => {
           stopQuickbarEvent(event);
-          if (isChanneledSpell) return;
           engineRef.current?.activateQuickSlot?.(slotId);
         }}
       >
@@ -707,7 +687,7 @@ export function GameHud({
         </section>
       ) : (
       <section className="skillbar" aria-label={t("hud.battleQuickbar")}>
-        {["1", "2", "3", "4"].map((slotId) => (
+        {["1", "2", "3", "4", "5", "6"].map((slotId) => (
           <QuickSlot
             cityOpen={cityOpen}
             engineRef={engineRef}

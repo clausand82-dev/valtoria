@@ -399,7 +399,7 @@ export function makeQuestInstance(def, npcId, context = {}) {
       }
       : def.type === "collect_quest_item"
         ? { items: 0 }
-        : def.type === "clear_map"
+        : (def.type === "clear_map" || def.type === "clear_map_and_action_targets")
           ? { kills: 0, total: null, cleared: false }
           : def.type === "action_targets"
             ? { done: 0, total: null, targets: {} }
@@ -436,6 +436,14 @@ export function isQuestComplete(quest, inventory = []) {
   }
   if (quest.type === "clear_map") {
     return quest.progress?.cleared === true;
+  }
+  if (quest.type === "clear_map_and_action_targets") {
+    if (quest.progress?.complete === true) return true;
+    const killTotal = Math.max(0, Math.floor(Number(quest.progress?.killTotal ?? quest.progress?.total) || 0));
+    const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
+    const targetTotal = Math.max(0, Math.floor(Number(quest.progress?.targetTotal) || 0));
+    const targetDone = Math.max(0, Math.floor(Number(quest.progress?.targetDone ?? quest.progress?.done) || 0));
+    return killTotal > 0 && kills >= killTotal && targetTotal > 0 && targetDone >= targetTotal;
   }
   if (quest.type === "action_targets") {
     if (quest.progress?.complete === true) return true;
@@ -575,6 +583,19 @@ export function questProgressText(quest, inventory = []) {
     const total = quest.progress?.total ?? "?";
     const label = quest.target?.label ?? resolveQuestDefById(quest.questId)?.target?.label ?? "monstre";
     return `${kills} / ${total} ${label}`;
+  }
+  if (quest.type === "clear_map_and_action_targets") {
+    const kills = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
+    const killTotal = quest.progress?.killTotal ?? quest.progress?.total ?? "?";
+    const killLabel = quest.target?.clearMap?.label ?? quest.target?.label ?? "monstre";
+    const groups = actionTargetGroupsForQuest(quest);
+    const targetText = groups.map((group) => {
+      const progress = quest.progress?.targets?.[group.questTargetKey] ?? {};
+      const done = Math.max(0, Math.floor(Number(progress.done) || 0));
+      const total = progress.total ?? "?";
+      return `${done} / ${total} ${group.label}`;
+    }).join(", ");
+    return [`${kills} / ${killTotal} ${killLabel}`, targetText].filter(Boolean).join(", ");
   }
   if (quest.type === "action_targets") {
     const groups = actionTargetGroupsForQuest(quest);

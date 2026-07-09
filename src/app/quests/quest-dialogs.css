@@ -1,0 +1,766 @@
+.quest-tracker {
+  position: fixed;
+  z-index: 5;
+  right: 16px;
+  top: 246px;
+  display: grid;
+  width: min(310px, calc(100vw - 32px));
+  gap: 6px;
+  padding: 9px;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.quest-track-row {
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.055);
+
+  /* Allow clicking the individual quest rows even though the tracker
+     container avoids pointer events to let the world canvas receive clicks. */
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.quest-track-row b {
+  color: #f4da96;
+  font-size: 12px;
+}
+
+.quest-track-row span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quest-track-row.complete {
+  border-color: rgba(88, 217, 109, 0.38);
+  background: rgba(88, 217, 109, 0.1);
+}
+
+.quest-toast-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.quest-offer-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.quest-parchment-dialog,
+.quest-parchment-panel {
+  --quest-ink: #2b1b10;
+  --quest-ink-soft: #4b321f;
+  --quest-red: #7c2118;
+  --quest-gold: #8b5d1f;
+  --quest-chip-bg: rgba(255, 238, 188, 0.72);
+  --quest-chip-border: rgba(84, 47, 19, 0.38);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  text-align: left;
+  color: var(--quest-ink);
+  border: 0;
+  background: url("/assets/generated/quest.png") center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
+.quest-parchment-dialog {
+  width: min(660px, calc(100vw - 28px));
+  min-height: min(690px, calc(100vh - 36px));
+  max-height: calc(100vh - 28px);
+  padding: clamp(62px, 8vw, 96px) clamp(52px, 7vw, 88px);
+  overflow: auto;
+}
+
+.confirm-dialog.quest-parchment-dialog {
+  color: var(--quest-ink) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+}
+
+.quest-accepted-dialog {
+  width: min(620px, calc(100vw - 28px));
+  min-height: min(620px, calc(100vh - 36px));
+}
+
+.quest-parchment-panel {
+  padding: clamp(44px, 5vw, 72px) clamp(38px, 4.6vw, 66px);
+  background-size: 100% 100%;
+}
+
+.quest-parchment-dialog h2,
+.quest-parchment-dialog h3,
+.quest-parchment-panel b {
+  color: var(--quest-red);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  letter-spacing: 0;
+  text-shadow: 0 1px 0 rgba(255, 236, 183, 0.5);
+}
+
+.quest-parchment-dialog h2 {
+  font-size: 30px;
+  text-align: left;
+}
+
+.quest-parchment-dialog h3 {
+  margin: 0;
+  font-size: 22px;
+  text-align: left;
+}
+
+.quest-parchment-dialog p,
+.quest-parchment-panel p,
+.quest-parchment-dialog .quest-progress-line,
+.quest-parchment-panel .quest-progress-line,
+.quest-parchment-dialog .quest-offer-header span,
+.quest-parchment-panel header span {
+  color: var(--quest-ink-soft);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.confirm-dialog.quest-parchment-dialog p,
+.confirm-dialog.quest-parchment-dialog .quest-progress-line,
+.confirm-dialog.quest-parchment-dialog .quest-offer-header span {
+  color: var(--quest-ink-soft) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  line-height: 1.55 !important;
+  opacity: 1 !important;
+}
+
+.confirm-dialog.quest-parchment-dialog > .quest-offer-header {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  justify-content: start;
+  justify-items: start;
+  border-bottom: 1px solid rgba(84, 47, 19, 0.22);
+  padding-bottom: 10px;
+}
+
+.quest-parchment-dialog .quest-offer-header > div {
+  display: block;
+  text-align: left;
+}
+
+.quest-parchment-dialog .quest-offer-header h2 {
+  margin: 0;
+  text-align: left;
+}
+
+.quest-parchment-dialog .quest-offer-header img {
+  border-color: rgba(82, 45, 18, 0.35);
+  background: rgba(74, 42, 18, 0.12);
+}
+
+.quest-parchment-dialog .quest-chip,
+.quest-parchment-dialog .quest-monster-chip,
+.quest-parchment-panel .quest-chip,
+.quest-parchment-panel .quest-monster-chip {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--quest-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  text-shadow: none;
+}
+
+.confirm-dialog.quest-parchment-dialog .quest-chip,
+.confirm-dialog.quest-parchment-dialog .quest-monster-chip,
+.confirm-dialog.quest-parchment-dialog .comparison-list span {
+  color: var(--quest-ink) !important;
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+.quest-parchment-dialog .quest-chip.kill-count,
+.quest-parchment-dialog .quest-chip.region-chip,
+.quest-parchment-panel .quest-chip.kill-count,
+.quest-parchment-panel .quest-chip.region-chip {
+  border: 0;
+  background: transparent;
+  color: var(--quest-red);
+}
+
+.confirm-dialog.quest-parchment-dialog .quest-chip.kill-count,
+.confirm-dialog.quest-parchment-dialog .quest-chip.region-chip {
+  color: var(--quest-red) !important;
+}
+
+.quest-parchment-dialog .quest-objective-meta,
+.quest-parchment-panel .quest-objective-meta,
+.quest-parchment-dialog .quest-objective-row,
+.quest-parchment-panel .quest-objective-row,
+.quest-parchment-dialog .comparison-list,
+.quest-parchment-panel .comparison-list {
+  justify-content: flex-start;
+  justify-items: start;
+  text-align: left;
+}
+
+.quest-parchment-dialog .comparison-list,
+.quest-parchment-panel .comparison-list {
+  max-height: 132px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.quest-parchment-dialog .comparison-list span,
+.quest-parchment-panel .comparison-list span {
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.quest-parchment-dialog .quest-monster-mini,
+.quest-parchment-panel .quest-monster-mini {
+  border: 0;
+  background-color: transparent;
+}
+
+.quest-parchment-dialog .diff-good,
+.quest-parchment-panel .diff-good,
+.quest-parchment-dialog .quest-progress-line b,
+.quest-parchment-panel .quest-progress-line b {
+  color: var(--quest-gold);
+}
+
+.quest-parchment-dialog button,
+.quest-parchment-panel button {
+  border-color: rgba(84, 47, 19, 0.36);
+  background: rgba(70, 38, 16, 0.18);
+  color: var(--quest-ink);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-weight: 700;
+}
+
+.quest-parchment-dialog button:hover:not(:disabled),
+.quest-parchment-panel button:hover:not(:disabled) {
+  background: rgba(70, 38, 16, 0.28);
+}
+
+.quest-parchment-dialog button:disabled,
+.quest-parchment-panel button:disabled {
+  border-color: rgba(84, 47, 19, 0.18);
+  background: rgba(70, 38, 16, 0.08);
+  color: rgba(75, 50, 31, 0.48);
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  opacity: 0.58;
+}
+
+.quest-overview-dialog {
+  width: min(1240px, calc(100vw - 16px));
+  height: min(78vh, 780px);
+  padding: 0;
+  gap: 0;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  border-color: rgba(244, 218, 150, 0.38);
+}
+
+.quest-overview-head {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.quest-overview-dialog h2 {
+  color: #f4da96;
+  margin: 0;
+}
+
+.quest-overview-tabs {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.quest-tab {
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.quest-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.quest-tab.active {
+  background: rgba(244, 218, 150, 0.15);
+  border-color: rgba(244, 218, 150, 0.4);
+  color: #f4da96;
+}
+
+.quest-overview-body {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+}
+
+.quest-overview-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quest-overview-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  align-items: start;
+}
+
+.confirm-dialog .quest-overview-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  scrollbar-gutter: stable;
+  padding: 10px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  align-items: start;
+}
+
+.confirm-dialog .quest-overview-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.quest-overview-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.quest-overview-row.selected {
+  border-color: rgba(244, 218, 150, 0.56);
+  background: rgba(244, 218, 150, 0.12);
+}
+
+.quest-overview-row.complete {
+  border-color: rgba(88, 217, 109, 0.36);
+  background: rgba(88, 217, 109, 0.08);
+}
+
+.quest-open-button {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  overflow: visible;
+}
+
+.confirm-dialog .quest-open-button {
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.quest-open-button:hover .quest-name-bar {
+  border-color: rgba(244, 218, 150, 0.46);
+}
+
+.quest-open-button:focus-visible {
+  outline: none;
+}
+
+.quest-open-button:focus-visible .quest-name-bar {
+  border-color: rgba(244, 218, 150, 0.62);
+  box-shadow: 0 0 0 1px rgba(244, 218, 150, 0.28);
+}
+
+.quest-name-bar {
+  --quest-pct: 0%;
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(90deg,
+    rgba(244, 218, 150, 0.48) 0,
+    rgba(244, 218, 150, 0.18) var(--quest-pct),
+    rgba(0, 0, 0, 0) var(--quest-pct),
+    rgba(0, 0, 0, 0) 100%);
+}
+
+.quest-name-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  color: #f4da96;
+  font-size: 13px;
+}
+
+.quest-overview-row:not(.complete) .quest-name-bar {
+  min-height: 34px;
+}
+
+.quest-overview-row:not(.complete) .quest-name-label {
+  min-height: 34px;
+  font-size: 13px;
+}
+
+.quest-track-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quest-track-toggle input {
+  width: 15px;
+  height: 15px;
+}
+
+.quest-overview-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.2);
+  overflow: auto;
+}
+
+.quest-overview-detail header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+}
+
+.quest-overview-detail header b {
+  color: #f4da96;
+  font-size: 18px;
+}
+
+.quest-overview-detail header span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.quest-overview-detail header button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(244, 218, 150, 0.35);
+  border-radius: 6px;
+  background: rgba(244, 218, 150, 0.14);
+  color: #f4da96;
+  cursor: pointer;
+}
+
+.quest-overview-detail p {
+  margin: 0;
+  color: #d3c9b5;
+  line-height: 1.45;
+}
+
+.quest-progress-line {
+  margin: 0;
+  color: #e7dac0;
+  font-size: 13px;
+}
+
+.quest-progress-line b {
+  color: #f4da96;
+  font-weight: 700;
+}
+
+.quest-overview-detail.quest-parchment-panel {
+  padding: clamp(44px, 5vw, 72px) clamp(38px, 4.6vw, 66px);
+  background: url("/assets/generated/quest.png") center / 100% 100% no-repeat;
+}
+
+.quest-overview-detail.quest-parchment-panel header b {
+  color: var(--quest-red);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 22px;
+}
+
+.quest-overview-detail.quest-parchment-panel header span,
+.quest-overview-detail.quest-parchment-panel p,
+.quest-overview-detail.quest-parchment-panel .quest-progress-line {
+  color: var(--quest-ink-soft);
+  font-family: "Papyrus", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.quest-overview-detail.quest-parchment-panel .quest-progress-line b {
+  color: var(--quest-gold);
+}
+
+.quest-offer-header {
+  display: grid;
+  grid-template-columns: 68px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.quest-offer-header img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+.quest-offer-header span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quest-popup {
+  width: min(540px, calc(100vw - 32px));
+}
+
+.quest-popup .quest-list {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.quest-popup .quest-list::-webkit-scrollbar {
+  display: none;
+}
+
+.quest-npc-summary {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px 14px;
+}
+
+.quest-npc-summary img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.quest-list {
+  display: grid;
+  gap: 10px;
+  padding: 0 18px 18px;
+}
+
+.quest-action-message {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 110, 95, 0.45);
+  border-radius: 6px;
+  background: rgba(120, 20, 14, 0.22);
+  color: #ffd6cf;
+  font-size: 13px;
+}
+
+.quest-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quest-card header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quest-card b {
+  color: #f4da96;
+}
+
+.quest-card span,
+.quest-card p,
+.quest-npc-summary p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.quest-card button {
+  justify-self: start;
+  padding: 8px 11px;
+  border: 1px solid rgba(244, 218, 150, 0.35);
+  border-radius: 6px;
+  background: rgba(244, 218, 150, 0.14);
+  cursor: pointer;
+}
+
+.quest-card button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.quest-card.complete,
+.quest-card.quest-status-ready {
+  border-color: rgba(88, 217, 109, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(88, 217, 109, 0.16);
+}
+
+.quest-card.quest-status-active {
+  border-color: rgba(232, 187, 68, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(232, 187, 68, 0.14);
+}
+
+.quest-card.quest-status-offer {
+  border-color: rgba(224, 84, 76, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(224, 84, 76, 0.14);
+}
+
+.quest-objective-meta {
+  display: grid;
+  gap: 6px;
+}
+
+.quest-objective-meta.compact {
+  gap: 4px;
+}
+
+.quest-objective-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quest-chip,
+.quest-monster-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #d7d0bf;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.quest-chip img {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.quest-step-chip.complete {
+  text-decoration: line-through;
+  opacity: 0.72;
+}
+
+.quest-objective-steps {
+  display: grid;
+  gap: 5px;
+}
+
+.quest-objective-steps .quest-step-chip {
+  width: fit-content;
+}
+
+.quest-monster-mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background-color: transparent;
+  image-rendering: pixelated;
+  display: block;
+}
+
+.quest-chip.kill-count,
+.quest-chip.region-chip {
+  border-color: rgba(244, 218, 150, 0.35);
+  color: #f4da96;
+}
+
+.quest-objective-meta.compact .quest-chip,
+.quest-objective-meta.compact .quest-monster-chip {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.quest-objective-meta.compact .quest-chip img,
+.quest-objective-meta.compact .quest-monster-mini {
+  width: 16px;
+  height: 16px;
+}
+
+.quest-track-row .quest-objective-meta {
+  margin-top: 2px;
+}
+
+@media (max-width: 760px) {
+  .quest-overview-layout {
+      grid-template-columns: 1fr;
+      min-height: 0;
+      height: 100%;
+    }
+
+  .confirm-dialog .quest-overview-list,
+    .quest-overview-detail {
+      max-height: none;
+    }
+}
+

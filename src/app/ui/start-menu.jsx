@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import "./start-menu.css";
 import { formatSaveTimestamp } from "../save/save-slots.js";
 import { useLocalization } from "../../i18n/index.js";
 import { GAME_VERSION } from "../../game/config/game-constants-config.js";
@@ -7,8 +8,19 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
   const { t } = useLocalization();
   const hasSaves = saveSlots.some((slot) => slot.exists);
   const [menuImageLoaded, setMenuImageLoaded] = useState(false);
+  const [frontpageMessage, setFrontpageMessage] = useState("");
   const [confirmNewGameOpen, setConfirmNewGameOpen] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/frontpage-message.txt", { signal: controller.signal })
+      .then((response) => response.ok ? response.text() : "")
+      .then((text) => setFrontpageMessage(text.trim()))
+      .catch((error) => {
+        if (error?.name !== "AbortError") setFrontpageMessage("");
+      });
+    return () => controller.abort();
+  }, []);
   return (
     <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label={t("menu.main")}>
       <img
@@ -20,7 +32,10 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
         onError={() => setMenuImageLoaded(false)}
       />
       <div className="start-menu-panel">
-        {!menuImageLoaded && <h1>Valtoria</h1>}
+        <div className="start-menu-brand">
+          {!menuImageLoaded && <h1>Valtoria</h1>}
+          {frontpageMessage && <p className="frontpage-message">{frontpageMessage}</p>}
+        </div>
         {view === "main" && (
           <nav className="start-menu-actions" aria-label={t("menu.main")}>
             <button type="button" onClick={() => setConfirmNewGameOpen(true)}>{t("menu.newGame")}</button>

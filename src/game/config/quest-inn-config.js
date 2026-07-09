@@ -1,26 +1,6 @@
 // Quest definitions are split by source. Keep objects in the existing quest shape.
 export const INN_QUESTS = {
 
-lost_watch: {
-    id: "lost_watch",
-    source: "inn",
-    kind: "rumor",
-    category: "mystery",
-    title: "The Lost Watch",
-    repeatable: false,
-    npcIds: ["noble"],
-    spawnChance: 0.18,
-    regionIds: ["city"],
-    demands: { completedQuests: ["lost_hammer"] },
-    type: "collect_quest_item",
-    target: { questItemId: "noble_watch", count: 1, source: "elite", dropChance: 0.28 },
-    story: "Turanios' family watch was taken during a chaotic escape through the wasteland. It holds the names of his family, and elite beasts collect trophies like it.",
-    acceptText: "My watch is priceless. Find it in the wasteland, and I will pay you in experience rather than small coins.",
-    turnInText: "My family's ticking has returned. This will be remembered.",
-    rewards: { xp: 520, gold: 0, resources: [], lydra: 5, factionRep: { village_outskirt: 1 } },
-
-  i18n: { da: { title: "Det forsvundne ur", story: "Turanios' familieur blev taget under en kaotisk flugt gennem oede stier. Uret er ikke bare guld; det indeholder navne paa slaegten, og elitebaesterne samler paa den slags skinnende trofaeer.", acceptText: "Mit ur er uvurderligt. Find det i oedemarken, og jeg betaler i erfaring, ikke smaamoenter.", turnInText: "Min slaegts tikken er vendt tilbage. Det skal huskes." } },
-},
 mage_sunforged: {
     id: "mage_sunforged",
     source: "inn",
@@ -48,7 +28,7 @@ sam_tylion_lion_gold_idols: {
     kind: "rumor",
     category: "mystery",
     title: "Sam Tylion's Lost Idols",
-    demands: { completedQuests: ["mayor_repair_village_houses"] },
+    demands: { completedQuests: ["check_inn_infestation"] },
     repeatable: false,
         npcIds: ["soldier"],
     regionIds: ["city"],

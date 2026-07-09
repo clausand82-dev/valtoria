@@ -1034,9 +1034,18 @@
 
 .city-map-action-icon.npc {
   overflow: visible;
+  width: 34px;
+  height: 34px;
   border-color: rgba(139, 233, 255, 0.76);
   background: rgba(8, 10, 11, 0.9);
   color: #cdeef4;
+}
+
+.city-map-action-icon.npc b {
+  top: calc(100% + 3px);
+  max-width: 108px;
+  padding: 2px 5px;
+  font-size: 9px;
 }
 
 .city-map-mob-icons {
@@ -1047,8 +1056,8 @@
   position: absolute;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1074,26 +1083,26 @@
 .city-map-mob-mini::after {
   content: "!";
   position: absolute;
-  top: -7px;
-  right: -7px;
+  top: -6px;
+  right: -6px;
   z-index: 3;
   display: grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   border: 2px solid #ffd17a;
   border-radius: 50%;
   background: #9d1e12;
   color: #fff4ce;
-  font: 900 11px/1 Georgia, serif;
+  font: 900 9px/1 Georgia, serif;
   box-shadow: 0 2px 7px rgba(0, 0, 0, 0.9);
 }
 
 .city-map-mob-mini img {
   position: relative;
   z-index: 1;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   object-fit: contain;
   image-rendering: pixelated;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.9));
@@ -1989,6 +1998,11 @@
   .city-map-action-icon {
     width: 40px;
     height: 40px;
+  }
+
+  .city-map-action-icon.npc {
+    width: 32px;
+    height: 32px;
   }
 
   .city-map-action-icon b {
