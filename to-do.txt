@@ -3,7 +3,22 @@ Små rettelse observeret igennem spil test:
 - skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
 - man skal kunne skyde spells udover sorte huller 
 - en para til at bestemme afstand imellem objects (på object eller generelt)
-a
+- underlig fejl ved indlevering af første basement quest
+- lidt periodisk lag ved lonline run
+- lidt loade forsinkelse af grafik ved online run
+- nogle ting er da ved eng
+
+Uncaught ReferenceError: resourcesPrepaid is not defined
+    at index-CLWqNRrI.js:1471:216461
+    at Ks (index-CLWqNRrI.js:48:50745)
+    at vg (index-CLWqNRrI.js:48:51665)
+    at Qm (index-CLWqNRrI.js:48:50785)
+    at Object.useState (index-CLWqNRrI.js:48:63063)
+    at QT.St.useState (index-CLWqNRrI.js:17:7526)
+    at p9 (index-CLWqNRrI.js:1471:172446)
+    at fg (index-CLWqNRrI.js:48:48429)
+    at Dg (index-CLWqNRrI.js:48:71302)
+    at $1 (index-CLWqNRrI.js:48:81694)
 
 
 

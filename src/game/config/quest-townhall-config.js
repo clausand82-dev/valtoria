@@ -2,7 +2,8 @@ import { QUEST_NPCS } from "./npc-config.js";
 
 // Quest definitions are split by source. Keep objects in the existing quest shape.
 export const TOWN_HALL_QUESTS = {
-vengeance: {
+//#region vengeance
+  vengeance: {
     id: "vengeance",
     source: "townHall",
     kind: "repeatable",
@@ -22,6 +23,8 @@ vengeance: {
 
   i18n: { da: { titleTemplate: "Haevn over {monster}", storyTemplate: "{npcName} har mistet folk, varer eller ro til {monster}. Ryd flokken ud, saa byen kan traekke vejret igen.", acceptTextTemplate: "Faeld {count} {monster}. Elite taeller med, hvis du finder dem.", turnInTextTemplate: "De vil huske, at nogen slog igen." } },
 },
+//#endregion vengeance
+//#region mage_papers
 mage_papers: {
     id: "mage_papers",
     source: "townHall",
@@ -42,6 +45,8 @@ mage_papers: {
 
   i18n: { da: { title: "Saml arkane sider", story: "Darium mangler opslagsvaerkenes sider for at fuldende sine noter. Han sender dig ud for at samle nogle stykker papir.", acceptText: "Bring mig 12 stykker papir til mine noter.", turnInText: "Mine noter er fuldendt takket vaere dig." } },
 },
+//#endregion mage_papers
+//#region farmer_supply
 farmer_supply: {
     id: "farmer_supply",
     source: "townHall",
@@ -62,6 +67,8 @@ farmer_supply: {
 
   i18n: { da: { title: "Fodr farmen", story: "Willis har brug for forraad til sine dyr. Han beder dig hente kød og frugt til at klare vinteren.", acceptText: "Saml 100 kød og 50 frugt til farmen.", turnInText: "Tak! Dyrene vil klare sig en maengde bedre nu." } },
 },
+//#endregion farmer_supply
+//#region wiseman_scrolls
 wiseman_scrolls: {
     id: "wiseman_scrolls",
     source: "townHall",
@@ -82,6 +89,8 @@ wiseman_scrolls: {
 
   i18n: { da: { title: "Gamle skriftruller", story: "Vitlias soeger gamle skrifter. Find 10 scrolls og bring dem til biblioteket.", acceptText: "Find 10 scrolls til mit bibliotek.", turnInText: "Disse vil give indsigt til mine studier. Godt fundet." } },
 },
+//#endregion wiseman_scrolls
+//#region himus_sell_king_orb
 himus_sell_king_orb: {
     id: "himus_sell_king_orb",
     source: "townHall",
@@ -102,6 +111,8 @@ himus_sell_king_orb: {
 
   i18n: { da: { title: "Himus: Byt 5 guldbarre for en orb", story: "Himus vil gerne se din støtte for et lille stykke magi. Giv ham 5 guldbarre, og han vil sælge dig noget sjældent.", acceptText: "Giv mig 5 guldbarre, så skal jeg se, hvad jeg kan gøre.", turnInText: "Tak. Her er orb'en som aftalt." } },
 },
+//#endregion himus_sell_king_orb
+//#region sail_to_tornvalhed
 sail_to_tornvalhed: {
     id: "sail_to_tornvalhed",
     source: "townHall",
@@ -131,6 +142,8 @@ sail_to_tornvalhed: {
 
   i18n: { da: { title: "Sejl til Tornvalhed", story: "Kaptajn Varlo kan faa dig over vandet til Tornvalhed, men skibet mangler et ror, sejl, planker og proviant. Han har set brugbare vragrester ved Fisherman's Fall.", acceptText: "Bring mig 1 ror, 2 sejl, 25 traeplanker og 10 fruit. Saa kan vi sejle mod Tornvalhed.", turnInText: "Det holder. Tornvalhed er ikke laengere uden for raekkevidde." } },
 },
+//#endregion sail_to_tornvalhed
+//#region villager_help_fix_the_house
 villager_help_fix_the_house: {
     id: "villager_help_fix_the_house",
     source: "townHall",
@@ -177,7 +190,8 @@ villager_help_fix_the_house: {
       },
     },
   },
-
+  //#endregion villager_help_fix_the_house
+  //#region villager_help_collect_hay
   villager_help_collect_hay: {
     id: "villager_help_collect_hay",
     source: "townHall",
@@ -223,4 +237,5 @@ villager_help_fix_the_house: {
       },
     },
   },
+  //#endregion villager_help_collect_hay
 };

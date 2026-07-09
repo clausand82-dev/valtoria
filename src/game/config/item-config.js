@@ -214,6 +214,7 @@ export const PREFIXES = {
 // triggerWeaponOnHitEffects(). For melee sker det efter normal damage, saa effekten
 // erstatter ikke det almindelige slag og koster ikke mana.
 export const UNIQUE_ITEMS = [
+  //#region Item Unique: treasure_of_the_fenris
   {
     id: "treasure_of_the_fenris",
     name: "Treasure of the Fenris",
@@ -237,6 +238,8 @@ export const UNIQUE_ITEMS = [
       ],
     },
   },
+  //#endregion: Item Unique: treasure_of_the_fenris
+  //#region Item Unique: old_walking_staff
   {
     id: "old_walking_staff",
     name: "Old Walking Staff",
@@ -280,6 +283,8 @@ export const UNIQUE_ITEMS = [
       ],
     },
   },
+  //#endregion: Item Unique: old_walking_staff
+  //#region Item Unique: blade_of_the_pulse
   {
     id: "blade_of_the_pulse",
     name: "Blade of the Pulse",
@@ -320,6 +325,8 @@ export const UNIQUE_ITEMS = [
       ],
     },
   },
+  //#endregion: Item Unique: blade_of_the_pulse
+  //#region Item Unique: frostheart
   {
     id: "frostheart",
     name: "Frostheart",
@@ -343,6 +350,8 @@ export const UNIQUE_ITEMS = [
       maxMana: 30,
     },
   },
+  //#endregion: Item Unique: frostheart
+  //#region Item Unique: frostguard_aegis
   {
     id: "frostguard_aegis",
     name: "Frostguard Aegis",
@@ -368,6 +377,8 @@ export const UNIQUE_ITEMS = [
       fireResist: -5,
     },
   },
+  //#endregion: Item Unique: frostguard_aegis
+  //#region Item Unique: lordkealand_chestplate
   {
     id: "lordkealand_chestplate",
     name: "Lord Kealand's Chestplate",
@@ -388,6 +399,8 @@ export const UNIQUE_ITEMS = [
       dodgeChance: 0.03,
     },
   },
+  //#endregion: Item Unique: lordkealand_chestplate
+  //#region Item Unique: lordkealand_shoulders
   {
     id: "lordkealand_shoulders",
     name: "Lord Kealand's Pauldrons",
@@ -408,6 +421,8 @@ export const UNIQUE_ITEMS = [
       dodgeChance: 0.01,
     },
   },
+  //#endregion: Item Unique: lordkealand_shoulders
+  //#region Item Unique: lordkealand_arms
   {
     id: "lordkealand_arms",
     name: "Lord Kealand's Vambraces",
@@ -423,6 +438,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 18, magic: 16, damageMin: 4, damageMax: 7, maxMana: 18 },
   },
+  //#endregion: Item Unique: lordkealand_arms
+  //#region Item Unique: lordkealand_cape
   {
     id: "lordkealand_cape",
     name: "Lord Kealand's Cape",
@@ -438,6 +455,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 8, magic: 18, maxMana: 22, speedPct: 0.05, dodgeChance: 0.02 },
   },
+  //#endregion: Item Unique: lordkealand_cape
+  //#region Item Unique: lordkealand_sword
   {
     id: "lordkealand_sword",
     name: "Lord Kealand's Sword",
@@ -453,6 +472,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { damageMin: 34, damageMax: 52, range: 1.34, cooldown: 0.46, magic: 16 },
   },
+  //#endregion: Item Unique: lordkealand_sword
+  //#region Item Unique: ladylirian_arms
   {
     id: "ladylirian_arms",
     name: "Lady Lirian's Vambraces",
@@ -468,6 +489,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 16, magic: 18, maxMana: 14, spellDamageBonus: 0.04 },
   },
+  //#endregion: Item Unique: ladylirian_arms
+  //#region Item Unique: ladylirian_cape
   {
     id: "ladylirian_cape",
     name: "Lady Lirian's Cape",
@@ -483,6 +506,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 7, magic: 22, maxMana: 26, speedPct: 0.06, allResist: 3 },
   },
+  //#endregion: Item Unique: ladylirian_cape
+  //#region Item Unique: ladylirian_chestplate
   {
     id: "ladylirian_chestplate",
     name: "Lady Lirian's Chestplate",
@@ -498,6 +523,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 42, magic: 26, maxMana: 34, allResist: 4 },
   },
+  //#endregion: Item Unique: ladylirian_chestplate
+  //#region Item Unique: ladylirian_legs
   {
     id: "ladylirian_legs",
     name: "Lady Lirian's Greaves",
@@ -514,6 +541,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 22, magic: 14, maxMana: 16, speedPct: 0.04 },
   },
+  //#endregion: Item Unique: ladylirian_legs
+  //#region Item Unique: ladylirian_shoulders
   {
     id: "ladylirian_shoulders",
     name: "Lady Lirian's Pauldrons",
@@ -529,6 +558,8 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { armor: 15, magic: 20, maxMana: 20, spellDamageBonus: 0.03 },
   },
+  //#endregion: Item Unique: ladylirian_shoulders
+  //#region Item Unique: ladylirian_sword
   {
     id: "ladylirian_sword",
     name: "Lady Lirian's Sword",
@@ -544,9 +575,11 @@ export const UNIQUE_ITEMS = [
     scaleWithLevel: true,
     stats: { damageMin: 30, damageMax: 48, range: 1.36, cooldown: 0.44, magic: 24, arcaneDamageBonus: 0.08 },
   },
+  //#endregion: Item Unique: ladylirian_sword
 ];
 
 export const NAMED_ITEM_TEMPLATES = [
+  //#region Item Named: maras_keepsake
   {
     id: "maras_keepsake",
     name: "Mara's Keepsake",
@@ -564,6 +597,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: false,
     stats: { armorFlat: 6, maxHp: 30, statusDurationBonus: -0.08 },
   },
+  //#endregion: Item Named: maras_keepsake
+  //#region Item Named: worn_sandals
   {
     id: "worn_sandals",
     name: "Worn Sandals",
@@ -581,6 +616,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: false,
     stats: { armor: 1, speedPct: 0.15 },
   },
+  //#endregion: Item Named: worn_sandals
+  //#region Item Named: luck_cigar
   {
     id: "luck_cigar",
     name: "Lucky Cigar",
@@ -602,6 +639,8 @@ export const NAMED_ITEM_TEMPLATES = [
     durabilityLossOnEvents: { criticalHit: 5 },
     stats: { critChance: 0.1 },
   },
+  //#endregion: Item Named: luck_cigar
+  //#region Item Named: screaming_red_necklace
   {
     id: "screaming_red_necklace",
     name: "Screaming Red Necklace",
@@ -620,6 +659,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: false,
     stats: { allResist: 10 },
   },
+  //#endregion: Item Named: screaming_red_necklace
+  //#region Item Named: poor_mans_belt
   {
     id: "poor_mans_belt",
     name: "Poor Man's Belt",
@@ -637,6 +678,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: false,
     stats: { maxMana: 50 },
   },
+  //#endregion: Item Named: poor_mans_belt
+  //#region Item Named: devils_judge
   {
     id: "devils_judge",
     name: "Devil's Judge",
@@ -653,6 +696,8 @@ export const NAMED_ITEM_TEMPLATES = [
       onHit: [{ type: "targetDamage", id: "devils_judge_beast_burn", target: ["tag:beast"], damagePct: 0.1, element: "fire", damageType: "magic", color: "#ff7b38" }],
     },
   },
+  //#endregion: Item Named: devils_judge
+  //#region Item Named: devils_protector
   {
     id: "devils_protector",
     name: "Devil's Protector",
@@ -667,6 +712,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { armor: 9, blockChance: 0.05, blockAmount: 4, fireResist: 10, armorPct: 0.1, slowImmune: true },
   },
+  //#endregion: Item Named: devils_protector
+  //#region Item Named: devils_boots
   {
     id: "devils_boots",
     name: "Devil's Boots",
@@ -680,6 +727,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { armor: 5, magicResist: 5, speedPct: 0.1 },
   },
+  //#endregion: Item Named: devils_boots
+  //#region Item Named: devils_touch
   {
     id: "devils_touch",
     name: "Devil's Touch",
@@ -693,6 +742,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { armor: 4, magicResist: 5, goldFind: 0.05, resourceFind: 0.05 },
   },
+  //#endregion: Item Named: devils_touch
+  //#region Item Named: nethrendor_soldier_sword
   {
     id: "nethrendor_soldier_sword",
     name: "Nethrendor Soldier Sword",
@@ -716,6 +767,8 @@ export const NAMED_ITEM_TEMPLATES = [
       armor: 2,
     },
   },
+  //#endregion: Item Named: nethrendor_soldier_sword
+  //#region Item Named: nethrendor_soldier_bow
   {
     id: "nethrendor_soldier_bow",
     name: "Nethrendor Soldier Bow",
@@ -739,6 +792,8 @@ export const NAMED_ITEM_TEMPLATES = [
       armor: 2,
     },
   },
+  //#endregion: Item Named: nethrendor_soldier_bow
+    //#region Item Named: mayors_oath_chain
     {
     id: "mayors_oath_chain",
     name: "Mayor's Oath Chain",
@@ -769,7 +824,8 @@ export const NAMED_ITEM_TEMPLATES = [
       factionRep: 1,
     },
   },
-
+    //#endregion: Item Named: mayors_oath_chain
+  //#region Item Named: roofmenders_buckle
   {
     id: "roofmenders_buckle",
     name: "Roofmender's Buckle",
@@ -799,7 +855,8 @@ export const NAMED_ITEM_TEMPLATES = [
       armorPct: 0.03,
     },
   },
-
+  //#endregion: Item Named: roofmenders_buckle
+  //#region Item Named: wintertile_charm
   {
     id: "wintertile_charm",
     name: "Wintertile Charm",
@@ -830,7 +887,8 @@ export const NAMED_ITEM_TEMPLATES = [
       arcaneDamageBonus: 0.03,
     },
   },
-
+  //#endregion: Item Named: wintertile_charm
+  //#region Item Named: fieldwardens_quiver
   {
     id: "fieldwardens_quiver",
     name: "Fieldwarden's Quiver",
@@ -861,7 +919,8 @@ export const NAMED_ITEM_TEMPLATES = [
       resourceFind: 0.03,
     },
   },
-
+  //#endregion: Item Named: fieldwardens_quiver
+  //#region Item Named: old_mill_sickle
   {
     id: "old_mill_sickle",
     name: "Old Mill Sickle",
@@ -894,7 +953,8 @@ export const NAMED_ITEM_TEMPLATES = [
       natureDamageBonus: 0.04,
     },
   },
-
+  //#endregion: Item Named: old_mill_sickle
+  //#region Item Named: rusk_miner_pick
   {
     id: "rusk_miner_pick",
     name: "Rusk's Miner Pick",
@@ -927,7 +987,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalDamageBonus: 0.05,
     },
   },
-
+  //#endregion: Item Named: rusk_miner_pick
+  //#region Item Named: miris_lantern_focus
   {
     id: "miris_lantern_focus",
     name: "Miri's Lantern Focus",
@@ -958,7 +1019,8 @@ export const NAMED_ITEM_TEMPLATES = [
       arcaneDamageBonus: 0.04,
     },
   },
-
+  //#endregion: Item Named: miris_lantern_focus
+  //#region Item Named: wellkeepers_gorget
   {
     id: "wellkeepers_gorget",
     name: "Wellkeeper's Gorget",
@@ -988,7 +1050,8 @@ export const NAMED_ITEM_TEMPLATES = [
       poisonResist: 5,
     },
   },
-
+  //#endregion: Item Named: wellkeepers_gorget
+  //#region Item Named: boarhide_pathfinders
   {
     id: "boarhide_pathfinders",
     name: "Boarhide Pathfinders",
@@ -1018,7 +1081,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalResist: 3,
     },
   },
-
+  //#endregion: Item Named: boarhide_pathfinders
+  //#region Item Named: fenris_tail_talisman
   {
     id: "fenris_tail_talisman",
     name: "Fenris Tail Talisman",
@@ -1049,7 +1113,8 @@ export const NAMED_ITEM_TEMPLATES = [
       goldFind: 0.05,
     },
   },
-
+  //#endregion: Item Named: fenris_tail_talisman
+  //#region Item Named: ashen_hearth_gloves
   {
     id: "ashen_hearth_gloves",
     name: "Ashen Hearth Gloves",
@@ -1080,7 +1145,8 @@ export const NAMED_ITEM_TEMPLATES = [
       resourceFind: 0.03,
     },
   },
-
+  //#endregion: Item Named: ashen_hearth_gloves
+  //#region Item Named: broken_watch_shield
   {
     id: "broken_watch_shield",
     name: "Broken Watch Shield",
@@ -1110,7 +1176,8 @@ export const NAMED_ITEM_TEMPLATES = [
       maxHp: 14,
     },
   },
-
+  //#endregion: Item Named: broken_watch_shield
+  //#region Item Named: tavernkeepers_token
   {
     id: "tavernkeepers_token",
     name: "Tavernkeeper's Token",
@@ -1140,7 +1207,8 @@ export const NAMED_ITEM_TEMPLATES = [
       goldFind: 0.04,
     },
   },
-
+  //#endregion: Item Named: tavernkeepers_token
+  //#region Item Named: young_boys_tin_soldier
   {
     id: "young_boys_tin_soldier",
     name: "Young Boy's Tin Soldier",
@@ -1171,7 +1239,8 @@ export const NAMED_ITEM_TEMPLATES = [
       statusDurationBonus: 0.04,
     },
   },
-
+  //#endregion: Item Named: young_boys_tin_soldier
+  //#region Item Named: haybound_wristwrap
   {
     id: "haybound_wristwrap",
     name: "Haybound Wristwrap",
@@ -1202,7 +1271,8 @@ export const NAMED_ITEM_TEMPLATES = [
       natureDamageBonus: 0.03,
     },
   },
-
+  //#endregion: Item Named: haybound_wristwrap
+  //#region Item Named: outskirt_scout_ring
   {
     id: "outskirt_scout_ring",
     name: "Outskirt Scout Ring",
@@ -1233,6 +1303,8 @@ export const NAMED_ITEM_TEMPLATES = [
       magicFind: 0.04,
     },
   },
+  //#endregion: Item Named: outskirt_scout_ring
+    //#region Item Named: militia_watchblade
     {
     id: "militia_watchblade",
     name: "Militia Watchblade",
@@ -1264,7 +1336,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalDamageBonus: 0.03,
     },
   },
-
+    //#endregion: Item Named: militia_watchblade
+  //#region Item Named: briarthorn_longbow
   {
     id: "briarthorn_longbow",
     name: "Briarthorn Longbow",
@@ -1297,7 +1370,8 @@ export const NAMED_ITEM_TEMPLATES = [
       natureDamageBonus: 0.04,
     },
   },
-
+  //#endregion: Item Named: briarthorn_longbow
+  //#region Item Named: wintergate_bulwark
   {
     id: "wintergate_bulwark",
     name: "Wintergate Bulwark",
@@ -1328,7 +1402,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalResist: 4,
     },
   },
-
+  //#endregion: Item Named: wintergate_bulwark
+  //#region Item Named: stonefield_maul
   {
     id: "stonefield_maul",
     name: "Stonefield Maul",
@@ -1361,7 +1436,8 @@ export const NAMED_ITEM_TEMPLATES = [
       stunChance: 0.03,
     },
   },
-
+  //#endregion: Item Named: stonefield_maul
+  //#region Item Named: frostwatch_helm
   {
     id: "frostwatch_helm",
     name: "Frostwatch Helm",
@@ -1391,7 +1467,8 @@ export const NAMED_ITEM_TEMPLATES = [
       allResist: 2,
     },
   },
-
+  //#endregion: Item Named: frostwatch_helm
+  //#region Item Named: fieldwarden_brigandine
   {
     id: "fieldwarden_brigandine",
     name: "Fieldwarden Brigandine",
@@ -1421,7 +1498,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalResist: 5,
     },
   },
-
+  //#endregion: Item Named: fieldwarden_brigandine
+  //#region Item Named: duskfang_blade
   {
     id: "duskfang_blade",
     name: "Duskfang Blade",
@@ -1453,7 +1531,8 @@ export const NAMED_ITEM_TEMPLATES = [
       shadowDamageBonus: 0.05,
     },
   },
-
+  //#endregion: Item Named: duskfang_blade
+  //#region Item Named: northfield_pike
   {
     id: "northfield_pike",
     name: "Northfield Pike",
@@ -1486,7 +1565,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalDamageBonus: 0.03,
     },
   },
-
+  //#endregion: Item Named: northfield_pike
+  //#region Item Named: boartrail_boots
   {
     id: "boartrail_boots",
     name: "Boartrail Boots",
@@ -1516,7 +1596,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalResist: 3,
     },
   },
-
+  //#endregion: Item Named: boartrail_boots
+  //#region Item Named: emberhearth_gauntlets
   {
     id: "emberhearth_gauntlets",
     name: "Emberhearth Gauntlets",
@@ -1547,7 +1628,8 @@ export const NAMED_ITEM_TEMPLATES = [
       fireDamageBonus: 0.04,
     },
   },
-
+  //#endregion: Item Named: emberhearth_gauntlets
+  //#region Item Named: rusks_tunnel_pick
   {
     id: "rusks_tunnel_pick",
     name: "Rusk's Tunnel Pick",
@@ -1579,7 +1661,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalDamageBonus: 0.05,
     },
   },
-
+  //#endregion: Item Named: rusks_tunnel_pick
+  //#region Item Named: roadwardens_sabre
   {
     id: "roadwardens_sabre",
     name: "Roadwarden's Sabre",
@@ -1611,7 +1694,8 @@ export const NAMED_ITEM_TEMPLATES = [
       speedPct: 0.03,
     },
   },
-
+  //#endregion: Item Named: roadwardens_sabre
+  //#region Item Named: ruinwatch_pauldrons
   {
     id: "ruinwatch_pauldrons",
     name: "Ruinwatch Pauldrons",
@@ -1641,7 +1725,8 @@ export const NAMED_ITEM_TEMPLATES = [
       armorPct: 0.03,
     },
   },
-
+  //#endregion: Item Named: ruinwatch_pauldrons
+  //#region Item Named: crowfeather_mantle
   {
     id: "crowfeather_mantle",
     name: "Crowfeather Mantle",
@@ -1671,7 +1756,8 @@ export const NAMED_ITEM_TEMPLATES = [
       magicFind: 0.03,
     },
   },
-
+  //#endregion: Item Named: crowfeather_mantle
+  //#region Item Named: bridgeguard_greaves
   {
     id: "bridgeguard_greaves",
     name: "Bridgeguard Greaves",
@@ -1701,7 +1787,8 @@ export const NAMED_ITEM_TEMPLATES = [
       speedPct: 0.02,
     },
   },
-
+  //#endregion: Item Named: bridgeguard_greaves
+  //#region Item Named: trollsplitter_axe
   {
     id: "trollsplitter_axe",
     name: "Trollsplitter Axe",
@@ -1733,6 +1820,8 @@ export const NAMED_ITEM_TEMPLATES = [
       physicalDamageBonus: 0.05,
     },
   },
+  //#endregion: Item Named: trollsplitter_axe
+  //#region Item Named: hunters_wolf_cape
   {
     id: "hunters_wolf_cape",
     name: "Hunter's Wolf Cape",
@@ -1751,6 +1840,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { armor: 7, maxHp: 12, speedPct: 0.03, coldResist: 5 },
   },
+  //#endregion: Item Named: hunters_wolf_cape
+  //#region Item Named: hunters_boar_tusk_necklace
   {
     id: "hunters_boar_tusk_necklace",
     name: "Hunter's Boar-Tusk Necklace",
@@ -1769,6 +1860,8 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { armor: 3, maxHp: 18, physicalResist: 4, critChance: 0.02 },
   },
+  //#endregion: Item Named: hunters_boar_tusk_necklace
+  //#region Item Named: hunters_bow
   {
     id: "hunters_bow",
     name: "Y'atho's Hunter Bow",
@@ -1788,6 +1881,7 @@ export const NAMED_ITEM_TEMPLATES = [
     scaleWithLevel: true,
     stats: { damageMin: 13, damageMax: 23, range: 5.9, cooldown: 0.58, critChance: 0.05, physicalDamageBonus: 0.04 },
   },
+  //#endregion: Item Named: hunters_bow
 ];
 
 // forslag til nye named items

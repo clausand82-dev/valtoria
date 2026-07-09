@@ -2,6 +2,7 @@ import { QUEST_NPCS } from "./npc-config.js";
 
 // Quest definitions are split by source. Keep objects in the existing quest shape.
 export const NPC_QUESTS = {
+//#region Quest: more_scarecrows
 more_scarecrows: {
     id: "more_scarecrows",
     source: "npc",
@@ -64,6 +65,8 @@ more_scarecrows: {
       turnInText: "Nu er begge marker beskyttet. Farmeren takker dig for at sikre landsbyens næste høst.",
     } },
 },
+//#endregion: Quest: more_scarecrows
+//#region Quest: build_scarecrows
 build_scarecrows: {
     id: "build_scarecrows",
     source: "npc",
@@ -89,6 +92,8 @@ build_scarecrows: {
       turnInText: "Farmeren binder det sidste bundt stramt. Syv fugleskræmsler er klar til de nordlige marker.",
     } },
 },
+//#endregion: Quest: build_scarecrows
+//#region Quest: place_scarecrows
 place_scarecrows: {
     id: "place_scarecrows",
     source: "npc",
@@ -123,6 +128,8 @@ place_scarecrows: {
       target: { label: "placerede fugleskræmsler" },
     } },
 },
+//#endregion: Quest: place_scarecrows
+//#region Quest: the_young_boys_letter
 the_young_boys_letter: {
     id: "the_young_boys_letter",
     source: "action",
@@ -183,6 +190,8 @@ the_young_boys_letter: {
     onComplete: { setFlags: ["young_boys_father_reported"] },
     i18n: { da: { title: "Den unge drengs brev", story: "En dreng døde, mens han forsøgte at bringe sin fars advarsel hjem. Hans mor venter stadig i Valtoria på dem begge.", acceptText: "Bring brevet til Mara, drengens mor, i byen.", turnInText: "Mara folder de to sider sammen. Hendes familie vender ikke hjem, men deres mod er vendt tilbage til hende." } },
 },
+//#endregion: Quest: the_young_boys_letter
+//#region Quest: mayor_intro_to_valtoria
 mayor_intro_to_valtoria: {
     id: "mayor_intro_to_valtoria",
     source: "npc",
@@ -207,6 +216,8 @@ mayor_intro_to_valtoria: {
 
   i18n: { da: { title: "Et land i skygge", story: "Valtoria er haardt ramt af Nethrendors moerke indflydelse, og mange borgere har mistet haabet. Der gaar rygter om en gammel elverkonge, Lydrendor, som maaske kan redde landet, men ingen ved hvor han befinder sig. Hvis byen skal finde modet igen, maa du foerst vinde borgernes tillid ved at hjaelpe dem.", acceptText: "Begynd ved kroen. Tal med Oliver, innkeeper. Kroen har brug for hjaelp, og han ved mere om byens problemer.", turnInText: "Oliver nikker alvorligt. Borgmesteren sendte dig altsaa. Godt. Saa lad os begynde med kroens kaelder." } },
 },
+//#endregion: Quest: mayor_intro_to_valtoria
+//#region Quest: mayor_cleanse_village
 mayor_cleanse_village: {
     id: "mayor_cleanse_village",
     source: "npc",
@@ -233,6 +244,8 @@ mayor_cleanse_village: {
 
   i18n: { da: { title: "Rens landsbyen", story: "Borgmesteren ser alvorligt paa dig. Nethrendors magt har forvredet landsbyboerne. De er ikke laengere sig selv, og de kan ikke reddes. Stop dem, foer de naar byen.", acceptText: "Rejs til landsbyen og stop alle de forvredne landsbyboere. De vilde vildsvin er ikke en del af opgaven.", turnInText: "Det var noedvendigt, selv om det var en tung pris. Nu maa vi begynde at bygge landsbyen op igen." } },
 },
+//#endregion: Quest: mayor_cleanse_village
+//#region Quest: mayor_repair_village_houses
 mayor_repair_village_houses: {
     id: "mayor_repair_village_houses",
     source: "npc",
@@ -266,6 +279,8 @@ mayor_repair_village_houses: {
 
   i18n: { da: { title: "Genopbyg landsbyen", story: "Landsbyen er stille nu, men husene staar oedelagte tilbage, og de faldne skal begraves. Borgmesteren beder dig tage materialer med og begynde genopbygningen.", acceptText: "Rejs tilbage til landsbyen, reparer alle de oedelagte huse og begrav de faldne landsbyboere.", turnInText: "Landsbyen kan igen blive et hjem, og de faldne har faaet fred. Dit arbejde giver os noget at bygge videre paa." } },
 },
+//#endregion: Quest: mayor_repair_village_houses
+//#region Quest: mayor_clear_market
 mayor_clear_market: {
     id: "mayor_clear_market",
     source: "npc",
@@ -286,6 +301,8 @@ mayor_clear_market: {
 
   i18n: { da: { title: "Ryd markedet", story: "Markedet kan blive byens haand igen, men foerst skal pladsen ryddes og sikres.", acceptText: "Ryd Market Area fra bykortet, og kom tilbage naar pladsen er klar.", turnInText: "Markedet er ryddet. Nu kan vi bygge de forretninger, byen mangler." } },
 },
+//#endregion: Quest: mayor_clear_market
+//#region Quest: mayor_build_bank
 mayor_build_bank: {
     id: "mayor_build_bank",
     source: "npc",
@@ -316,6 +333,8 @@ mayor_build_bank: {
 
   i18n: { da: { title: "Byg banken", story: "Byen har brug for et sikkert sted til vaerdier og forsyninger. Borgmesteren beder dig skaffe materialer til banken.", acceptText: "Skaff 32 wood planks, 18 stone bricks til banken.", turnInText: "Banken staar klar. Byens forsyninger kan endelig samles et sikkert sted." } },
 },
+//#endregion: Quest: mayor_build_bank
+//#region Quest: clear_the_inn
 clear_the_inn: {
     id: "clear_the_inn",
     source: "npc",
@@ -341,6 +360,8 @@ clear_the_inn: {
 
   i18n: { da: { title: "Edderkopper i Kroen", story: "Oliver tørrer af bordet og sukker tungt. 'Kroen er fuld af edderkopper – i kælderen, bag skabene, i loftet. Gæsterne tør ikke sove, og jeg kan ikke drive forretning sådan her. Ryd dem ud, alle sammen.'", acceptText: "Dræb alle edderkopper i kroen og kom tilbage, når det er gjort.", turnInText: "Endelig. Jeg har allerede sat øllet frem. Tak, eventyrer." } },
 },
+//#endregion: Quest: clear_the_inn
+//#region Quest: check_inn_infestation
 check_inn_infestation: {
     id: "check_inn_infestation",
     source: "npc",
@@ -396,6 +417,8 @@ check_inn_infestation: {
 
   i18n: { da: { title: "Hvor kommer edderkopperne fra?", story: "Kroens kaelder burde vaere ryddet, men der kommer stadig nye spor af edderkopper. Tjek kaelderen og find kilden.", acceptText: "Undersoeg kaelderen igen. Hvis der er en kilde, saa luk den.", turnInText: "Revnen er forseglet, og kroen kan endelig faa ro." } },
 },
+//#endregion: Quest: check_inn_infestation
+  //#region Quest: find_my_mug
   find_my_mug: {
     id: "find_my_mug",
     source: "npc",
@@ -416,6 +439,8 @@ check_inn_infestation: {
 
     i18n: { da: { title: "Find Mit Krus", story: "Jeg mangler mit ynglingskrus - når du nu er i i kælderen, så find lige mit krus for mig også", acceptText: "Find mit krus i kælderen og kom tilbage, når det er gjort.", turnInText: "Tusind tusind tak, det er mit yndlingskrus. Jeg har allerede sat øllet frem. Tak, eventyrer." } },
   },
+  //#endregion: Quest: find_my_mug
+//#region Quest: find_the_beer
 find_the_beer: {
     id: "find_the_beer",
     source: "npc",
@@ -428,7 +453,7 @@ find_the_beer: {
     demands: { completedQuests: ["check_inn_infestation"] },
     spawnChance: 1,
     type: "collect_quest_item",
-    target: { questItemId: "lost_beer", count: 3, source: "monster", dropChance: 0.31, dropRegionIds: ["inn-of-the-good-oak"] },
+    target: { questItemId: "lost_beer", count: 3, source: "monster", dropChance: 0.11, dropRegionIds: ["inn-of-the-good-oak"] },
     story: "I am missing the ale for my guests. Those cursed spiders probably hid it somewhere in the cellar.",
     acceptText: "Find my ale in the cellar and return when you have it.",
     turnInText: "Thank you, adventurer. Now there is ale for everyone!",
@@ -436,6 +461,8 @@ find_the_beer: {
 
   i18n: { da: { title: "Find Øllet", story: "Jeg mangler mit øl til gæsterne - de fordømte edderkopper har nok gemt det et sted i kælderen. Hvis du er dernede, så find det for mig.", acceptText: "Find mit øl i kælderen og kom tilbage, når det er gjort.", turnInText: "Tak, eventyrer. Så er der øl til alle!" } },
 },
+//#endregion: Quest: find_the_beer
+//#region Quest: merchant_rebuild_shop
 merchant_rebuild_shop: {
     id: "merchant_rebuild_shop",
     source: "npc",
@@ -464,6 +491,8 @@ merchant_rebuild_shop: {
 
   i18n: { da: { title: "Genopbyg handelsboden", story: "Elis kan faa handlen i gang igen, hvis markedet faar en rigtig bod og en solid disk.", acceptText: "Skaff 26 wood planks, 16 stone bricks og 2 iron bars til handelsboden.", turnInText: "Disken er paa plads, og Elis kan igen handle med byen." } },
 },
+//#endregion: Quest: merchant_rebuild_shop
+//#region Quest: lost_anvil
 lost_anvil: {
     id: "lost_anvil",
     source: "npc",
@@ -483,6 +512,8 @@ lost_anvil: {
 
   i18n: { da: { title: "Den forsvundne anvil", story: "Traver havde gemt sin gamle anvil i et rejsebur, mens han undersoegte en malmsti. Baesterne rev vognen op og sloebte metallet vaek som et blankt trofae. Find den, foer smedjen mister sit bedste arbejde.", acceptText: "Find min gamle anvil. Jeg kan ikke smede ordentligt uden den.", turnInText: "Der er ridser i kanten, men det er min. Smedjen kan arbejde igen." } },
 },
+//#endregion: Quest: lost_anvil
+//#region Quest: lost_hammer
 lost_hammer: {
     id: "lost_hammer",
     source: "npc",
@@ -502,6 +533,8 @@ lost_hammer: {
 
   i18n: { da: { title: "Den forsvundne hammer", story: "Traver mistede sin runemarkerede hammer, da en flok monstre overfaldt hans forsyningskurv. Hammeren kan stadig kalde varme frem i metallet, og den maa ikke ende hos de forkerte.", acceptText: "Min hammer er borte. Finder du den, betaler jeg dig med mere end tak.", turnInText: "Haandtaget kender stadig min haand. Godt arbejde." } },
 },
+//#endregion: Quest: lost_hammer
+//#region Quest: blacksmith_restore_weapon_anvil
 blacksmith_restore_weapon_anvil: {
     id: "blacksmith_restore_weapon_anvil",
     source: "npc",
@@ -529,6 +562,8 @@ blacksmith_restore_weapon_anvil: {
 
   i18n: { da: { title: "Genskab weapon anvil", story: "Med smedjens ild genskabt og baade ambolt og hammer fundet kan Traver genskabe smedjens weapon anvil.", acceptText: "Tal med Traver, saa han kan samle sit vigtigste vaerktoej.", turnInText: "Weapon anvil er tilbage. Nu kan smedjen arbejde med vaaben igen." } },
 },
+//#endregion: Quest: blacksmith_restore_weapon_anvil
+//#region Quest: devils_judge
 devils_judge: {
     id: "devils_judge",
     source: "npc",
@@ -548,6 +583,8 @@ devils_judge: {
 
   i18n: { da: { title: "Devil's Judge", story: "Nu hvor weapon anvil er genskabt, kan Traver smede et saerligt svaerd, hvis du bringer ham jern og et stykke skind.", acceptText: "Bring 2 iron bars og 1 skind til Traver.", turnInText: "Metallet holder. Tag Devil's Judge, og brug det mod baesterne uden for byen." } },
 },
+//#endregion: Quest: devils_judge
+//#region Quest: blacksmith_smithy_supplies
 blacksmith_smithy_supplies: {
     id: "blacksmith_smithy_supplies",
     source: "npc",
@@ -567,6 +604,8 @@ blacksmith_smithy_supplies: {
 
   i18n: { da: { title: "Metal til smedjen", story: "Smedjen er aaben igen, men Traver mangler de tunge dele, foer han kan faa vaerkstedet i gang. Saml 25 metalplader og 15 metalkaeder i smithy. Der ligger ikke altid nok paa en enkelt tur, saa du skal maaske gennemsoge omraadet flere gange og rerun map'et.", acceptText: "Find 25 metalplader og 15 metalkaeder i smithy. Kig grundigt, og kom tilbage naar du har nok.", turnInText: "Det er nok til at begynde. Jeg sorterer delene og bruger dem til at reparere furnace, anvil og bellow i smedjen." } },
 },
+//#endregion: Quest: blacksmith_smithy_supplies
+//#region Quest: blacksmith_repair_smithy
 blacksmith_repair_smithy: {
     id: "blacksmith_repair_smithy",
     source: "npc",
@@ -610,6 +649,8 @@ blacksmith_repair_smithy: {
 
   i18n: { da: { title: "Faa ilden tilbage", story: "Traver mener, at selve hjertet af smedjen stadig kan reddes. Find hans gamle arbejdsplads i smithy og reparer furnace, anvil og bellow med metalplader og metalkaeder.", acceptText: "Gaa til smithy, find arbejdspladsen og reparer furnace, anvil og bellow.", turnInText: "De reddede dele kan bruges igen. Repair station er klar, og smedjen kan endelig arbejde ordentligt." } },
 },
+//#endregion: Quest: blacksmith_repair_smithy
+//#region Quest: blacksmith_clear_crafting_quarter
 blacksmith_clear_crafting_quarter: {
     id: "blacksmith_clear_crafting_quarter",
     source: "npc",
@@ -635,6 +676,8 @@ blacksmith_clear_crafting_quarter: {
 
   i18n: { da: { title: "Ryd Crafting Quarter", story: "Traver kan ikke bygge den rigtige smedje, foer Crafting Quarter er ryddet og gjort sikkert.", acceptText: "Ryd Crafting Quarter fra bykortet, og kom tilbage naar pladsen er klar.", turnInText: "Crafting Quarter er klar. Nu kan smedjen rejses ordentligt igen." } },
 },
+//#endregion: Quest: blacksmith_clear_crafting_quarter
+//#region Quest: rebuild_blacksmith
 rebuild_blacksmith: {
     id: "rebuild_blacksmith",
     source: "npc",
@@ -663,6 +706,8 @@ rebuild_blacksmith: {
 
   i18n: { da: { title: "Genopbyg smedjen", story: "Crafting Quarter er ryddet, og byen kan endelig rejse en rigtig smedje til Traver.", acceptText: "Skaff 50 wood planks, 20 stone bricks, 10 iron bars og 1 green gemstone.", turnInText: "Den rigtige smedje staar igen. Skaff de tunge smedjedele bagefter, saa kan Traver faa det gamle vaerksted ordentligt i gang." } },
 },
+//#endregion: Quest: rebuild_blacksmith
+//#region Quest: blacksmith_find_wife
 blacksmith_find_wife: {
     id: "blacksmith_find_wife",
     source: "npc",
@@ -688,6 +733,8 @@ blacksmith_find_wife: {
 
   i18n: { da: { title: "Hvor er Marta?", story: "Nu hvor smedjen staar igen, kan Traver ikke laengere skubbe frygten vaek. Hans kone Marta forsvandt ved smedjen. Rejs tilbage, find spor efter hende og undersoeg hvad der skete.", acceptText: "Tag tilbage til smithy og led efter Marta.", turnInText: "Traver bliver helt stille, da du fortaeller om bidemaerkerne fra et enormt vildsvin. Han har brug for tid til at soerge." } },
 },
+//#endregion: Quest: blacksmith_find_wife
+//#region Quest: blacksmith_boar_hunt
 blacksmith_boar_hunt: {
     id: "blacksmith_boar_hunt",
     source: "npc",
@@ -718,6 +765,8 @@ blacksmith_boar_hunt: {
 
   i18n: { da: { title: "Blod i Elvbaekken", story: "Traver er klar til at tale igen. Sporene peger mod Elvbaekken og en grotte, hvor det enorme vildsvin maa have trukket sig tilbage. Find grotten, gaa ned gennem revnerne og draeb baestet.", acceptText: "Rejs til river-creek, find grotten og draeb det store vildsvin.", turnInText: "Saa er det gjort. Traver knuger hammeren, men denne gang ryster haanden ikke." } },
 },
+//#endregion: Quest: blacksmith_boar_hunt
+//#region Quest: devils_protector
 devils_protector: {
     id: "devils_protector",
     source: "npc",
@@ -737,6 +786,8 @@ devils_protector: {
 
   i18n: { da: { title: "Devil's Protector", story: "Traver vil binde ildvaern og beskyttende runer i et skjold.", acceptText: "Bring 1 pink gemstone, 3 iron bars og 25 magic essence til Traver.", turnInText: "Devil's Protector er faerdigt. Skjoldets runer holder flammer og langsomme forbandelser fra dig." } },
 },
+//#endregion: Quest: devils_protector
+//#region Quest: devils_boots
 devils_boots: {
     id: "devils_boots",
     source: "npc",
@@ -756,6 +807,8 @@ devils_boots: {
 
   i18n: { da: { title: "Devil's Boots", story: "Traver kan smede lette, runebundne stoevler, hvis du skaffer materialerne.", acceptText: "Bring 1 orange gemstone, 2 iron bars og 10 magic essence til Traver.", turnInText: "Devil's Boots er faerdige. De er lettere, end de ser ud." } },
 },
+//#endregion: Quest: devils_boots
+//#region Quest: devils_touch
 devils_touch: {
     id: "devils_touch",
     source: "npc",
@@ -775,6 +828,8 @@ devils_touch: {
 
   i18n: { da: { title: "Devil's Touch", story: "Traver vil smede handsker, som traekker vaerdifulde materialer frem fra selv de fattigste fund.", acceptText: "Bring 1 turquoise gemstone, 2 iron bars og 25 magic essence til Traver.", turnInText: "Devil's Touch er faerdige. Runerne reagerer allerede paa din beroring." } },
 },
+//#endregion: Quest: devils_touch
+//#region Quest: elis_stolen_fruit_barrel
 elis_stolen_fruit_barrel: {
     id: "elis_stolen_fruit_barrel",
     source: "npc",
@@ -799,6 +854,8 @@ elis_stolen_fruit_barrel: {
 
   i18n: { da: { title: "Elis' tomme frugttoende", story: "Elis har fundet sin stjaalne frugttoende igen, men den er tom. Han mangler 16 bananer og 18 appelsiner. Marketplace er det bedste sted at lede, men frugten er ikke til at redde, mens omraadet stadig er for corrupted. Ryd Marketplace foerst, vend tilbage bagefter, og soeg saa efter frugtkurve og rester af frugt.", acceptText: "Marketplace er nu aabent. Clear regionen foerst, kom tilbage, og saml derefter 16 bananer og 18 appelsiner til Elis.", turnInText: "Elis taeller frugten op og aander lettet ud. Det er ikke hele lasten, men det er nok til at faa handlen i gang igen." } },
 },
+//#endregion: Quest: elis_stolen_fruit_barrel
+//#region Quest: priest_rebuild_sanctuary
 priest_rebuild_sanctuary: {
     id: "priest_rebuild_sanctuary",
     source: "npc",
@@ -827,6 +884,8 @@ priest_rebuild_sanctuary: {
 
   i18n: { da: { title: "Genopbyg Sanctuary", story: "Iolan vil give byen et roligt sted igen, men Sanctuary maa rejses foerst.", acceptText: "Skaff 25 wood planks, 12 stone bricks til Sanctuary.", turnInText: "Sanctuary staar igen i Mystic Quarter. Byen har faaet et sted at samle mod." } },
 },
+//#endregion: Quest: priest_rebuild_sanctuary
+//#region Quest: lost_watch
 lost_watch: {
     id: "lost_watch",
     source: "npc",
@@ -839,7 +898,7 @@ lost_watch: {
     regionIds: ["city"],
     demands: { completedQuests: ["check_inn_infestation"] },
     type: "collect_quest_item",
-    target: { questItemId: "noble_watch", count: 1, source: "elite", dropChance: 0.28 },
+    target: { questItemId: "noble_watch", count: 1, source: "elite", dropChance: 0.18 },
     story: "Turanios' family watch was taken during a chaotic escape through the wasteland. It holds the names of his family, and elite beasts collect trophies like it.",
     acceptText: "My watch is priceless. Find it in the wasteland, and I will pay you in experience rather than small coins.",
     turnInText: "My family's ticking has returned. This will be remembered.",
@@ -847,6 +906,8 @@ lost_watch: {
 
   i18n: { da: { title: "Det forsvundne ur", story: "Turanios' familieur blev taget under en kaotisk flugt gennem oede stier. Uret er ikke bare guld; det indeholder navne paa slaegten, og elitebaesterne samler paa den slags skinnende trofaeer.", acceptText: "Mit ur er uvurderligt. Find det i oedemarken, og jeg betaler i erfaring, ikke smaamoenter.", turnInText: "Min slaegts tikken er vendt tilbage. Det skal huskes." } },
 },
+//#endregion: Quest: lost_watch
+//#region Quest: find_annelises_redroses
 find_annelises_redroses: {
     id: "find_annelises_redroses",
     source: "npc",
@@ -866,7 +927,8 @@ find_annelises_redroses: {
 
   i18n: { da: { title: "Find Annelises røde roser", story: "Annelise har brug for dine tjenester. Hendes forlovede gav hende 12 røde roser, men de er forsvundet under en tur uden for byen. Kan du finde dem tilbage?", acceptText: "Find 12 røde roser og bring dem tilbage til Annelise.", turnInText: "Oh, mine roser! Tak, du har gjort mig en stor tjeneste. Tag dette som tak." } },
 },
-
+//#endregion: Quest: find_annelises_redroses
+//#region Quest: annelise_document_chain
 annelise_document_chain: {
     id: "annelise_document_chain",
     source: "npc",
@@ -975,6 +1037,8 @@ annelise_document_chain: {
 
   i18n: { da: { title: "Annelises Aerinde" } },
 },
+//#endregion: Quest: annelise_document_chain
+//#region Quest: find_annelises_rarepinkflowers
 find_annelises_rarepinkflowers: {
     id: "find_annelises_rarepinkflowers",
     source: "npc",
@@ -994,6 +1058,9 @@ find_annelises_rarepinkflowers: {
 
   i18n: { da: { title: "Annelise: Sjældne lilla blomster", story: "Annelise har besluttet at finde noget helt særligt — 24 sjældne lilla blomster til en særlig ceremoni. Hun har allerede fået hjælp med sine røde roser. Kan du samle dem?", acceptText: "Jeg behøver 24 sjældne lilla blomster. Kan du hente dem?", turnInText: "Disse er perfekte — du har min dybeste tak. Modtag denne belønning for din indsats." } },
 },
+//#endregion: Quest: find_annelises_rarepinkflowers
+//#region Questline: miri, rusk and veldor
+//#region Quest: miri_find_father
 miri_find_father: {
     id: "miri_find_father",
     source: "npc",
@@ -1023,6 +1090,8 @@ miri_find_father: {
 
   i18n: { da: { title: "Miri leder efter sin far", story: "Miri knuger haenderne. 'Min far Rusk gik ned i den gamle broend efter en gammel mineskakt. Han sagde, han bare skulle finde nok til at betale Veldor. Han kom aldrig tilbage.'", acceptText: "Find broenden uden for byen, gaa ned i minen og find Rusk.", turnInText: "Rusk hoster i det kolde minestoev. 'Miri sendte dig? Saa er jeg ikke helt glemt endnu.'" } },
 },
+//#endregion: Quest: miri_find_father
+//#region Quest: rusk_gold_nuggets
 rusk_gold_nuggets: {
     id: "rusk_gold_nuggets",
     source: "npc",
@@ -1052,6 +1121,8 @@ rusk_gold_nuggets: {
 
   i18n: { da: { title: "Rusk skal bruge guldklumper", story: "Rusk laener sig mod en vaad stenvaeg. 'Jeg skylder Veldor mere, end jeg kan betale. Der er smaa guldklumper i stenene hernede, hvis man slaar laenge nok. Syv kan maaske koebe mig tid.'", acceptText: "Oedelaeg stenklumper i minen og saml 7 guldklumper til Rusk.", turnInText: "Rusk holder guldklumperne som om de braender. 'Det er nok til at faa mig op. Fortael Miri, at jeg lever.'" } },
 },
+//#endregion: Quest: rusk_gold_nuggets
+//#region Quest: miri_father_returns
 miri_father_returns: {
     id: "miri_father_returns",
     source: "npc",
@@ -1078,6 +1149,8 @@ miri_father_returns: {
 
   i18n: { da: { title: "Tilbage til Miri", story: "Miri ser op, foer du naar at tale. 'Du fandt ham, ikke? Sig at du fandt ham.'", acceptText: "Fortæl Miri sandheden om Rusk.", turnInText: "Miri lukker oejnene og aander ud. 'Tak. Men Veldor slipper ham ikke bare. Han slipper aldrig nogen.'" } },
 },
+//#endregion: Quest: miri_father_returns
+//#region Quest: rusk_confront_veldor
 rusk_confront_veldor: {
     id: "rusk_confront_veldor",
     source: "npc",
@@ -1104,6 +1177,8 @@ rusk_confront_veldor: {
 
   i18n: { da: { title: "Rusk vil konfrontere Veldor", story: "Rusk staar igen i byen, men skuldrene haenger. 'Veldor tager guldet og kalder det renter. Hvis han skal hoere sandhed, maa det komme fra en, han ikke ejer.'", acceptText: "Tal med Veldor ved byens midte.", turnInText: "Veldor smiler uden varme. 'Rusk har altid haft en dramatisk sjæl. Men maaske kan du goere dig nyttig.'" } },
 },
+//#endregion: Quest: rusk_confront_veldor
+//#region Quest: veldor_clear_the_mine
 veldor_clear_the_mine: {
     id: "veldor_clear_the_mine",
     source: "npc",
@@ -1146,6 +1221,8 @@ veldor_clear_the_mine: {
 
   i18n: { da: { title: "Veldor kraever minen ryddet", story: "Veldor retter paa sin manchet. 'Ryd minen for monstre, saa vil jeg overveje Rusks gaeld. Overveje, forstaar du.'", acceptText: "Ryd alle tre niveauer i den gamle mine.", turnInText: "Veldor loefter brynene. 'Imponerende. Men aftaler er komplicerede, og Rusk skylder mere end guld.'" } },
 },
+//#endregion: Quest: veldor_clear_the_mine
+//#region Quest: mayor_veldor_evidence
 mayor_veldor_evidence: {
     id: "mayor_veldor_evidence",
     source: "npc",
@@ -1174,6 +1251,8 @@ mayor_veldor_evidence: {
 
   i18n: { da: { title: "Mayor vil have beviser", story: "Borgmesteren taler lavt. 'Veldor ejer gaeld, jord og frygt. Nogle siger, hans rigdom begyndte, da Nethrendors skygge foerst faldt. Find et brev. Noget han ikke kan smile sig ud af.'", acceptText: "Find et brev eller bevis i den gamle mine.", turnInText: "Borgmesteren laeser brevet to gange. 'Dette naevner hans kone. Gaa til praesten. Iolan ved, hvilke navne byen har laert at tie om.'" } },
 },
+//#endregion: Quest: mayor_veldor_evidence
+//#region Quest: priest_veldors_letter
 priest_veldors_letter: {
     id: "priest_veldors_letter",
     source: "npc",
@@ -1200,6 +1279,8 @@ priest_veldors_letter: {
 
   i18n: { da: { title: "Praesten og Veldors brev", story: "Iolan ser ikke overrasket ud, da du naevner brevet. 'Hans kone gik mod en skovmine og kom aldrig tilbage. Veldor byggede sin magt oven paa stilheden.'", acceptText: "Lyt til praestens forklaring.", turnInText: "Iolan tegner et tegn i luften. 'Find hende. Ikke for Veldor, men for dem han holder fanget med loegne.'" } },
 },
+//#endregion: Quest: priest_veldors_letter
+//#region Quest: find_veldors_wife
 find_veldors_wife: {
     id: "find_veldors_wife",
     source: "npc",
@@ -1229,6 +1310,8 @@ find_veldors_wife: {
 
   i18n: { da: { title: "Find Veldors kone", story: "Praesten peger mod de gamle traeer. 'Der er en skakt i skoven. Rødderne skjuler indgangen, men mørket derinde husker hendes navn.'", acceptText: "Find skovminen, gaa ned i dybet og undersoeg liget.", turnInText: "Iolan boejer hovedet. 'Saa er sandheden ikke laengere begravet. Tag den til Veldor.'" } },
 },
+//#endregion: Quest: find_veldors_wife
+//#region Quest: confront_veldor_with_truth
 confront_veldor_with_truth: {
     id: "confront_veldor_with_truth",
     source: "npc",
@@ -1256,6 +1339,9 @@ confront_veldor_with_truth: {
 
   i18n: { da: { title: "Konfronter Veldor med sandheden", story: "Veldor naar ikke at smile, foer han ser dit ansigt. Beviset er tungere end guld, og byen er ikke laengere helt hans.", acceptText: "Gaa til Veldor og fortael ham, hvad du fandt.", turnInText: "Veldor bliver bleg. 'Rusk er fri. Sig det til ham. Sig det til alle, hvis du absolut maa.'" } },
 },
+//#endregion: Quest: confront_veldor_with_truth
+//#endregion Questline: miri, rusk and veldor
+//#region Quest: merchant_recover_wagon_wheels
 merchant_recover_wagon_wheels: {
     id: "merchant_recover_wagon_wheels",
     source: "npc",
@@ -1283,6 +1369,8 @@ merchant_recover_wagon_wheels: {
       },
     },
 },
+//#endregion: Quest: merchant_recover_wagon_wheels
+//#region Quest: blacksmith_gift_for_the_king
 blacksmith_gift_for_the_king: {
     id: "blacksmith_gift_for_the_king",
     source: "npc",
@@ -1313,6 +1401,8 @@ blacksmith_gift_for_the_king: {
       },
     },
 },
+//#endregion: Quest: blacksmith_gift_for_the_king
+//#region Quest: status_on_city_defences
 status_on_city_defences: {
     id: "status_on_city_defences",
     source: "npc",
@@ -1345,6 +1435,8 @@ status_on_city_defences: {
       turnInText: "Rapporten er vaerre, end borgmesteren haabede, men den er brugbar. Nu ved byen, hvad der skal repareres foerst.",
     } },
 },
+//#endregion: Quest: status_on_city_defences
+//#region Quest: clear_and_repair_the_lookout_post
 clear_and_repair_the_lookout_post: {
     id: "clear_and_repair_the_lookout_post",
     source: "npc",
@@ -1387,6 +1479,8 @@ clear_and_repair_the_lookout_post: {
       turnInText: "Udkigsposten staar igen. Naar corruption er vaek, kan posten advare byen, foer faren naar murene.",
     } },
 },
+//#endregion: Quest: clear_and_repair_the_lookout_post
+//#region Quest: repair_the_fences
 repair_the_fences: {
     id: "repair_the_fences",
     source: "npc",
@@ -1423,6 +1517,8 @@ repair_the_fences: {
       turnInText: "Gravpladsen er igen lukket inde. Det, der hviler der, er mindre udsat for vildmarken.",
     } },
 },
+//#endregion: Quest: repair_the_fences
+//#region Quest: light_the_beacons
 light_the_beacons: {
     id: "light_the_beacons",
     source: "npc",
@@ -1455,6 +1551,9 @@ light_the_beacons: {
       turnInText: "Roegen stiger igen fra de ydre stier. Byen har faaet oejne i vildmarken.",
     } },
 },
+//#endregion: Quest: light_the_beacons
+//#region Questline: hunter_quests
+//#region Quest: help_hunter_kill_wolfs
 help_hunter_kill_wolfs: {
     id: "help_hunter_kill_wolfs",
     source: "npc",
@@ -1485,6 +1584,8 @@ help_hunter_kill_wolfs: {
       turnInText: "Y'atho tæller halerne og nikker. Borgmesteren får sit bevis. Han lægger de bedste skind til side og lover din kappe efter den næste jagt.",
     } },
 },
+//#endregion: Quest: help_hunter_kill_wolfs
+//#region Quest: help_hunter_kill_boars
 help_hunter_kill_boars: {
     id: "help_hunter_kill_boars",
     source: "npc",
@@ -1515,6 +1616,8 @@ help_hunter_kill_boars: {
       turnInText: "Tænderne er rene og ubrudte. Y'atho giver dig den lovede ulvekappe, vender så de fineste tænder i hænderne og siger, at de vil blive til en stærk halskæde.",
     } },
 },
+//#endregion: Quest: help_hunter_kill_boars
+//#region Quest: help_hunter_find_bow
 help_hunter_find_bow: {
     id: "help_hunter_find_bow",
     source: "npc",
@@ -1545,6 +1648,8 @@ help_hunter_find_bow: {
       turnInText: "Y'atho holder buen, som om han hilser en gammel ledsager. Hans lettelse er tydelig. Han fæstner den lovede tandhalskæde om din hals og kalder dig en sand ven af jagten.",
     } },
 },
+//#endregion: Quest: help_hunter_find_bow
+//#region Quest: help_hunter_find_weddingring
 help_hunter_find_weddingring: {
     id: "help_hunter_find_weddingring",
     source: "npc",
@@ -1575,6 +1680,8 @@ help_hunter_find_weddingring: {
       turnInText: "Ringen er ridset, men hel. Y'atho lukker hånden om den, ler én gang af ren lettelse og sværger aldrig at tage den af igen.",
     } },
 },
+//#endregion: Quest: help_hunter_find_weddingring
+//#region Quest: help_hunter_find_flower
 help_hunter_find_flower: {
     id: "help_hunter_find_flower",
     source: "npc",
@@ -1634,6 +1741,9 @@ help_hunter_find_flower: {
       turnInText: "Endelig er den rette blomst fundet.",
     } },
 },
+//#endregion: Quest: help_hunter_find_flower
+//#endregion: Questline: hunter_quests
+//#region Quest: vitlias_kings_relics
 vitlias_kings_relics: {
     id: "vitlias_kings_relics",
     source: "npc",
@@ -1659,6 +1769,8 @@ vitlias_kings_relics: {
 
   i18n: { da: { title: "Vitlias: Kongens relikvier", story: "Vitlias søger kongelige relikvier til sine studier. Find kronen (fra et elite-skelet i laden), scepteret (få det fra Annelise når hun går med til det), og orb'en (køb eller byt med Himus).", acceptText: "Find kongens tre relikvier og bring dem til mig.", turnInText: "Perfekt. Disse relikvier vil kaste lys over vores historie. Tak." } },
 },
+//#endregion: Quest: vitlias_kings_relics
+//#region Quest: annelise_spider_task
 annelise_spider_task: {
     id: "annelise_spider_task",
     source: "npc",
@@ -1679,4 +1791,5 @@ annelise_spider_task: {
 
   i18n: { da: { title: "Annelise: Dræb 100 edderkopper", story: "Annelise har en frygt for edderkopper. Hun beder dig dræbe 100 edderkopper i området. Når du har gjort det, vil hun belønne dig med noget særligt.", acceptText: "Dræb 100 edderkopper for mig, og jeg vil overveje at give dig noget værdifuldt.", turnInText: "Du gjorde det... disse kryb var ikke sjove. Her er scepteret, som jeg har holdt tilbage indtil nu." } },
 },
+//#endregion: Quest: annelise_spider_task
 };

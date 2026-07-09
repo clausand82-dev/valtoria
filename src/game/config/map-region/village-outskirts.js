@@ -10,9 +10,11 @@ const MAINLAND_PATH_FOLIAGE = [
 ];
 
 export function createVillageOutskirtsMapRegions(region) {
-  return {
-  "village-outskirts": [
+  return {  
+    "village-outskirts": [
+    //#region Path to Hunter Hut
     region({
+      
       id: "path-to-hunter-hut",
       label: "Path to Hunter Hut",
       i18n: { da: { label: "Sti til jaegerhytten" } },
@@ -51,7 +53,10 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "29.90,4.25 47.85,4.25 41.87,17.00 31.10,14.88",
     }),
+    //#endregion Path to Hunter Hut
+    //#region Lookout Post
     region({
+      
       id: "lookout-post",
       label: "Lookout Post",
       i18n: { da: { label: "Udkigsposten" } },
@@ -108,7 +113,9 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       points: "31.10,14.88 41.87,17.00 41.87,31.88 34.69,36.13 23.92,29.76",
     }),
-    region({
+    //#endregion Lookout Post
+    //#region Old Shrine
+    region({      
       id: "old-shrine",
       label: "The Old Shrine",
       i18n: { da: { label: "Den gamle helligdom" } },
@@ -145,6 +152,8 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       points: "78.95,4.25 65.79,4.25 61.00,17.00 72.97,27.63 83.73,17.00",
     }),
+    //#endregion Old Shrine
+    //#region Paths into Elvindale
     region({
       id: "paths-into-elvindale",
       label: "Paths into Elvindale",
@@ -166,6 +175,8 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "78.95,4.25 95.69,4.25 98.09,25.50 83.73,17.00",
     }),
+    //#endregion Paths into Elvindale
+    //#region Southern Fields
     region({
       id: "southern-fields",
       label: "Southern Fields",
@@ -196,6 +207,8 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       points: "66.99,87.14 87.32,72.26 70.57,57.39 56.22,74.39",
     }),
+    //#endregion Southern Fields
+    //#region River Creek
     region({
       id: "river-creek", label: "River Creek", i18n: { da: { label: "Elvbaekken" } }, color: "#7fb6d6",
       unlock: {
@@ -278,6 +291,8 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       points: "66.99,87.14 35.89,85.02 35.89,68.01 56.22,74.39",
     }),
+    //#endregion River Creek
+    //#region Trail to Inner Elvindale
     region({
       id: "trail-to-inner-elvindale",
       label: "Trail to Inner Elvindale",
@@ -317,6 +332,8 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "35.89,85.02 13.16,87.14 14.35,68.01 35.89,68.01",
     }),
+    //#endregion Trail to Inner Elvindale
+    //#region Market Square
     region({
       id: "market-square",
       label: "Marketplace",
@@ -384,6 +401,8 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       points: "47.85,40.38 44.26,46.76 46.65,51.01 50.24,48.88 55.02,48.88 56.22,42.51 51.44,38.26",
     }),
+    //#endregion Market Square
+    //#region The Well
     region({
       id: "well",
       label: "The Well",
@@ -427,6 +446,8 @@ export function createVillageOutskirtsMapRegions(region) {
       points: "46.65,51.01 49.04,57.39 56.22,55.26 58.61,51.01 55.02,48.88 50.24,48.88",
       mobs: ["wolf",],
     }),
+    //#endregion The Well
+    //#region Inn of the Good Oak
     region({
       id: "inn-of-the-good-oak",
       label: "Inn of the Good Oak",
@@ -558,6 +579,8 @@ export function createVillageOutskirtsMapRegions(region) {
       antiDrops: { allPotions: false, rarities: ["rare"], allUniques: true, allResources: false },
       points: "51.44,38.26 61.00,17.00 72.97,27.63 56.22,42.51",
     }),
+    //#endregion Inn of the Good Oak
+    //#region The Barn
     region({
       id: "barn",
       label: "The Barn",
@@ -613,6 +636,8 @@ export function createVillageOutskirtsMapRegions(region) {
       //weights: { house: 5, tree: 2, rock: 1, foilage: 4, fireplace: 2 },
       points: "70.57,57.39 56.22,74.39 49.04,57.39 56.22,55.26 58.61,51.01",
     }),
+    //#endregion The Barn
+    //#region The Mill
     region({
       id: "mill",
       label: "The Mill",
@@ -634,6 +659,8 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "70.57,57.39 81.34,44.63 94.50,55.26 87.32,72.26",
     }),
+    //#endregion The Mill
+    //#region Hunter Trail to the Forest
     region({
       id: "hunter-trail-to-the-forest",
       label: "Hunter Trail to the Forest",
@@ -673,6 +700,8 @@ export function createVillageOutskirtsMapRegions(region) {
       foliageSet: MAINLAND_PATH_FOLIAGE,
       points: "81.34,44.63 98.09,25.50 98.09,55.26 94.50,55.26",
     }),
+    //#endregion Hunter Trail to the Forest
+    //#region The Smithy
     region({
       id: "smithy",
       label: "The Smithy",
@@ -735,6 +764,8 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       points: "34.69,36.13 44.26,46.76 47.85,40.38 51.44,38.26 41.87,17.00 41.87,31.88",
     }),
+    //#endregion The Smithy
+    //#region Northern Fields
     region({
       id: "northern-fields",
       label: "Northern Fields",
@@ -771,6 +802,8 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       points: "98.09,25.50 81.34,44.63 70.57,57.39 58.61,51.01 55.02,48.88 56.22,42.51 72.97,27.63 83.73,17.00",
     }),
+    //#endregion Northern Fields
+    //#region The Village
     region({
       id: "village",
       label: "The Village",
@@ -872,6 +905,8 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       points: "23.92,29.76 34.69,36.13 44.26,46.76 46.65,51.01 49.04,57.39 56.22,74.39 35.89,68.01 14.35,68.01",
     }),
+    //#endregion The Village
+    //#region The Forest
     region({
       id: "the-forest",
       label: "The Forest",
@@ -928,6 +963,8 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       points: "41.87,17.00 47.85,4.25 65.79,4.25 61.00,17.00 51.44,38.26",
     }),
+  //#endregion The Forest
   ],
   };
+  
 }

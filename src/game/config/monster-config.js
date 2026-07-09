@@ -19,6 +19,133 @@ const monsterSprite = (sprite) => ({
 export const BOSS_TINT = { color: "#d8313d", tintAlpha: 0.34 };
 
 export const MONSTER_DEFS = {
+  //#region Category: Spiders
+  //#region Monster: Spawn of Archnogrim
+  "Spawn of Archnogrim": {
+    sprite: monsterSprite({
+      id: "archnogrim", url: "/assets/generated/mobs/archnogrim_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.5, shadowW: 36, shadowH: 12, shadowAlpha: 0.38, yOffset: 44
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "large"],
+    stats: { hp: 104, damage: 20, speed: 1.48, range: 0.68, radius: 0.36, color: "#7b607d", xp: 38 },
+    popularity: { change: 1 },
+    onHitStatus: { type: "root", chance: 0.25, minDuration: 0.5, maxDuration: 1.5, color: "#d7d4c7" },
+    leapAttack: { minRange: 1.25, maxRange: 3, speed: 8.5, cooldown: 2.4 },
+    lootTables: ["gold_medium", "monster_profile_humanoid", "equipment_attacker_rare", "equipment_defender_rare", "monster_special_global", "material_houses", "material_humanoid"]
+  },
+  //#endregion: Monster: Spawn of Archnogrim
+  //#region Monster: ArachnogrimOffspring
+  ArachnogrimOffspring: {
+    catalogId: "arachnogrim_offspring",
+    sprite: monsterSprite({
+      id: "arachnogrim_offspring", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.34, shadowW: 23, shadowH: 8, shadowAlpha: 0.34, shadowY: 13, yOffset: 30
+    }),
+    speciesId: "spider",
+    tags: ["spider", "arachnogrim", "beast", "offspring", "medium", "poison"],
+    stats: { hp: 52, damage: 20, speed: 2.05, range: 0.42, radius: 0.28, color: "#493354", xp: 25, spells: ["web_slow"] },
+    library: {
+      title: "Arachnogrim Offspring",
+      text: "A vicious juvenile from an unnatural brood, fast enough to overwhelm isolated prey.",
+      strengths: ["Fast", "Dangerous in groups"],
+      weaknesses: ["Low endurance", "Short range"],
+      habitatText: "Found in sealed, web-choked caves."
+    },
+    lootTables: ["gold_low", "material_bone"],
+  },
+  //#endregion: Monster: ArachnogrimOffspring
+  //#region Monster: Spider
+  Spider: {
+    sprite: monsterSprite({
+      id: "spider", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.43, shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17, yOffset: 38
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "medium"],
+    stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22, spells: ["web_slow"] },
+    popularity: { change: 0.85 },
+    library: {
+      title: "Edderkop",
+      text: "En taetbygget kryber, der bruger net og trange passager til at saenke sit bytte.",
+      strengths: ["Kan saenke fjender", "Farlig i grupper"],
+      weaknesses: ["Begraenset raekkevidde", "Saarbar naar den holdes i bevaegelse"],
+      habitatText: "Traeffes i grotter, lader, ruiner og fugtige underjordiske steder."
+    },
+    lootTables: ["gold_low", "material_bone"]
+  },
+  //#endregion: Monster: Spider
+  //#region Monster: MiniSpider
+  MiniSpider: {
+    sprite: monsterSprite({
+      id: "minispider", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.1, shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4, yOffset: 9
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "small"],
+    stats: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10 },
+    allowElite: false,
+    lootTables: ["gold_low", "material_bone"]
+  },
+  //#endregion: Monster: MiniSpider
+  //#region Monster: MediumSpider
+  MediumSpider: {
+    sprite: monsterSprite({
+      id: "mediumspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.2, shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8, yOffset: 18
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "medium"],
+    stats: { hp: 36, damage: 18, speed: 2, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16, spells: ["web_slow"] },
+    lootTables: ["gold_low", "material_bone"]
+  },
+  //#endregion: Monster: MediumSpider
+  //#region Monster: LargeSpider
+  LargeSpider: {
+    sprite: monsterSprite({
+      id: "largespider", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.55, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "large"],
+    stats: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32, spells: ["web_slow"] },
+    lootTables: ["gold_low", "material_bone"]
+  },
+  //#endregion: Monster: LargeSpider
+  //#region Monster: MotherSpider
+  MotherSpider: {
+    sprite: monsterSprite({
+      id: "motherspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.75, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
+    }),
+    speciesId: "spider",
+    tags: ["spider", "beast", "wildlife", "boss", "large"],
+    stats: { hp: 220, damage: 36, speed: 1.2, range: 0.8, radius: 0.4, color: "#6d5b83", xp: 48, spells: ["web_slow", "poison_cloud"] },
+    allowElite: false,
+    isBoss: true,
+    haveMinion: true,
+    minions: {
+      cooldown: 8,
+      maxActive: 4,
+      spawnCount: 2,
+      scale: 0.42,
+      statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 }
+    },
+    lootTables: ["gold_boss", "material_bone", "material_gemstones", "material_humanoid", "monster_special_global"]
+  },
+  //#endregion: Monster: MotherSpider
+  //#endregion: Category: Spiders
+
+  //#region Category: Demons
+
+  //#region Monster: Fallen
   Fallen: {
     sprite: monsterSprite({
       id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
@@ -30,72 +157,8 @@ export const MONSTER_DEFS = {
     stats: { hp: 35, damage: 7, speed: 1.62, range: 0.52, radius: 0.26, color: "#b84d43", xp: 12 },
     lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
-  "Thorn Husk": {
-    sprite: monsterSprite({
-      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "plant",
-    tags: ["plant", "medium"],
-    stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
-  "Mire Brute": {
-    sprite: monsterSprite({
-      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "plant",
-    tags: ["plant", "large"],
-    stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
-  Hollow: {
-    sprite: monsterSprite({
-      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
-    }),
-    speciesId: "spirit",
-    tags: ["spirit", "medium"],
-    stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
-  },
-  "Shard Crawler": {
-    sprite: monsterSprite({
-      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
-    }),
-    speciesId: "spirit",
-    tags: ["spirit", "medium"],
-    stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
-  },
-  "Deep Guard": {
-    sprite: monsterSprite({
-      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "undead",
-    tags: ["undead", "large"],
-    stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
-  Raider: {
-    sprite: monsterSprite({
-      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
+  //#endregion: Monster: Fallen
+  //#region Monster: Ashbound
   Ashbound: {
     sprite: monsterSprite({
       id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
@@ -107,6 +170,67 @@ export const MONSTER_DEFS = {
     stats: { hp: 76, damage: 14, speed: 1.18, range: 0.64, radius: 0.35, color: "#925758", xp: 26 },
     lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
+  //#endregion: Monster: Ashbound
+  //#region Monster: Demon
+  Demon: {
+    sprite: monsterSprite({
+      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "demon",
+    tags: ["demon", "medium"],
+    stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
+    popularity: { change: 1.7 },
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Demon
+  //#region Monster: Hellhound
+  Hellhound: {
+    sprite: monsterSprite({
+      id: "hellhound", url: "/assets/generated/mobs/hellhound_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.52, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 40
+    }),
+    speciesId: "demon",
+    tags: ["demon", "beast", "medium"],
+    stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18, fireResist: 30, iceResist: -20 },
+    popularity: { change: 0.9 },
+    lootTables: ["gold_low", "material_animal_medium", "material_gemstones", "material_magic"]
+  },
+  //#endregion: Monster: Hellhound
+  //#region Monster: Infernus Minion
+  "Infernus Minion": {
+    sprite: monsterSprite({
+      id: "infernus", url: "/assets/generated/mobs/infernus_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.54, shadowW: 36, shadowH: 12, shadowAlpha: 0.4, yOffset: 48
+    }),
+    speciesId: "demon",
+    tags: ["demon", "medium", "fire"],
+    stats: { hp: 90, damage: 16, speed: 1.16, range: 4.2, radius: 0.35, color: "#e56d35", xp: 36, magic: 9, spells: ["fireball"] },
+    popularity: { change: 1.15 },
+    onHitStatus: { type: "dot", chance: 1, damage: 5, duration: 3.5, tick: 1, color: "#ff7b38", label: "Burn" },
+    lootTables: ["gold_medium", "equipment_attacker_rare", "readable_fire_spellbooks", "material_humanoid"]
+  },
+  //#endregion: Monster: Infernus Minion
+  //#endregion: Category: Demons
+
+  //#region Category: Skeletons
+  //#region Monster: Deep Guard
+  "Deep Guard": {
+    sprite: monsterSprite({
+      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "undead",
+    tags: ["undead", "large"],
+    stats: { hp: 118, damage: 18, speed: 0.86, range: 0.76, radius: 0.45, color: "#9a8e80", xp: 39 },
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Deep Guard
+  //#region Monster: Gate Warden
   "Gate Warden": {
     sprite: monsterSprite({
       id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
@@ -118,6 +242,8 @@ export const MONSTER_DEFS = {
     stats: { hp: 134, damage: 20, speed: 0.78, range: 0.82, radius: 0.48, color: "#aa8849", xp: 44 },
     lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
+  //#endregion: Monster: Gate Warden
+  //#region Monster: Bone Warden
   "Bone Warden": {
     sprite: monsterSprite({
       id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
@@ -129,6 +255,234 @@ export const MONSTER_DEFS = {
     stats: { hp: 80, damage: 18, speed: 1.38, range: 0.6, radius: 0.32, color: "#c8bda7", xp: 22 },
     lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
   },
+  //#endregion: Monster: Bone Warden
+  //#region Monster: Iron Revenant
+  "Iron Revenant": {
+    sprite: monsterSprite({
+      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "undead",
+    tags: ["undead", "large"],
+    stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Iron Revenant
+  //#region Monster: Skeleton
+  Skeleton: {
+    sprite: monsterSprite({
+      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "undead",
+    tags: ["undead", "medium"],
+    stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
+    popularity: { change: 1.2 },
+    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
+  },
+  //#endregion: Monster: Skeleton
+  //#endregion: Category: Skeletons
+
+  //#region Category: Ghosts
+  //#region Monster: Hollow
+  Hollow: {
+    sprite: monsterSprite({
+      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
+    }),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
+    stats: { hp: 42, damage: 8, speed: 1.7, range: 0.52, radius: 0.27, color: "#798391", xp: 15 },
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Hollow
+  //#region Monster: Shard Crawler
+  "Shard Crawler": {
+    sprite: monsterSprite({
+      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
+    }),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
+    stats: { hp: 66, damage: 12, speed: 1.36, range: 0.6, radius: 0.32, color: "#758996", xp: 24, iceResist: 25, fireResist: -15 },
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Shard Crawler
+  //#region Monster: Rune Shade
+  "Rune Shade": {
+    sprite: monsterSprite({
+      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
+    }),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
+    stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Rune Shade
+  //#region Monster: Ghost
+  Ghost: {
+    sprite: monsterSprite({
+      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
+    }),
+    speciesId: "spirit",
+    tags: ["spirit", "medium"],
+    stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
+    popularity: { change: 1.35 },
+    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
+  },
+  //#endregion: Monster: Ghost
+  //#endregion: Category: Ghosts
+
+  //#region Category: Villages
+  //#region Monster: Village01
+  Village01: {
+    sprite: monsterSprite({
+      id: "village01", url: "/assets/generated/mobs/village01_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
+    popularity: { change: -0.35 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village01
+  //#region Monster: Village02
+  Village02: {
+    sprite: monsterSprite({
+      id: "village02", url: "/assets/generated/mobs/village02_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
+    popularity: { change: -0.4 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village02
+  //#region Monster: Peasant
+  Peasant: {
+    sprite: monsterSprite({
+      id: "village02", url: "/assets/generated/mobs/village02_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 60, damage: 11, speed: 1.35, range: 0.58, radius: 0.3, color: "#8a7657", xp: 20 },
+    popularity: { change: -0.3 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
+  },
+  //#endregion: Monster: Peasant
+  //#region Monster: Village03
+  Village03: {
+    sprite: monsterSprite({
+      id: "village03", url: "/assets/generated/mobs/village03_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
+    popularity: { change: -0.35 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village03
+  //#region Monster: Village04
+  Village04: {
+    sprite: monsterSprite({
+      id: "village04", url: "/assets/generated/mobs/village04_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
+    popularity: { change: -0.38 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village04
+  //#region Monster: Village05
+  Village05: {
+    sprite: monsterSprite({
+      id: "village05", url: "/assets/generated/mobs/village05_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
+    popularity: { change: -0.36 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village05
+  //#region Monster: Village06
+  Village06: {
+    sprite: monsterSprite({
+      id: "village06", url: "/assets/generated/mobs/village06_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
+    popularity: { change: -0.4 },
+    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
+  },
+  //#endregion: Monster: Village06
+  //#endregion: Category: Villages
+
+  //#region Category: Other Monsters
+  //#region Monster: Thorn Husk
+  "Thorn Husk": {
+    sprite: monsterSprite({
+      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "plant",
+    tags: ["plant", "medium"],
+    stats: { hp: 58, damage: 9, speed: 1.22, range: 0.58, radius: 0.34, color: "#667848", xp: 19 },
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Thorn Husk
+  //#region Monster: Mire Brute
+  "Mire Brute": {
+    sprite: monsterSprite({
+      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "plant",
+    tags: ["plant", "large"],
+    stats: { hp: 92, damage: 14, speed: 0.9, range: 0.66, radius: 0.43, color: "#706344", xp: 30 },
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Mire Brute
+  //#region Monster: Raider
+  Raider: {
+    sprite: monsterSprite({
+      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
+      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+    }),
+    speciesId: "human",
+    tags: ["humanoid", "human", "medium"],
+    stats: { hp: 50, damage: 10, speed: 1.72, range: 0.58, radius: 0.28, color: "#a45f3f", xp: 17 },
+    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
+  },
+  //#endregion: Monster: Raider
+  //#region Monster: Knight
   Knight: {
     sprite: monsterSprite({
       id: "knight", url: "/assets/generated/mobs/knight_animated_sheet.png",
@@ -141,6 +495,8 @@ export const MONSTER_DEFS = {
     popularity: { change: 0.9 },
     lootTables: ["gold_medium", "material_humanoid", "monster_profile_humanoid", "equipment_defender_rare", "monster_special_global", "readable_lore"]
   },
+  //#endregion: Monster: Knight
+  //#region Monster: Wild Boar
   "Wild Boar": {
     sprite: monsterSprite({
       id: "wildboar", url: "/assets/generated/mobs/wildboar_animated_sheet.png",
@@ -153,6 +509,8 @@ export const MONSTER_DEFS = {
     popularity: { change: -0.15 },
     lootTables: ["gold_low", "material_animal_medium"]
   },
+  //#endregion: Monster: Wild Boar
+  //#region Monster: Blacksmiths Bane
   "Blacksmiths Bane": {
     sprite: monsterSprite({
       id: "wildboar", url: "/assets/generated/mobs/wildboar_animated_sheet.png",
@@ -169,6 +527,8 @@ export const MONSTER_DEFS = {
     leapAttack: { minRange: 1.35, maxRange: 3.8, speed: 11, cooldown: 2.2 },
     lootTables: ["gold_low", "material_animal_medium", "equipment_defender_rare", "material_gemstones"]
   },
+  //#endregion: Monster: Blacksmiths Bane
+  //#region Monster: Bear
   Bear: {
     sprite: monsterSprite({
       id: "bear", url: "/assets/generated/mobs/bear_animated_sheet.png",
@@ -182,6 +542,8 @@ export const MONSTER_DEFS = {
     attackCooldown: { min: 1.05, max: 1.55 },
     lootTables: ["gold_low", "material_animal_medium"]
   },
+  //#endregion: Monster: Bear
+  //#region Monster: Icebear
   Icebear: {
     sprite: monsterSprite({
       id: "icebear", url: "/assets/generated/mobs/icebear_animated_sheet.png",
@@ -195,6 +557,8 @@ export const MONSTER_DEFS = {
     attackCooldown: { min: 1.1, max: 1.65 },
     lootTables: ["gold_low", "material_animal_medium"]
   },
+  //#endregion: Monster: Icebear
+  //#region Monster: Lion
   Lion: {
     sprite: monsterSprite({
       id: "lion", url: "/assets/generated/mobs/lion_animated_sheet.png",
@@ -208,6 +572,8 @@ export const MONSTER_DEFS = {
     leapAttack: { minRange: 1.45, maxRange: 3.2, speed: 9, cooldown: 3.2 },
     lootTables: ["gold_low", "material_animal_medium"]
   },
+  //#endregion: Monster: Lion
+  //#region Monster: Rat
   Rat: {
     sprite: monsterSprite({
       id: "rat", url: "/assets/generated/mobs/rat_animated_sheet.png",
@@ -227,6 +593,8 @@ export const MONSTER_DEFS = {
     },
     lootTables: ["gold_low", "material_animal_small"]
   },
+  //#endregion: Monster: Rat
+  //#region Monster: SickRat
   SickRat: {
     sprite: monsterSprite({
       id: "sickrat", url: "/assets/generated/mobs/sickrat_animated_sheet.png",
@@ -240,90 +608,8 @@ export const MONSTER_DEFS = {
     onHitStatus: { type: "dot", chance: 0.35, damage: 2, duration: 3, tick: 1, color: "#8fca4a", label: "Sickness" },
     lootTables: ["gold_low"]
   },
-  Village01: {
-    sprite: monsterSprite({
-      id: "village01", url: "/assets/generated/mobs/village01_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
-    popularity: { change: -0.35 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
-  Village02: {
-    sprite: monsterSprite({
-      id: "village02", url: "/assets/generated/mobs/village02_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
-    popularity: { change: -0.4 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
-  Peasant: {
-    sprite: monsterSprite({
-      id: "village02", url: "/assets/generated/mobs/village02_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 60, damage: 11, speed: 1.35, range: 0.58, radius: 0.3, color: "#8a7657", xp: 20 },
-    popularity: { change: -0.3 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
-  },
-  Village03: {
-    sprite: monsterSprite({
-      id: "village03", url: "/assets/generated/mobs/village03_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
-    popularity: { change: -0.35 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
-  Village04: {
-    sprite: monsterSprite({
-      id: "village04", url: "/assets/generated/mobs/village04_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
-    popularity: { change: -0.38 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
-  Village05: {
-    sprite: monsterSprite({
-      id: "village05", url: "/assets/generated/mobs/village05_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
-    popularity: { change: -0.36 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
-  Village06: {
-    sprite: monsterSprite({
-      id: "village06", url: "/assets/generated/mobs/village06_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
-    }),
-    speciesId: "human",
-    tags: ["humanoid", "human", "medium"],
-    stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
-    popularity: { change: -0.4 },
-    lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "readable_lore"]
-  },
+  //#endregion: Monster: SickRat
+  //#region Monster: Wizard
   Wizard: {
     sprite: monsterSprite({
       id: "wizard", url: "/assets/generated/mobs/wizard_animated_sheet.png",
@@ -337,6 +623,8 @@ export const MONSTER_DEFS = {
     popularity: { change: 0.6 },
     lootTables: ["gold_low", "monster_profile_humanoid", "monster_special_global", "material_gemstones", "material_magic", "readable_lore"]
   },
+  //#endregion: Monster: Wizard
+  //#region Monster: Spawn of Hydra
   "Spawn of Hydra": {
     sprite: monsterSprite({
       id: "hydra", url: "/assets/generated/mobs/hydra_animated_sheet.png",
@@ -349,18 +637,8 @@ export const MONSTER_DEFS = {
     popularity: { change: 1.25 },
     lootTables: ["gold_low", "material_animal_medium", "monster_special_global", "material_gemstones", "material_magic"]
   },
-  Hellhound: {
-    sprite: monsterSprite({
-      id: "hellhound", url: "/assets/generated/mobs/hellhound_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.52, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 40
-    }),
-    speciesId: "demon",
-    tags: ["demon", "beast", "medium"],
-    stats: { hp: 94, damage: 18, speed: 2.45, range: 0.58, radius: 0.33, color: "#b9482f", xp: 34, blockChance: 0.18, fireResist: 30, iceResist: -20 },
-    popularity: { change: 0.9 },
-    lootTables: ["gold_low", "material_animal_medium", "material_gemstones", "material_magic"]
-  },
+  //#endregion: Monster: Spawn of Hydra
+  //#region Monster: Flesheater
   Flesheater: {
     sprite: monsterSprite({
       id: "flesheater", url: "/assets/generated/mobs/flesheater_animated_sheet.png",
@@ -382,6 +660,8 @@ export const MONSTER_DEFS = {
     },
     lootTables: ["gold_low", "material_plant"]
   },
+  //#endregion: Monster: Flesheater
+  //#region Monster: Flesheater Young
   "Flesheater Young": {
     sprite: monsterSprite({
       id: "flesheater_young", url: "/assets/generated/mobs/flesheater_animated_sheet.png",
@@ -394,33 +674,8 @@ export const MONSTER_DEFS = {
     allowElite: false,
     lootTables: ["gold_low"]
   },
-  "Spawn of Archnogrim": {
-    sprite: monsterSprite({
-      id: "archnogrim", url: "/assets/generated/mobs/archnogrim_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.5, shadowW: 36, shadowH: 12, shadowAlpha: 0.38, yOffset: 44
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "large"],
-    stats: { hp: 104, damage: 20, speed: 1.48, range: 0.68, radius: 0.36, color: "#7b607d", xp: 38 },
-    popularity: { change: 1 },
-    onHitStatus: { type: "root", chance: 0.25, minDuration: 0.5, maxDuration: 1.5, color: "#d7d4c7" },
-    leapAttack: { minRange: 1.25, maxRange: 3, speed: 8.5, cooldown: 2.4 },
-    lootTables: ["gold_medium", "monster_profile_humanoid", "equipment_attacker_rare", "equipment_defender_rare", "monster_special_global", "material_houses", "material_humanoid"]
-  },
-  "Infernus Minion": {
-    sprite: monsterSprite({
-      id: "infernus", url: "/assets/generated/mobs/infernus_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.54, shadowW: 36, shadowH: 12, shadowAlpha: 0.4, yOffset: 48
-    }),
-    speciesId: "demon",
-    tags: ["demon", "medium", "fire"],
-    stats: { hp: 90, damage: 16, speed: 1.16, range: 4.2, radius: 0.35, color: "#e56d35", xp: 36, magic: 9, spells: ["fireball"] },
-    popularity: { change: 1.15 },
-    onHitStatus: { type: "dot", chance: 1, damage: 5, duration: 3.5, tick: 1, color: "#ff7b38", label: "Burn" },
-    lootTables: ["gold_medium", "equipment_attacker_rare", "readable_fire_spellbooks", "material_humanoid"]
-  },
+  //#endregion: Monster: Flesheater Young
+  //#region Monster: Shadowdragon
   Shadowdragon: {
     sprite: monsterSprite({
       id: "shadowdragon", url: "/assets/generated/mobs/shadowdragon_animated_sheet.png",
@@ -443,6 +698,8 @@ export const MONSTER_DEFS = {
     popularity: { change: 0 },
     onHitStatus: { type: "dot", chance: 1, damage: 7, duration: 4, tick: 1, color: "#b53c5f", label: "Bleed" }
   },
+  //#endregion: Monster: Shadowdragon
+  //#region Monster: MountainTroll
   MountainTroll: {
     sprite: monsterSprite({
       id: "mountaintroll", url: "/assets/generated/mobs/mountaintroll_animated_sheet.png",
@@ -456,6 +713,8 @@ export const MONSTER_DEFS = {
     attackCooldown: { min: 1.45, max: 2.1 },
     lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
+  //#endregion: Monster: MountainTroll
+  //#region Monster: GiantTroll
   GiantTroll: {
     sprite: monsterSprite({
       id: "gianttroll", url: "/assets/generated/mobs/gianttroll_animated_sheet.png",
@@ -470,64 +729,8 @@ export const MONSTER_DEFS = {
     meleeAreaDamage: { radius: 3.2, damageMult: 0.72, visibleOnly: true, color: "#d8c091", shake: 10 },
     lootTables: ["gold_high", "material_humanoid", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
   },
-  "Rune Shade": {
-    sprite: monsterSprite({
-      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
-    }),
-    speciesId: "spirit",
-    tags: ["spirit", "medium"],
-    stats: { hp: 78, damage: 16, speed: 1.48, range: 3.4, radius: 0.3, color: "#7468c7", xp: 31 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "readable_lore"]
-  },
-  "Iron Revenant": {
-    sprite: monsterSprite({
-      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "undead",
-    tags: ["undead", "large"],
-    stats: { hp: 150, damage: 22, speed: 0.72, range: 0.84, radius: 0.5, color: "#85888f", xp: 49 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
-  Demon: {
-    sprite: monsterSprite({
-      id: "demon", url: "/assets/generated/mobs/demon_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.58, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "demon",
-    tags: ["demon", "medium"],
-    stats: { hp: 86, damage: 16, speed: 1.16, range: 0.66, radius: 0.38, color: "#925758", xp: 30, magic: 7, critChance: 0.04, spells: ["fireball"] },
-    popularity: { change: 1.7 },
-    lootTables: ["gold_low", "material_humanoid", "readable_fire_spellbooks", "material_gemstones", "equipment_attacker_rare", "readable_lore"]
-  },
-  Ghost: {
-    sprite: monsterSprite({
-      id: "ghost", url: "/assets/generated/mobs/ghost_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.4, shadowW: 26, shadowH: 8, shadowAlpha: 0.22, yOffset: 38
-    }),
-    speciesId: "spirit",
-    tags: ["spirit", "medium"],
-    stats: { hp: 66, damage: 15, speed: 1.5, range: 3.4, radius: 0.3, color: "#7468c7", xp: 32, magic: 9, dodgeChance: 0.08, spells: ["energy_beam"] },
-    popularity: { change: 1.35 },
-    lootTables: ["gold_medium", "material_humanoid", "readable_arcane_spellbooks", "material_magic", "equipment_defender_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
-  },
-  Skeleton: {
-    sprite: monsterSprite({
-      id: "skeleton", url: "/assets/generated/mobs/skeleton_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
-    }),
-    speciesId: "undead",
-    tags: ["undead", "medium"],
-    stats: { hp: 72, damage: 13, speed: 1.32, range: 0.62, radius: 0.32, color: "#c8bda7", xp: 26, magic: 5, blockChance: 0.06, spells: ["poison_cloud"] },
-    popularity: { change: 1.2 },
-    lootTables: ["gold_low", "material_humanoid", "readable_frost_spellbooks", "material_gemstones", "equipment_attacker_rare", "monster_profile_humanoid", "monster_special_global", "readable_lore"]
-  },
+  //#endregion: Monster: GiantTroll
+  //#region Monster: Scorpion
   Scorpion: {
     sprite: monsterSprite({
       id: "scorpion", url: "/assets/generated/mobs/scorpion_animated_sheet.png",
@@ -539,6 +742,8 @@ export const MONSTER_DEFS = {
     stats: { hp: 64, damage: 13, speed: 1.28, range: 0.62, radius: 0.32, color: "#b46b38", xp: 24 },
     lootTables: ["gold_low", "material_bone", "material_stone", "material_gemstones", "material_humanoid"]
   },
+  //#endregion: Monster: Scorpion
+  //#region Monster: Snake
   Snake: {
     sprite: monsterSprite({
       id: "snake", url: "/assets/generated/mobs/snake_animated_sheet.png",
@@ -551,99 +756,8 @@ export const MONSTER_DEFS = {
     popularity: { change: -0.3 },
     lootTables: ["gold_low", "material_animal_medium"]
   },
-  ArachnogrimOffspring: {
-    catalogId: "arachnogrim_offspring",
-    sprite: monsterSprite({
-      id: "arachnogrim_offspring", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.34, shadowW: 23, shadowH: 8, shadowAlpha: 0.34, shadowY: 13, yOffset: 30
-    }),
-    speciesId: "spider",
-    tags: ["spider", "arachnogrim", "beast", "offspring", "medium", "poison"],
-    stats: { hp: 52, damage: 20, speed: 2.05, range: 0.42, radius: 0.28, color: "#493354", xp: 25, spells: ["web_slow"] },
-    library: {
-      title: "Arachnogrim Offspring",
-      text: "A vicious juvenile from an unnatural brood, fast enough to overwhelm isolated prey.",
-      strengths: ["Fast", "Dangerous in groups"],
-      weaknesses: ["Low endurance", "Short range"],
-      habitatText: "Found in sealed, web-choked caves."
-    },
-    lootTables: ["gold_low", "material_bone"],
-  },
-  Spider: {
-    sprite: monsterSprite({
-      id: "spider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.43, shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17, yOffset: 38
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "medium"],
-    stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22, spells: ["web_slow"] },
-    popularity: { change: 0.85 },
-    library: {
-      title: "Edderkop",
-      text: "En taetbygget kryber, der bruger net og trange passager til at saenke sit bytte.",
-      strengths: ["Kan saenke fjender", "Farlig i grupper"],
-      weaknesses: ["Begraenset raekkevidde", "Saarbar naar den holdes i bevaegelse"],
-      habitatText: "Traeffes i grotter, lader, ruiner og fugtige underjordiske steder."
-    },
-    lootTables: ["gold_low", "material_bone"]
-  },
-  MiniSpider: {
-    sprite: monsterSprite({
-      id: "minispider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.1, shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4, yOffset: 9
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "small"],
-    stats: { hp: 12, damage: 24, speed: 2.5, range: 0.2, radius: 0.3, color: "#6d5b83", xp: 10 },
-    allowElite: false,
-    lootTables: ["gold_low", "material_bone"]
-  },
-  MediumSpider: {
-    sprite: monsterSprite({
-      id: "mediumspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.2, shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8, yOffset: 18
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "medium"],
-    stats: { hp: 36, damage: 18, speed: 2, range: 0.4, radius: 0.3, color: "#6d5b83", xp: 16, spells: ["web_slow"] },
-    lootTables: ["gold_low", "material_bone"]
-  },
-  LargeSpider: {
-    sprite: monsterSprite({
-      id: "largespider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.55, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "large"],
-    stats: { hp: 72, damage: 24, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 32, spells: ["web_slow"] },
-    lootTables: ["gold_low", "material_bone"]
-  },
-  MotherSpider: {
-    sprite: monsterSprite({
-      id: "motherspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.75, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
-    }),
-    speciesId: "spider",
-    tags: ["spider", "beast", "wildlife", "boss", "large"],
-    stats: { hp: 220, damage: 36, speed: 1.2, range: 0.8, radius: 0.4, color: "#6d5b83", xp: 48, spells: ["web_slow", "poison_cloud"] },
-    allowElite: false,
-    isBoss: true,
-    haveMinion: true,
-    minions: {
-      cooldown: 8,
-      maxActive: 4,
-      spawnCount: 2,
-      scale: 0.42,
-      statsMult: { hp: 0.22, damage: 0.28, speed: 1.22, xp: 0.08, magic: 0.25 }
-    },
-    lootTables: ["gold_boss", "material_bone", "material_gemstones", "material_humanoid", "monster_special_global"]
-  },
+  //#endregion: Monster: Snake
+  //#region Monster: WolfCub
   WolfCub: {
     sprite: monsterSprite({
       id: "wolf_cub", url: "/assets/generated/mobs/wolf_animated_sheet.png",
@@ -663,6 +777,8 @@ export const MONSTER_DEFS = {
     },
     lootTables: ["gold_low", "material_bone", "material_animal_small", "special_wolffenris_treasure"]
   },
+  //#endregion: Monster: WolfCub
+  //#region Monster: Wolf
   Wolf: {
     sprite: monsterSprite({
       id: "wolf", url: "/assets/generated/mobs/wolf_animated_sheet.png",
@@ -675,6 +791,8 @@ export const MONSTER_DEFS = {
     popularity: { change: -0.35 },
     lootTables: ["gold_low", "material_bone", "material_animal_medium", "special_wolffenris_treasure"]
   },
+  //#endregion: Monster: Wolf
+  //#region Monster: WolfFenris
   WolfFenris: {
     sprite: monsterSprite({
       id: "wolf_fenris", url: "/assets/generated/mobs/wolf_animated_sheet.png",
@@ -697,6 +815,8 @@ export const MONSTER_DEFS = {
     },
     lootTables: ["gold_boss", "special_wolffenris_treasure", "material_animal_medium", "material_humanoid"]
   },
+  //#endregion: Monster: WolfFenris
+    //#region Monster: Bandit
     Bandit: {
     sprite: monsterSprite({
       id: "bandit", url: "/assets/generated/mobs/bandit_animated_sheet.png",
@@ -709,8 +829,9 @@ export const MONSTER_DEFS = {
     popularity: { change: -0.35 },
     lootTables: ["gold_low", "material_bone", "material_animal_medium", "special_wolffenris_treasure"]
   },
+  //#endregion: Monster: Bandit
+  //#endregion: Category: Other Monsters
 };
-
 const MONSTER_CATALOG_IDS = {
   Fallen: "fallen", "Thorn Husk": "thorn_husk", "Mire Brute": "mire_brute",
   Hollow: "hollow", "Shard Crawler": "shard_crawler", "Deep Guard": "deep_guard",

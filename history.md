@@ -1,5 +1,8 @@
 History over changes
 
+*V. 1.11
+
+
 *V. 1.10
 - added summary modal after expedition run
 - added game version number i right bottom corner in velcome screen
