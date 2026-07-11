@@ -8,6 +8,7 @@ import {
   visibleScreenPoint,
   worldToScreen,
 } from "../dependencies.js";
+import { audioManager } from "../../audio-manager.js";
 import { REGION_OBJECT_DEFS } from "../../config/region-object-config.js";
 import { resolveAttachedObjectParticleConfigs } from "../../objects/object-attached-effects.js";
 
@@ -496,6 +497,7 @@ export const effectsMethods = {
       maxLife: duration,
       bolt,
     };
+    audioManager.playSound("lightning_strike");
     if (event.sound) {
       // TODO: Hook into a dedicated audio system when thunder assets/runtime exist.
       this.pendingThunder = {
@@ -634,8 +636,20 @@ export const effectsMethods = {
   },
 
   updateAmbient(dt) {
-    // Legacy biome ambient particles are disabled. Region-specific ambience is
-    // driven by map-region-config ambient/weather particle configs.
+    // Campfires use the existing nearby-chunk traversal, never a region scan.
+    const now = performance.now();
+    if (now < (this.campfireAudioUntil ?? 0)) return;
+    let nearest = null;
+    let nearestDistance = 7;
+    for (const chunk of this.nearbyChunks(1)) for (const object of chunk.objects ?? []) {
+      const kind = `${object.type ?? ""} ${object.objectDefId ?? ""}`.toLowerCase();
+      if (!kind.includes("fireplace") && !kind.includes("campfire")) continue;
+      const distance = Math.hypot(object.x - this.player.x, object.y - this.player.y);
+      if (distance < nearestDistance) { nearest = object; nearestDistance = distance; }
+    }
+    if (!nearest) return;
+    this.campfireAudioUntil = now + 5600;
+    audioManager.playSound("campfire", { position: nearest, listener: this.player, maxDistance: 7 });
   },
 
   setParticlesEnabled(enabled) {
@@ -722,7 +736,7 @@ export const effectsMethods = {
     if (this.pendingThunder) {
       this.pendingThunder.delay -= dt;
       if (this.pendingThunder.delay <= 0) {
-        // TODO: Play this.pendingThunder.sound when sound assets/system are available.
+        audioManager.playSound("thunder");
         this.pendingThunder = null;
       }
     }

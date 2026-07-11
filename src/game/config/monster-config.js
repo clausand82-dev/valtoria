@@ -59,6 +59,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: ArachnogrimOffspring
   //#region Monster: Spider
   Spider: {
+    audioProfile: "spider",
     sprite: monsterSprite({
       id: "spider", url: "/assets/generated/mobs/spider_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
@@ -80,6 +81,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: Spider
   //#region Monster: MiniSpider
   MiniSpider: {
+    audioProfile: "spider",
     sprite: monsterSprite({
       id: "minispider", url: "/assets/generated/mobs/spider_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
@@ -94,6 +96,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: MiniSpider
   //#region Monster: MediumSpider
   MediumSpider: {
+    audioProfile: "spider",
     sprite: monsterSprite({
       id: "mediumspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
@@ -107,6 +110,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: MediumSpider
   //#region Monster: LargeSpider
   LargeSpider: {
+    audioProfile: "spider",
     sprite: monsterSprite({
       id: "largespider", url: "/assets/generated/mobs/spider_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
@@ -120,6 +124,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: LargeSpider
   //#region Monster: MotherSpider
   MotherSpider: {
+    audioProfile: "spider",
     sprite: monsterSprite({
       id: "motherspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,

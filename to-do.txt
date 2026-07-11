@@ -11,10 +11,13 @@ Små rettelse observeret igennem spil test:
 - en genvejs tast til mute
 - mulighed for at gå tilbage til start menu
 
+FØLG OP PÅ LYD OG MUSIK - SE CHATGPT
 
 
-
-
+konventer wav til ogg med denne her (inklusiv stereo til mono konventering):
+Get-ChildItem *.wav | ForEach-Object {
+    ffmpeg -i $_.FullName -ac 1 -c:a libvorbis -q:a 5 -ar 48000 "$($_.DirectoryName)\$($_.BaseName).ogg"
+}
 
 
 

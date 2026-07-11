@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = Object.freeze({ masterVolume: 1, musicVolume: 0.7, ambi
 const BUS_SETTING = Object.freeze({ music: "musicVolume", ambience: "ambienceVolume", sfx: "sfxVolume", ui: "uiVolume" });
 
 function clamp(value, fallback = 1) { const n = Number(value); return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : fallback; }
-function fileFor(definition) { const files = definition?.files ?? (definition?.file ? [definition.file] : []); return files.length ? files[Math.floor(Math.random() * files.length)] : null; }
+function fileFor(definition, excludedFile = null) { const files = definition?.files ?? (definition?.file ? [definition.file] : []); const candidates = files.filter((file) => file !== excludedFile); const pool = candidates.length ? candidates : files; return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null; }
 
 class AudioManager {
   constructor() {
@@ -75,11 +75,59 @@ class AudioManager {
     for (const id of this.desiredAmbience) if (!this.ambience.has(id)) { const entry = this.startLoop(id, SOUND_DEFS[id]); if (entry) this.ambience.set(id, entry); }
     const desired = this.desiredMusic?.trackId; if (this.music?.id !== desired) { const fadeMs = this.desiredMusic?.fadeMs ?? 0; if (this.music) this.stopLoop(this.music, fadeMs); this.music = desired ? this.startLoop(desired, MUSIC_TRACKS[desired], fadeMs) : null; }
   }
-  startLoop(id, definition, fadeInMs = 0) { const file = fileFor(definition); const template = this.template(file); if (!template || this.unavailable.has(file)) return null; const audio = template.cloneNode(true); audio.loop = true; audio.volume = fadeInMs > 0 ? 0 : this.gain(definition); const entry = { id, audio, definition }; audio.addEventListener("error", () => this.markUnavailable(file), { once: true }); audio.play().catch(() => {}); if (fadeInMs > 0) this.fadeLoopVolume(entry, this.gain(definition), fadeInMs); return entry; }
-  fadeLoopVolume(entry, targetVolume, fadeMs) { if (!entry?.audio || fadeMs <= 0) return; const startedAt = performance.now(); const startVolume = entry.audio.volume; const tick = () => { const progress = Math.min(1, (performance.now() - startedAt) / fadeMs); entry.audio.volume = startVolume + (targetVolume - startVolume) * progress; if (progress < 1) requestAnimationFrame(tick); }; requestAnimationFrame(tick); }
+  cancelLoopFade(entry) {
+    if (!entry) return;
+    entry.fadeToken = (entry.fadeToken ?? 0) + 1;
+    if (entry.fadeFrame != null) cancelAnimationFrame(entry.fadeFrame);
+    entry.fadeFrame = null;
+  }
+  applyLoopVolume(entry) { if (entry?.audio) entry.audio.volume = this.gain(entry.definition) * (entry.fadeGain ?? 1); }
+  isDesiredLoop(entry) { return entry && (entry.definition?.bus === "music" ? this.music === entry && this.desiredMusic?.trackId === entry.id : this.ambience.get(entry.id) === entry && this.desiredAmbience.includes(entry.id)); }
+  handleLoopPlayFailure(entry, error) {
+    if (!entry || entry.stopped) return;
+    entry.pending = false;
+    const name = String(error?.name ?? "");
+    const blocked = name === "NotAllowedError" || name === "AbortError" || entry.audio?.readyState === HTMLMediaElement.HAVE_NOTHING;
+    if (!blocked && (name === "NotSupportedError" || name === "EncodingError")) this.markUnavailable(entry.file);
+    if (this.music === entry) this.music = null;
+    if (this.ambience.get(entry.id) === entry) this.ambience.delete(entry.id);
+    // Autoplay/context failures retain the desired profile and are retried only on unlock.
+  }
+  startLoop(id, definition, fadeInMs = 0, excludedFile = null) {
+    const file = fileFor(definition, excludedFile); const template = this.template(file);
+    if (!template || this.unavailable.has(file)) return null;
+    const audio = template.cloneNode(true); audio.loop = !definition.rotateVariants;
+    const entry = { id, file, audio, definition, fadeGain: fadeInMs > 0 ? 0 : 1, fadeFrame: null, fadeToken: 0, pending: true, stopped: false };
+    this.applyLoopVolume(entry);
+    audio.addEventListener("error", () => { this.markUnavailable(file); this.handleLoopPlayFailure(entry, new Error("media error")); }, { once: true });
+    if (definition.rotateVariants && (definition.files?.length ?? 0) > 1) audio.addEventListener("ended", () => {
+      if (this.music !== entry || this.desiredMusic?.trackId !== id || entry.stopped) return;
+      this.stopLoop(entry, 0); this.music = this.startLoop(id, definition, 350, file);
+    }, { once: true });
+    audio.play().then(() => { entry.pending = false; if (entry.stopped || !this.isDesiredLoop(entry)) this.stopLoop(entry, 0); }).catch((error) => this.handleLoopPlayFailure(entry, error));
+    if (fadeInMs > 0) this.fadeLoopVolume(entry, 1, fadeInMs);
+    return entry;
+  }
+  fadeLoopVolume(entry, targetGain, fadeMs, onComplete = null) {
+    if (!entry?.audio) return;
+    this.cancelLoopFade(entry);
+    const token = entry.fadeToken; const startedAt = performance.now(); const startGain = entry.fadeGain ?? 1;
+    if (fadeMs <= 0) { entry.fadeGain = targetGain; this.applyLoopVolume(entry); onComplete?.(); return; }
+    const tick = () => {
+      if (entry.stopped || token !== entry.fadeToken) return;
+      const progress = Math.min(1, (performance.now() - startedAt) / fadeMs);
+      entry.fadeGain = startGain + (targetGain - startGain) * progress; this.applyLoopVolume(entry);
+      if (progress < 1) entry.fadeFrame = requestAnimationFrame(tick); else { entry.fadeFrame = null; onComplete?.(); }
+    };
+    entry.fadeFrame = requestAnimationFrame(tick);
+  }
   fadeAndStopVoice(entry, fadeOutMs) { if (!entry?.audio) return; if (fadeOutMs <= 0) { entry.audio.pause(); entry.audio.currentTime = 0; entry.cleanup?.(); return; } const start = entry.audio.volume; const began = performance.now(); const tick = () => { const progress = Math.min(1, (performance.now() - began) / fadeOutMs); entry.audio.volume = start * (1 - progress); if (progress < 1) requestAnimationFrame(tick); else { entry.audio.pause(); entry.audio.currentTime = 0; entry.cleanup?.(); } }; requestAnimationFrame(tick); }
-  stopLoop(entry, fadeMs) { if (!entry?.audio) return; const finish = () => { entry.audio.pause(); entry.audio.currentTime = 0; }; if (fadeMs > 0 && entry.audio.volume > 0) { const start = entry.audio.volume; const began = performance.now(); const tick = () => { const pct = Math.min(1, (performance.now() - began) / fadeMs); entry.audio.volume = start * (1 - pct); if (pct < 1) requestAnimationFrame(tick); else finish(); }; requestAnimationFrame(tick); } else finish(); }
-  applyVolumes() { for (const entries of this.voices.values()) for (const entry of entries) entry.audio.volume = this.gain(entry.definition, entry.attenuation); for (const entry of this.ambience.values()) entry.audio.volume = this.gain(entry.definition); if (this.music) this.music.audio.volume = this.gain(this.music.definition); }
+  stopLoop(entry, fadeMs) {
+    if (!entry?.audio) return;
+    const finish = () => { entry.stopped = true; this.cancelLoopFade(entry); entry.audio.pause(); entry.audio.currentTime = 0; };
+    if (fadeMs > 0 && (entry.fadeGain ?? 1) > 0) this.fadeLoopVolume(entry, 0, fadeMs, finish); else finish();
+  }
+  applyVolumes() { for (const entries of this.voices.values()) for (const entry of entries) entry.audio.volume = this.gain(entry.definition, entry.attenuation); for (const entry of this.ambience.values()) this.applyLoopVolume(entry); this.applyLoopVolume(this.music); }
   stopAll() { this.stopMusic({ fadeMs: 0 }); this.stopAmbience(); for (const entries of this.voices.values()) for (const entry of entries) { if (entry.stopTimer) clearTimeout(entry.stopTimer); entry.audio.pause(); entry.audio.currentTime = 0; } this.voices.clear(); }
 }
 

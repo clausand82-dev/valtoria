@@ -215,11 +215,16 @@ export const combatMethods = {
         monster.vx = 0;
         monster.vy = 0;
       } else if (d < monster.aggro) {
-        if (!monster.audioAggroed) {
+        const audioNow = performance.now();
+        const audioDisengagedLongEnough = monster.audioAggroed
+          && audioNow - (monster.audioAggroContactAt ?? audioNow) >= 6000;
+        if (!monster.audioAggroed || audioDisengagedLongEnough) {
           monster.audioAggroed = true;
+          monster.audioAggroExitAt = 0;
           const soundId = MONSTER_AUDIO_PROFILES[monster.audioProfile]?.aggro;
           if (soundId) audioManager.playSound(soundId, { position: monster, listener: this.player, maxDistance: 14 });
         }
+        monster.audioAggroContactAt = audioNow;
         this.updateMonsterMinions(monster, dt);
         const n = normalize(this.player.x - monster.x, this.player.y - monster.y);
         monster.facingX = n.x || monster.facingX;
@@ -239,7 +244,10 @@ export const combatMethods = {
           this.applyMonsterMeleeHit(monster, critical);
         }
       } else {
-        monster.audioAggroed = false;
+        // Audio disengagement is deliberately slower than the AI radius. This prevents
+        // a monster pacing at the edge of aggro from barking every update cycle.
+        if (monster.audioAggroed && !monster.audioAggroExitAt) monster.audioAggroExitAt = performance.now();
+        if (monster.audioAggroed && performance.now() - monster.audioAggroExitAt >= 6000) monster.audioAggroed = false;
         if (Math.random() < 0.004 * passiveWanderScale) {
         const a = Math.random() * Math.PI * 2;
         monster.vx = Math.cos(a) * monster.speed * 0.28;
@@ -313,6 +321,8 @@ export const combatMethods = {
     if (this.isStunned(monster)) return;
     const amount = critical ? monster.damage * (Number(monster.critDamage) || 1.5) : monster.damage;
     this.recordBestiaryFought?.(monster);
+    const attackSoundId = MONSTER_AUDIO_PROFILES[monster.audioProfile]?.attack;
+    if (attackSoundId) audioManager.playSound(attackSoundId, { position: monster, listener: this.player, maxDistance: 14 });
     this.damagePlayer(amount, monster, critical);
     this.applyMonsterOnHitStatus(monster, this.player);
     this.applyMonsterMeleeAreaDamage(monster);
@@ -1697,10 +1707,13 @@ export const combatMethods = {
             }).damage
             : Math.max(1, Math.floor(Number(effect.damage) || 1));
           if (isPlayer) {
-            entity.hp = Math.max(0, entity.hp - damage);
+            const appliedDamage = Math.max(0, Math.min(Math.max(0, Number(entity.hp) || 0), Math.floor(Number(damage) || 0)));
+            if (appliedDamage <= 0) continue;
+            entity.hp = Math.max(0, entity.hp - appliedDamage);
+            this.playPlayerHurtAudio("dot");
             entity.hurtCooldown = 0.2;
-            this.player.stats.damageTaken += damage;
-            this.addFloater(entity.x, entity.y, `-${damage}`, effect.color ?? "#87d65a");
+            this.player.stats.damageTaken += appliedDamage;
+            this.addFloater(entity.x, entity.y, `-${appliedDamage}`, effect.color ?? "#87d65a");
             if (entity.hp <= 0) this.player.stats.deaths += 1;
           } else {
             this.damageMonster(entity, damage, "magic", false, { type: "dot", id: effect.sourceId ?? "dot", spellId: effect.sourceId ?? null });
@@ -1753,16 +1766,19 @@ export const combatMethods = {
   },
 
   damagePlayer(amount, source, critical = false) {
+    if (!(Number(amount) > 0)) return false;
     const stats = this.calcStats();
     if (Math.random() < stats.dodgeChance) {
       this.addFloater(this.player.x, this.player.y, "Dodge", "#9ee8a4");
+      audioManager.playSound("player_dodge", { position: this.player, listener: this.player });
       return;
     }
     const block = this.applyIncomingBlock(amount, stats);
+    if (block.blocked) audioManager.playSound("shield_block", { position: this.player, listener: this.player });
     const mitigated = Math.max(1, Math.floor(block.damage * (100 / (100 + stats.armor * 7))));
     if (damageDebugEnabled()) console.debug("[Valtoria Damage Block]", { target: "player", blocked: block.blocked, blockAmount: block.blockAmount, damageBeforeBlock: amount, damageAfterBlock: block.damage, finalDamage: mitigated });
     this.player.hp = Math.max(0, this.player.hp - mitigated);
-    if (mitigated > 0) audioManager.playSound("player_hurt", { position: this.player, listener: this.player });
+    if (mitigated > 0) this.playPlayerHurtAudio("direct");
     this.player.stats.damageTaken += mitigated;
     this.player.hurtCooldown = 0.2;
     this.camera.shake = Math.max(this.camera.shake, 4);
@@ -1770,6 +1786,7 @@ export const combatMethods = {
     this.addParticles(this.player.x, this.player.y, "#cc3c3c", 9, 0.1);
     this.drainArmorDurability();
     if (this.player.hp <= 0) {
+      audioManager.playSound("player_death", { position: this.player, listener: this.player });
       this.player.stats.deaths += 1;
       this.applyDeathDurabilityLoss();
       this.addToast(`Faldt mod ${source.typeName}`);
@@ -1780,6 +1797,14 @@ export const combatMethods = {
         const xpPct = xp / nextXp;
         this.lastDeath = { id: ++this.deathSerial, xpPct };
       }
+  },
+
+  playPlayerHurtAudio(context = "direct") {
+    const now = performance.now();
+    const cooldownMs = context === "direct" ? 280 : 420;
+    if (now < (this.playerHurtAudioUntil ?? 0)) return false;
+    this.playerHurtAudioUntil = now + cooldownMs;
+    return audioManager.playSound("player_hurt", { position: this.player, listener: this.player });
   },
 
   damageMonster(monster, amount, sourceType, critical = false, deathSource = null) {
@@ -1800,7 +1825,14 @@ export const combatMethods = {
     if (damage > 0) this.recordBestiaryFought?.(monster);
     this.player.stats.damageDealt += Math.min(beforeHp, damage);
     if (critical && damage > 0) this.triggerEquipmentDurabilityEvent?.("criticalHit");
+    if (critical && damage > 0) audioManager.playSound("critical_hit", { position: monster, listener: this.player, maxDistance: 14 });
     monster.hurt = 0.18;
+    const hurtSoundId = MONSTER_AUDIO_PROFILES[monster.audioProfile]?.hurt;
+    const now = performance.now();
+    if (damage > 0 && monster.hp > 0 && hurtSoundId && now >= (monster.hurtAudioUntil ?? 0)) {
+      monster.hurtAudioUntil = now + 350;
+      audioManager.playSound(hurtSoundId, { position: monster, listener: this.player, maxDistance: 16 });
+    }
     this.addFloater(monster.x, monster.y, block.blocked ? `Block -${damage}` : critical ? `CRIT -${damage}` : `-${damage}`, critical ? "#ffdf5f" : sourceType === "magic" ? "#9de9ff" : "#f1d08d");
     const stats = this.calcStats();
     if (stats.lifeSteal > 0 && damage > 0) {

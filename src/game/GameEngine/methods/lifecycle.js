@@ -36,10 +36,19 @@ import { resolvePerformanceProfile } from "../../config/performance-config.js";
 import { audioManager } from "../../audio-manager.js";
 
 function playerFootstepSurface(engine) {
-  const tileset = String(JSON.stringify(engine.region?.mapRegion?.tileset ?? engine.region?.tileset ?? "")).toLowerCase();
-  if (/(wood|plank)/.test(tileset)) return "wood";
-  if (/(stone|rock|brick)/.test(tileset)) return "stone";
-  return "grass";
+  const tileX = Math.floor(Number(engine.player?.x) || 0);
+  const tileY = Math.floor(Number(engine.player?.y) || 0);
+  const cacheKey = `${tileX},${tileY}`;
+  if (engine.player?.footstepSurfaceTile === cacheKey) return engine.player.footstepSurface ?? "grass";
+  const chunk = engine.currentChunk?.();
+  const tile = chunk?.tiles?.find((entry) => entry.x === tileX && entry.y === tileY);
+  // Tiles retain the selected ground-sheet id, so this is a constant-size local
+  // lookup rather than a region/tileset scan. Paths have no separate material yet.
+  const material = String(tile?.groundSheetId ?? "").toLowerCase();
+  const surface = /(wood|plank)/.test(material) ? "wood" : /(stone|rock|brick|debris)/.test(material) ? "stone" : "grass";
+  engine.player.footstepSurfaceTile = cacheKey;
+  engine.player.footstepSurface = surface;
+  return surface;
 }
 import { CHEAT_SETTINGS } from "../../config/cheat-config.js";
 

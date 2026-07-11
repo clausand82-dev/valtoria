@@ -95,6 +95,7 @@ import {
   hasCityBuilding,
 } from "../../config/city-state-helpers.js";
 import { sortInventorySlots } from "../../inventory-sort.js";
+import { audioManager } from "../../audio-manager.js";
 
 function isPlayerItemEquipped(player, item) {
   if (!item) return false;
@@ -177,6 +178,7 @@ export const inventoryMethods = {
       this.player.mana = stats.maxMana;
       this.addFloater(this.player.x, this.player.y, `Level ${this.player.level}`, "#f4da96", 1.2);
       this.addToast(`Level ${this.player.level}`);
+      audioManager.playSound("player_level_up", { position: this.player, listener: this.player });
       needed = this.xpForNextLevel();
     }
     this.publishSnapshot();
@@ -447,6 +449,8 @@ export const inventoryMethods = {
     this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
     this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
     this.addToast(`Udstyret: ${item.name}`);
+    audioManager.playSound("item_equip");
+    if (old || removedOffhand) audioManager.playSound("item_unequip");
     this.publishSnapshot();
   },
 
@@ -507,6 +511,7 @@ export const inventoryMethods = {
     this.player.hp = clamp(this.player.hp, 1, stats.maxHp);
     this.player.mana = clamp(this.player.mana, 0, stats.maxMana);
     this.addToast(`Afudstyret: ${item.name}`);
+    audioManager.playSound("item_unequip");
     this.publishSnapshot();
     return true;
   },
@@ -640,6 +645,7 @@ export const inventoryMethods = {
     if (restoreHealthPct > 0 || def.type === "health" || def.type === "hybrid" || def.type === "regen") this.player.stats.healthPotionsUsed += 1;
     if (restoreManaPct > 0 || def.type === "mana" || def.type === "regen") this.player.stats.manaPotionsUsed += 1;
     this.potionCooldown = 0.5;
+    audioManager.playSound("potion_drink", { position: this.player, listener: this.player });
     this.publishSnapshot();
   },
 

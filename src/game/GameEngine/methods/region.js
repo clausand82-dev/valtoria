@@ -181,7 +181,9 @@ export const regionMethods = {
       ...preparedRegionConfig,
       areaMapId,
     });
-    audioManager.setRegionAudio(preparedRegionConfig.audio);
+    const weatherId = String(preparedRegionConfig.weather?.id ?? "");
+    const weatherAmbience = ["rain", "light_rain", "heavy_rain", "thunderstorm"].includes(weatherId) ? ["rain_ambience"] : [];
+    audioManager.setRegionAudio({ ...(preparedRegionConfig.audio ?? {}), ambience: [...(preparedRegionConfig.audio?.ambience ?? []), ...weatherAmbience] });
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();

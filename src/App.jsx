@@ -371,7 +371,8 @@ export default function App() {
   const lastCityOpenRef = useRef(false);
   const lastCityRollSessionRef = useRef(null);
   const preloadedGameAssetsRef = useRef({ atlas: null, animationSheets: null });
-  const audioModalOpenRef = useRef(false);
+  const audioModalOpenRef = useRef(null);
+  const menuAudioStartedRef = useRef(false);
   const inventoryAudioOpenRef = useRef(false);
   const cityStorageAudioOpenRef = useRef(false);
   const loadTokenRef = useRef(0);
@@ -534,11 +535,25 @@ export default function App() {
     audioManager.setSettings(audioSettings);
   }, [audioSettings]);
 
-  const anyImportantPanelOpen = Boolean(menuView !== "main" || mapOpen || heroOpen || questOverviewOpen || toastLogOpen || citySettingsOpen || confirmMapAbandonOpen || helpState.open || questOffer || questRewardModal || viewedQuest);
+  // A panel id (not a broad boolean) preserves the open cue when switching between
+  // meaningful panels while avoiding rerender/content-change repeats. Region map is
+  // intentionally excluded: its city entry point already owns the map_fold cue.
+  const importantPanelAudioId = menuView !== "main" ? `menu:${menuView}`
+    : mapOpen ? "map"
+      : heroOpen ? "hero"
+        : questOverviewOpen ? "quest-overview"
+          : toastLogOpen ? "toast-log"
+            : citySettingsOpen ? "city-settings"
+              : confirmMapAbandonOpen ? "map-abandon"
+                : helpState.open ? `help:${helpState.topicId ?? "root"}`
+                  : questOffer ? `quest-offer:${questOffer.npcId ?? questOffer.id ?? "open"}`
+                    : questRewardModal ? `quest-reward:${questRewardModal.questId ?? questRewardModal.id ?? "open"}`
+                      : viewedQuest ? `quest:${viewedQuest.id ?? "open"}`
+                        : null;
   useEffect(() => {
-    if (anyImportantPanelOpen && !audioModalOpenRef.current) audioManager.playSound("ui_open");
-    audioModalOpenRef.current = anyImportantPanelOpen;
-  }, [anyImportantPanelOpen]);
+    if (importantPanelAudioId && importantPanelAudioId !== audioModalOpenRef.current) audioManager.playSound("ui_open");
+    audioModalOpenRef.current = importantPanelAudioId;
+  }, [importantPanelAudioId]);
 
   useEffect(() => {
     if (inventoryOpen && !inventoryAudioOpenRef.current) audioManager.playSound("backpack_open");
@@ -559,7 +574,13 @@ export default function App() {
     });
   };
 
-  const handleUiPointerDown = () => audioManager.unlock();
+  const handleUiPointerDown = () => {
+    audioManager.unlock();
+    if (!gameSessionRef.current && !menuAudioStartedRef.current) {
+      menuAudioStartedRef.current = true;
+      audioManager.playSound("menu_open");
+    }
+  };
   const handleUiClick = (event) => {
     const button = event.target instanceof Element ? event.target.closest("button") : null;
     if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
@@ -1274,6 +1295,7 @@ export default function App() {
           onDeleteSave={deleteSaveSlot}
           onExportSave={exportSaveSlot}
           onImportSaveFile={importSaveFile}
+          onMenuHighlight={() => audioManager.playSound("menu_highlight")}
         />
       )}
 

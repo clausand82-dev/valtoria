@@ -53,6 +53,7 @@ import { applyFactionRepEffects, getFactionRepFrom } from "../../config/faction-
 import { addPlayerStatBonuses, normalizePlayerStatBonuses } from "../../config/player-stat-bonus-config.js";
 import { applyCityProgressEffects, cityRequirementContext, normalizeCityProgressEffect } from "../../config/city-state-helpers.js";
 import { setWorldFlag, incrementWorldCounter, worldConditionMet, worldEntryAllowed } from "../../world-state.js";
+import { audioManager } from "../../audio-manager.js";
 
 function questStepCompletedFlag(questId, stepId) {
   return `quest.${String(questId ?? "").trim()}.step.${String(stepId ?? "").trim()}.completed`;
@@ -1100,6 +1101,7 @@ export const questsMethods = {
         sourceLabel: quest.sourceLabel ?? "readable",
       },
     });
+    audioManager.playSound("quest_accept");
     this.publishSnapshot();
     this.saveProgress({ force: true });
     return true;
@@ -1566,6 +1568,7 @@ export const questsMethods = {
     this.player.stats.questsCompleted += 1;
     this.questState.cityFade.push({ npcId: String(quest.turnInNpcId ?? quest.npcId), startedAt: Date.now() });
     this.addToast(`${quest.title} indleveret`);
+    audioManager.playSound("quest_completed");
     this.levelUpIfNeeded();
     this.publishSnapshot();
     this.saveProgress();

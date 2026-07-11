@@ -441,6 +441,7 @@ export const lootMethods = {
             this.recordRunGold?.(loot.amount);
             this.player.stats.goldLooted += loot.amount;
             this.player.stats.goldEarned += loot.amount;
+            audioManager.playSound("gold_pickup", { position: loot, listener: this.player, maxDistance: 10 });
             timedLootFloater(() => this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657"));
             timedLootToast(() => addLootToast(this, `+${loot.amount} guld`));
             this.loots.splice(i, 1);
@@ -640,6 +641,7 @@ export const lootMethods = {
     this.nearbyFoliageLoot = null;
 
     const first = items[0];
+    audioManager.playSound("foliage_pickup", { position: object, listener: this.player, maxDistance: 10 });
     const color = first ? RESOURCE_DEFS[first.resourceId]?.color ?? first.rarityColor : "#8be9ff";
     const toast = items.length === 1
       ? pickupStatusText(first, Math.max(1, Math.floor(Number(first.count) || 1)))
@@ -688,6 +690,7 @@ export const lootMethods = {
 
   dropGroundItem(x, y, item, options = {}) {
     if (!item || this.isDropBlocked(item)) return false;
+    audioManager.playSound("loot_drop", { position: { x, y }, listener: this.player, maxDistance: 14 });
     const startedAt = performance.now();
     const loot = timedLootDrop(this, "lootObjectCreationMs", () => ({
       id: createId(),
@@ -876,6 +879,7 @@ export const lootMethods = {
     const drops = this.rollLootTables(tableIds, context);
     for (const drop of drops) {
       if (drop.type === "gold") {
+        audioManager.playSound("loot_drop", { position: { x, y }, listener: this.player, maxDistance: 14 });
         const loot = timedLootDrop(this, "lootObjectCreationMs", () => ({
           id: createId(),
           type: "gold",

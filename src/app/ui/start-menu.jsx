@@ -4,10 +4,17 @@ import { formatSaveTimestamp } from "../save/save-slots.js";
 import { useLocalization } from "../../i18n/index.js";
 import { GAME_VERSION } from "../../game/config/game-constants-config.js";
 
-export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave, onExportSave, onImportSaveFile }) {
+export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave, onExportSave, onImportSaveFile, onMenuHighlight }) {
   const { t } = useLocalization();
   const hasSaves = saveSlots.some((slot) => slot.exists);
   const importInputRef = useRef(null);
+  const highlightedButtonRef = useRef(null);
+  const handleMenuHighlight = (event) => {
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    if (!button || button.disabled || button === highlightedButtonRef.current) return;
+    highlightedButtonRef.current = button;
+    onMenuHighlight?.();
+  };
   const [menuImageLoaded, setMenuImageLoaded] = useState(false);
   const [frontpageMessage, setFrontpageMessage] = useState("");
   const [confirmNewGameOpen, setConfirmNewGameOpen] = useState(false);
@@ -37,7 +44,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
   };
 
   return (
-    <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label={t("menu.main")}>
+    <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label={t("menu.main")} onMouseOver={handleMenuHighlight} onFocus={handleMenuHighlight} onMouseLeave={() => { highlightedButtonRef.current = null; }}>
       <img
         className="start-menu-bg"
         src="/assets/generated/menu.png"
