@@ -9,6 +9,7 @@ import {
 } from "../game/data.js";
 import { drawGroundTile, drawShadow, loadGeneratedAtlas } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
+import { audioManager } from "../game/audio-manager.js";
 import { makeItem, itemValue, makePotion } from "../game/world.js";
 import { consumePotionInputs, consumeResourceInputs, inventoryCanAccept, isQuestComplete, makeResourceItem, questItemCanStack, questItemCount, questItemStacksByQuestInstance, questItemTargetsForQuest, questItemsCanStack, questItemStackMax, questProgressText, resourceStackMax } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
@@ -593,6 +594,7 @@ function CityPage({
         },
       },
     }));
+    audioManager.playSound("building_upgrade");
   };
 
   const repairArea = (area, percent = null) => {
@@ -633,6 +635,7 @@ function CityPage({
     }));
 
     engineRef.current?.addToast?.(`Område repareret: +${missing}%`);
+    audioManager.playSound("building_repair");
   };
 
   const hoverArea = (area) => {
@@ -3332,6 +3335,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
         upgradedAt: Date.now(),
       },
     }));
+    audioManager.playSound("building_upgrade");
   };
 
   const buyAddon = (addon) => {
@@ -3613,6 +3617,7 @@ function CityBuildingPopup({ buildingId, engineRef, snapshot, snapshotRef, progr
     });
 
     engineRef.current?.addToast?.(`Reparation gennemført: +${missing}%`);
+    audioManager.playSound("building_repair");
   };
 
   const moveStoredItem = (fromSectionKey, fromSlotIndex, toSectionKey, toSlotIndex) => {

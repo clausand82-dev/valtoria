@@ -6,6 +6,10 @@ Små rettelse observeret igennem spil test:
 - lidt periodisk lag ved lonline run
 - lidt loade forsinkelse af grafik ved online run
 - i city map run er exit ofte næsten umulig at se
+- teste om questreward på hunters quests virker
+- en setting i expedition mode
+- en genvejs tast til mute
+- mulighed for at gå tilbage til start menu
 
 
 

@@ -11,6 +11,7 @@ import {
 } from "../dependencies.js";
 import { actionTargetGroupsForQuest, rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
 import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.js";
+import { audioManager } from "../../audio-manager.js";
 import {
   mobWorldStateKey,
   normalizeWorldState,
@@ -180,6 +181,7 @@ export const regionMethods = {
       ...preparedRegionConfig,
       areaMapId,
     });
+    audioManager.setRegionAudio(preparedRegionConfig.audio);
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();
@@ -347,6 +349,7 @@ export const regionMethods = {
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "cleared"), cleared);
     this.worldState = setWorldFlag(this.worldState, regionWorldStateKey(active.regionId, "corrupted"), !cleared);
     this.activeMapRegion = null;
+    audioManager.setRegionAudio(null);
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.player.target = null;
@@ -371,6 +374,7 @@ export const regionMethods = {
     restoreKeptAbandonState(this, currentState);
     this.clearSubregionExpedition?.();
     this.activeMapRegion = null;
+    audioManager.setRegionAudio(null);
     this.exitPromptOpen = false;
     this.exitPromptCooldown = 0;
     this.player.target = null;
@@ -617,6 +621,8 @@ export const regionMethods = {
     monster.eliteKillLydra = Math.max(0, Number(base.eliteKillLydra) || 0);
     monster.eliteKillNetdra = Math.max(0, Number(base.eliteKillNetdra) || 0);
     monster.speciesId = base.speciesId;
+    monster.audioProfile = base.audioProfile ?? null;
+    monster.audio = base.audio ? { ...base.audio } : null;
     monster.factionId = base.factionId;
     monster.tags = Array.isArray(base.tags) ? [...base.tags] : [];
     monster.spellCooldown = Math.max(0, Number(monster.spellCooldown) || 0);

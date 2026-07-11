@@ -41,6 +41,7 @@ import {
   randomInt
 } from "../helpers.js";
 import { worldEntryAllowed } from "../../world-state.js";
+import { audioManager } from "../../audio-manager.js";
 
 const FOLIAGE_LOOT_INTERACT_RANGE = 0.78;
 
@@ -422,6 +423,7 @@ export const lootMethods = {
           if (loot.despawn <= 0) {
             this.handleLootDespawn(loot);
             this.loots.splice(i, 1);
+            audioManager.playSound("item_pickup", { position: loot, listener: this.player, maxDistance: 10 });
             this.markRenderDirty?.("loot-remove");
             return true;
           }
@@ -457,6 +459,7 @@ export const lootMethods = {
               timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, picked));
               timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, picked)));
               this.loots.splice(i, 1);
+              audioManager.playSound("item_pickup", { position: loot, listener: this.player, maxDistance: 10 });
               this.markRenderDirty?.("loot-pickup");
               pickedUpItems += picked;
             });
@@ -474,6 +477,7 @@ export const lootMethods = {
             timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, 1));
             timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, 1)));
             this.loots.splice(i, 1);
+            audioManager.playSound("item_pickup", { position: loot, listener: this.player, maxDistance: 10 });
             this.markRenderDirty?.("loot-pickup");
             pickedUpItems += 1;
           });
@@ -490,6 +494,7 @@ export const lootMethods = {
             timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, picked));
             timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, picked)));
             this.loots.splice(i, 1);
+            audioManager.playSound("item_pickup", { position: loot, listener: this.player, maxDistance: 10 });
             this.markRenderDirty?.("loot-pickup");
             pickedUpItems += picked;
           });

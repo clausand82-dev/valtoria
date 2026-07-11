@@ -48,6 +48,8 @@ import {
   targetDamageBonus,
   targetMetadata,
 } from "../../combat/target-metadata.js";
+import { audioManager } from "../../audio-manager.js";
+import { MONSTER_AUDIO_PROFILES, SPELL_AUDIO_PROFILES } from "../../config/sound-config.js";
 
 const ELEMENTS = ["physical", "fire", "ice", "lightning", "poison", "arcane", "holy", "shadow", "nature"];
 const BONUS_STAT_KEYS = [
@@ -84,6 +86,18 @@ function damageKindBonusKey(damageKind) {
 
 function damageDebugEnabled() {
   return typeof window !== "undefined" && window.VALTORIA_DEBUG_DAMAGE === true;
+}
+
+function swordObjectHitSoundId(object) {
+  const tags = objectMetadataConfig(object).tags ?? [];
+  return tags.includes("stone") ? "sword_hit_stone" : "sword_hit_wood";
+}
+
+function destroyedObjectSoundId(object) {
+  const tags = objectMetadataConfig(object).tags ?? [];
+  if (tags.includes("stone")) return "stone_rumble";
+  if (tags.includes("wood") || tags.includes("tree")) return "tree_rumble";
+  return null;
 }
 
 function distanceSq(a, b) {
@@ -152,6 +166,12 @@ export const combatMethods = {
     return (entity?.statusEffects ?? []).some((effect) => effect.type === "stun" && effect.duration > 0);
   },
 
+  playSpellAudio(projectile, event, position = projectile, materialOverride = null) {
+    const profile = SPELL_AUDIO_PROFILES[projectile?.spellId];
+    const soundId = profile?.impactByMaterial?.[materialOverride] ?? profile?.[event];
+    if (soundId) audioManager.playSound(soundId, { position, listener: this.player, maxDistance: 16 });
+  },
+
   updateMonsters(dt) {
     const timings = this.monsterUpdateTimings ?? {};
     const timedMonster = (key, action) => {
@@ -195,6 +215,11 @@ export const combatMethods = {
         monster.vx = 0;
         monster.vy = 0;
       } else if (d < monster.aggro) {
+        if (!monster.audioAggroed) {
+          monster.audioAggroed = true;
+          const soundId = MONSTER_AUDIO_PROFILES[monster.audioProfile]?.aggro;
+          if (soundId) audioManager.playSound(soundId, { position: monster, listener: this.player, maxDistance: 14 });
+        }
         this.updateMonsterMinions(monster, dt);
         const n = normalize(this.player.x - monster.x, this.player.y - monster.y);
         monster.facingX = n.x || monster.facingX;
@@ -213,10 +238,13 @@ export const combatMethods = {
           const critical = Math.random() < (Number(monster.critChance) || 0);
           this.applyMonsterMeleeHit(monster, critical);
         }
-      } else if (Math.random() < 0.004 * passiveWanderScale) {
+      } else {
+        monster.audioAggroed = false;
+        if (Math.random() < 0.004 * passiveWanderScale) {
         const a = Math.random() * Math.PI * 2;
         monster.vx = Math.cos(a) * monster.speed * 0.28;
         monster.vy = Math.sin(a) * monster.speed * 0.28;
+        }
       }
       timings.monsterAiMs = (timings.monsterAiMs ?? 0) + performance.now() - aiStartedAt;
 
@@ -615,6 +643,7 @@ export const combatMethods = {
 
     if (targetIsObject) {
       this.player.stats.meleeAttacks += 1;
+      if (stats.mode === "melee") audioManager.playSound("sword_swing", { position: this.player, listener: this.player });
       const baseDamage = this.rollDamage(stats.damageMin, stats.damageMax);
       const critical = Math.random() < (Number(stats.critChance) || 0);
       const finalDamage = this.calculateDamage({
@@ -629,6 +658,7 @@ export const combatMethods = {
         sourceConfig: weapon,
       }).damage;
       this.damageObject(target, finalDamage);
+      if (stats.mode === "melee") audioManager.playSound(swordObjectHitSoundId(target), { position: target, listener: this.player, maxDistance: 12 });
       this.drainWeaponDurability();
       this.camera.shake = Math.max(this.camera.shake, 3);
       this.player.attackTargetId = null;
@@ -638,6 +668,7 @@ export const combatMethods = {
 
     if (stats.mode === "melee") {
       this.player.stats.meleeAttacks += 1;
+      audioManager.playSound("sword_swing", { position: this.player, listener: this.player });
       const baseDamage = this.rollDamage(stats.damageMin, stats.damageMax);
       const critical = Math.random() < (Number(stats.critChance) || 0);
       const finalDamage = this.calculateDamage({
@@ -651,7 +682,8 @@ export const combatMethods = {
         source: { type: "weapon", id: weapon?.id ?? "weapon" },
         sourceConfig: weapon,
       }).damage;
-      this.damageMonster(target, finalDamage, "melee", critical, { type: "melee", id: weapon?.id ?? "weapon" });
+      const hit = this.damageMonster(target, finalDamage, "melee", critical, { type: "melee", id: weapon?.id ?? "weapon" });
+      if (hit) audioManager.playSound(target.audio?.hit ?? "sword_hit_flesh", { position: target, listener: this.player, maxDistance: 12 });
       this.triggerWeaponOnHitEffects({
         weapon: this.player.equipment?.weapon,
         player: this.player,
@@ -1101,6 +1133,7 @@ export const combatMethods = {
       particleVisuals: visuals,
     };
     this.projectiles.push(projectile);
+    this.playSpellAudio(projectile, "launch");
     this.markRenderDirty?.("projectile-spawn");
     if (visuals.trail?.type) {
       this.particleEngine?.attachEmitterToProjectile(projectile.id, {
@@ -1174,6 +1207,7 @@ export const combatMethods = {
         particleVisuals: visuals,
       };
       this.projectiles.push(projectile);
+      this.playSpellAudio(projectile, "launch");
       this.markRenderDirty?.("projectile-spawn");
       if (visuals.trail?.type) {
         this.particleEngine?.attachEmitterToProjectile(projectile.id, {
@@ -1231,6 +1265,7 @@ export const combatMethods = {
       this.activeProjectileUpdateTimings.projectileImpactAoERadius = Number(projectile.areaRadius) || 0;
     }
 
+    let destroyedObjectMaterial = null;
     for (const target of targets) {
       const direct = target === directTarget;
       const damage = addProjectileImpactTiming("projectileImpactAoEMs", () => direct
@@ -1265,7 +1300,11 @@ export const combatMethods = {
       } else if (target.runtimeType === "critter" || target.type === "critter") {
         addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageCritter?.(target, damage, "magic", false)));
       } else if (isDestructibleObject(target)) {
-        addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageObject(target, damage)));
+        const destroyed = addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageObject(target, damage)));
+        if (destroyed && !destroyedObjectMaterial) {
+          const tags = objectMetadataConfig(target).tags ?? [];
+          destroyedObjectMaterial = tags.includes("stone") ? "stone" : tags.includes("wood") ? "wood" : null;
+        }
       } else {
         const wasAlive = !target.dead;
         const killStartedAt = performance.now();
@@ -1280,6 +1319,7 @@ export const combatMethods = {
       if (!target.dead && !(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) addProjectileImpactTiming("projectileImpactStatusEffectMs", () => this.applyProjectileStatus(target, projectile));
       this.spawnImpactBeamVisual(projectile, target);
     }
+    this.playSpellAudio(projectile, "impact", { x, y }, destroyedObjectMaterial);
     const impact = projectile.particleVisuals?.impact;
     addProjectileImpactTiming("projectileImpactSpawnEffectsMs", () => {
       if (impact?.type) {
@@ -1722,6 +1762,7 @@ export const combatMethods = {
     const mitigated = Math.max(1, Math.floor(block.damage * (100 / (100 + stats.armor * 7))));
     if (damageDebugEnabled()) console.debug("[Valtoria Damage Block]", { target: "player", blocked: block.blocked, blockAmount: block.blockAmount, damageBeforeBlock: amount, damageAfterBlock: block.damage, finalDamage: mitigated });
     this.player.hp = Math.max(0, this.player.hp - mitigated);
+    if (mitigated > 0) audioManager.playSound("player_hurt", { position: this.player, listener: this.player });
     this.player.stats.damageTaken += mitigated;
     this.player.hurtCooldown = 0.2;
     this.camera.shake = Math.max(this.camera.shake, 4);
@@ -1744,12 +1785,12 @@ export const combatMethods = {
   damageMonster(monster, amount, sourceType, critical = false, deathSource = null) {
     if (monster?.runtimeType === "critter" || monster?.type === "critter") {
       this.damageCritter?.(monster, amount, sourceType, critical);
-      return;
+      return false;
     }
     this.markMobSeen?.(monster?.typeName);
     if (Math.random() < (Number(monster.dodgeChance) || 0)) {
       this.addFloater(monster.x, monster.y, "Dodge", "#9ee8a4");
-      return;
+      return false;
     }
     const block = this.applyIncomingBlock(amount, monster);
     const damage = block.damage;
@@ -1772,11 +1813,12 @@ export const combatMethods = {
       id: deathSource?.id ?? null,
       spellId: deathSource?.spellId ?? null,
     });
+    return damage > 0;
   },
 
   damageObject(object, amount) {
     const def = getDestructibleDef(object);
-    if (!def) return;
+    if (!def) return false;
     if (!Number.isFinite(Number(object.maxHp))) {
       object.maxHp = def.hp;
       object.hp = def.hp;
@@ -1798,7 +1840,9 @@ export const combatMethods = {
     object.hurt = 0.18;
     this.addFloater(object.x, object.y, `-${object.harvestHits}/${stages}`, "#f1d08d", 0.72);
     this.addParticles(object.x, object.y, def.particleColor ?? "#d8c091", 8, 0.08);
-    if (object.harvestHits >= stages || object.hp <= 0) this.destroyObject(object, def);
+    const destroyed = object.harvestHits >= stages || object.hp <= 0;
+    if (destroyed) this.destroyObject(object, def);
+    return destroyed;
   },
 
   destroyObject(object, def) {
@@ -1806,6 +1850,8 @@ export const combatMethods = {
     const chunk = this.getChunk(cx, cy);
     const index = chunk.objects.findIndex((entry) => entry.id === object.id);
     if (index < 0) return;
+    const destructionSoundId = destroyedObjectSoundId(object);
+    if (destructionSoundId) audioManager.playSound(destructionSoundId, { position: object, listener: this.player, maxDistance: 16 });
     this.particleEngine?.removeEmittersByOwner(object.id);
     chunk.objects.splice(index, 1);
     this.player.stats.objectsDestroyed += 1;
@@ -1919,6 +1965,8 @@ export const combatMethods = {
       monster.dead = true;
       monster.deathState = "dead";
     });
+    const deathSoundId = MONSTER_AUDIO_PROFILES[monster.audioProfile]?.death;
+    if (deathSoundId) audioManager.playSound(deathSoundId, { position: monster, listener: this.player, maxDistance: 16 });
     timedDeath("monsterDeathAnimationSetupMs", () => {});
     timedDeath("monsterDeathDirtyMarkMs", () => this.markRenderDirty?.("monster-death"));
     timedDeath("monsterDeathBestiaryProgressMs", () => runDeathCallback("bestiary-progress", {

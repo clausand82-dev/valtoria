@@ -33,6 +33,14 @@ import { DEFAULT_CLASS_ID } from "../../config/class-config.js";
 import { normalizeFactionRep } from "../../config/faction-config.js";
 import { createAutoLootRules } from "./loot.js";
 import { resolvePerformanceProfile } from "../../config/performance-config.js";
+import { audioManager } from "../../audio-manager.js";
+
+function playerFootstepSurface(engine) {
+  const tileset = String(JSON.stringify(engine.region?.mapRegion?.tileset ?? engine.region?.tileset ?? "")).toLowerCase();
+  if (/(wood|plank)/.test(tileset)) return "wood";
+  if (/(stone|rock|brick)/.test(tileset)) return "stone";
+  return "grass";
+}
 import { CHEAT_SETTINGS } from "../../config/cheat-config.js";
 
 function makeDevTestInventory() {
@@ -144,6 +152,7 @@ export const lifecycleMethods = {
   },
 
   stop() {
+    audioManager.stopAll();
     if (this.pendingAutosaveTimer) {
       clearTimeout(this.pendingAutosaveTimer);
       this.pendingAutosaveTimer = null;
@@ -1277,6 +1286,17 @@ export const lifecycleMethods = {
     this.player.moveSpeed = lerp(this.player.moveSpeed, rawSpeed, moved ? 0.45 : 0.18);
     if (this.player.moveSpeed > 0.02) this.player.gait += dt * (7.5 + this.player.moveSpeed * 2.3);
     if (moved && Math.random() < (this.footstepDustChance?.(0.18) ?? 0.18)) this.addDust(this.player.x, this.player.y, 1);
+    if (travelled > 0.001) {
+      const gait = input.x || input.y ? "run" : "walk";
+      const stride = gait === "run" ? 0.68 : 0.52;
+      this.player.footstepDistance = Math.max(0, Number(this.player.footstepDistance) || 0) + travelled;
+      if (this.player.footstepDistance >= stride) {
+        this.player.footstepDistance -= stride;
+        audioManager.playSound(`footstep_${gait}_${playerFootstepSurface(this)}`, { position: this.player, listener: this.player });
+      }
+    } else {
+      this.player.footstepDistance = 0;
+    }
 
     const attackTarget = timedPlayer("playerTargetingMs", () => this.monsters.get(this.player.attackTargetId));
     if (!attackTarget || attackTarget.dead) {

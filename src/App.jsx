@@ -10,6 +10,7 @@ import { incrementWorldCounter } from "./game/world-state.js";
 import { CHEAT_SETTINGS, cheatGiveOptions, installValtoriaCheats } from "./game/config/cheat-config.js";
 import { QUEST_NPCS } from "./game/config/npc-config.js";
 import { PERFORMANCE_PROFILES, resolvePerformanceProfile } from "./game/config/performance-config.js";
+import { audioManager, DEFAULT_AUDIO_SETTINGS } from "./game/audio-manager.js";
 import { QUEST_DEFS } from "./game/config/quest-config.js";
 import { ACTION_CONFIG } from "./game/config/action-config.js";
 import { READABLE_DEF_BY_ID } from "./game/config/readable-config.js";
@@ -75,6 +76,7 @@ function loadUiImage(src) {
 
 const PERFORMANCE_MODE_STORAGE_KEY = "valtoria.performanceMode";
 const PERFORMANCE_CUSTOM_STORAGE_KEY = "valtoria.performanceCustom.v1";
+const AUDIO_SETTINGS_STORAGE_KEY = "valtoria.audio.v1";
 const LANGUAGE_SETTING = Object.freeze({
   id: "language_setting",
   label: "Language",
@@ -205,6 +207,26 @@ function localizedRegionNames(text, localize) {
   return result;
 }
 
+function normalizeAudioSettings(input = {}) {
+  return {
+    masterVolume: clampNumber(input.masterVolume, 0, 1, DEFAULT_AUDIO_SETTINGS.masterVolume),
+    musicVolume: clampNumber(input.musicVolume, 0, 1, DEFAULT_AUDIO_SETTINGS.musicVolume),
+    ambienceVolume: clampNumber(input.ambienceVolume, 0, 1, DEFAULT_AUDIO_SETTINGS.ambienceVolume),
+    sfxVolume: clampNumber(input.sfxVolume, 0, 1, DEFAULT_AUDIO_SETTINGS.sfxVolume),
+    uiVolume: clampNumber(input.uiVolume, 0, 1, DEFAULT_AUDIO_SETTINGS.uiVolume),
+    audioMuted: Boolean(input.audioMuted),
+  };
+}
+
+function readAudioSettings() {
+  if (typeof window === "undefined") return normalizeAudioSettings();
+  try { return normalizeAudioSettings(JSON.parse(window.localStorage?.getItem?.(AUDIO_SETTINGS_STORAGE_KEY) ?? "{}")); } catch { return normalizeAudioSettings(); }
+}
+
+function persistAudioSettings(settings) {
+  if (typeof window !== "undefined") window.localStorage?.setItem?.(AUDIO_SETTINGS_STORAGE_KEY, JSON.stringify(normalizeAudioSettings(settings)));
+}
+
 function downloadJsonFile(filename, data) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -328,6 +350,7 @@ export default function App() {
   const [helpState, setHelpState] = useState({ open: false, topicId: null });
   const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
   const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
+  const [audioSettings, setAudioSettings] = useState(() => readAudioSettings());
   const [cheatResetQuestId, setCheatResetQuestId] = useState(() => Object.keys(QUEST_DEFS ?? {})[0] ?? "");
   const [cheatClearCityTarget, setCheatClearCityTarget] = useState("all");
   const [cheatGiveSelection, setCheatGiveSelection] = useState(() => {
@@ -348,6 +371,9 @@ export default function App() {
   const lastCityOpenRef = useRef(false);
   const lastCityRollSessionRef = useRef(null);
   const preloadedGameAssetsRef = useRef({ atlas: null, animationSheets: null });
+  const audioModalOpenRef = useRef(false);
+  const inventoryAudioOpenRef = useRef(false);
+  const cityStorageAudioOpenRef = useRef(false);
   const loadTokenRef = useRef(0);
   const [appLoading, setAppLoading] = useState({
     active: true,
@@ -497,6 +523,48 @@ export default function App() {
   useEffect(() => {
     gameSessionRef.current = gameSession;
   }, [gameSession]);
+
+  useEffect(() => {
+    if (gameSession) return;
+    audioManager.stopAmbience();
+    audioManager.playMusic("menu");
+  }, [gameSession]);
+
+  useEffect(() => {
+    audioManager.setSettings(audioSettings);
+  }, [audioSettings]);
+
+  const anyImportantPanelOpen = Boolean(menuView !== "main" || mapOpen || heroOpen || questOverviewOpen || toastLogOpen || citySettingsOpen || confirmMapAbandonOpen || helpState.open || questOffer || questRewardModal || viewedQuest);
+  useEffect(() => {
+    if (anyImportantPanelOpen && !audioModalOpenRef.current) audioManager.playSound("ui_open");
+    audioModalOpenRef.current = anyImportantPanelOpen;
+  }, [anyImportantPanelOpen]);
+
+  useEffect(() => {
+    if (inventoryOpen && !inventoryAudioOpenRef.current) audioManager.playSound("backpack_open");
+    inventoryAudioOpenRef.current = inventoryOpen;
+  }, [inventoryOpen]);
+
+  useEffect(() => {
+    if (cityStorageOpen && !cityStorageAudioOpenRef.current) audioManager.playSound("backpack_open");
+    cityStorageAudioOpenRef.current = cityStorageOpen;
+  }, [cityStorageOpen]);
+
+  const updateAudioSettings = (patch) => {
+    setAudioSettings((current) => {
+      const next = normalizeAudioSettings({ ...current, ...patch });
+      persistAudioSettings(next);
+      audioManager.setSettings(next);
+      return next;
+    });
+  };
+
+  const handleUiPointerDown = () => audioManager.unlock();
+  const handleUiClick = (event) => {
+    const button = event.target instanceof Element ? event.target.closest("button") : null;
+    if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
+    audioManager.playSound("ui_click");
+  };
 
   useEffect(() => {
     if (!gameSession || !canvasRef.current) return undefined;
@@ -821,6 +889,15 @@ export default function App() {
   const effectivePopularity = Math.max(0, Math.min(100, Number(derivedCityStats.popularity) || 0));
   const popularityPct = effectivePopularity;
   const cityThreatLevel = Math.max(0, Math.min(100, Number(cityProgressHud?.threatLevel) || 0));
+  useEffect(() => {
+    if (!cityOpen) return;
+    audioManager.stopAmbience();
+    audioManager.playMusic(cityThreatLevel >= 100
+      ? "city_very_high_threat"
+      : cityThreatLevel >= 50
+        ? "city_high_threat"
+        : "city_low_threat");
+  }, [cityOpen, cityThreatLevel]);
   const cityStatBreakdown = useMemo(
     () => calculateCityStatBreakdown(cityProgressHud, snapshot, regionCorruption),
     [cityProgressHud, snapshot, regionCorruption],
@@ -1158,6 +1235,7 @@ export default function App() {
   };
 
   const openWorldMapFromCity = () => {
+    audioManager.playSound("map_fold");
     clearToastLogForModeSwitch();
     setRegionMapOpen(true);
     setMapOpen(false);
@@ -1181,7 +1259,7 @@ export default function App() {
   const showingOverlappingLoot = overlappingActionAndLoot && snapshot.nearbyInteractionMode === "loot";
 
   return (
-    <main className={`game-shell ${gameSession ? "game-active" : "menu-active"} ${cityOpen ? "city-open" : ""}`}>
+    <main className={`game-shell ${gameSession ? "game-active" : "menu-active"} ${cityOpen ? "city-open" : ""}`} onPointerDownCapture={handleUiPointerDown} onClickCapture={handleUiClick}>
       {!gameSession && !appLoading.active && (
         <StartMenu
           view={menuView}
@@ -1270,6 +1348,21 @@ export default function App() {
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
             <h2 id="city-settings-title">{t("panel.settings.title")}</h2>
             <p className="city-settings-note">{t("settings.performance.note")}</p>
+            <div className="city-settings-section">
+              <h3>Audio</h3>
+              <label className="city-settings-check">
+                <input type="checkbox" checked={audioSettings.audioMuted} onChange={(event) => updateAudioSettings({ audioMuted: event.target.checked })} />
+                Mute audio
+              </label>
+              {[
+                ["masterVolume", "Master"], ["musicVolume", "Music"], ["ambienceVolume", "Ambience"], ["sfxVolume", "Sound effects"], ["uiVolume", "UI"],
+              ].map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <input type="range" min="0" max="1" step="0.01" value={audioSettings[key]} onChange={(event) => updateAudioSettings({ [key]: Number(event.target.value) })} />
+                </label>
+              ))}
+            </div>
             <div className="city-settings-section">
               <h3>{localize(LANGUAGE_SETTING, "label")}</h3>
               <p>{localize(LANGUAGE_SETTING, "description")}</p>

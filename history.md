@@ -8,9 +8,10 @@ History over changes
 - changed stack size on some resources (from 100 to 1000)
 - fixed a bug where 1000 stack resourcer changed to 100 stack size in city inventory
 - fixed a bug where item reward was not rewarded in some hunters quest - NEED TEST
+- added sfx and music support (ongoing)
 
 *V. 1.11
-- fixed an bug where questreqrds crashed game
+- fixed an bug where questreward crashed game
 
 *V. 1.10
 - added summary modal after expedition run

@@ -765,6 +765,7 @@ export const MONSTER_DEFS = {
       scale: 0.3, shadowW: 32, shadowH: 10, shadowAlpha: 0.36, yOffset: 39
     }),
     speciesId: "wolf",
+    audioProfile: "wolf",
     tags: ["beast", "wildlife", "small"],
     stats: { hp: 52, damage: 14, speed: 2, range: 0.12, radius: 0.34, color: "#8b8f93", xp: 28 },
     popularity: { change: -0.35 },
@@ -786,6 +787,7 @@ export const MONSTER_DEFS = {
       scale: 0.48, shadowW: 32, shadowH: 10, shadowAlpha: 0.36, yOffset: 39
     }),
     speciesId: "wolf",
+    audioProfile: "wolf",
     tags: ["beast", "wildlife", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.86, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     popularity: { change: -0.35 },
@@ -800,6 +802,7 @@ export const MONSTER_DEFS = {
       scale: 0.95, shadowW: 32, shadowH: 10, shadowAlpha: 0.36, yOffset: 39
     }),
     speciesId: "wolf",
+    audioProfile: "wolf",
     tags: ["beast", "wildlife", "boss", "large"],
     stats: { hp: 220, damage: 30, speed: 1.25, range: 0.64, radius: 0.34, color: "#8b8f93", xp: 28 },
     popularity: { change: -0.35 },
@@ -913,6 +916,8 @@ export const MONSTER_STATS = Object.fromEntries(
         eliteKillLydra: Math.max(0, Number(def.eliteKillLydra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillLydra) || 0),
         eliteKillNetdra: Math.max(0, Number(def.eliteKillNetdra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillNetdra) || 0),
         speciesId: def.speciesId,
+        audioProfile: def.audioProfile ?? null,
+        audio: def.audio ? { ...def.audio } : null,
         factionId: inferMonsterFaction(type, def),
         tags: Array.isArray(def.tags) ? [...def.tags] : [],
         allowElite: def.allowElite !== false,

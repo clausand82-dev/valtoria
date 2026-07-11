@@ -225,6 +225,7 @@ export function createVillageOutskirtsMapRegions(region) {
     },
       labelX: 49, labelY: 79,
       mapSize: "small",
+      audio: { musicProfile: "forest", ambience: ["forest_ambience"] },
       cityStats: {
         population: 10,
         water: 20,
@@ -913,6 +914,7 @@ export function createVillageOutskirtsMapRegions(region) {
       i18n: { da: { label: "Skoven" } },
       color: "#7fb172",
       mapSize: "large",
+      audio: { musicProfile: "forest", ambience: ["forest_ambience"] },
       cityStats: { population: 20 },
       tileset: { fileName: "tileset/tileset_grass.png" },
         spawnCounts: {                                            // Per chunk spawn counts.
