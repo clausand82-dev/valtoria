@@ -536,6 +536,7 @@ export const regionMethods = {
   getChunk(cx, cy) {
     const key = chunkKey(cx, cy);
     if (!this.chunks.has(key)) {
+      const nearbyBefore = this.monsters?.size ?? 0;
       const chunk = createChunk(cx, cy, this.region);
       this.applySavedActionObjectStates?.(chunk);
       this.chunks.set(key, chunk);
@@ -544,6 +545,15 @@ export const regionMethods = {
         this.scaleMonsterToHeroLevel(monster);
         this.assignEliteVariant(monster);
         this.monsters.set(monster.id, monster);
+      }
+      const metrics = this.chunkFrameMetrics;
+      if (metrics) {
+        metrics.chunksCreatedThisFrame += 1;
+        metrics.chunkIdsCreated.push(key);
+        metrics.monstersInsertedIntoIndexes += chunk.monsters?.length ?? 0;
+        metrics.objectsInsertedIntoIndexes += chunk.objects?.length ?? 0;
+        metrics.nearbyMonsterSetSizeBefore = nearbyBefore;
+        metrics.nearbyMonsterSetSizeAfter = this.monsters?.size ?? nearbyBefore;
       }
     }
     return this.chunks.get(key);

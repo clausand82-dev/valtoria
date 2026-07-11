@@ -1,7 +1,16 @@
 History over changes
 
-*V. 1.11
+*V. 1.12
+- fixed an error where hay wasn't destructable - only meant to been diabled when villager_help_collect_hay was active
+- added export/import to start menu (can be used to transfer save game between browser/pc)
+- fixed some hardcoded danish words to be english and moved danish to lang system
+- futher optimized performence log system to report more details
+- changed stack size on some resources (from 100 to 1000)
+- fixed a bug where 1000 stack resourcer changed to 100 stack size in city inventory
+- fixed a bug where item reward was not rewarded in some hunters quest - NEED TEST
 
+*V. 1.11
+- fixed an bug where questreqrds crashed game
 
 *V. 1.10
 - added summary modal after expedition run

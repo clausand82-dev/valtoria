@@ -146,6 +146,11 @@ export class ParticleEngine {
     for (const [id, emitter] of this.emitters) {
       if (!emitter.dead) continue;
       this.emitters.delete(id);
+      for (const [ownerId, ids] of this.ownerEmitters) {
+        const nextIds = ids.filter((entryId) => entryId !== id);
+        if (nextIds.length) this.ownerEmitters.set(ownerId, nextIds);
+        else this.ownerEmitters.delete(ownerId);
+      }
       this.lastExpiredRemoved += 1;
     }
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
@@ -186,11 +191,18 @@ export class ParticleEngine {
     const config = emitter.config;
     const active = emitter.activeParticleCount(this.particles);
     const quality = this.qualityMultiplier();
+    const adaptive = context.adaptiveSettings ?? {};
+    const category = config.effectCategory ?? "";
+    const adaptiveScale = category === "spell-effects" || config.spellInstanceId
+      ? Math.max(0.05, Math.min(1, Number(adaptive.spellVisualScale) || 1))
+      : Math.max(0.05, Math.min(1, Number(adaptive.particleEmissionScale) || 1));
+    const scaledRequested = count * quality * adaptiveScale;
+    const requestedBudget = Math.floor(scaledRequested) + (Math.random() < scaledRequested % 1 ? 1 : 0);
     const emitterMax = Math.max(1, Math.floor(config.maxParticles * quality));
     const budget = Math.min(
-      Math.ceil(count * quality),
+      requestedBudget,
       Math.max(0, emitterMax - active),
-      Math.max(0, Math.floor(this.maxParticles * quality) - this.particles.length),
+      Math.max(0, Math.floor(this.maxParticles * quality * adaptiveScale) - this.particles.length),
     );
     if (budget <= 0) return;
     if (config.onlyWhenOnScreen && anchor && !this.isAnchorVisible(anchor, config, context)) return;

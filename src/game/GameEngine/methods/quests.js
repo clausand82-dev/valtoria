@@ -78,6 +78,24 @@ function talkTargetNpcIds(target = {}) {
   return [];
 }
 
+function addInteractionTiming(engine, key, ms) {
+  if (!engine?.interactionTargetTimings) return;
+  engine.interactionTargetTimings[key] = (engine.interactionTargetTimings[key] ?? 0) + ms;
+}
+
+function addInteractionStateReason(engine, reason) {
+  if (!engine?.interactionTargetTimings) return;
+  const key = String(reason || "unknown");
+  const reasons = engine.interactionTargetTimings.interactionTargetStateReasons ??= {};
+  reasons[key] = (reasons[key] ?? 0) + 1;
+}
+
+function distanceSq(a, b) {
+  const dx = (Number(a?.x) || 0) - (Number(b?.x) || 0);
+  const dy = (Number(a?.y) || 0) - (Number(b?.y) || 0);
+  return dx * dx + dy * dy;
+}
+
 // Keep the quest instance shaped like a normal quest while the current step changes.
 function copyStepRuntimeFields(quest, step, def = null) {
   if (!quest || !step) return quest;
@@ -265,7 +283,10 @@ export const questsMethods = {
     }
 
     const activeIndex = this.questState.active.findIndex((entry) => entry.id === quest.id);
-    if (activeIndex >= 0) this.questState.active.splice(activeIndex, 1);
+    if (activeIndex >= 0) {
+      this.questState.active.splice(activeIndex, 1);
+      this.questKillTargetIndex = null;
+    }
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
     }
@@ -366,6 +387,7 @@ export const questsMethods = {
     const turnInQuestInfo = questSnapshot(quest, this.player.inventory);
     const rewardSummary = this.grantQuestRewards(quest);
     this.questState.active.splice(index, 1);
+    this.questKillTargetIndex = null;
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
     }
@@ -391,20 +413,50 @@ export const questsMethods = {
     }
     const candidates = [];
     if (this.questState.wildernessNpc) candidates.push(this.questState.wildernessNpc);
+    const maxRangeSq = QUEST_INTERACT_RADIUS * QUEST_INTERACT_RADIUS;
     for (const chunk of this.nearbyChunks(1)) {
       for (const npc of chunk.npcs ?? []) {
-        if (!npc || npc.removed || npc.actionRemoved || !npc.npcId) continue;
+        const collectStartedAt = performance.now();
+        const valid = npc && !npc.removed && !npc.actionRemoved && npc.npcId;
+        addInteractionTiming(this, "interactionTargetCollectNpcsMs", performance.now() - collectStartedAt);
+        if (!valid) continue;
+        const distanceStartedAt = performance.now();
+        const radius = Number(npc.radius) || 0;
+        const checkRange = QUEST_INTERACT_RADIUS + radius;
+        if (distanceSq(this.player, npc) > checkRange * checkRange) {
+          addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+          continue;
+        }
+        addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
         const interactions = this.getNpcQuestInteractions(npc.npcId, "wilderness");
         if (!interactions.active.length && !interactions.offers.length) continue;
         candidates.push(npc);
       }
     }
-    const nearby = candidates
-      .filter((npc) => distance(this.player, npc) <= QUEST_INTERACT_RADIUS + (Number(npc.radius) || 0))
-      .sort((a, b) => distance(this.player, a) - distance(this.player, b))[0] ?? null;
+    const sortStartedAt = performance.now();
+    let nearby = null;
+    let nearbyDistance = Infinity;
+    for (const npc of candidates) {
+      const distanceStartedAt = performance.now();
+      const radius = Number(npc.radius) || 0;
+      const checkRange = QUEST_INTERACT_RADIUS + radius;
+      if (distanceSq(this.player, npc) > Math.max(maxRangeSq, checkRange * checkRange)) {
+        addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+        continue;
+      }
+      const d = distance(this.player, npc);
+      addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+      if (d > checkRange || d >= nearbyDistance) continue;
+      nearby = npc;
+      nearbyDistance = d;
+    }
+    addInteractionTiming(this, "interactionTargetSortMs", performance.now() - sortStartedAt);
     if ((nearby?.id ?? null) !== (this.nearbyQuestgiver?.id ?? null)) {
+      const stateStartedAt = performance.now();
       this.nearbyQuestgiver = nearby;
-      this.publishSnapshot();
+      addInteractionStateReason(this, "questgiver-target");
+      this.markUiOnlySnapshot?.("questgiver-target");
+      addInteractionTiming(this, "interactionTargetStateUpdateMs", performance.now() - stateStartedAt);
     }
   },
 
@@ -1018,8 +1070,10 @@ export const questsMethods = {
       return false;
     }
     this.questState.active.push(quest);
+    this.questKillTargetIndex = null;
     if (questHasSteps(quest) && !this.startQuestCurrentStep(quest)) {
       this.questState.active = this.questState.active.filter((entry) => entry.id !== quest.id);
+      this.questKillTargetIndex = null;
       this.publishSnapshot();
       return false;
     }
@@ -1141,6 +1195,7 @@ export const questsMethods = {
       if (step?.id) this.worldState = setWorldFlag(this.worldState, questStepCompletedFlag(quest.questId, step.id), false);
     }
     this.questState.active.splice(index, 1);
+    this.questKillTargetIndex = null;
     if (targetIds.size > 0 && Array.isArray(this.player?.inventory)) {
       this.player.inventory = this.player.inventory.filter((item) => {
         if (item?.mode !== "quest") return true;
@@ -1164,7 +1219,7 @@ export const questsMethods = {
     this.publishSnapshot();
   },
 
-  applyQuestKill(monster) {
+  applyQuestKill(monster, { publishSnapshot = true, diagnostics = null } = {}) {
     let changed = false;
     const norm = (value) => String(value ?? "").trim().toLowerCase();
     const killedType = norm(monster?.typeName);
@@ -1180,7 +1235,48 @@ export const questsMethods = {
     const killObjectiveTargets = (quest) => (
       Array.isArray(quest?.target?.killObjectives) ? quest.target.killObjectives : []
     );
-    for (const quest of this.questState.active) {
+    const activeQuests = this.questState.active ?? [];
+    // Active quests change rarely but kills can be extremely frequent.  Index
+    // only death-relevant quests by target type, keeping wildcard/clear-map
+    // quests in a small always-check list.  The cache is rebuilt whenever the
+    // active collection changes size or identity.
+    const cache = this.questKillTargetIndex;
+    if (!cache || cache.active !== activeQuests || cache.length !== activeQuests.length) {
+      const byMonsterType = new Map();
+      const always = new Set();
+      const add = (type, quest) => {
+        const key = norm(type);
+        if (!key || key === "random") { always.add(quest); return; }
+        const matches = byMonsterType.get(key) ?? new Set();
+        matches.add(quest);
+        byMonsterType.set(key, matches);
+      };
+      for (const quest of activeQuests) {
+        if (quest.type === "kill_monsters") {
+          for (const target of normalizeMonsterTargetList(quest.target?.monster)) add(target, quest);
+        } else if (quest.type === "clear_map" || quest.type === "clear_map_and_action_targets") {
+          const clearTarget = quest.type === "clear_map_and_action_targets" ? (quest.target?.clearMap ?? {}) : quest.target;
+          const targets = Array.isArray(clearTarget?.monsters) ? clearTarget.monsters : [];
+          if (targets.length) for (const target of targets) add(target, quest);
+          else always.add(quest);
+        } else if (quest.type === "collect_quest_item") {
+          const objectives = killObjectiveTargets(quest);
+          if (!objectives.length) continue;
+          for (const objective of objectives) {
+            const targets = Array.isArray(objective?.monsterTypes)
+              ? objective.monsterTypes : normalizeMonsterTargetList(objective?.monsterType ?? objective?.monster ?? objective?.monsters);
+            if (targets.length) for (const target of targets) add(target, quest);
+            else always.add(quest);
+          }
+        }
+      }
+      this.questKillTargetIndex = { active: activeQuests, length: activeQuests.length, byMonsterType, always };
+    }
+    const index = this.questKillTargetIndex;
+    const candidates = new Set([...(index.byMonsterType.get(killedType) ?? []), ...index.always]);
+    if (diagnostics) diagnostics.duplicateQuestChecksPrevented = Math.max(0, activeQuests.length - candidates.size);
+    for (const quest of candidates) {
+      if (diagnostics) diagnostics.questsChecked = (diagnostics.questsChecked ?? 0) + 1;
       if (quest.type === "collect_quest_item") {
         const objectives = killObjectiveTargets(quest);
         if (objectives.length > 0) {
@@ -1206,6 +1302,7 @@ export const questsMethods = {
             if (current >= needed) continue;
             nextKills[key] = Math.min(needed, current + 1);
             objectiveChanged = true;
+            if (diagnostics) diagnostics.questTargetsMatched = (diagnostics.questTargetsMatched ?? 0) + 1;
           }
           if (objectiveChanged) {
             if (stepId) {
@@ -1248,6 +1345,7 @@ export const questsMethods = {
       const targetList = normalizeMonsterTargetList(targetMonster);
       const matches = targetList.includes("random") || targetList.includes(killedType);
       if (!matches) continue;
+      if (diagnostics) diagnostics.questTargetsMatched = (diagnostics.questTargetsMatched ?? 0) + 1;
       const needed = Math.max(1, Math.floor(Number(quest.target.count) || 1));
       const current = Math.max(0, Math.floor(Number(quest.progress?.kills) || 0));
       if (current >= needed) continue;
@@ -1258,7 +1356,8 @@ export const questsMethods = {
         localization: { type: "questReady", questId: quest.questId ?? quest.id },
       });
     }
-    if (changed) this.publishSnapshot();
+    if (changed && publishSnapshot) this.publishSnapshot();
+    return { changed };
   },
 
   tryDropQuestTargetLoot({ source = "monster", sourceId = null, sourceTags = [], x = 0, y = 0, sourceObject = null, monster = null } = {}) {
@@ -1453,6 +1552,7 @@ export const questsMethods = {
     const rewardSummary = this.grantQuestRewards(quest);
     if (quest.type === "collect_quest_item") this.consumeQuestItems(quest, { skipResources: resourcesPrepaid });
     this.questState.active.splice(index, 1);
+    this.questKillTargetIndex = null;
     if (!quest.repeatable && !this.questState.completed.includes(quest.questId)) {
       this.questState.completed.push(quest.questId);
     }

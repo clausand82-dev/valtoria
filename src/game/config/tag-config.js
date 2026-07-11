@@ -14,6 +14,9 @@ export const TAGS = {
   corrupted: { label: "Corrupted" },
   cursed: { label: "Cursed" },
   undead: { label: "Undead" },
+  human: { label: "Human" },
+  spirit: { label: "Spirit" },
+  dragon: { label: "Dragon" },
 
   magic: { label: "Magic" },
   melee: { label: "Melee" },

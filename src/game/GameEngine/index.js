@@ -86,6 +86,7 @@ export class GameEngine {
     this.performanceRecording = null;
     this.lastPerformanceRecordingSummary = null;
     this.renderTimings = null;
+    this.updateTimings = null;
     this.renderDebugCounts = null;
     this.effectDebugCounts = {
       activeSpellParticles: 0,
@@ -98,6 +99,7 @@ export class GameEngine {
     this.monsterActivityDebug = {
       totalMonsters: 0,
       nearbyUpdatedMonsters: 0,
+      nearbyTotalMonsters: 0,
       visibleMovingMonsters: 0,
       visiblePassiveMovingMonsters: 0,
       visibleCombatMovingMonsters: 0,
@@ -107,6 +109,7 @@ export class GameEngine {
     };
     this.adaptivePerformanceTier = 0;
     this.adaptiveLowFpsSamples = 0;
+    this.adaptivePerformanceReason = "tier-0";
     this.terrainLayersCleared = 0;
     this.tileEdgeWallImage = null;
     this.lastSaveInfo = null;

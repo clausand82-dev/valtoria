@@ -1087,6 +1087,11 @@ export const renderingMethods = {
     this.minimapStaticRebuildReason = String(reason || "data-change");
   },
 
+  invalidateMinimapFogOverlay(reason = "fog") {
+    this.minimapFogRevision = (this.minimapFogRevision ?? 0) + 1;
+    this.minimapFogRebuildReason = String(reason || "fog");
+  },
+
   minimapDynamicSignature(size, scale, includeLoot = true) {
     let hash = 2166136261;
     const mix = (value) => {
@@ -1121,11 +1126,17 @@ export const renderingMethods = {
     this.minimapCanvasStates ??= new WeakMap();
     const state = this.minimapCanvasStates.get(canvas) ?? {};
     const budgetBackoff = (state.slowUntil ?? 0) > now;
-    const interval = budgetBackoff ? 500 : (this.minimapIntervalMs ?? 200);
+    // Static-map backoff must not slow the marker or fog overlay.  `minimapFps`
+    // is the dynamic cadence, normally 5 FPS (200ms).
+    const interval = this.minimapIntervalMs ?? 200;
     const emptyTimings = (reason) => {
       this.renderTimings = {
         ...(this.renderTimings ?? {}),
         minimapMs: performance.now() - startedAt,
+        minimapWorkThisFrameMs: performance.now() - startedAt,
+        lastMinimapRebuildMs: this.renderTimings?.lastMinimapRebuildMs ?? 0,
+        minimapIncludedInRenderTotal: false,
+        minimapRebuiltThisFrame: false,
         minimapCacheHit: true,
         minimapRebuildReason: reason,
         minimapStaticMs: 0,
@@ -1200,8 +1211,6 @@ export const renderingMethods = {
         }
       }
       operationStartedAt = performance.now();
-      this.drawMinimapFog(staticCtx, staticCenter, scale, { x: state.anchorX, y: state.anchorY });
-      fogOverlayMs += performance.now() - operationStartedAt;
       staticCtx.globalAlpha = 1;
       const origin = { x: state.anchorX, y: state.anchorY };
       if (this.isPointExplored(this.region.start)) this.drawMinimapPoint(staticCtx, this.region.start, staticCenter, scale, "#8bdfff", 3, origin);
@@ -1228,13 +1237,18 @@ export const renderingMethods = {
     const dynamicStartedAt = performance.now();
     const markerCanvas = separateDynamicLayer ? dynamicCanvas : canvas;
     const markerCtx = markerCanvas.getContext("2d");
+    const center = size / 2;
     if (separateDynamicLayer) {
       const clearStartedAt = performance.now();
       markerCtx.clearRect(0, 0, markerCanvas.width, markerCanvas.height);
       clearMs += performance.now() - clearStartedAt;
     }
+    // Fog follows the current view on the dynamic layer. Its revision is kept
+    // separate from static terrain so an explore stamp never rebuilds tiles.
+    const fogStartedAt = performance.now();
+    this.drawMinimapFog(markerCtx, center, scale, this.player);
+    fogOverlayMs += performance.now() - fogStartedAt;
     const markerStartedAt = performance.now();
-    const center = size / 2;
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead || !this.isPointVisible(monster)) continue;
       const x = center + (monster.x - this.player.x) * scale;
@@ -1267,10 +1281,15 @@ export const renderingMethods = {
     state.lastRenderAt = now;
     state.lastViewSignature = viewSignature;
     state.lastDynamicSignature = dynamicSignature;
+    state.lastFogRevision = this.minimapFogRevision ?? 0;
     this.minimapCanvasStates.set(canvas, state);
     this.renderTimings = {
       ...(this.renderTimings ?? {}),
       minimapMs: totalMs,
+      minimapWorkThisFrameMs: totalMs,
+      lastMinimapRebuildMs: needsStaticRebuild ? totalMs : (this.renderTimings?.lastMinimapRebuildMs ?? 0),
+      minimapIncludedInRenderTotal: false,
+      minimapRebuiltThisFrame: needsStaticRebuild,
       minimapCacheHit: !needsStaticRebuild,
       minimapRebuildReason: rebuildReason,
       minimapStaticMs: staticMs,

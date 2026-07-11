@@ -1224,7 +1224,7 @@ function achievementConditionProgress(condition, snapshot = emptySnapshot, cityP
         return currentLevel >= conditionTargetNumber(numberCondition);
       }).length,
       target: entries.length,
-      label: condition.progressLabel ?? "områder",
+      label: condition.progressLabel ?? "areas",
     };
   }
   if (condition.tagKills && typeof condition.tagKills === "object") {

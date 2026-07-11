@@ -555,12 +555,27 @@ export const persistenceMethods = {
   },
 
   saveProgress(options = {}) {
+    const saveStartedAt = performance.now();
+    const saveTimings = {
+      autosaveSnapshotBuildMs: 0,
+      autosaveCloneMs: 0,
+      autosaveSerializeMs: 0,
+      autosaveStorageWriteMs: 0,
+      autosaveTotalMs: 0,
+    };
+    const addSaveTiming = (key, ms) => {
+      saveTimings[key] = (saveTimings[key] ?? 0) + ms;
+      if (this.cleanupUpdateTimings) {
+        this.cleanupUpdateTimings[key] = (this.cleanupUpdateTimings[key] ?? 0) + ms;
+      }
+    };
     const force = Boolean(options?.force);
     if (this.activeMapRegion && !force && !this.currentExpedition) return false;
     if (!SAVE_PERSIST_CONFIG.storage.playerSave) return false;
     if (this.currentExpedition?.currentMapInstanceId) {
       this.storeCurrentMapSnapshot?.(this.currentExpedition.currentMapInstanceId);
     }
+    const cloneStartedAt = performance.now();
     const cfg = SAVE_PERSIST_CONFIG;
     const inventoryPayload = cfg.player.inventory
       ? this.player.inventory.map((item) => this.serializeItemForSave(item))
@@ -637,10 +652,15 @@ export const persistenceMethods = {
       ...(cfg.currentExpedition ? { currentExpedition: normalizeCurrentExpedition(this.currentExpedition) } : {}),
       loots: [],
     };
+    addSaveTiming("autosaveCloneMs", performance.now() - cloneStartedAt);
 
     let saveSizeKb = 0;
+    let serializedPayload = "";
     try {
-      saveSizeKb = Math.round((new Blob([JSON.stringify(payload)]).size / 1024) * 10) / 10;
+      const serializeStartedAt = performance.now();
+      serializedPayload = JSON.stringify(payload);
+      addSaveTiming("autosaveSerializeMs", performance.now() - serializeStartedAt);
+      saveSizeKb = Math.round((new Blob([serializedPayload]).size / 1024) * 10) / 10;
       if (saveSizeKb > 2500) {
         console.warn(`[save] CRITICAL large save payload: ${saveSizeKb} KB`, {
           storageKey: this.currentSaveStorageKey(),
@@ -658,12 +678,42 @@ export const persistenceMethods = {
       console.warn("[save] Failed to measure save payload size", error);
     }
 
-    const saved = saveRepository.saveGameSync(this.currentSaveStorageKey(), payload);
+    const storageStartedAt = performance.now();
+    const saved = serializedPayload && typeof saveRepository.saveGameSerializedSync === "function"
+      ? saveRepository.saveGameSerializedSync(this.currentSaveStorageKey(), serializedPayload)
+      : saveRepository.saveGameSync(this.currentSaveStorageKey(), payload);
+    addSaveTiming("autosaveStorageWriteMs", performance.now() - storageStartedAt);
+    addSaveTiming("autosaveTotalMs", performance.now() - saveStartedAt);
     this.lastSaveInfo = {
       savedAt: payload.savedAt,
       sizeKb: saveSizeKb,
       status: saved ? "OK" : "failed",
+      reason: options?.reason ?? (force ? "force" : "manual"),
+      timings: { ...saveTimings },
     };
+    if (saved) {
+      this.saveDirty = false;
+      this.saveDirtyReasons = {};
+    }
+    this.warnPerformanceThreshold?.("autosaveTotalMs", saveTimings.autosaveTotalMs, 1.5, {
+      save: {
+        sizeKb: saveSizeKb,
+        reason: this.lastSaveInfo.reason,
+        status: this.lastSaveInfo.status,
+        timings: { ...saveTimings },
+      },
+      regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId ?? this.region?.id ?? null,
+      playerTile: {
+        x: Math.floor(Number(this.player?.x) || 0),
+        y: Math.floor(Number(this.player?.y) || 0),
+      },
+      counts: {
+        objects: this.renderDebugCounts?.objects ?? 0,
+        monsters: this.monsters?.size ?? 0,
+        loot: this.loots?.length ?? 0,
+        projectiles: this.projectiles?.length ?? 0,
+      },
+    });
     if (saved && this.onSave) {
       this.onSave(payload);
     }

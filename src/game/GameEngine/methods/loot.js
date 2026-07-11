@@ -44,6 +44,40 @@ import { worldEntryAllowed } from "../../world-state.js";
 
 const FOLIAGE_LOOT_INTERACT_RANGE = 0.78;
 
+function distanceSq(a, b) {
+  const dx = (Number(a?.x) || 0) - (Number(b?.x) || 0);
+  const dy = (Number(a?.y) || 0) - (Number(b?.y) || 0);
+  return dx * dx + dy * dy;
+}
+
+function addTiming(bucket, key, ms) {
+  if (!bucket) return;
+  bucket[key] = (bucket[key] ?? 0) + ms;
+}
+
+function addLootDropTiming(engine, key, ms) {
+  addTiming(engine?.lootUpdateTimings ?? null, key, ms);
+}
+
+function timedLootDrop(engine, key, action) {
+  const startedAt = performance.now();
+  const result = action();
+  addLootDropTiming(engine, key, performance.now() - startedAt);
+  return result;
+}
+
+function addInteractionTiming(engine, key, ms) {
+  if (!engine?.interactionTargetTimings) return;
+  engine.interactionTargetTimings[key] = (engine.interactionTargetTimings[key] ?? 0) + ms;
+}
+
+function addInteractionStateReason(engine, reason) {
+  if (!engine?.interactionTargetTimings) return;
+  const key = String(reason || "unknown");
+  const reasons = engine.interactionTargetTimings.interactionTargetStateReasons ??= {};
+  reasons[key] = (reasons[key] ?? 0) + 1;
+}
+
 function rollPotionIdByWeight(filter = null) {
   const entries = Object.values(POTION_DEFS)
     .filter((def) => def?.id && (!filter || filter(def)))
@@ -127,6 +161,49 @@ function weightedLootEntry(entries) {
     if (roll <= 0) return entry;
   }
   return weighted[weighted.length - 1] ?? null;
+}
+
+const LOOT_CONDITION_KEYS = new Set([
+  "all", "any", "not", "conditions", "requires", "blockedBy",
+  "worldBalanceLydra", "worldBalanceNetdra", "corruption", "visited", "cleared", "explored", "unlocked",
+  "flag", "notFlag", "counter", "quest", "questActive", "questCompleted", "questStep", "stepCompleted",
+  "questStepActive", "questStepCompleted", "questStepRevealed", "questCurrentStep", "inventory",
+  "cityStat", "cityArea", "cityAreas", "cityAreaLevel", "cityAreaLevels", "cityBuilding", "cityBuildings",
+  "cityAddon", "cityAddons", "cityStorage", "cityInventory", "player", "playerStat", "factions",
+  "factionRep", "speciesKills", "tagKills", "destroyedObjectTags", "rootRegionId", "rootMapId",
+  "rootMapInstanceId", "sourceRegionId", "sourceMapId", "sourceObjectId", "sourceObjectRuntimeId",
+  "subregionId", "subregionKind", "subregionDepth",
+]);
+
+function lootConditionKey(entry) {
+  return Object.keys(entry ?? {}).find((key) => LOOT_CONDITION_KEYS.has(key)) ?? null;
+}
+
+function lootEntryAllowed(engine, entry, context = {}) {
+  if (!entry) return false;
+  const conditionKey = lootConditionKey(entry);
+  // Most loot-table entries are unconditional.  Avoid normalizing the whole
+  // world state for those entries; it is both stable and implicitly allowed.
+  if (!conditionKey) return true;
+  const cache = context.conditionCache;
+  if (cache?.has(entry)) return cache.get(entry);
+  const startedAt = performance.now();
+  const allowed = worldEntryAllowed(entry, engine.worldState, context.conditionContext ?? context);
+  const elapsed = performance.now() - startedAt;
+  addLootDropTiming(engine, "lootConditionEvaluationMs", elapsed);
+  const timings = engine?.lootUpdateTimings;
+  if (timings) {
+    timings.lootEntriesEvaluated = (timings.lootEntriesEvaluated ?? 0) + 1;
+    if (elapsed > (timings.slowLootConditionMs ?? 0)) {
+      timings.slowLootConditionMs = elapsed;
+      timings.slowLootEntryId = String(entry.id ?? entry.itemId ?? entry.resourceId ?? entry.type ?? "unknown");
+      timings.slowLootConditionKey = conditionKey;
+    }
+    timings.conditionKey = conditionKey;
+    timings.conditionElapsedMs = elapsed;
+  }
+  cache?.set(entry, allowed);
+  return allowed;
 }
 
 function chanceValue(entry, fallback = 1) {
@@ -243,6 +320,11 @@ function questRequirementMatchesItem(requirement, item) {
 }
 
 function questPickupProgress(engine, item, pickedCount = 1) {
+  const startedAt = performance.now();
+  const finish = (value) => {
+    addTiming(engine?.lootUpdateTimings ?? null, "lootQuestTargetScanMs", performance.now() - startedAt);
+    return value;
+  };
   const inventory = engine?.player?.inventory ?? [];
   const picked = Math.max(1, Math.floor(Number(pickedCount) || 1));
   for (const quest of engine?.questState?.active ?? []) {
@@ -254,7 +336,7 @@ function questPickupProgress(engine, item, pickedCount = 1) {
       const needed = Math.max(1, Math.floor(Number(target.count) || 1));
       const rawCurrent = questItemCount(inventory, quest.id, target.questItemId);
       if (rawCurrent - picked >= needed) continue;
-      return `${item.name ?? target.questItemId}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+      return finish(`${item.name ?? target.questItemId}: ${Math.min(needed, rawCurrent)} / ${needed}`);
     }
 
     if (isResourceItem(item)) {
@@ -265,7 +347,7 @@ function questPickupProgress(engine, item, pickedCount = 1) {
       if (target) {
         const needed = Math.max(1, Math.floor(Number(target.count) || 1));
         const rawCurrent = resourceCount(inventory, resourceId);
-        if (rawCurrent - picked < needed) return `${RESOURCE_DEFS[resourceId]?.name ?? item.name ?? resourceId}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+        if (rawCurrent - picked < needed) return finish(`${RESOURCE_DEFS[resourceId]?.name ?? item.name ?? resourceId}: ${Math.min(needed, rawCurrent)} / ${needed}`);
       }
     }
 
@@ -273,10 +355,10 @@ function questPickupProgress(engine, item, pickedCount = 1) {
     if (itemTarget) {
       const needed = Math.max(1, Math.floor(Number(itemTarget.count) || 1));
       const rawCurrent = inventory.filter((entry) => questRequirementMatchesItem(itemTarget, entry)).length;
-      if (rawCurrent - 1 < needed) return `${item.name ?? itemTarget.templateId ?? itemTarget.baseName ?? "Quest item"}: ${Math.min(needed, rawCurrent)} / ${needed}`;
+      if (rawCurrent - 1 < needed) return finish(`${item.name ?? itemTarget.templateId ?? itemTarget.baseName ?? "Quest item"}: ${Math.min(needed, rawCurrent)} / ${needed}`);
     }
   }
-  return "";
+  return finish("");
 }
 
 function addPickupFloater(engine, x, y, item, pickedCount = 1) {
@@ -293,9 +375,13 @@ function addPickupFloater(engine, x, y, item, pickedCount = 1) {
   engine.addFloater(x, y, item.name, item.rarityColor, 1.05);
 }
 
+function addLootToast(engine, text, options = {}) {
+  engine.addToast(text, { deferSnapshot: true, ...options });
+}
+
 export const lootMethods = {
-  autoLootAllows(loot) {
-    const rules = normalizeAutoLootRules(this.player.autoLoot);
+  autoLootAllows(loot, normalizedRules = null) {
+    const rules = normalizedRules ?? normalizeAutoLootRules(this.player.autoLoot);
     const typeId = autoLootTypeFor(loot?.item, loot?.type);
     if (rules.types[typeId] === false) return false;
     const rarityId = autoLootRarityFor(loot?.item, loot?.type);
@@ -304,77 +390,121 @@ export const lootMethods = {
   },
 
   updateLoot(dt) {
+    const timings = this.lootUpdateTimings ??= {};
+    const timed = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      addTiming(timings, key, performance.now() - startedAt);
+      return result;
+    };
+    const timedMerge = (action) => {
+      const startedAt = performance.now();
+      const result = action();
+      const elapsed = performance.now() - startedAt;
+      addTiming(timings, "lootMergeMs", elapsed);
+      addTiming(timings, "lootInventoryMergeMs", elapsed);
+      return result;
+    };
+    const timedLootFloater = (action) => timed("lootFloaterMs", action);
+    const timedLootToast = (action) => timed("lootToastMs", action);
+    this.processPendingLootDrops?.();
     const beforeLootCount = this.loots.length;
+    const autoLootRules = normalizeAutoLootRules(this.player.autoLoot);
+    const pickupRangeSq = 0.62 * 0.62;
+    let shouldPublishSnapshot = false;
+    let pickedUpItems = 0;
     for (let i = this.loots.length - 1; i >= 0; i -= 1) {
       const loot = this.loots[i];
-      loot.bob += dt * 4.5;
-      if (Number.isFinite(Number(loot.despawn))) {
-        loot.despawn -= dt;
-        if (loot.despawn <= 0) {
-          this.handleLootDespawn(loot);
-          this.loots.splice(i, 1);
-          this.markRenderDirty?.("loot-remove");
-          continue;
+      const despawned = timed("lootRenderStateMs", () => {
+        loot.bob += dt * 4.5;
+        if (Number.isFinite(Number(loot.despawn))) {
+          loot.despawn -= dt;
+          if (loot.despawn <= 0) {
+            this.handleLootDespawn(loot);
+            this.loots.splice(i, 1);
+            this.markRenderDirty?.("loot-remove");
+            return true;
+          }
         }
-      }
-      loot.pickupDelay = Math.max(0, (loot.pickupDelay || 0) - dt);
+        loot.pickupDelay = Math.max(0, (loot.pickupDelay || 0) - dt);
+        return false;
+      });
+      if (despawned) continue;
       if (loot.pickupDelay > 0) continue;
-      if (!this.autoLootAllows(loot)) continue;
-      if (distance(this.player, loot) < 0.62) {
+      const canTryPickup = timed("lootHoverMs", () => this.autoLootAllows(loot, autoLootRules) && distanceSq(this.player, loot) < pickupRangeSq);
+      if (canTryPickup) {
         if (loot.type === "gold") {
-          this.player.gold += loot.amount;
-          this.recordRunGold?.(loot.amount);
-          this.player.stats.goldLooted += loot.amount;
-          this.player.stats.goldEarned += loot.amount;
-          this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657");
-          this.addToast(`+${loot.amount} guld`);
-          this.loots.splice(i, 1);
-          this.markRenderDirty?.("loot-pickup");
-        } else if (isPotionItem(loot.item)) {
-          const before = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? 0;
-          if (this.addPotionLoot(loot.item)) {
-            const after = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? before + 1;
-            const picked = Math.max(1, after - before);
-            this.trackItemPicked(loot.item);
-            this.recordRunItem?.(loot.item, picked);
-            addPickupFloater(this, loot.x, loot.y, loot.item, picked);
-            this.addToast(pickupStatusText(loot.item, picked));
+          timed("lootPickupMs", () => {
+            this.player.gold += loot.amount;
+            this.recordRunGold?.(loot.amount);
+            this.player.stats.goldLooted += loot.amount;
+            this.player.stats.goldEarned += loot.amount;
+            timedLootFloater(() => this.addFloater(loot.x, loot.y, `+${loot.amount} g`, "#f1c657"));
+            timedLootToast(() => addLootToast(this, `+${loot.amount} guld`));
             this.loots.splice(i, 1);
             this.markRenderDirty?.("loot-pickup");
-            this.publishSnapshot();
+            pickedUpItems += 1;
+            shouldPublishSnapshot = true;
+          });
+        } else if (isPotionItem(loot.item)) {
+          const before = timedMerge(() => this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? 0);
+          if (timedMerge(() => this.addPotionLoot(loot.item))) {
+            const after = this.potionInventoryCount?.(loot.item.potionId ?? loot.item.potionType) ?? before + 1;
+            const picked = Math.max(1, after - before);
+            timed("lootPickupMs", () => {
+              this.trackItemPicked(loot.item);
+              this.recordRunItem?.(loot.item, picked);
+              timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, picked));
+              timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, picked)));
+              this.loots.splice(i, 1);
+              this.markRenderDirty?.("loot-pickup");
+              pickedUpItems += picked;
+            });
+            shouldPublishSnapshot = true;
           } else if (!loot.warned) {
             loot.warned = true;
-            this.addToast("Potion stack er fuld");
+            timedLootToast(() => addLootToast(this, "Potion stack er fuld"));
           }
-        } else if (isQuestItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
-          this.player.stats.itemsPicked += 1;
-          this.trackItemPicked(loot.item);
-          this.recordRunItem?.(loot.item, 1);
-          this.applyQuestItemPickup(loot.item);
-          addPickupFloater(this, loot.x, loot.y, loot.item, 1);
-          this.addToast(pickupStatusText(loot.item, 1));
-          this.loots.splice(i, 1);
-          this.markRenderDirty?.("loot-pickup");
-          this.publishSnapshot();
-        } else if (!isPotionItem(loot.item) && this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) })) {
-          const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
-          this.recordRunItem?.(loot.item, picked);
-          if (isResourceItem(loot.item)) this.player.stats.resourcesPicked += picked;
-          else {
+        } else if (isQuestItem(loot.item) && timedMerge(() => this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) }))) {
+          timed("lootPickupMs", () => {
             this.player.stats.itemsPicked += 1;
             this.trackItemPicked(loot.item);
-          }
-          addPickupFloater(this, loot.x, loot.y, loot.item, picked);
-          this.addToast(pickupStatusText(loot.item, picked));
-          this.loots.splice(i, 1);
-          this.markRenderDirty?.("loot-pickup");
-          this.publishSnapshot();
+            this.recordRunItem?.(loot.item, 1);
+            this.applyQuestItemPickup(loot.item);
+            timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, 1));
+            timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, 1)));
+            this.loots.splice(i, 1);
+            this.markRenderDirty?.("loot-pickup");
+            pickedUpItems += 1;
+          });
+          shouldPublishSnapshot = true;
+        } else if (!isPotionItem(loot.item) && timedMerge(() => this.addInventoryItem(loot.item, { countAsCollected: Boolean(loot.countAsCollected) }))) {
+          const picked = isResourceItem(loot.item) ? Math.max(1, Math.floor(Number(loot.item.count) || 1)) : 1;
+          timed("lootPickupMs", () => {
+            this.recordRunItem?.(loot.item, picked);
+            if (isResourceItem(loot.item)) this.player.stats.resourcesPicked += picked;
+            else {
+              this.player.stats.itemsPicked += 1;
+              this.trackItemPicked(loot.item);
+            }
+            timedLootFloater(() => addPickupFloater(this, loot.x, loot.y, loot.item, picked));
+            timedLootToast(() => addLootToast(this, pickupStatusText(loot.item, picked)));
+            this.loots.splice(i, 1);
+            this.markRenderDirty?.("loot-pickup");
+            pickedUpItems += picked;
+          });
+          shouldPublishSnapshot = true;
         } else if (!loot.warned) {
           loot.warned = true;
-          this.addToast(isPotionItem(loot.item) ? "Potion stack er fuld" : "Rygsaekken er fuld");
+          timedLootToast(() => addLootToast(this, isPotionItem(loot.item) ? "Potion stack er fuld" : "Rygsaekken er fuld"));
         }
       }
     }
+    timings.pickedUpItems = (timings.pickedUpItems ?? 0) + pickedUpItems;
+    if (shouldPublishSnapshot) timed("lootSnapshotMs", () => {
+      this.markSaveDirty?.("loot-pickup");
+      this.scheduleSnapshotPublish?.("loot-pickup");
+    });
     if (beforeLootCount !== this.loots.length) this.markRenderDirty?.("loot");
   },
 
@@ -382,9 +512,12 @@ export const lootMethods = {
     const target = this.nearestLootableFoliage(FOLIAGE_LOOT_INTERACT_RANGE);
     const next = target ? this.foliageLootSnapshot(target) : null;
     if ((next?.id ?? null) === (this.nearbyFoliageLoot?.id ?? null)) return;
+    const stateStartedAt = performance.now();
     this.nearbyFoliageLoot = next;
     this.markRenderDirty?.("foliage-target");
-    this.publishSnapshot();
+    addInteractionStateReason(this, "foliage-target");
+    this.markUiOnlySnapshot?.("foliage-target");
+    addInteractionTiming(this, "interactionTargetStateUpdateMs", performance.now() - stateStartedAt);
   },
 
   nearestLootableFoliage(maxRange) {
@@ -392,13 +525,21 @@ export const lootMethods = {
     let bestD = maxRange;
     for (const chunk of this.nearbyChunks(1)) {
       for (const object of chunk.objects) {
-        if (object.type !== "foliage" || object.foliageLooted) continue;
-        if (!this.availableFoliageResourceDrops(object).length) continue;
-        const d = distance(this.player, object);
-        if (d < bestD) {
-          best = object;
-          bestD = d;
+        const collectStartedAt = performance.now();
+        const valid = object?.type === "foliage" && !object.foliageLooted;
+        addInteractionTiming(this, "interactionTargetCollectLootMs", performance.now() - collectStartedAt);
+        if (!valid) continue;
+        const distanceStartedAt = performance.now();
+        if (distanceSq(this.player, object) > maxRange * maxRange) {
+          addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+          continue;
         }
+        const d = distance(this.player, object);
+        addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+        if (d >= bestD) continue;
+        if (!this.availableFoliageResourceDrops(object).length) continue;
+        best = object;
+        bestD = d;
       }
     }
     return best;
@@ -542,7 +683,8 @@ export const lootMethods = {
 
   dropGroundItem(x, y, item, options = {}) {
     if (!item || this.isDropBlocked(item)) return false;
-    this.loots.push({
+    const startedAt = performance.now();
+    const loot = timedLootDrop(this, "lootObjectCreationMs", () => ({
       id: createId(),
       type: "item",
       item,
@@ -552,9 +694,12 @@ export const lootMethods = {
       bob: Math.random() * Math.PI * 2,
       pickupDelay: options.pickupDelay ?? 0,
       despawn: options.despawn ?? GROUND_LOOT_DESPAWN_SECONDS,
-    });
+    }));
+    timedLootDrop(this, "lootPlacementMs", () => this.loots.push(loot));
+    this.lootUpdateTimings.lootObjectsCreated = (this.lootUpdateTimings.lootObjectsCreated ?? 0) + 1;
     this.trackItemDropped(item);
-    this.markRenderDirty?.("loot-drop");
+    timedLootDrop(this, "lootDirtyMarkMs", () => this.markRenderDirty?.("loot-drop"));
+    addTiming(this.lootUpdateTimings ??= {}, "lootDropCreationMs", performance.now() - startedAt);
     return true;
   },
 
@@ -584,41 +729,41 @@ export const lootMethods = {
     if (type === "named") {
       const id = entry.itemId ?? entry.id;
       if (id) {
-        const definition = NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(id));
+        const definition = timedLootDrop(this, "lootNamedCheckMs", () => NAMED_ITEM_TEMPLATES.find((candidate) => String(candidate.id) === String(id)));
         if (!definition) return null;
-        if (!worldEntryAllowed(definition, this.worldState, context.conditionContext ?? {})) return null;
+        if (!lootEntryAllowed(this, definition, context)) return null;
         return makeNamedItem(definition, level);
       }
       const monster = context.monster;
       const chanceMult = entry.chanceMult === "monster"
         ? namedItemChanceMultiplier(monster) * (1 + (this.calcStats().magicFind ?? 0))
         : Number(entry.chanceMult ?? 1) * (1 + (entry.magicFind ? this.calcStats().magicFind ?? 0 : 0));
-      return rollNamedItem(level, {
+      return timedLootDrop(this, "lootNamedCheckMs", () => rollNamedItem(level, {
         source: monster?.isBoss ? "boss" : entry.source ?? context.source ?? "monster",
         biomeId: this.region.mapRegion?.id,
         chanceMult,
         worldState: this.worldState,
         conditionContext: context.conditionContext ?? {},
-      });
+      }));
     }
     if (type === "unique") {
       const id = entry.itemId ?? entry.id;
       if (id) {
-        const definition = UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(id));
+        const definition = timedLootDrop(this, "lootUniqueCheckMs", () => UNIQUE_ITEMS.find((candidate) => String(candidate.id) === String(id)));
         if (!definition) return null;
-        if (!worldEntryAllowed(definition, this.worldState, context.conditionContext ?? {})) return null;
+        if (!lootEntryAllowed(this, definition, context)) return null;
         return makeUniqueItem(definition, level);
       }
       const monster = context.monster;
       const baseChance = Number(entry.chance ?? UNIQUE_DROP_CHANCES.monster) || 0;
       const chance = baseChance * (1 + (entry.magicFind ? this.calcStats().magicFind ?? 0 : 0));
-      return rollUniqueItem(level, {
+      return timedLootDrop(this, "lootUniqueCheckMs", () => rollUniqueItem(level, {
         source: monster?.isBoss ? "boss" : entry.source ?? context.source ?? "monster",
         biomeId: this.region.mapRegion?.id,
         chance,
         worldState: this.worldState,
         conditionContext: context.conditionContext ?? {},
-      });
+      }));
     }
     if (type === "equipment") {
       const category = String(entry.category ?? "all");
@@ -639,8 +784,8 @@ export const lootMethods = {
   lootEntryChance(entry, context = {}) {
     const type = String(entry?.type ?? "").trim();
     let chance = chanceValue(entry, entry?.weight !== undefined ? 1 : 1);
-    const stats = this.calcStats();
-    const cityModifiers = cityRuntimeModifiers(this.cityStats);
+    const stats = context.lootStats ?? (context.lootStats = this.calcStats());
+    const cityModifiers = context.lootCityModifiers ?? (context.lootCityModifiers = cityRuntimeModifiers(this.cityStats));
     if (type === "resource") {
       const resourceId = entry.id ?? entry.resourceId ?? entry.resource;
       chance *= (1 + (stats.resourceFind ?? 0)) * (cityModifiers.resourceDropMultiplierById?.[resourceId] ?? 1);
@@ -653,37 +798,66 @@ export const lootMethods = {
   },
 
   rollLootEntry(entry, context = {}) {
-    if (!entry || !worldEntryAllowed(entry, this.worldState, context.conditionContext ?? context)) return [];
+    const startedAt = performance.now();
+    const finish = (drops) => {
+      const timings = this.lootUpdateTimings;
+      if (timings) {
+        timings.entryId = String(entry?.id ?? entry?.itemId ?? entry?.resourceId ?? entry?.type ?? "unknown");
+        timings.entryElapsedMs = performance.now() - startedAt;
+        timings.entriesEvaluatedThisFrame = (timings.entriesEvaluatedThisFrame ?? 0) + 1;
+        if (timings.entryElapsedMs > 0.5) console.warn("[performance] slow loot entry", { entryId: timings.entryId, elapsed: timings.entryElapsedMs, tableId: timings.lootTableId ?? null });
+      }
+      return drops;
+    };
+    if (!lootEntryAllowed(this, entry, context)) return finish([]);
     const type = String(entry.type ?? "").trim();
     if (type === "gold") {
-      if (Math.random() > this.lootEntryChance(entry, context)) return [];
+      if (Math.random() > this.lootEntryChance(entry, context)) return finish([]);
       const source = context.sourceEntity ?? context.monster ?? this.player;
       const level = Math.max(1, Math.floor(Number(source?.lootLevel ?? source?.level ?? this.player?.level) || 1));
-      const cityModifiers = cityRuntimeModifiers(this.cityStats);
-      const stats = this.calcStats();
+      const cityModifiers = context.lootCityModifiers ?? (context.lootCityModifiers = cityRuntimeModifiers(this.cityStats));
+      const stats = context.lootStats ?? (context.lootStats = this.calcStats());
       const gold = Math.floor((4 + Math.random() * 9) * (1 + level * 0.28) * Number(entry.goldMult ?? 1) * (1 + stats.goldFind) * (cityModifiers.goldDropMultiplier ?? 1));
-      return gold > 0 ? [{ type: "gold", amount: gold }] : [];
+      return finish(gold > 0 ? [{ type: "gold", amount: gold }] : []);
     }
     const rollsInternally = (type === "unique" || type === "named") && !(entry.itemId ?? entry.id);
-    if (!rollsInternally && Math.random() > this.lootEntryChance(entry, context)) return [];
-    const item = this.createLootEntryItem(entry, context);
-    if (!item || this.isDropBlocked(item)) return [];
-    return [{ type: "item", item, countAsCollected: type === "resource" || Boolean(entry.countAsCollected) }];
+    if (!rollsInternally && Math.random() > this.lootEntryChance(entry, context)) return finish([]);
+    const item = timedLootDrop(this, "lootObjectCreationMs", () => this.createLootEntryItem(entry, context));
+    if (!item || this.isDropBlocked(item)) return finish([]);
+    return finish([{ type: "item", item, countAsCollected: type === "resource" || Boolean(entry.countAsCollected) }]);
   },
 
   rollLootTable(tableId, context = {}) {
-    const entries = LOOT_TABLES[String(tableId)] ?? [];
-    if (!Array.isArray(entries) || !entries.length) return [];
-    const drops = [];
-    for (const entry of entries.filter((candidate) => !candidate?.weight)) {
-      drops.push(...this.rollLootEntry(entry, context));
-    }
-    const weighted = weightedLootEntry(entries);
-    if (weighted && !this.isDropCategoryBlocked(weighted.category)) {
-      drops.push(...this.rollLootEntry(weighted, context));
-      if (weighted.category === "all" && context.monster && Math.random() < clamp(0.08 + context.monster.level * 0.01, 0.08, 0.24)) {
-        drops.push(...this.rollLootEntry({ type: "potionPool", category: "all", chance: 1 }, context));
+    const startedAt = performance.now();
+    if (this.lootUpdateTimings) this.lootUpdateTimings.lootTableId = String(tableId);
+    const drops = timedLootDrop(this, "lootTableRollMs", () => {
+      const entries = LOOT_TABLES[String(tableId)] ?? [];
+      if (!Array.isArray(entries) || !entries.length) return [];
+      const drops = [];
+      for (const entry of entries) {
+        if (entry?.weight) continue;
+        drops.push(...this.rollLootEntry(entry, context));
       }
+      const weighted = weightedLootEntry(entries);
+      if (weighted && !this.isDropCategoryBlocked(weighted.category)) {
+        drops.push(...this.rollLootEntry(weighted, context));
+        if (weighted.category === "all" && context.monster && Math.random() < clamp(0.08 + context.monster.level * 0.01, 0.08, 0.24)) {
+          drops.push(...this.rollLootEntry({ type: "potionPool", category: "all", chance: 1 }, context));
+        }
+      }
+      return drops;
+    });
+    const timings = this.lootUpdateTimings;
+    if (timings) {
+      timings.lootTablesRolled = (timings.lootTablesRolled ?? 0) + 1;
+      const elapsed = performance.now() - startedAt;
+      if (elapsed > (timings.slowLootTableMs ?? 0)) {
+        timings.slowLootTableMs = elapsed;
+        timings.slowLootTableId = String(tableId);
+      }
+      timings.lootTableId = String(tableId);
+      timings.tableElapsedMs = elapsed;
+      if (elapsed > 1) console.warn("[performance] slow loot table", { tableId, elapsed, jobId: context.lootJobId ?? null });
     }
     return drops;
   },
@@ -693,10 +867,11 @@ export const lootMethods = {
   },
 
   dropLootFromTables(x, y, tableIds = [], context = {}, options = {}) {
+    const startedAt = performance.now();
     const drops = this.rollLootTables(tableIds, context);
     for (const drop of drops) {
       if (drop.type === "gold") {
-        this.loots.push({
+        const loot = timedLootDrop(this, "lootObjectCreationMs", () => ({
           id: createId(),
           type: "gold",
           amount: drop.amount,
@@ -704,12 +879,15 @@ export const lootMethods = {
           y: y + (Math.random() - 0.5) * (options.spread ?? 0.5),
           bob: Math.random() * Math.PI * 2,
           despawn: GROUND_LOOT_DESPAWN_SECONDS,
-        });
-        this.markRenderDirty?.("loot-drop");
+        }));
+        timedLootDrop(this, "lootPlacementMs", () => this.loots.push(loot));
+        this.lootUpdateTimings.lootObjectsCreated = (this.lootUpdateTimings.lootObjectsCreated ?? 0) + 1;
+        timedLootDrop(this, "lootDirtyMarkMs", () => this.markRenderDirty?.("loot-drop"));
       } else if (drop.item) {
         this.dropGroundItem(x, y, drop.item, { spread: options.spread ?? 0.7, pickupDelay: options.pickupDelay ?? 0.35, countAsCollected: drop.countAsCollected });
       }
     }
+    addTiming(this.lootUpdateTimings ??= {}, "lootDropCreationMs", performance.now() - startedAt);
     return drops;
   },
 
@@ -725,9 +903,14 @@ export const lootMethods = {
   },
 
   dropLoot(monster) {
+    if (monster && this.enqueueMonsterLootDrop?.(monster)) return;
+    this.dropMonsterLootNow(monster);
+  },
+
+  dropMonsterLootNow(monster) {
     const rareMode = monster?.lootMode === "override" ? "override" : "add";
     if (rareMode !== "override") {
-      this.dropQuestLoot(monster);
+      timedLootDrop(this, "lootQuestDropCheckMs", () => this.dropQuestLoot(monster));
       this.dropLootFromTables(monster.x, monster.y, normalizeLootTableRefs(monster), {
         source: "monster",
         monster,
@@ -737,6 +920,158 @@ export const lootMethods = {
     }
 
     this.dropInstanceLootTables(monster);
+  },
+
+  enqueueMonsterLootDrop(monster) {
+    if (!monster || monster.__lootDropQueued) {
+      if (monster?.__lootDropQueued && this.monsterDeathTimings) {
+        this.monsterDeathTimings.duplicateLootJobsPrevented = (this.monsterDeathTimings.duplicateLootJobsPrevented ?? 0) + 1;
+      }
+      return false;
+    }
+    const deathTimings = this.activeMonsterDeathTimings;
+    const preparationStartedAt = deathTimings ? performance.now() : 0;
+    monster.__lootDropQueued = true;
+    this.pendingLootDrops ??= [];
+    const nextJobId = () => `loot-${(this.nextLootDropJobId = (this.nextLootDropJobId ?? 0) + 1)}`;
+    // Do not resolve tables or create an expensive condition context here.  The
+    // job captures stable death inputs and lets the resumable processor create
+    // its working context in the following frame.
+    const normalTables = normalizeLootTableRefs(monster);
+    const instanceTables = normalizeLootTableRefs({ lootTables: monster?.instanceLootTables });
+    const enqueueGeneration = this.lootProcessingGeneration ?? 0;
+    const deathSource = this.activeMonsterDeathSource ?? {};
+    const deathSnapshot = Object.freeze({
+      monsterId: monster.id ?? null,
+      monsterType: monster.typeName ?? null,
+      monsterLevel: Math.max(0, Math.floor(Number(monster.lootLevel ?? monster.level) || 0)),
+      regionId: this.region?.mapRegion?.id ?? null,
+      subregionId: this.activeSubregion?.id ?? null,
+      x: Number(monster.x) || 0,
+      y: Number(monster.y) || 0,
+      isRare: Boolean(monster.elite), isNamed: Boolean(monster.named), isBoss: Boolean(monster.isBoss || monster.boss),
+      deathSourceType: deathSource.type ?? null, deathSourceId: deathSource.id ?? null,
+      deathSourceSpellId: deathSource.spellId ?? null,
+    });
+    const jobBase = (source) => ({
+      monster,
+      source,
+      deathSourceType: deathSource.type ?? null,
+      deathSnapshot,
+      enqueueGeneration,
+      eligibleGeneration: enqueueGeneration + 1,
+      enqueuedFrame: enqueueGeneration,
+    });
+    const queueJob = (job) => {
+      const descriptor = Object.freeze({
+        ...job,
+        tableIds: job.tableIds ? Object.freeze([...job.tableIds]) : undefined,
+      });
+      this.pendingLootDrops.push(descriptor);
+      this.lootJobsQueuedThisFrame = (this.lootJobsQueuedThisFrame ?? 0) + 1;
+      const lootTimings = this.lootUpdateTimings;
+      if (lootTimings) {
+        lootTimings.lootJobsQueuedThisFrame = (lootTimings.lootJobsQueuedThisFrame ?? 0) + 1;
+        const sourceType = descriptor.deathSourceType;
+        if (sourceType === "groundHazard") lootTimings.lootQueuedFromGroundHazardDeath += 1;
+        else if (sourceType === "projectile") lootTimings.lootQueuedFromProjectileDeath += 1;
+        else if (sourceType === "melee") lootTimings.lootQueuedFromMeleeDeath += 1;
+        else lootTimings.lootQueuedFromMonsterDeath += 1;
+      }
+    };
+    const rareMode = monster?.lootMode === "override" ? "override" : "add";
+    if (rareMode !== "override") {
+      queueJob({
+        id: nextJobId(),
+        type: "quest",
+        x: monster.x,
+        y: monster.y,
+        ...jobBase("monster"),
+      });
+      for (const tableId of normalTables) {
+        queueJob({
+          id: nextJobId(),
+          type: "table",
+          x: monster.x,
+          y: monster.y,
+          tableIds: [tableId],
+          ...jobBase("monster"),
+        });
+      }
+    }
+    for (const tableId of instanceTables) {
+      queueJob({
+        id: nextJobId(),
+        type: "table",
+        x: monster.x,
+        y: monster.y,
+        tableIds: [tableId],
+        ...jobBase("rare_mob"),
+      });
+    }
+    if (deathTimings) {
+      deathTimings.monsterDeathLootPreparationMs = (deathTimings.monsterDeathLootPreparationMs ?? 0) + (performance.now() - preparationStartedAt);
+    }
+    return true;
+  },
+
+  processPendingLootDrops(maxMs = 2) {
+    const queue = this.pendingLootDrops;
+    if (!Array.isArray(queue) || queue.length <= 0) return;
+    this.lootUpdateTimings ??= {};
+    const startedAt = performance.now();
+    let processed = 0;
+    const generation = this.lootProcessingGeneration ?? 0;
+    const firstEligible = (queue[0]?.eligibleGeneration ?? generation) <= generation ? queue[0] : null;
+    this.lootUpdateTimings.lootJobsEligibleThisFrame = this.lootJobsEligibleThisFrame ?? 0;
+    this.lootUpdateTimings.lootJobsDeferredBecauseNew = this.lootJobsQueuedThisFrame ?? 0;
+    this.lootUpdateTimings.lootOldestEligibleJobAgeFrames = firstEligible
+      ? Math.max(0, generation - (firstEligible.enqueuedFrame ?? generation)) : 0;
+    this.lootUpdateTimings.lootProcessingGeneration = generation;
+    if (!firstEligible) return;
+    while (queue.length > 0 && performance.now() - startedAt < maxMs) {
+      if ((queue[0]?.eligibleGeneration ?? generation) > generation) break;
+      const job = queue.shift();
+      this.lootJobsEligibleThisFrame = Math.max(0, (this.lootJobsEligibleThisFrame ?? 0) - 1);
+      const jobStartedAt = performance.now();
+      this.lootUpdateTimings.currentLootJobId = job?.id ?? null;
+      this.lootUpdateTimings.sourceType = job?.context?.source ?? job?.type ?? null;
+      this.lootUpdateTimings.sourceId = job?.monster?.id ?? job?.context?.monster?.id ?? null;
+      this.lootUpdateTimings.jobStage = job?.type ?? "unknown";
+      if (job?.type === "quest") {
+        timedLootDrop(this, "lootQuestDropCheckMs", () => this.dropQuestLoot(job.monster));
+      } else if (job?.type === "table") {
+        const context = typeof job.contextFactory === "function" ? job.contextFactory() : (job.context ?? {
+          monster: job.monster,
+          sourceEntity: job.monster,
+          source: job.source ?? "monster",
+          conditionContext: this.questConditionContext?.({
+            monster: job.monster,
+            source: job.source === "monster" && job.monster?.isBoss ? "boss" : job.source,
+            sourceRegionId: this.region?.mapRegion?.id,
+          }) ?? {},
+          conditionCache: new Map(),
+          lootStats: this.calcStats(),
+          lootCityModifiers: cityRuntimeModifiers(this.cityStats),
+        });
+        if (context) context.lootJobId = job.id;
+        this.dropLootFromTables(job.x, job.y, job.tableIds, context, job.options ?? {});
+      }
+      processed += 1;
+      if (performance.now() - startedAt >= maxMs || performance.now() - jobStartedAt >= maxMs) break;
+    }
+    this.lootUpdateTimings.lootQueuedJobsProcessed = (this.lootUpdateTimings.lootQueuedJobsProcessed ?? 0) + processed;
+    this.lootUpdateTimings.lootDropJobsQueued = queue.length + processed;
+    this.lootUpdateTimings.lootDropJobsDeferred = queue.length;
+    this.lootUpdateTimings.lootDropBudgetMs = maxMs;
+    const elapsed = performance.now() - startedAt;
+    this.lootUpdateTimings.frameLootElapsedMs = elapsed;
+    this.lootUpdateTimings.jobElapsedTotalMs = elapsed;
+    this.lootUpdateTimings.lootDropBudgetHit = elapsed >= maxMs;
+    this.lootUpdateTimings.deferredBecauseBudget = this.lootUpdateTimings.lootDropBudgetHit && queue.length > 0;
+    if (elapsed > maxMs) console.warn("[performance] loot drop frame budget exceeded", {
+      elapsed, maxMs, processed, deferred: queue.length, jobId: this.lootUpdateTimings.currentLootJobId,
+    });
   },
 
   isDropRestricted(item) {

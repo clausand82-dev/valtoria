@@ -85,7 +85,7 @@ function summarizeSamples(samples) {
   const durationSeconds = round(Math.max(0, (last.elapsedMs - first.elapsedMs) / 1000), 1);
   const profileIds = [...new Set(samples.map((sample) => sample.profileId ?? "unknown"))];
   const worstSample = [...samples].sort((a, b) => (
-    (Number(b.render?.totalMs) || 0) - (Number(a.render?.totalMs) || 0)
+    Math.max(Number(b.render?.totalMs) || 0, Number(b.update?.totalMs) || 0) - Math.max(Number(a.render?.totalMs) || 0, Number(a.update?.totalMs) || 0)
     || (Number(a.renderFps) || 0) - (Number(b.renderFps) || 0)
   ))[0];
   return {
@@ -94,10 +94,77 @@ function summarizeSamples(samples) {
     durationSeconds,
     sampleCount: samples.length,
     avgUpdateFps: average(samples, (sample) => sample.updateFps),
+    medianUpdateFps: percentileValue(samples, (sample) => sample.updateFps, 0.5),
+    minUpdateFps: minValue(samples, (sample) => sample.updateFps),
     avgRenderFps: average(samples, (sample) => sample.renderFps),
     medianRenderFps: percentileValue(samples, (sample) => sample.renderFps, 0.5),
     minRenderFps: minValue(samples, (sample) => sample.renderFps),
     maxRenderFps: maxValue(samples, (sample) => sample.renderFps),
+    avgUpdateTotalMs: average(samples, (sample) => sample.update?.totalMs),
+    maxUpdateTotalMs: maxValue(samples, (sample) => sample.update?.totalMs),
+    avgUpdatePlayerMs: average(samples, (sample) => sample.update?.playerMs),
+    avgUpdateCameraMs: average(samples, (sample) => sample.update?.cameraMs),
+    avgUpdateMonstersMs: average(samples, (sample) => sample.update?.monstersMs),
+    avgUpdateProjectilesMs: average(samples, (sample) => sample.update?.projectilesMs),
+    avgProjectileMovementMs: average(samples, (sample) => sample.update?.projectiles?.projectileMovementMs),
+    avgProjectileCollisionMonstersMs: average(samples, (sample) => sample.update?.projectiles?.projectileCollisionMonstersMs),
+    avgProjectileCollisionObjectsMs: average(samples, (sample) => sample.update?.projectiles?.projectileCollisionObjectsMs),
+    avgProjectileCollisionTerrainMs: average(samples, (sample) => sample.update?.projectiles?.projectileCollisionTerrainMs),
+    avgProjectileRemovalMs: average(samples, (sample) => sample.update?.projectiles?.projectileRemovalMs),
+    avgProjectileSpawnMs: average(samples, (sample) => sample.update?.projectiles?.projectileSpawnMs),
+    avgProjectileImpactMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactMs),
+    avgProjectileImpactDamageMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactDamageMs),
+    avgProjectileImpactKillMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactKillMs),
+    avgProjectileImpactSpawnEffectsMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactSpawnEffectsMs),
+    avgProjectileImpactHazardSpawnMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactHazardSpawnMs),
+    avgProjectileImpactLootDropMs: average(samples, (sample) => sample.update?.projectiles?.projectileImpactLootDropMs),
+    avgUpdateGroundHazardsMs: average(samples, (sample) => sample.update?.groundHazardsMs),
+    avgUpdateSpellEffectsMs: average(samples, (sample) => sample.update?.spellEffectsMs),
+    avgUpdateParticlesFloatersMs: average(samples, (sample) => sample.update?.particlesFloatersMs),
+    avgUpdateLootMs: average(samples, (sample) => sample.update?.lootMs),
+    avgLootHoverMs: average(samples, (sample) => sample.update?.loot?.lootHoverMs),
+    avgLootPickupMs: average(samples, (sample) => sample.update?.loot?.lootPickupMs),
+    avgLootMergeMs: average(samples, (sample) => sample.update?.loot?.lootMergeMs),
+    avgLootInventoryMergeMs: average(samples, (sample) => sample.update?.loot?.lootInventoryMergeMs),
+    avgLootQuestTargetScanMs: average(samples, (sample) => sample.update?.loot?.lootQuestTargetScanMs),
+    avgLootDropCreationMs: average(samples, (sample) => sample.update?.loot?.lootDropCreationMs),
+    avgLootRenderStateMs: average(samples, (sample) => sample.update?.loot?.lootRenderStateMs),
+    avgLootFloaterMs: average(samples, (sample) => sample.update?.loot?.lootFloaterMs),
+    avgLootToastMs: average(samples, (sample) => sample.update?.loot?.lootToastMs),
+    avgLootSnapshotMs: average(samples, (sample) => sample.update?.loot?.lootSnapshotMs),
+    avgLootTableRollMs: average(samples, (sample) => sample.update?.loot?.lootTableRollMs),
+    avgLootConditionEvaluationMs: average(samples, (sample) => sample.update?.loot?.lootConditionEvaluationMs),
+    avgLootUniqueCheckMs: average(samples, (sample) => sample.update?.loot?.lootUniqueCheckMs),
+    avgLootNamedCheckMs: average(samples, (sample) => sample.update?.loot?.lootNamedCheckMs),
+    avgLootQuestDropCheckMs: average(samples, (sample) => sample.update?.loot?.lootQuestDropCheckMs),
+    avgLootObjectCreationMs: average(samples, (sample) => sample.update?.loot?.lootObjectCreationMs),
+    avgLootPlacementMs: average(samples, (sample) => sample.update?.loot?.lootPlacementMs),
+    avgLootDirtyMarkMs: average(samples, (sample) => sample.update?.loot?.lootDirtyMarkMs),
+    avgLootToastOrFloaterMs: average(samples, (sample) => sample.update?.loot?.lootToastOrFloaterMs),
+    avgLootSaveDirtyMs: average(samples, (sample) => sample.update?.loot?.lootSaveDirtyMs),
+    avgUpdateCleanupMs: average(samples, (sample) => sample.update?.cleanupMs),
+    avgCleanupEffectArraysMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupEffectArraysMs),
+    avgCleanupProjectileArraysMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupProjectileArraysMs),
+    avgCleanupFloatersMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupFloatersMs),
+    avgCleanupParticlesMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupParticlesMs),
+    avgCleanupWorldMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupWorldMs),
+    avgCleanupInteractionTargetsMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupInteractionTargetsMs),
+    avgInteractionTargetCollectObjectsMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetCollectObjectsMs),
+    avgInteractionTargetCollectLootMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetCollectLootMs),
+    avgInteractionTargetCollectMonstersMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetCollectMonstersMs),
+    avgInteractionTargetCollectNpcsMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetCollectNpcsMs),
+    avgInteractionTargetDistanceChecksMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetDistanceChecksMs),
+    avgInteractionTargetSortMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetSortMs),
+    avgInteractionTargetStateUpdateMs: average(samples, (sample) => sample.update?.cleanupDetails?.interactionTargets?.interactionTargetStateUpdateMs),
+    avgCleanupRegionExitMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupRegionExitMs),
+    avgCleanupAutosaveSnapshotMs: average(samples, (sample) => sample.update?.cleanupDetails?.cleanupAutosaveSnapshotMs),
+    avgAutosaveShouldRunMs: average(samples, (sample) => sample.update?.cleanupDetails?.autosave?.autosaveShouldRunMs),
+    avgAutosaveSnapshotBuildMs: average(samples, (sample) => sample.snapshot?.timings?.autosaveSnapshotBuildMs ?? sample.update?.cleanupDetails?.autosave?.autosaveSnapshotBuildMs),
+    avgAutosaveCloneMs: average(samples, (sample) => sample.update?.cleanupDetails?.autosave?.autosaveCloneMs),
+    avgAutosaveSerializeMs: average(samples, (sample) => sample.update?.cleanupDetails?.autosave?.autosaveSerializeMs),
+    avgAutosaveStorageWriteMs: average(samples, (sample) => sample.update?.cleanupDetails?.autosave?.autosaveStorageWriteMs),
+    avgAutosaveTotalMs: average(samples, (sample) => sample.update?.cleanupDetails?.autosave?.autosaveTotalMs),
+    avgUpdateMinimapFogMs: average(samples, (sample) => sample.update?.minimapFogMs),
     avgRenderTotalMs: average(samples, (sample) => sample.render?.totalMs),
     maxRenderTotalMs: maxValue(samples, (sample) => sample.render?.totalMs),
     avgFogMs: average(samples, (sample) => sample.render?.fogMs),
@@ -122,6 +189,12 @@ function summarizeSamples(samples) {
     worstSample: worstSample ? {
       timestamp: worstSample.timestamp,
       elapsedMs: worstSample.elapsedMs,
+      updateTotalMs: worstSample.update?.totalMs ?? null,
+      updateWorstCategory: worstSample.update?.worstCategory ?? null,
+      updateWorstCategoryMs: worstSample.update?.worstCategoryMs ?? null,
+      updateProjectiles: worstSample.update?.projectiles ?? null,
+      updateLoot: worstSample.update?.loot ?? null,
+      updateCleanupDetails: worstSample.update?.cleanupDetails ?? null,
       renderTotalMs: worstSample.render?.totalMs ?? null,
       renderFps: worstSample.renderFps,
       activityLevel: worstSample.activityLevel,
@@ -152,12 +225,35 @@ export const regionStatsMethods = {
       lowPowerMode: Boolean(this.lowPowerMode),
       adaptiveEnabled: Boolean(this.adaptivePerformanceEnabled),
       adaptiveTier: Math.max(0, Math.floor(Number(this.adaptivePerformanceTier) || 0)),
+      adaptiveReason: this.adaptivePerformanceReason ?? "tier-0",
+    };
+  },
+
+  adaptiveRuntimeSettings() {
+    const tier = Math.max(0, Math.floor(Number(this.adaptivePerformanceTier) || 0));
+    return {
+      tier,
+      particleEmissionScale: tier >= 3 ? 0.42 : tier >= 2 ? 0.58 : tier >= 1 ? 0.75 : 1,
+      spellVisualScale: tier >= 3 ? 0.45 : tier >= 2 ? 0.62 : tier >= 1 ? 0.8 : 1,
+      floaterLifeScale: tier >= 3 ? 0.6 : tier >= 2 ? 0.72 : tier >= 1 ? 0.85 : 1,
+      maxFloaters: tier >= 3 ? 14 : tier >= 2 ? 20 : tier >= 1 ? 28 : 999,
+      footstepDustScale: tier >= 3 ? 0.25 : tier >= 2 ? 0.4 : tier >= 1 ? 0.65 : 1,
+      passiveMonsterWanderScale: tier >= 3 ? 0.12 : tier >= 2 ? 0.25 : tier >= 1 ? 0.5 : 1,
+      nearbyMonsterUpdateBudget: tier >= 3 ? 28 : tier >= 2 ? 36 : tier >= 1 ? 44 : Infinity,
+      minimapFogRebuildIntervalMs: tier >= 3 ? 1000 : tier >= 2 ? 750 : tier >= 1 ? 450 : 0,
     };
   },
 
   createPerformanceSample(now = performance.now()) {
     const particleEngine = this.particleEngine;
     const timings = this.renderTimings ?? {};
+    const updateTimings = this.updateTimings ?? {};
+    const projectileTimings = this.projectileUpdateTimings ?? {};
+    const playerTimings = this.playerUpdateTimings ?? {};
+    const lootTimings = this.lootUpdateTimings ?? {};
+    const cleanupTimings = this.cleanupUpdateTimings ?? {};
+    const interactionTargetTimings = this.interactionTargetTimings ?? {};
+    const groundHazardTimings = this.groundHazardUpdateTimings ?? {};
     const counts = this.renderDebugCounts ?? {};
     const visualActivityLevel = this.getVisualActivityLevel?.() ?? "idle";
     const dirtyReasons = this.renderDirtyReasons?.size ? [...this.renderDirtyReasons] : [];
@@ -194,6 +290,164 @@ export const regionStatsMethods = {
       },
       canvasMegapixels: round(((this.canvas?.width ?? 0) * (this.canvas?.height ?? 0)) / 1000000, 2),
       dpr: round(this.dpr ?? 1, 2),
+      update: {
+        totalMs: formatMs(updateTimings.totalMs),
+        playerMs: formatMs(updateTimings.player),
+        player: {
+          playerInputMs: formatMs(playerTimings.playerInputMs),
+          playerMovementMs: formatMs(playerTimings.playerMovementMs),
+          playerCollisionMs: formatMs(playerTimings.playerCollisionMs),
+          playerTargetingMs: formatMs(playerTimings.playerTargetingMs),
+          playerTargetCandidateCollectionMs: formatMs(playerTimings.playerTargetCandidateCollectionMs),
+          playerTargetSpatialQueryMs: formatMs(playerTimings.playerTargetSpatialQueryMs),
+          playerTargetDistanceChecksMs: formatMs(playerTimings.playerTargetDistanceChecksMs),
+          playerTargetLineOfSightMs: formatMs(playerTimings.playerTargetLineOfSightMs),
+          playerTargetConditionEvaluationMs: formatMs(playerTimings.playerTargetConditionEvaluationMs),
+          playerTargetSortMs: formatMs(playerTimings.playerTargetSortMs),
+          playerTargetStateComparisonMs: formatMs(playerTimings.playerTargetStateComparisonMs),
+          playerTargetStateCommitMs: formatMs(playerTimings.playerTargetStateCommitMs),
+          playerTargetChunkSyncMs: formatMs(playerTimings.playerTargetChunkSyncMs),
+          targetCandidateCount: playerTimings.targetCandidateCount ?? 0,
+          targetDistanceCheckCount: playerTimings.targetDistanceCheckCount ?? 0,
+          targetLineOfSightCheckCount: playerTimings.targetLineOfSightCheckCount ?? 0,
+          targetConditionCheckCount: playerTimings.targetConditionCheckCount ?? 0,
+          objectsScanned: playerTimings.objectsScanned ?? 0, monstersScanned: playerTimings.monstersScanned ?? 0,
+          lootScanned: playerTimings.lootScanned ?? 0, npcsScanned: playerTimings.npcsScanned ?? 0,
+          actionTargetsScanned: playerTimings.actionTargetsScanned ?? 0,
+          selectedTargetType: playerTimings.selectedTargetType ?? null,
+          selectedTargetId: playerTimings.selectedTargetId ?? null,
+          targetingTriggeredBy: playerTimings.targetingTriggeredBy ?? null,
+          playerCombatMs: formatMs(playerTimings.playerCombatMs),
+          playerStatusEffectsMs: formatMs(playerTimings.playerStatusEffectsMs),
+          playerAnimationMs: formatMs(playerTimings.playerAnimationMs),
+          playerChunkOrRegionUpdateMs: formatMs(playerTimings.playerChunkOrRegionUpdateMs),
+          playerDirtyMarkMs: formatMs(playerTimings.playerDirtyMarkMs),
+        },
+        cameraMs: formatMs(updateTimings.camera),
+        monstersMs: formatMs(updateTimings.monsters),
+        monsterTimings: { ...(this.monsterUpdateTimings ?? {}) },
+        chunkCreation: { ...(this.chunkFrameMetrics ?? {}) },
+        projectilesMs: formatMs(updateTimings.projectiles),
+        groundHazardsMs: formatMs(updateTimings.groundHazards),
+        spellEffectsMs: formatMs(updateTimings.spellEffects),
+        particlesFloatersMs: formatMs(updateTimings.particlesFloaters),
+        lootMs: formatMs(updateTimings.loot),
+        cleanupMs: formatMs(updateTimings.cleanup),
+        minimapFogMs: formatMs(updateTimings.minimapFog),
+        worstCategory: updateTimings.worstCategory ?? "none",
+        worstCategoryMs: formatMs(updateTimings.worstCategoryMs),
+        projectiles: {
+          projectileMovementMs: formatMs(projectileTimings.projectileMovementMs),
+          projectileCollisionMonstersMs: formatMs(projectileTimings.projectileCollisionMonstersMs),
+          projectileCollisionObjectsMs: formatMs(projectileTimings.projectileCollisionObjectsMs),
+          projectileCollisionTerrainMs: formatMs(projectileTimings.projectileCollisionTerrainMs),
+          projectileRemovalMs: formatMs(projectileTimings.projectileRemovalMs),
+          projectileSpawnMs: formatMs(projectileTimings.projectileSpawnMs),
+          projectileImpactMs: formatMs(projectileTimings.projectileImpactMs),
+          projectileImpactDamageMs: formatMs(projectileTimings.projectileImpactDamageMs),
+          projectileImpactTargetCollectionMs: formatMs(projectileTimings.projectileImpactTargetCollectionMs),
+          projectileImpactDamageApplyMs: formatMs(projectileTimings.projectileImpactDamageApplyMs),
+          projectileImpactAoEMs: formatMs(projectileTimings.projectileImpactAoEMs),
+          projectileImpactStatusEffectMs: formatMs(projectileTimings.projectileImpactStatusEffectMs),
+          projectileImpactDeathHandlingMs: formatMs(projectileTimings.projectileImpactDeathHandlingMs),
+          projectileImpactKillMs: formatMs(projectileTimings.projectileImpactKillMs),
+          projectileImpactSpawnEffectsMs: formatMs(projectileTimings.projectileImpactSpawnEffectsMs),
+          projectileImpactHazardSpawnMs: formatMs(projectileTimings.projectileImpactHazardSpawnMs),
+          projectileImpactLootDropMs: formatMs(projectileTimings.projectileImpactLootDropMs),
+          projectileImpactDirtyMs: formatMs(projectileTimings.projectileImpactDirtyMs),
+          projectileCandidatesMonsters: projectileTimings.projectileCandidatesMonsters ?? 0,
+          projectileCandidatesObjects: projectileTimings.projectileCandidatesObjects ?? 0,
+          projectileImpactCandidateCount: projectileTimings.projectileImpactCandidateCount ?? 0,
+          projectileImpactAffectedTargetCount: projectileTimings.projectileImpactAffectedTargetCount ?? 0,
+          projectileImpactSpellId: projectileTimings.projectileImpactSpellId ?? null,
+          projectileImpactAoERadius: projectileTimings.projectileImpactAoERadius ?? 0,
+        },
+        loot: {
+          lootHoverMs: formatMs(lootTimings.lootHoverMs),
+          lootPickupMs: formatMs(lootTimings.lootPickupMs),
+          lootMergeMs: formatMs(lootTimings.lootMergeMs),
+          lootInventoryMergeMs: formatMs(lootTimings.lootInventoryMergeMs),
+          lootDropCreationMs: formatMs(lootTimings.lootDropCreationMs),
+          lootQuestTargetScanMs: formatMs(lootTimings.lootQuestTargetScanMs),
+          lootRenderStateMs: formatMs(lootTimings.lootRenderStateMs),
+          lootFloaterMs: formatMs(lootTimings.lootFloaterMs),
+          lootToastMs: formatMs(lootTimings.lootToastMs),
+          lootSnapshotMs: formatMs(lootTimings.lootSnapshotMs),
+          pickedUpItems: Math.max(0, Math.floor(Number(lootTimings.pickedUpItems) || 0)),
+          lootTableRollMs: formatMs(lootTimings.lootTableRollMs),
+          lootConditionEvaluationMs: formatMs(lootTimings.lootConditionEvaluationMs),
+          lootUniqueCheckMs: formatMs(lootTimings.lootUniqueCheckMs),
+          lootNamedCheckMs: formatMs(lootTimings.lootNamedCheckMs),
+          lootQuestDropCheckMs: formatMs(lootTimings.lootQuestDropCheckMs),
+          lootObjectCreationMs: formatMs(lootTimings.lootObjectCreationMs),
+          lootPlacementMs: formatMs(lootTimings.lootPlacementMs),
+          lootDirtyMarkMs: formatMs(lootTimings.lootDirtyMarkMs),
+          lootToastOrFloaterMs: formatMs(lootTimings.lootToastOrFloaterMs),
+          lootSaveDirtyMs: formatMs(lootTimings.lootSaveDirtyMs),
+          lootQueuedJobsProcessed: Math.max(0, Math.floor(Number(lootTimings.lootQueuedJobsProcessed) || 0)),
+          lootDropJobsQueued: Math.max(0, Math.floor(Number(lootTimings.lootDropJobsQueued) || 0)),
+          lootDropJobsDeferred: Math.max(0, Math.floor(Number(lootTimings.lootDropJobsDeferred) || 0)),
+          lootDropBudgetHit: Boolean(lootTimings.lootDropBudgetHit),
+          lootDropBudgetMs: formatMs(lootTimings.lootDropBudgetMs),
+          slowLootTableId: lootTimings.slowLootTableId ?? null,
+          slowLootEntryId: lootTimings.slowLootEntryId ?? null,
+          slowLootConditionKey: lootTimings.slowLootConditionKey ?? null,
+          lootEntriesEvaluated: Math.max(0, Math.floor(Number(lootTimings.lootEntriesEvaluated) || 0)),
+          lootTablesRolled: Math.max(0, Math.floor(Number(lootTimings.lootTablesRolled) || 0)),
+          nestedLootTablesRolled: Math.max(0, Math.floor(Number(lootTimings.nestedLootTablesRolled) || 0)),
+          lootObjectsCreated: Math.max(0, Math.floor(Number(lootTimings.lootObjectsCreated) || 0)),
+        },
+        groundHazards: {
+          groundHazardUpdateMs: formatMs(groundHazardTimings.groundHazardUpdateMs),
+          groundHazardCollisionMs: formatMs(groundHazardTimings.groundHazardCollisionMs),
+          groundHazardDamageMs: formatMs(groundHazardTimings.groundHazardDamageMs),
+          groundHazardDamageApplyMs: formatMs(groundHazardTimings.groundHazardDamageApplyMs),
+          groundHazardDeathDetectionMs: formatMs(groundHazardTimings.groundHazardDeathDetectionMs),
+          groundHazardDeathStateMs: formatMs(groundHazardTimings.groundHazardDeathStateMs),
+          groundHazardDeathCallbacksMs: formatMs(groundHazardTimings.groundHazardDeathCallbacksMs),
+          groundHazardLootJobEnqueueMs: formatMs(groundHazardTimings.groundHazardLootJobEnqueueMs),
+          groundHazardCorpseCreationMs: formatMs(groundHazardTimings.groundHazardCorpseCreationMs),
+          groundHazardDeathEffectsMs: formatMs(groundHazardTimings.groundHazardDeathEffectsMs),
+          groundHazardSpatialRemovalMs: formatMs(groundHazardTimings.groundHazardSpatialRemovalMs),
+          groundHazardQuestProgressMs: formatMs(groundHazardTimings.groundHazardQuestProgressMs),
+          groundHazardKillMs: formatMs(groundHazardTimings.groundHazardKillMs),
+          groundHazardLootDropMs: formatMs(groundHazardTimings.groundHazardLootDropMs),
+          groundHazardSpawnEffectsMs: formatMs(groundHazardTimings.groundHazardSpawnEffectsMs),
+          groundHazardCleanupMs: formatMs(groundHazardTimings.groundHazardCleanupMs),
+          groundHazardCandidateCount: groundHazardTimings.groundHazardCandidateCount ?? 0,
+          groundHazardAffectedTargetCount: groundHazardTimings.groundHazardAffectedTargetCount ?? 0,
+          groundHazardType: groundHazardTimings.groundHazardType ?? null,
+        },
+        monsterDeath: { ...(this.monsterDeathTimings ?? {}) },
+        cleanupDetails: {
+          cleanupEffectArraysMs: formatMs(cleanupTimings.cleanupEffectArraysMs),
+          cleanupProjectileArraysMs: formatMs(cleanupTimings.cleanupProjectileArraysMs),
+          cleanupFloatersMs: formatMs(cleanupTimings.cleanupFloatersMs),
+          cleanupParticlesMs: formatMs(cleanupTimings.cleanupParticlesMs),
+          cleanupWorldMs: formatMs(cleanupTimings.cleanupWorldMs),
+          cleanupInteractionTargetsMs: formatMs(cleanupTimings.cleanupInteractionTargetsMs),
+          interactionTargets: {
+            interactionTargetCollectObjectsMs: formatMs(interactionTargetTimings.interactionTargetCollectObjectsMs),
+            interactionTargetCollectLootMs: formatMs(interactionTargetTimings.interactionTargetCollectLootMs),
+            interactionTargetCollectMonstersMs: formatMs(interactionTargetTimings.interactionTargetCollectMonstersMs),
+            interactionTargetCollectNpcsMs: formatMs(interactionTargetTimings.interactionTargetCollectNpcsMs),
+            interactionTargetDistanceChecksMs: formatMs(interactionTargetTimings.interactionTargetDistanceChecksMs),
+            interactionTargetSortMs: formatMs(interactionTargetTimings.interactionTargetSortMs),
+            interactionTargetStateUpdateMs: formatMs(interactionTargetTimings.interactionTargetStateUpdateMs),
+            interactionTargetStateReasons: { ...(interactionTargetTimings.interactionTargetStateReasons ?? {}) },
+          },
+          cleanupRegionExitMs: formatMs(cleanupTimings.cleanupRegionExitMs),
+          cleanupAutosaveSnapshotMs: formatMs(cleanupTimings.cleanupAutosaveSnapshotMs),
+          autosave: {
+            autosaveShouldRunMs: formatMs(cleanupTimings.autosaveShouldRunMs),
+            autosaveSnapshotBuildMs: formatMs(cleanupTimings.autosaveSnapshotBuildMs),
+            autosaveCloneMs: formatMs(cleanupTimings.autosaveCloneMs),
+            autosaveSerializeMs: formatMs(cleanupTimings.autosaveSerializeMs),
+            autosaveStorageWriteMs: formatMs(cleanupTimings.autosaveStorageWriteMs),
+            autosaveTotalMs: formatMs(cleanupTimings.autosaveTotalMs),
+          },
+        },
+      },
       render: {
         totalMs: formatMs(timings.totalMs),
         tilesMs: formatMs(timings.tilesMs),
@@ -201,6 +455,10 @@ export const regionStatsMethods = {
         particlesMs: formatMs(timings.particlesMs),
         fogMs: formatMs(timings.fogMs),
         minimapMs: formatMs(timings.minimapMs),
+        minimapWorkThisFrameMs: formatMs(timings.minimapWorkThisFrameMs ?? timings.minimapMs),
+        lastMinimapRebuildMs: formatMs(timings.lastMinimapRebuildMs ?? timings.minimapMs),
+        minimapIncludedInRenderTotal: Boolean(timings.minimapIncludedInRenderTotal),
+        minimapRebuiltThisFrame: Boolean(timings.minimapRebuiltThisFrame),
         minimapCacheHit: timings.minimapCacheHit ?? null,
         minimapRebuildReason: timings.minimapRebuildReason ?? null,
         minimapStaticMs: formatMs(timings.minimapStaticMs),
@@ -215,6 +473,27 @@ export const regionStatsMethods = {
         uiMs: formatMs(timings.uiMs),
         overlayMs: formatMs(timings.overlayMs),
       },
+      snapshot: this.lastSnapshotInfo ? {
+        reason: this.lastSnapshotInfo.reason ?? null,
+        reasons: { ...(this.lastSnapshotInfo.reasons ?? {}) },
+        builtAt: this.lastSnapshotInfo.builtAt ?? null,
+        ageMs: Math.max(0, Math.round(Date.now() - (this.lastSnapshotInfo.builtAt ?? Date.now()))),
+        buildCount: Math.max(0, Math.floor(Number(this.lastSnapshotInfo.buildCount) || 0)),
+        actualBuildCount: Math.max(0, Math.floor(Number(this.snapshotBuildCount) || 0)),
+        coalescedCount: Math.max(0, Math.floor(Number(this.snapshotCoalescedCount) || 0)),
+        skippedBecauseUiOnly: Math.max(0, Math.floor(Number(this.snapshotSkippedBecauseUiOnly) || 0)),
+        builtSinceLastSample: this.lastSnapshotInfo.builtAt !== this.lastPerformanceSampleSnapshotBuiltAt,
+        timings: {
+          autosaveSnapshotBuildMs: formatMs(this.lastSnapshotInfo.autosaveSnapshotBuildMs),
+        },
+      } : null,
+      dirtyState: {
+        saveDirty: Boolean(this.saveDirty),
+        saveDirtyReasons: { ...(this.saveDirtyReasons ?? {}) },
+        saveDirtyReasonCountsCumulative: { ...(this.saveDirtyReasonCounts ?? {}) },
+        uiDirtyReasonCountsCumulative: { ...(this.uiDirtyReasons ?? {}) },
+      },
+      save: this.lastSaveInfo ? { ...this.lastSaveInfo } : null,
       counts: {
         drawables: counts.drawables ?? 0,
         particles: counts.particles ?? ((particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0)),
@@ -226,6 +505,7 @@ export const regionStatsMethods = {
         projectiles: this.projectiles?.length ?? 0,
         totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
         nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
+        nearbyTotalMonsters: this.monsterActivityDebug?.nearbyTotalMonsters ?? this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
         visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
         visiblePassiveMovingMonsters: this.monsterActivityDebug?.visiblePassiveMovingMonsters ?? 0,
         visibleCombatMovingMonsters: this.monsterActivityDebug?.visibleCombatMovingMonsters ?? 0,
@@ -255,6 +535,7 @@ export const regionStatsMethods = {
     if (now - (this.lastPerformanceSampleTime ?? 0) < (this.performanceSampleIntervalMs ?? PERFORMANCE_SAMPLE_INTERVAL_MS)) return;
     this.lastPerformanceSampleTime = now;
     const sample = this.createPerformanceSample(now);
+    this.lastPerformanceSampleSnapshotBuiltAt = this.lastSnapshotInfo?.builtAt ?? null;
     this.performanceHistory ??= [];
     this.performanceHistory.push(sample);
     const maxSamples = Math.max(1, Math.floor(Number(this.performanceHistoryMaxSamples) || PERFORMANCE_HISTORY_MAX_SAMPLES));
@@ -272,31 +553,53 @@ export const regionStatsMethods = {
   updateAdaptivePerformance(sample) {
     if (!this.adaptivePerformanceEnabled || this.isCustomPerformanceProfile || sample?.activityLevel !== "active") {
       this.adaptiveLowFpsSamples = 0;
+      if (!this.adaptivePerformanceEnabled) this.adaptivePerformanceReason = "disabled";
       return;
     }
     const target = Math.max(30, Number(this.targetFps) || 50);
+    const targetFrameMs = 1000 / target;
+    const updateFps = Math.max(0, Number(sample?.updateFps) || 0);
     const renderFps = Math.max(0, Number(sample?.renderFps) || 0);
-    if (renderFps >= target * 0.8) {
+    const updateMs = Math.max(0, Number(sample?.update?.totalMs) || 0);
+    const renderMs = Math.max(0, Number(sample?.render?.totalMs) || 0);
+    const lowRenderFps = renderFps > 0 && renderFps < target * 0.8;
+    const lowUpdateFps = updateFps > 0 && updateFps < target * 0.9;
+    const highUpdateCost = updateMs > Math.max(7.5, targetFrameMs * 0.42);
+    const highCombinedCost = updateMs + renderMs > targetFrameMs * 0.62;
+    const pressureReasons = [
+      lowRenderFps ? "low-render-fps" : "",
+      lowUpdateFps ? "low-update-fps" : "",
+      highUpdateCost ? "high-update-cost" : "",
+      highCombinedCost ? "high-frame-cost" : "",
+    ].filter(Boolean);
+    if (!pressureReasons.length) {
       this.adaptiveLowFpsSamples = 0;
+      if ((this.adaptivePerformanceTier ?? 0) <= 0) this.adaptivePerformanceReason = "tier-0";
       return;
     }
     this.adaptiveLowFpsSamples = (this.adaptiveLowFpsSamples ?? 0) + 1;
-    if (this.adaptiveLowFpsSamples < 5 || (this.adaptivePerformanceTier ?? 0) >= 2) return;
+    this.adaptivePerformanceReason = `${pressureReasons.join("+")} ${this.adaptiveLowFpsSamples}/5`;
+    if (this.adaptiveLowFpsSamples < 5 || (this.adaptivePerformanceTier ?? 0) >= 3) return;
     this.adaptiveLowFpsSamples = 0;
     this.adaptivePerformanceTier = (this.adaptivePerformanceTier ?? 0) + 1;
+    this.adaptivePerformanceReason = `${pressureReasons.join("+")} -> tier ${this.adaptivePerformanceTier}`;
     if (this.adaptivePerformanceTier === 1) {
-      this.maxDpr = Math.min(this.maxDpr ?? 1.25, 1.1);
       this.fogRenderScale = Math.min(this.fogRenderScale ?? 0.45, 0.4);
       this.setParticleQuality?.("medium");
       if (this.particleEngine) this.particleEngine.maxParticles = Math.min(this.particleEngine.maxParticles, 400);
       this.disableAmbientCritters = true;
       this.resetCritterRuntime?.();
-    } else {
-      this.targetFps = Math.min(this.targetFps ?? 50, 40);
+    } else if (this.adaptivePerformanceTier === 2) {
       this.maxDpr = 1;
       this.fogRenderScale = Math.min(this.fogRenderScale ?? 0.4, 0.35);
       this.setParticleQuality?.("low");
       if (this.particleEngine) this.particleEngine.maxParticles = Math.min(this.particleEngine.maxParticles, 300);
+    } else {
+      this.targetFps = Math.min(this.targetFps ?? 50, 40);
+      this.maxDpr = 1;
+      this.fogRenderScale = Math.min(this.fogRenderScale ?? 0.35, 0.32);
+      this.setParticleQuality?.("low");
+      if (this.particleEngine) this.particleEngine.maxParticles = Math.min(this.particleEngine.maxParticles, 220);
     }
     if (this.particleEngine) {
       this.particleEngine.pool.max = this.particleEngine.maxParticles;
@@ -306,6 +609,7 @@ export const regionStatsMethods = {
       }
     }
     this.fogOverlayCanvas = null;
+    this.flushPendingMinimapFogInvalidation?.(true);
     this.resize?.();
     this.markRenderDirty?.(`adaptive-performance-tier-${this.adaptivePerformanceTier}`);
   },
@@ -415,6 +719,12 @@ export const regionStatsMethods = {
     }
     this.updatePerformanceHistory?.();
     const timings = this.renderTimings ?? {};
+    const updateTimings = this.updateTimings ?? {};
+    const projectileTimings = this.projectileUpdateTimings ?? {};
+    const lootTimings = this.lootUpdateTimings ?? {};
+    const cleanupTimings = this.cleanupUpdateTimings ?? {};
+    const interactionTargetTimings = this.interactionTargetTimings ?? {};
+    const groundHazardTimings = this.groundHazardUpdateTimings ?? {};
     const counts = this.renderDebugCounts ?? {};
     const formatMs = (value) => Number.isFinite(Number(value)) ? Math.round(Number(value) * 10) / 10 : null;
     const visualActivityLevel = this.getVisualActivityLevel?.() ?? "idle";
@@ -440,6 +750,106 @@ export const regionStatsMethods = {
       frameMs: this.lastFrameDt > 0 ? Math.round(this.lastFrameDt * 10000) / 10 : 0,
       targetFps: Math.max(0, Math.round(Number(this.targetFps) || 0)),
       performanceMode: this.performanceMode ?? "balanced",
+      adaptive: {
+        enabled: Boolean(this.adaptivePerformanceEnabled),
+        tier: Math.max(0, Math.floor(Number(this.adaptivePerformanceTier) || 0)),
+        reason: this.adaptivePerformanceReason ?? "tier-0",
+      },
+      update: {
+        totalMs: formatMs(updateTimings.totalMs),
+        playerMs: formatMs(updateTimings.player),
+        cameraMs: formatMs(updateTimings.camera),
+        monstersMs: formatMs(updateTimings.monsters),
+        projectilesMs: formatMs(updateTimings.projectiles),
+        groundHazardsMs: formatMs(updateTimings.groundHazards),
+        spellEffectsMs: formatMs(updateTimings.spellEffects),
+        particlesFloatersMs: formatMs(updateTimings.particlesFloaters),
+        lootMs: formatMs(updateTimings.loot),
+        cleanupMs: formatMs(updateTimings.cleanup),
+        minimapFogMs: formatMs(updateTimings.minimapFog),
+        worstCategory: updateTimings.worstCategory ?? "none",
+        worstCategoryMs: formatMs(updateTimings.worstCategoryMs),
+        projectiles: {
+          projectileMovementMs: formatMs(projectileTimings.projectileMovementMs),
+          projectileCollisionMonstersMs: formatMs(projectileTimings.projectileCollisionMonstersMs),
+          projectileCollisionObjectsMs: formatMs(projectileTimings.projectileCollisionObjectsMs),
+          projectileCollisionTerrainMs: formatMs(projectileTimings.projectileCollisionTerrainMs),
+          projectileRemovalMs: formatMs(projectileTimings.projectileRemovalMs),
+          projectileSpawnMs: formatMs(projectileTimings.projectileSpawnMs),
+          projectileImpactMs: formatMs(projectileTimings.projectileImpactMs),
+          projectileImpactDamageMs: formatMs(projectileTimings.projectileImpactDamageMs),
+          projectileImpactKillMs: formatMs(projectileTimings.projectileImpactKillMs),
+          projectileImpactSpawnEffectsMs: formatMs(projectileTimings.projectileImpactSpawnEffectsMs),
+          projectileImpactHazardSpawnMs: formatMs(projectileTimings.projectileImpactHazardSpawnMs),
+          projectileImpactLootDropMs: formatMs(projectileTimings.projectileImpactLootDropMs),
+          projectileImpactDirtyMs: formatMs(projectileTimings.projectileImpactDirtyMs),
+          projectileCandidatesMonsters: projectileTimings.projectileCandidatesMonsters ?? 0,
+          projectileCandidatesObjects: projectileTimings.projectileCandidatesObjects ?? 0,
+        },
+        loot: {
+          lootHoverMs: formatMs(lootTimings.lootHoverMs),
+          lootPickupMs: formatMs(lootTimings.lootPickupMs),
+          lootMergeMs: formatMs(lootTimings.lootMergeMs),
+          lootInventoryMergeMs: formatMs(lootTimings.lootInventoryMergeMs),
+          lootDropCreationMs: formatMs(lootTimings.lootDropCreationMs),
+          lootQuestTargetScanMs: formatMs(lootTimings.lootQuestTargetScanMs),
+          lootRenderStateMs: formatMs(lootTimings.lootRenderStateMs),
+          lootFloaterMs: formatMs(lootTimings.lootFloaterMs),
+          lootToastMs: formatMs(lootTimings.lootToastMs),
+          lootSnapshotMs: formatMs(lootTimings.lootSnapshotMs),
+          pickedUpItems: Math.max(0, Math.floor(Number(lootTimings.pickedUpItems) || 0)),
+          lootTableRollMs: formatMs(lootTimings.lootTableRollMs),
+          lootConditionEvaluationMs: formatMs(lootTimings.lootConditionEvaluationMs),
+          lootUniqueCheckMs: formatMs(lootTimings.lootUniqueCheckMs),
+          lootNamedCheckMs: formatMs(lootTimings.lootNamedCheckMs),
+          lootQuestDropCheckMs: formatMs(lootTimings.lootQuestDropCheckMs),
+          lootObjectCreationMs: formatMs(lootTimings.lootObjectCreationMs),
+          lootPlacementMs: formatMs(lootTimings.lootPlacementMs),
+          lootDirtyMarkMs: formatMs(lootTimings.lootDirtyMarkMs),
+          lootToastOrFloaterMs: formatMs(lootTimings.lootToastOrFloaterMs),
+          lootSaveDirtyMs: formatMs(lootTimings.lootSaveDirtyMs),
+          lootQueuedJobsProcessed: Math.max(0, Math.floor(Number(lootTimings.lootQueuedJobsProcessed) || 0)),
+          lootObjectsCreated: Math.max(0, Math.floor(Number(lootTimings.lootObjectsCreated) || 0)),
+        },
+        groundHazards: {
+          groundHazardUpdateMs: formatMs(groundHazardTimings.groundHazardUpdateMs),
+          groundHazardCollisionMs: formatMs(groundHazardTimings.groundHazardCollisionMs),
+          groundHazardDamageMs: formatMs(groundHazardTimings.groundHazardDamageMs),
+          groundHazardKillMs: formatMs(groundHazardTimings.groundHazardKillMs),
+          groundHazardLootDropMs: formatMs(groundHazardTimings.groundHazardLootDropMs),
+          groundHazardSpawnEffectsMs: formatMs(groundHazardTimings.groundHazardSpawnEffectsMs),
+          groundHazardCleanupMs: formatMs(groundHazardTimings.groundHazardCleanupMs),
+        },
+        monsterDeath: { ...(this.monsterDeathTimings ?? {}) },
+        cleanupDetails: {
+          cleanupEffectArraysMs: formatMs(cleanupTimings.cleanupEffectArraysMs),
+          cleanupProjectileArraysMs: formatMs(cleanupTimings.cleanupProjectileArraysMs),
+          cleanupFloatersMs: formatMs(cleanupTimings.cleanupFloatersMs),
+          cleanupParticlesMs: formatMs(cleanupTimings.cleanupParticlesMs),
+          cleanupWorldMs: formatMs(cleanupTimings.cleanupWorldMs),
+          cleanupInteractionTargetsMs: formatMs(cleanupTimings.cleanupInteractionTargetsMs),
+          interactionTargets: {
+            interactionTargetCollectObjectsMs: formatMs(interactionTargetTimings.interactionTargetCollectObjectsMs),
+            interactionTargetCollectLootMs: formatMs(interactionTargetTimings.interactionTargetCollectLootMs),
+            interactionTargetCollectMonstersMs: formatMs(interactionTargetTimings.interactionTargetCollectMonstersMs),
+            interactionTargetCollectNpcsMs: formatMs(interactionTargetTimings.interactionTargetCollectNpcsMs),
+            interactionTargetDistanceChecksMs: formatMs(interactionTargetTimings.interactionTargetDistanceChecksMs),
+            interactionTargetSortMs: formatMs(interactionTargetTimings.interactionTargetSortMs),
+            interactionTargetStateUpdateMs: formatMs(interactionTargetTimings.interactionTargetStateUpdateMs),
+            interactionTargetStateReasons: { ...(interactionTargetTimings.interactionTargetStateReasons ?? {}) },
+          },
+          cleanupRegionExitMs: formatMs(cleanupTimings.cleanupRegionExitMs),
+          cleanupAutosaveSnapshotMs: formatMs(cleanupTimings.cleanupAutosaveSnapshotMs),
+          autosave: {
+            autosaveShouldRunMs: formatMs(cleanupTimings.autosaveShouldRunMs),
+            autosaveSnapshotBuildMs: formatMs(cleanupTimings.autosaveSnapshotBuildMs),
+            autosaveCloneMs: formatMs(cleanupTimings.autosaveCloneMs),
+            autosaveSerializeMs: formatMs(cleanupTimings.autosaveSerializeMs),
+            autosaveStorageWriteMs: formatMs(cleanupTimings.autosaveStorageWriteMs),
+            autosaveTotalMs: formatMs(cleanupTimings.autosaveTotalMs),
+          },
+        },
+      },
       render: {
         totalMs: formatMs(timings.totalMs),
         tilesMs: formatMs(timings.tilesMs),
@@ -459,6 +869,25 @@ export const regionStatsMethods = {
         minimapTotalDrawMs: formatMs(timings.minimapTotalDrawMs),
         minimapBudgetBackoff: Boolean(timings.minimapBudgetBackoff),
       },
+      snapshot: this.lastSnapshotInfo ? {
+        reason: this.lastSnapshotInfo.reason ?? null,
+        reasons: { ...(this.lastSnapshotInfo.reasons ?? {}) },
+        builtAt: this.lastSnapshotInfo.builtAt ?? null,
+        ageMs: Math.max(0, Math.round(Date.now() - (this.lastSnapshotInfo.builtAt ?? Date.now()))),
+        buildCount: Math.max(0, Math.floor(Number(this.lastSnapshotInfo.buildCount) || 0)),
+        actualBuildCount: Math.max(0, Math.floor(Number(this.snapshotBuildCount) || 0)),
+        coalescedCount: Math.max(0, Math.floor(Number(this.snapshotCoalescedCount) || 0)),
+        skippedBecauseUiOnly: Math.max(0, Math.floor(Number(this.snapshotSkippedBecauseUiOnly) || 0)),
+        timings: {
+          autosaveSnapshotBuildMs: formatMs(this.lastSnapshotInfo.autosaveSnapshotBuildMs),
+        },
+      } : null,
+      dirtyState: {
+        saveDirty: Boolean(this.saveDirty),
+        saveDirtyReasons: { ...(this.saveDirtyReasons ?? {}) },
+        saveDirtyReasonCountsCumulative: { ...(this.saveDirtyReasonCounts ?? {}) },
+        uiDirtyReasonCountsCumulative: { ...(this.uiDirtyReasons ?? {}) },
+      },
       counts: {
         drawables: counts.drawables ?? 0,
         monsters: counts.monsters ?? this.monsters?.size ?? 0,
@@ -468,6 +897,7 @@ export const regionStatsMethods = {
         terrainLayersCleared: this.terrainLayersCleared ?? counts.terrainLayersCleared ?? 0,
         totalMonsters: this.monsterActivityDebug?.totalMonsters ?? this.monsters?.size ?? 0,
         nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
+        nearbyTotalMonsters: this.monsterActivityDebug?.nearbyTotalMonsters ?? this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
         visibleMovingMonsters: this.monsterActivityDebug?.visibleMovingMonsters ?? 0,
         visiblePassiveMovingMonsters: this.monsterActivityDebug?.visiblePassiveMovingMonsters ?? 0,
         visibleCombatMovingMonsters: this.monsterActivityDebug?.visibleCombatMovingMonsters ?? 0,

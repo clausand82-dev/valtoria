@@ -791,7 +791,7 @@ export function createVillageOutskirtsMapRegions(region) {
       objects: [
         { id: "object_hay", weight: 3, blockedBy: {questActive: "villager_help_collect_hay"}},
         { id: "object_sacks_ground", weight: 5, destructible: true },
-        { id: "object_hay", weight: 18, destructible: false, actionId: "collect_villager_haystack", },
+        { id: "object_hay", weight: 18, destructible: false, actionId: "collect_villager_haystack", requires: {questActive: "villager_help_collect_hay"} },
       ],
       weather: {
         possible: [

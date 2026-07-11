@@ -19,6 +19,36 @@ import {
 
 const OBJECT_ACTION_INTERACT_RANGE = 1.15;
 
+function addInteractionTiming(engine, key, ms) {
+  if (!engine?.interactionTargetTimings) return;
+  engine.interactionTargetTimings[key] = (engine.interactionTargetTimings[key] ?? 0) + ms;
+  const targetTimings = engine.playerUpdateTimings;
+  if (!targetTimings) return;
+  const targetKey = ({
+    interactionTargetCollectObjectsMs: "playerTargetCandidateCollectionMs",
+    interactionTargetCollectLootMs: "playerTargetCandidateCollectionMs",
+    interactionTargetCollectMonstersMs: "playerTargetCandidateCollectionMs",
+    interactionTargetCollectNpcsMs: "playerTargetCandidateCollectionMs",
+    interactionTargetDistanceChecksMs: "playerTargetDistanceChecksMs",
+    interactionTargetSortMs: "playerTargetSortMs",
+    interactionTargetStateUpdateMs: "playerTargetStateCommitMs",
+  })[key];
+  if (targetKey) targetTimings[targetKey] = (targetTimings[targetKey] ?? 0) + ms;
+}
+
+function addInteractionStateReason(engine, reason) {
+  if (!engine?.interactionTargetTimings) return;
+  const key = String(reason || "unknown");
+  const reasons = engine.interactionTargetTimings.interactionTargetStateReasons ??= {};
+  reasons[key] = (reasons[key] ?? 0) + 1;
+}
+
+function distanceSq(a, b) {
+  const dx = (Number(a?.x) || 0) - (Number(b?.x) || 0);
+  const dy = (Number(a?.y) || 0) - (Number(b?.y) || 0);
+  return dx * dx + dy * dy;
+}
+
 function normalizeRuntimeActionObjectStates(engine) {
   if (!engine.runtimeActionObjectStates || typeof engine.runtimeActionObjectStates !== "object") {
     engine.runtimeActionObjectStates = {};
@@ -148,11 +178,14 @@ export const actionsMethods = {
     const candidates = this.actionTargetsInRange(OBJECT_ACTION_INTERACT_RANGE);
     if (!candidates.length) {
       if (!this.nearbyActionTarget) return;
+      const stateStartedAt = performance.now();
       this.nearbyActionTarget = null;
       this.nearbyInteractionMode = "action";
       this.actionTargetCycleId = null;
       this.markRenderDirty?.("action-target");
-      this.publishSnapshot();
+      addInteractionStateReason(this, "action-target-clear");
+      this.markUiOnlySnapshot?.("action-target-clear");
+      addInteractionTiming(this, "interactionTargetStateUpdateMs", performance.now() - stateStartedAt);
       return;
     }
     const selectedId = this.actionTargetCycleId;
@@ -178,34 +211,70 @@ export const actionsMethods = {
     if ((next?.id ?? null) !== (this.nearbyActionTarget?.id ?? null)) {
       this.nearbyInteractionMode = "action";
     }
+    const stateStartedAt = performance.now();
     this.nearbyActionTarget = next;
     this.markRenderDirty?.("action-target");
-    this.publishSnapshot();
+    addInteractionStateReason(this, "action-target");
+    this.markUiOnlySnapshot?.("action-target");
+    addInteractionTiming(this, "interactionTargetStateUpdateMs", performance.now() - stateStartedAt);
   },
 
   actionTargetsInRange(maxRange = OBJECT_ACTION_INTERACT_RANGE) {
     const candidates = [];
     for (const chunk of this.nearbyChunks(1)) {
       for (const object of chunk.objects) {
-        if (!object || object.removed || object.actionRemoved) continue;
+        const collectStartedAt = performance.now();
+        const valid = object && !object.removed && !object.actionRemoved;
+        if (this.playerUpdateTimings) {
+          this.playerUpdateTimings.objectsScanned += 1;
+          this.playerUpdateTimings.actionTargetsScanned += 1;
+          this.playerUpdateTimings.targetCandidateCount += 1;
+        }
+        addInteractionTiming(this, "interactionTargetCollectObjectsMs", performance.now() - collectStartedAt);
+        if (!valid) continue;
+        const distanceStartedAt = performance.now();
+        const radius = Number(object.radius) || 0;
+        if (this.playerUpdateTimings) this.playerUpdateTimings.targetDistanceCheckCount += 1;
+        if (distanceSq(this.player, object) > (maxRange + radius) * (maxRange + radius)) {
+          addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+          continue;
+        }
+        const d = distance(this.player, object) - radius;
+        addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
         if (!targetActionId(this, object)) continue;
-        const d = distance(this.player, object) - (Number(object.radius) || 0);
         if (d <= maxRange) {
           object.sourceType = "object";
           candidates.push({ target: object, distance: d });
         }
       }
       for (const npc of chunk.npcs ?? []) {
+        const collectStartedAt = performance.now();
         if (!npc || npc.removed || npc.actionRemoved) continue;
+        if (this.playerUpdateTimings) {
+          this.playerUpdateTimings.npcsScanned += 1;
+          this.playerUpdateTimings.actionTargetsScanned += 1;
+          this.playerUpdateTimings.targetCandidateCount += 1;
+        }
+        addInteractionTiming(this, "interactionTargetCollectNpcsMs", performance.now() - collectStartedAt);
+        const distanceStartedAt = performance.now();
+        const radius = Number(npc.radius) || 0;
+        if (this.playerUpdateTimings) this.playerUpdateTimings.targetDistanceCheckCount += 1;
+        if (distanceSq(this.player, npc) > (maxRange + radius) * (maxRange + radius)) {
+          addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
+          continue;
+        }
+        const d = distance(this.player, npc) - radius;
+        addInteractionTiming(this, "interactionTargetDistanceChecksMs", performance.now() - distanceStartedAt);
         if (!targetActionId(this, npc)) continue;
-        const d = distance(this.player, npc) - (Number(npc.radius) || 0);
         if (d <= maxRange) {
           npc.sourceType = "npc";
           candidates.push({ target: npc, distance: d });
         }
       }
     }
+    const sortStartedAt = performance.now();
     candidates.sort((a, b) => a.distance - b.distance || String(a.target.runtimeId ?? a.target.id).localeCompare(String(b.target.runtimeId ?? b.target.id)));
+    addInteractionTiming(this, "interactionTargetSortMs", performance.now() - sortStartedAt);
     return candidates;
   },
 

@@ -144,6 +144,16 @@ export const lifecycleMethods = {
   },
 
   stop() {
+    if (this.pendingAutosaveTimer) {
+      clearTimeout(this.pendingAutosaveTimer);
+      this.pendingAutosaveTimer = null;
+    }
+    if (this.pendingSnapshotTimer) {
+      if (typeof this.pendingSnapshotClear === "function") this.pendingSnapshotClear(this.pendingSnapshotTimer);
+      else clearTimeout(this.pendingSnapshotTimer);
+      this.pendingSnapshotTimer = null;
+      this.pendingSnapshotClear = null;
+    }
     this.saveProgress();
     for (const timerId of this.toastTimers.values()) {
       clearTimeout(timerId);
@@ -263,6 +273,7 @@ export const lifecycleMethods = {
     this.adaptivePerformanceEnabled = Boolean(profile.adaptive);
     this.adaptivePerformanceTier = 0;
     this.adaptiveLowFpsSamples = 0;
+    this.adaptivePerformanceReason = "tier-0";
     if (this.particleEngine) {
       this.particleEngine.quality = profile.particleQuality;
       this.particleEngine.maxParticles = profile.maxParticles;
@@ -291,71 +302,644 @@ export const lifecycleMethods = {
   },
 
   update(dt) {
+    const updateStartedAt = performance.now();
+    const timings = {
+      playerMs: 0,
+      cameraMs: 0,
+      monstersMs: 0,
+      projectilesMs: 0,
+      groundHazardsMs: 0,
+      spellEffectsMs: 0,
+      particlesFloatersMs: 0,
+      lootMs: 0,
+      cleanupMs: 0,
+      minimapFogMs: 0,
+    };
+    const timed = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      timings[key] = (timings[key] ?? 0) + (performance.now() - startedAt);
+      return result;
+    };
     this.time += dt;
+    // A job enqueued while this update is running is deliberately not eligible
+    // until the next update.  Existing work keeps the current 2ms budget.
+    this.lootProcessingGeneration = (this.lootProcessingGeneration ?? 0) + 1;
+    this.lootJobsQueuedThisFrame = 0;
+    this.lootJobsEligibleThisFrame = this.pendingLootDrops?.length ?? 0;
+    this.lootJobsDeferredBecauseNew = 0;
     // City UI keeps the engine instance alive. Do not regenerate or update the
     // disposed map while no run is active.
     if (this.mapRuntimeDisposed && !this.activeMapRegion) return;
-    this.ensureWorldAroundPlayer();
-    if (this.updateFogOfWar()) this.markRenderDirty("fog");
-    const stats = this.calcStats();
-    this.player.hp = clamp(this.player.hp, 0, stats.maxHp);
-    if (this.player.hp > 0 && this.player.deadTimer > 0) {
-      this.player.deadTimer = 0;
-      this.markRenderDirty("player-death-reset");
-    }
-    this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, stats.maxMana);
-    this.player.attackCooldown = Math.max(0, this.player.attackCooldown - dt);
-    this.player.spellCooldown = Math.max(0, this.player.spellCooldown - dt);
-    this.potionCooldown = Math.max(0, this.potionCooldown - dt);
-    this.player.hurtCooldown = Math.max(0, this.player.hurtCooldown - dt);
-    this.player.attackAnim = Math.max(0, this.player.attackAnim - dt);
-    this.player.castAnim = Math.max(0, this.player.castAnim - dt);
+    this.monsterDeathsThisFrame = 0;
+    this.monsterDeathTimings = {
+      monsterDeathValidationMs: 0, monsterDeathStateMutationMs: 0, monsterDeathAnimationSetupMs: 0,
+      monsterDeathCallbacksMs: 0, monsterDeathQuestProgressMs: 0, monsterDeathAchievementProgressMs: 0,
+      monsterDeathBestiaryProgressMs: 0, monsterDeathLootJobEnqueueMs: 0, monsterDeathLootPreparationMs: 0,
+      monsterDeathCorpseCreationMs: 0, monsterDeathReplacementFoliageMs: 0, monsterDeathSpatialIndexRemovalMs: 0,
+      monsterDeathNearbySetRemovalMs: 0, monsterDeathCollisionIndexRemovalMs: 0, monsterDeathTargetCleanupMs: 0,
+      monsterDeathEffectsCreationMs: 0, monsterDeathParticlesMs: 0, monsterDeathFloatersMs: 0,
+      monsterDeathAudioMs: 0, monsterDeathDirtyMarkMs: 0, monsterDeathSaveDirtyMs: 0,
+      monsterDeathEventDispatchMs: 0, monsterDeathTotalMs: 0,
+      duplicateDeathCallsIgnored: 0, killedMonsterId: null, killedMonsterType: null, killedMonsterLevel: 0,
+      deathSourceType: null, deathSourceId: null, deathSourceSpellId: null,
+      lootTablesReferenced: 0, lootJobsQueued: 0, callbacksExecuted: 0, questsChecked: 0,
+      monsterDeathCallbackCount: 0, monsterDeathCallbackIds: [], monsterDeathSlowestCallbackId: null,
+      monsterDeathSlowestCallbackMs: 0, monsterDeathCallbackTimings: [],
+      duplicateCallbackInvocationsIgnored: 0, duplicateDeathEventsIgnored: 0,
+      repeatedSaveDirtyMarksCoalesced: 0, repeatedRenderDirtyMarksCoalesced: 0,
+      duplicateLootJobsPrevented: 0, duplicateQuestChecksPrevented: 0,
+      duplicateBestiaryChecksPrevented: 0, duplicateAchievementChecksPrevented: 0,
+      questTargetsMatched: 0, achievementsChecked: 0, bestiaryEntriesChecked: 0,
+      spatialIndexesUpdated: 0, corpseObjectsCreated: 0, effectsCreated: 0, particlesCreated: 0,
+      listenersNotified: 0,
+    };
+    this.chunkFrameMetrics = {
+      chunksCreatedThisFrame: 0, chunkIdsCreated: [], monstersInsertedIntoIndexes: 0,
+      objectsInsertedIntoIndexes: 0, spatialIndexCellsTouched: 0,
+      nearbyMonsterSetSizeBefore: 0, nearbyMonsterSetSizeAfter: 0,
+      pathfindingCacheInvalidations: 0, visibilityCacheInvalidations: 0,
+    };
+    this.projectileUpdateTimings = null;
+    this.monsterUpdateTimings = {
+      monsterCandidateCollectionMs: 0, monsterNearbySetUpdateMs: 0, monsterSpatialIndexInsertMs: 0,
+      monsterSpatialIndexRebuildMs: 0, monsterChunkActivationMs: 0, monsterChunkSpawnProcessingMs: 0,
+      monsterVisibilityUpdateMs: 0, monsterPathfindingMs: 0, monsterCollisionMs: 0,
+      monsterAiMs: 0, monsterAnimationMs: 0, monsterDeathCleanupMs: 0, monsterStateCommitMs: 0,
+    };
+    this.playerUpdateTimings = {
+      playerInputMs: 0, playerMovementMs: 0, playerCollisionMs: 0, playerTargetingMs: 0,
+      playerTargetCandidateCollectionMs: 0, playerTargetSpatialQueryMs: 0, playerTargetDistanceChecksMs: 0,
+      playerTargetLineOfSightMs: 0, playerTargetConditionEvaluationMs: 0, playerTargetSortMs: 0,
+      playerTargetStateComparisonMs: 0, playerTargetStateCommitMs: 0, playerTargetChunkSyncMs: 0,
+      targetCandidateCount: 0, targetDistanceCheckCount: 0, targetLineOfSightCheckCount: 0,
+      targetConditionCheckCount: 0, objectsScanned: 0, monstersScanned: 0, lootScanned: 0,
+      npcsScanned: 0, actionTargetsScanned: 0, selectedTargetType: null, selectedTargetId: null,
+      targetingTriggeredBy: null,
+      playerCombatMs: 0, playerStatusEffectsMs: 0, playerAnimationMs: 0,
+      playerChunkOrRegionUpdateMs: 0, playerDirtyMarkMs: 0,
+    };
+    this.lootUpdateTimings = {
+      lootHoverMs: 0,
+      lootPickupMs: 0,
+      lootMergeMs: 0,
+      lootInventoryMergeMs: 0,
+      lootDropCreationMs: 0,
+      lootQuestTargetScanMs: 0,
+      lootRenderStateMs: 0,
+      lootFloaterMs: 0,
+      lootToastMs: 0,
+      lootSnapshotMs: 0,
+      pickedUpItems: 0,
+      lootTableRollMs: 0,
+      lootConditionEvaluationMs: 0,
+      lootUniqueCheckMs: 0,
+      lootNamedCheckMs: 0,
+      lootQuestDropCheckMs: 0,
+      lootObjectCreationMs: 0,
+      lootPlacementMs: 0,
+      lootDirtyMarkMs: 0,
+      lootToastOrFloaterMs: 0,
+      lootSaveDirtyMs: 0,
+      lootQueuedJobsProcessed: 0,
+      lootDropJobsQueued: this.pendingLootDrops?.length ?? 0,
+      lootJobsQueuedThisFrame: 0,
+      lootJobsEligibleThisFrame: 0,
+      lootJobsDeferredBecauseNew: 0,
+      lootOldestEligibleJobAgeFrames: 0,
+      lootProcessingGeneration: this.lootProcessingGeneration ?? 0,
+      lootQueuedFromMonsterDeath: 0,
+      lootQueuedFromGroundHazardDeath: 0,
+      lootQueuedFromProjectileDeath: 0,
+      lootQueuedFromMeleeDeath: 0,
+      lootDropJobsDeferred: 0,
+      lootDropBudgetHit: false,
+      lootDropBudgetMs: 2,
+      slowLootTableId: null,
+      slowLootEntryId: null,
+      slowLootConditionKey: null,
+      lootEntriesEvaluated: 0,
+      lootTablesRolled: 0,
+      nestedLootTablesRolled: 0,
+      currentLootJobId: null,
+      sourceType: null,
+      sourceId: null,
+      lootTableId: null,
+      tableElapsedMs: 0,
+      entryId: null,
+      entryElapsedMs: 0,
+      conditionKey: null,
+      conditionElapsedMs: 0,
+      entriesEvaluatedThisFrame: 0,
+      entriesRemaining: 0,
+      tablesCompletedThisFrame: 0,
+      tablesRemaining: 0,
+      jobStage: null,
+      jobElapsedTotalMs: 0,
+      frameLootElapsedMs: 0,
+      deferredBecauseBudget: false,
+      lootObjectsCreated: 0,
+    };
+    this.groundHazardUpdateTimings = {
+      groundHazardUpdateMs: 0,
+      groundHazardCollisionMs: 0,
+      groundHazardDamageMs: 0,
+      groundHazardDamageApplyMs: 0,
+      groundHazardDeathDetectionMs: 0,
+      groundHazardDeathStateMs: 0,
+      groundHazardDeathCallbacksMs: 0,
+      groundHazardLootJobEnqueueMs: 0,
+      groundHazardCorpseCreationMs: 0,
+      groundHazardDeathEffectsMs: 0,
+      groundHazardSpatialRemovalMs: 0,
+      groundHazardQuestProgressMs: 0,
+      groundHazardKillMs: 0,
+      groundHazardLootDropMs: 0,
+      groundHazardSpawnEffectsMs: 0,
+      groundHazardCleanupMs: 0,
+      groundHazardCandidateCount: 0,
+      groundHazardAffectedTargetCount: 0,
+      groundHazardType: null,
+    };
+    this.cleanupUpdateTimings = {
+      cleanupEffectArraysMs: 0,
+      cleanupProjectileArraysMs: 0,
+      cleanupFloatersMs: 0,
+      cleanupParticlesMs: 0,
+      cleanupWorldMs: 0,
+      cleanupInteractionTargetsMs: 0,
+      cleanupRegionExitMs: 0,
+      cleanupAutosaveSnapshotMs: 0,
+      autosaveShouldRunMs: 0,
+      autosaveSnapshotBuildMs: 0,
+      autosaveCloneMs: 0,
+      autosaveSerializeMs: 0,
+      autosaveStorageWriteMs: 0,
+      autosaveTotalMs: 0,
+    };
+    this.interactionTargetTimings = {
+      interactionTargetCollectObjectsMs: 0,
+      interactionTargetCollectLootMs: 0,
+      interactionTargetCollectMonstersMs: 0,
+      interactionTargetCollectNpcsMs: 0,
+      interactionTargetDistanceChecksMs: 0,
+      interactionTargetSortMs: 0,
+      interactionTargetStateUpdateMs: 0,
+      interactionTargetStateReasons: {},
+    };
+    timed("cleanupMs", () => {
+      const startedAt = performance.now();
+      this.ensureWorldAroundPlayer();
+      this.cleanupUpdateTimings.cleanupWorldMs += performance.now() - startedAt;
+    });
+    timed("minimapFogMs", () => {
+      if (this.updateFogOfWar()) this.markRenderDirty("fog");
+      this.flushPendingMinimapFogInvalidation?.(false);
+    });
+    const stats = timed("playerMs", () => {
+      const calculated = this.calcStats();
+      this.player.hp = clamp(this.player.hp, 0, calculated.maxHp);
+      if (this.player.hp > 0 && this.player.deadTimer > 0) {
+        this.player.deadTimer = 0;
+        this.markRenderDirty("player-death-reset");
+      }
+      this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, calculated.maxMana);
+      this.player.attackCooldown = Math.max(0, this.player.attackCooldown - dt);
+      this.player.spellCooldown = Math.max(0, this.player.spellCooldown - dt);
+      this.potionCooldown = Math.max(0, this.potionCooldown - dt);
+      this.player.hurtCooldown = Math.max(0, this.player.hurtCooldown - dt);
+      this.player.attackAnim = Math.max(0, this.player.attackAnim - dt);
+      this.player.castAnim = Math.max(0, this.player.castAnim - dt);
+      return calculated;
+    });
 
     if (this.player.hp <= 0) {
-      this.updateDeath(dt, stats);
+      timed("playerMs", () => this.updateDeath(dt, stats));
     } else {
-      this.updatePlayer(dt, stats);
-      this.updateHeldSpell?.(dt);
-      this.updateQuestgiver(dt);
-      this.updateNearbyActionTarget();
-      this.updateFoliageLoot();
-      this.updateMonsters(dt, stats);
-      this.updateCritters?.(dt);
-      this.updateProjectiles(dt);
-      this.updateGroundHazards(dt);
-      this.updateSpellVisualCleanups?.(dt);
-      this.updateLoot(dt);
+      timed("playerMs", () => this.updatePlayer(dt, stats));
+      timed("spellEffectsMs", () => this.updateHeldSpell?.(dt));
+      timed("cleanupMs", () => {
+        const startedAt = performance.now();
+        this.updateInteractionTargets?.(dt);
+        this.cleanupUpdateTimings.cleanupInteractionTargetsMs += performance.now() - startedAt;
+      });
+      timed("monstersMs", () => {
+        this.updateMonsters(dt, stats);
+        this.updateCritters?.(dt);
+      });
+      timed("projectilesMs", () => this.updateProjectiles(dt));
+      timed("groundHazardsMs", () => this.updateGroundHazards(dt));
+      timed("spellEffectsMs", () => this.updateSpellVisualCleanups?.(dt));
+      timed("lootMs", () => this.updateLoot(dt));
     }
 
-    this.updateEffects(dt);
-    this.updateAmbient(dt);
-    this.updateConfiguredParticles(dt);
-    this.updateWeatherEvents(dt);
-    this.updateWeatherOverlay(dt);
-    this.updateRegionExit(dt);
-    this.updateCamera(dt);
-    this.autosaveTimer -= dt;
-    if (this.autosaveTimer <= 0) {
-      this.saveProgress();
-      this.autosaveTimer = AUTOSAVE_INTERVAL_SECONDS;
-    }
-    this.snapshotTimer -= dt;
-    if (this.snapshotTimer <= 0) {
-      this.publishSnapshot();
-      this.snapshotTimer = 0.2;
-    }
+    timed("particlesFloatersMs", () => {
+      this.updateEffects(dt);
+      this.updateAmbient(dt);
+      this.updateConfiguredParticles(dt);
+      this.updateWeatherEvents(dt);
+      this.updateWeatherOverlay(dt);
+    });
+    timed("cleanupMs", () => {
+      const startedAt = performance.now();
+      this.updateRegionExit(dt);
+      this.cleanupUpdateTimings.cleanupRegionExitMs += performance.now() - startedAt;
+    });
+    timed("cameraMs", () => this.updateCamera(dt));
+    timed("cleanupMs", () => {
+      const startedAt = performance.now();
+      const autosaveCheckStartedAt = performance.now();
+      this.autosaveTimer -= dt;
+      const shouldAutosave = this.autosaveTimer <= 0;
+      this.cleanupUpdateTimings.autosaveShouldRunMs += performance.now() - autosaveCheckStartedAt;
+      if (shouldAutosave) {
+        this.scheduleAutosave?.();
+        this.autosaveTimer = AUTOSAVE_INTERVAL_SECONDS;
+      }
+      this.snapshotTimer -= dt;
+      if (this.snapshotTimer <= 0) {
+        if (this.shouldSchedulePeriodicSnapshot?.()) this.scheduleSnapshotPublish?.("periodic");
+        this.snapshotTimer = 2;
+      }
+      this.cleanupUpdateTimings.cleanupAutosaveSnapshotMs += performance.now() - startedAt;
+    });
+    const totalMs = performance.now() - updateStartedAt;
+    const categories = {
+      player: timings.playerMs,
+      camera: timings.cameraMs,
+      monsters: timings.monstersMs,
+      projectiles: timings.projectilesMs,
+      groundHazards: timings.groundHazardsMs,
+      spellEffects: timings.spellEffectsMs,
+      particlesFloaters: timings.particlesFloatersMs,
+      loot: timings.lootMs,
+      cleanup: timings.cleanupMs,
+      minimapFog: timings.minimapFogMs,
+    };
+    const [worstCategory, worstCategoryMs] = Object.entries(categories)
+      .sort((a, b) => b[1] - a[1])[0] ?? ["none", 0];
+    this.updateTimings = {
+      totalMs,
+      ...categories,
+      worstCategory,
+      worstCategoryMs,
+    };
+    this.warnSlowUpdateCategory?.(worstCategory, worstCategoryMs);
+    this.warnPerformanceThreshold?.("update.totalMs", totalMs, 8, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("playerTargetingMs", this.playerUpdateTimings?.playerTargetingMs, 2, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("monstersMs", categories.monsters, 3, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("cleanupInteractionTargetsMs", this.cleanupUpdateTimings.cleanupInteractionTargetsMs, 2);
+    this.warnPerformanceThreshold?.("cleanupAutosaveSnapshotMs", this.cleanupUpdateTimings.cleanupAutosaveSnapshotMs, 1.5, {
+      save: this.lastSaveInfo ? {
+        sizeKb: this.lastSaveInfo.sizeKb ?? null,
+        reason: this.lastSaveInfo.reason ?? null,
+        status: this.lastSaveInfo.status ?? null,
+        timings: this.lastSaveInfo.timings ? { ...this.lastSaveInfo.timings } : null,
+      } : null,
+    });
+    this.warnPerformanceThreshold?.("projectilesMs", categories.projectiles, 2, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      projectileCount: this.projectiles?.length ?? 0,
+      projectileTimings: this.projectileUpdateTimings ? { ...this.projectileUpdateTimings } : null,
+      dirtyReasons: this.renderDirtyReasons ? [...this.renderDirtyReasons] : [],
+      lastRenderedDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+    });
+    this.warnPerformanceThreshold?.("lootMs", categories.loot, 2, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      lootCount: this.loots?.length ?? 0,
+      lootTimings: this.lootUpdateTimings ? { ...this.lootUpdateTimings } : null,
+      pickedUpItems: Math.max(0, Math.floor(Number(this.lootUpdateTimings?.pickedUpItems) || 0)),
+      saveDirtyReasons: { ...(this.saveDirtyReasons ?? {}) },
+      snapshotActualBuildCount: Math.max(0, Math.floor(Number(this.snapshotBuildCount) || 0)),
+      dirtyReasons: this.renderDirtyReasons ? [...this.renderDirtyReasons] : [],
+      lastRenderedDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+      inventory: this.performanceInventoryCounts?.() ?? null,
+    });
+    this.warnPerformanceThreshold?.("lootDropCreationMs", this.lootUpdateTimings?.lootDropCreationMs, 2, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("projectileImpactMs", this.projectileUpdateTimings?.projectileImpactMs, 2, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("projectileImpactDamageMs", this.projectileUpdateTimings?.projectileImpactDamageMs, 2, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      projectileCount: this.projectiles?.length ?? 0,
+      projectileImpact: this.projectileUpdateTimings ? { ...this.projectileUpdateTimings } : null,
+      dirtyReasons: this.renderDirtyReasons ? [...this.renderDirtyReasons] : [],
+    });
+    this.warnPerformanceThreshold?.("projectileImpactLootDropMs", this.projectileUpdateTimings?.projectileImpactLootDropMs, 2, this.performanceSpikeContext?.());
+    this.warnPerformanceThreshold?.("groundHazardsMs", categories.groundHazards, 2, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      groundHazardTimings: this.groundHazardUpdateTimings ? { ...this.groundHazardUpdateTimings } : null,
+    });
+    this.warnPerformanceThreshold?.("groundHazardDamageMs", this.groundHazardUpdateTimings?.groundHazardDamageMs, 2, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      hazardCount: this.groundHazards?.length ?? 0,
+      affectedTargetCount: this.groundHazardUpdateTimings?.groundHazardAffectedTargetCount ?? 0,
+      candidateCount: this.groundHazardUpdateTimings?.groundHazardCandidateCount ?? 0,
+      hazardType: this.groundHazardUpdateTimings?.groundHazardType ?? null,
+      regionId: this.region?.mapRegion?.id ?? this.region?.id ?? null,
+    });
+    this.warnPerformanceThreshold?.("monsterDeathTotalMs", this.monsterDeathTimings?.monsterDeathTotalMs, 2.5, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      monsterDeath: this.monsterDeathTimings ? { ...this.monsterDeathTimings } : null,
+    });
+    this.warnPerformanceThreshold?.("monsterDeathTotalSevereMs", this.monsterDeathTimings?.monsterDeathTotalMs, 5, {
+      ...(this.performanceSpikeContext?.() ?? {}),
+      monsterDeath: this.monsterDeathTimings ? { ...this.monsterDeathTimings } : null,
+    });
     this.updatePerformanceHistory?.();
+  },
+
+  updateInteractionTargets(dt = 0) {
+    const now = performance.now();
+    const player = this.player ?? {};
+    const signature = [
+      this.region?.mapRegion?.id ?? this.region?.id ?? "",
+      Math.floor((Number(player.x) || 0) * 4),
+      Math.floor((Number(player.y) || 0) * 4),
+      this.loots?.length ?? 0,
+      this.questState?.wildernessNpc?.id ?? "",
+      this.actionTargetRevision ?? 0,
+    ].join("|");
+    const force = this.interactionTargetsDirty
+      || this.interactionTargetSignature !== signature
+      || now - (this.lastInteractionTargetUpdateAt ?? 0) > 250;
+    if (!force) return false;
+    this.interactionTargetsDirty = false;
+    this.interactionTargetSignature = signature;
+    this.lastInteractionTargetUpdateAt = now;
+    this.updateQuestgiver(dt);
+    this.updateNearbyActionTarget();
+    this.updateFoliageLoot();
+    if (this.playerUpdateTimings) {
+      const selected = this.nearbyActionTarget ?? this.nearbyFoliageLoot ?? this.nearbyQuestgiver;
+      this.playerUpdateTimings.selectedTargetType = selected?.sourceType ?? (selected?.npcId ? "npc" : selected ? "object" : null);
+      this.playerUpdateTimings.selectedTargetId = selected?.runtimeId ?? selected?.id ?? null;
+      this.playerUpdateTimings.targetingTriggeredBy = this.interactionTargetsDirty ? "dirty" : "player-position";
+    }
+    return true;
+  },
+
+  scheduleAutosave() {
+    if (this.pendingAutosaveTimer) return false;
+    this.pendingAutosaveTimer = setTimeout(() => {
+      this.pendingAutosaveTimer = null;
+      this.saveProgress({ reason: "autosave" });
+    }, 0);
+    return true;
+  },
+
+  scheduleSnapshotPublish(reason = "periodic") {
+    const reasonKey = String(reason || "periodic");
+    if (reasonKey === "toast" || reasonKey === "toast-expire") {
+      // Toasts are represented in the UI snapshot but do not change persisted
+      // game state; never rebuild an unchanged snapshot for their lifecycle.
+      return false;
+    }
+    this.pendingSnapshotReasons ??= {};
+    this.pendingSnapshotReasons[reasonKey] = (this.pendingSnapshotReasons[reasonKey] ?? 0) + 1;
+    if (this.pendingSnapshotTimer) {
+      this.snapshotCoalescedCount = (this.snapshotCoalescedCount ?? 0) + 1;
+      return true;
+    }
+    const schedule = (callback) => {
+      if (typeof requestIdleCallback === "function") {
+        return requestIdleCallback(callback, { timeout: 120 });
+      }
+      return setTimeout(callback, 0);
+    };
+    const clearScheduled = (id) => {
+      if (typeof cancelIdleCallback === "function") cancelIdleCallback(id);
+      else clearTimeout(id);
+    };
+    this.pendingSnapshotClear = clearScheduled;
+    this.pendingSnapshotTimer = schedule(() => {
+      this.pendingSnapshotTimer = null;
+      this.pendingSnapshotClear = null;
+      const requestedReasons = { ...(this.pendingSnapshotReasons ?? {}) };
+      const primaryRequestedReason = Object.entries(requestedReasons)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? reasonKey;
+      this.pendingSnapshotReasons = {};
+      if ((this.persistentStateVersion ?? 0) === (this.snapshotStateVersion ?? -1)) {
+        this.snapshotSkippedUnchangedVersion = (this.snapshotSkippedUnchangedVersion ?? 0) + 1;
+        this.lastSnapshotInfo = {
+          ...(this.lastSnapshotInfo ?? {}), snapshotRequestedReason: primaryRequestedReason,
+          snapshotSkippedUnchangedVersion: this.snapshotSkippedUnchangedVersion,
+        };
+        return;
+      }
+      const startedAt = performance.now();
+      this.publishSnapshot();
+      const elapsed = performance.now() - startedAt;
+      const reasons = requestedReasons;
+      const primaryReason = Object.entries(reasons)
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0]?.[0] ?? reasonKey;
+      const info = {
+        reason: primaryReason,
+        reasons,
+        snapshotRequestedReason: primaryRequestedReason,
+        snapshotActualBuildReason: primaryReason,
+        snapshotDirtyReasonsConsumed: { ...(this.saveDirtyReasons ?? {}) },
+        persistentStateVersion: this.persistentStateVersion ?? 0,
+        snapshotStateVersion: this.persistentStateVersion ?? 0,
+        builtAt: Date.now(),
+        buildCount: (this.snapshotBuildCount ?? 0) + 1,
+        coalescedCount: this.snapshotCoalescedCount ?? 0,
+        skippedBecauseUiOnly: this.snapshotSkippedBecauseUiOnly ?? 0,
+        autosaveSnapshotBuildMs: elapsed,
+        regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId ?? this.region?.id ?? null,
+        playerTile: {
+          x: Math.floor(Number(this.player?.x) || 0),
+          y: Math.floor(Number(this.player?.y) || 0),
+        },
+      };
+      this.snapshotBuildCount = info.buildCount;
+      this.snapshotStateVersion = this.persistentStateVersion ?? 0;
+      this.lastSnapshotInfo = info;
+      this.warnPerformanceThreshold?.("autosaveSnapshotBuildMs", elapsed, 1.5, {
+        snapshot: info,
+      });
+    });
+    return true;
+  },
+
+  markSaveDirty(reason = "unknown") {
+    const key = String(reason || "unknown");
+    if (this.saveDirtyReasons?.[key] && this.monsterDeathTimings) {
+      this.monsterDeathTimings.repeatedSaveDirtyMarksCoalesced = (this.monsterDeathTimings.repeatedSaveDirtyMarksCoalesced ?? 0) + 1;
+    }
+    this.saveDirty = true;
+    this.saveDirtyReasons ??= {};
+    this.saveDirtyReasons[key] = true;
+    this.saveDirtyReasonCounts ??= {};
+    this.saveDirtyReasonCounts[key] = (this.saveDirtyReasonCounts[key] ?? 0) + 1;
+    this.stateVersion = (this.stateVersion ?? 0) + 1;
+    this.persistentStateVersion = (this.persistentStateVersion ?? 0) + 1;
+  },
+
+  markUiOnlySnapshot(reason = "ui") {
+    const key = String(reason || "ui");
+    this.uiDirtyReasons ??= {};
+    this.uiDirtyReasons[key] = (this.uiDirtyReasons[key] ?? 0) + 1;
+    this.snapshotSkippedBecauseUiOnly = (this.snapshotSkippedBecauseUiOnly ?? 0) + 1;
+  },
+
+  periodicSnapshotSignature() {
+    const player = this.player ?? {};
+    return [
+      Math.ceil(Number(player.hp) || 0),
+      Math.floor((Number(player.mana) || 0) / 5),
+      Math.ceil((Number(player.attackCooldown) || 0) * 4),
+      Math.ceil((Number(player.spellCooldown) || 0) * 4),
+      Math.ceil((Number(this.potionCooldown) || 0) * 4),
+      this.loots?.length ?? 0,
+    ].join("|");
+  },
+
+  shouldSchedulePeriodicSnapshot() {
+    const signature = this.periodicSnapshotSignature?.() ?? "";
+    if (signature === this.lastPeriodicSnapshotSignature) return false;
+    this.lastPeriodicSnapshotSignature = signature;
+    return true;
+  },
+
+  performanceInventoryCounts() {
+    const inventory = this.player?.inventory ?? [];
+    const resources = {};
+    let resourceStacks = 0;
+    let potionStacks = 0;
+    let questItems = 0;
+    for (const item of inventory) {
+      if (!item) continue;
+      if (item.resourceId || item.mode === "resource" || item.slot === "resource") {
+        resourceStacks += 1;
+        const id = String(item.resourceId ?? item.id ?? "unknown");
+        resources[id] = (resources[id] ?? 0) + Math.max(1, Math.floor(Number(item.count) || 1));
+      } else if (item.potionId || item.potionType || item.mode === "potion") {
+        potionStacks += 1;
+      } else if (item.questItemId || item.mode === "quest") {
+        questItems += 1;
+      }
+    }
+    return {
+      inventorySlots: inventory.length,
+      resourceStacks,
+      potionStacks,
+      questItems,
+      resources,
+    };
+  },
+
+  performanceSpikeContext() {
+    return {
+      dirtyReasons: this.renderDirtyReasons ? [...this.renderDirtyReasons] : [],
+      lastRenderedDirtyReasons: [...(this.lastRenderDirtyReasons ?? [])],
+      monsterDeathsThisFrame: Math.max(0, Math.floor(Number(this.monsterDeathsThisFrame) || 0)),
+      lootObjectsCreatedThisFrame: Math.max(0, Math.floor(Number(this.lootUpdateTimings?.lootObjectsCreated) || 0)),
+      projectileCount: this.projectiles?.length ?? 0,
+      hazardCount: this.groundHazards?.length ?? 0,
+      activeSpellEffects: (this.effectDebugCounts?.activeSpellParticles ?? 0) + (this.effectDebugCounts?.activeSpellEmitters ?? 0),
+      activeParticles: (this.particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0),
+      lootTimings: this.lootUpdateTimings ? { ...this.lootUpdateTimings } : null,
+      projectileTimings: this.projectileUpdateTimings ? { ...this.projectileUpdateTimings } : null,
+      groundHazardTimings: this.groundHazardUpdateTimings ? { ...this.groundHazardUpdateTimings } : null,
+    };
+  },
+
+  warnSlowUpdateCategory(category, ms) {
+    const elapsed = Number(ms) || 0;
+    if (elapsed <= 5) return;
+    this.warnPerformanceThreshold?.(`slow-${category || "unknown"}`, elapsed, 5, {
+      category: String(category || "unknown"),
+    });
+  },
+
+  warnPerformanceThreshold(metric, ms, threshold, extra = {}) {
+    const elapsed = Number(ms) || 0;
+    if (elapsed <= threshold) return;
+    const now = performance.now();
+    const key = String(metric || "unknown");
+    this.performanceWarnTimes ??= {};
+    if (now - (this.performanceWarnTimes[key] ?? 0) < 2000) return;
+    this.performanceWarnTimes[key] = now;
+    const counts = {
+      monsters: this.monsters?.size ?? 0,
+      nearbyUpdatedMonsters: this.monsterActivityDebug?.nearbyUpdatedMonsters ?? 0,
+      nearbyTotalMonsters: this.monsterActivityDebug?.nearbyTotalMonsters ?? 0,
+      projectiles: this.projectiles?.length ?? 0,
+      loot: this.loots?.length ?? 0,
+      objects: this.renderDebugCounts?.objects ?? 0,
+      groundHazards: this.groundHazards?.length ?? 0,
+      particles: (this.particleEngine?.particles?.length ?? 0) + (this.particles?.length ?? 0),
+      emitters: this.particleEngine?.emitters?.size ?? 0,
+      floaters: this.floaters?.length ?? 0,
+    };
+    console.warn("[performance] Update/render threshold exceeded", {
+      metric: key,
+      thresholdMs: threshold,
+      ms: Math.round(elapsed * 10) / 10,
+      counts,
+      playerTile: {
+        x: Math.floor(Number(this.player?.x) || 0),
+        y: Math.floor(Number(this.player?.y) || 0),
+      },
+      regionId: this.region?.mapRegion?.id ?? this.activeMapRegion?.regionId ?? this.region?.id ?? null,
+      activeReasons: [...(this.visualActivityReasons ?? [])],
+      ...extra,
+      projectile: this.projectileUpdateTimings ? { ...this.projectileUpdateTimings } : null,
+      loot: this.lootUpdateTimings ? { ...this.lootUpdateTimings } : null,
+      cleanup: this.cleanupUpdateTimings ? { ...this.cleanupUpdateTimings } : null,
+      interactionTargets: this.interactionTargetTimings ? { ...this.interactionTargetTimings } : null,
+    });
   },
 
   markRenderDirty(reason = "unknown") {
     this.renderDirty = true;
     const normalizedReason = String(reason || "unknown");
+    if (this.renderDirtyReasons?.has(normalizedReason) && this.monsterDeathTimings) {
+      this.monsterDeathTimings.repeatedRenderDirtyMarksCoalesced = (this.monsterDeathTimings.repeatedRenderDirtyMarksCoalesced ?? 0) + 1;
+    }
     if (this.renderDirtyReasons) this.renderDirtyReasons.add(normalizedReason);
     this.renderDirtyReasonTimes ??= new Map();
     this.renderDirtyReasonTimes.set(normalizedReason, performance.now());
+    if (/action|quest|loot|foliage|object|npc|monster-death|chunk|region|map/i.test(normalizedReason)) {
+      this.interactionTargetsDirty = true;
+    }
+    if (/fog/i.test(normalizedReason)) {
+      // Fog is a small, dynamic overlay. Never make it wait for the expensive
+      // static-map backoff: the player needs newly revealed terrain promptly.
+      this.invalidateMinimapFogOverlay?.(normalizedReason);
+      return;
+    }
     if (/fog|map|region|chunk|object|city|explor|start/i.test(normalizedReason)) {
       this.invalidateMinimapStatic?.(normalizedReason);
     }
+  },
+
+  shouldBatchMinimapFogInvalidation() {
+    if (!this.fogOfWarActive) return false;
+    const tier = Math.max(0, Math.floor(Number(this.adaptivePerformanceTier) || 0));
+    if (tier <= 0 && this.visualActivityLevel !== "active") return false;
+    const reasons = new Set(this.visualActivityReasons ?? []);
+    return tier > 0
+      || reasons.has("player-moving")
+      || reasons.has("monster-combat-motion")
+      || reasons.has("combat-particles")
+      || reasons.has("spell-visuals")
+      || reasons.has("visible-ground-hazard");
+  },
+
+  flushPendingMinimapFogInvalidation(force = false) {
+    if (!this.pendingMinimapFogInvalidation) return false;
+    const settings = this.adaptiveRuntimeSettings?.() ?? {};
+    const baseInterval = Math.max(0, Number(settings.minimapFogRebuildIntervalMs) || 0);
+    const interval = baseInterval > 0 ? baseInterval : (this.shouldBatchMinimapFogInvalidation?.() ? 400 : 0);
+    const now = performance.now();
+    const last = Number(this.lastMinimapFogInvalidationAt) || 0;
+    if (!force && interval > 0 && now - last < interval) return false;
+    this.pendingMinimapFogInvalidation = false;
+    this.pendingMinimapFogInvalidationAt = null;
+    this.lastMinimapFogInvalidationAt = now;
+    this.invalidateMinimapStatic?.(this.pendingMinimapFogInvalidationReason ?? "fog-batched");
+    this.pendingMinimapFogInvalidationReason = null;
+    return true;
   },
 
   clearRenderDirty() {
@@ -614,6 +1198,7 @@ export const lifecycleMethods = {
   },
 
   updateRenderDiagnostics(dt) {
+    this.warnPerformanceThreshold?.("minimapMs", this.renderTimings?.minimapMs, 4);
     this.renderStatsWindowTime = (this.renderStatsWindowTime ?? 0) + dt;
     if (this.renderStatsWindowTime < 0.75) return;
     const seconds = this.renderStatsWindowTime;
@@ -657,13 +1242,19 @@ export const lifecycleMethods = {
   },
 
   updatePlayer(dt, stats) {
-    const input = this.readMovementInput();
+    const timedPlayer = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      this.playerUpdateTimings[key] = (this.playerUpdateTimings[key] ?? 0) + (performance.now() - startedAt);
+      return result;
+    };
+    const input = timedPlayer("playerInputMs", () => this.readMovementInput());
     const beforeX = this.player.x;
     const beforeY = this.player.y;
     let moved = false;
     if (input.x || input.y) {
       const speedMult = this.statusSpeedMultiplier?.(this.player) ?? 1;
-      this.moveEntity(this.player, input.x * stats.speed * speedMult * dt, input.y * stats.speed * speedMult * dt);
+      timedPlayer("playerMovementMs", () => this.moveEntity(this.player, input.x * stats.speed * speedMult * dt, input.y * stats.speed * speedMult * dt));
       this.player.target = null;
       this.setFacing(input.x, input.y);
       moved = true;
@@ -673,7 +1264,7 @@ export const lifecycleMethods = {
       const n = normalize(dx, dy);
       if (Math.hypot(dx, dy) > 0.08) {
         const speedMult = this.statusSpeedMultiplier?.(this.player) ?? 1;
-        this.moveEntity(this.player, n.x * stats.speed * speedMult * dt, n.y * stats.speed * speedMult * dt);
+        timedPlayer("playerMovementMs", () => this.moveEntity(this.player, n.x * stats.speed * speedMult * dt, n.y * stats.speed * speedMult * dt));
         this.setFacing(n.x, n.y);
         moved = true;
       } else {
@@ -687,7 +1278,7 @@ export const lifecycleMethods = {
     if (this.player.moveSpeed > 0.02) this.player.gait += dt * (7.5 + this.player.moveSpeed * 2.3);
     if (moved && Math.random() < (this.footstepDustChance?.(0.18) ?? 0.18)) this.addDust(this.player.x, this.player.y, 1);
 
-    const attackTarget = this.monsters.get(this.player.attackTargetId);
+    const attackTarget = timedPlayer("playerTargetingMs", () => this.monsters.get(this.player.attackTargetId));
     if (!attackTarget || attackTarget.dead) {
       this.player.attackTargetId = null;
     } else {
@@ -696,11 +1287,11 @@ export const lifecycleMethods = {
         this.player.target = { x: attackTarget.x, y: attackTarget.y };
       }
       if (d <= stats.range + attackTarget.radius && this.player.attackCooldown <= 0) {
-        this.primaryAttack(attackTarget);
+        timedPlayer("playerCombatMs", () => this.primaryAttack(attackTarget));
       }
     }
 
-    const attackObject = this.findObjectById(this.player.attackObjectId);
+    const attackObject = timedPlayer("playerTargetingMs", () => this.findObjectById(this.player.attackObjectId));
     if (!attackObject || !isDestructibleObject(attackObject)) {
       this.player.attackObjectId = null;
     } else if (!this.player.attackTargetId) {
@@ -709,7 +1300,7 @@ export const lifecycleMethods = {
         this.player.target = { x: attackObject.x, y: attackObject.y };
       }
       if (d <= DESTRUCTIBLE_OBJECT_ATTACK_RANGE + attackObject.radius && this.player.attackCooldown <= 0) {
-        this.primaryAttack(attackObject);
+        timedPlayer("playerCombatMs", () => this.primaryAttack(attackObject));
       }
     }
 

@@ -9,10 +9,10 @@ import {
 import { useLocalization } from "../i18n/index.js";
 
 const STAGE_LABELS = {
-  unknown: "Ukendt",
-  seen: "Set",
-  fought: "Bekaempet",
-  killed: "Draebt",
+  unknown: "Unknown",
+  seen: "Seen",
+  fought: "Fought",
+  killed: "Killed",
 };
 
 function MonsterSpriteCanvas({ monsterId, seen }) {
@@ -67,12 +67,18 @@ function BestiaryBookModal({ entry, onClose }) {
   const metadataRows = bestiaryMetadataRows(entry, language);
   const regionRows = bestiaryRegionRows(discovery);
   const loreText = library.text;
-  const labels = language === "da" ? {
-    unknown: "Ukendt væsen", locked: "Denne side er låst. Find væsenet i vildmarken for at begynde noterne.",
-    habitat: "Levested", strengths: "Styrker", weaknesses: "Svagheder",
-  } : {
-    unknown: "Unknown creature", locked: "This page is locked. Find the creature in the wild to begin the notes.",
-    habitat: "Habitat", strengths: "Strengths", weaknesses: "Weaknesses",
+  const labels = {
+    unknown: t("bestiary.unknownCreature"),
+    locked: t("bestiary.lockedPage"),
+    habitat: t("bestiary.habitat"),
+    strengths: t("bestiary.strengths"),
+    weaknesses: t("bestiary.weaknesses"),
+    stage: {
+      unknown: t("bestiary.stage.unknown"),
+      seen: t("bestiary.stage.seen"),
+      fought: t("bestiary.stage.fought"),
+      killed: t("bestiary.stage.killed"),
+    },
   };
 
   return (
@@ -98,11 +104,11 @@ function BestiaryBookModal({ entry, onClose }) {
                     <MonsterSpriteCanvas monsterId={id} seen={seen} />
                     <div>
                       <h4 id="bestiary-title">{entry.title}</h4>
-                      <span>{STAGE_LABELS[stage]}</span>
-                      {discovery.lastSeenRegionId && <small>Set i: {discovery.lastSeenRegionId}</small>}
+                      <span>{labels.stage[stage] ?? STAGE_LABELS[stage] ?? stage}</span>
+                      {discovery.lastSeenRegionId && <small>{t("bestiary.seenIn", { region: discovery.lastSeenRegionId })}</small>}
                     </div>
                   </header>
-                  {!fought && <p>Vaesenet er observeret, men detaljerede kampnoter mangler stadig.</p>}
+                  {!fought && <p>{t("bestiary.observedNoCombatNotes")}</p>}
                   {fought && (
                     <>
                       <p>{loreText}</p>
@@ -125,9 +131,9 @@ function BestiaryBookModal({ entry, onClose }) {
               )}
             </article>
             <article className="bestiary-book-page">
-              <h4>Feltdata</h4>
-              {!seen && <p>Ingen feltdata endnu.</p>}
-              {seen && !fought && <p>Stats og kampdata laases op efter foerste kamp.</p>}
+              <h4>{t("bestiary.fieldData")}</h4>
+              {!seen && <p>{t("bestiary.noFieldData")}</p>}
+              {seen && !fought && <p>{t("bestiary.combatDataLocked")}</p>}
               {fought && (
                 <div className="bestiary-stat-grid">
                   {metadataRows.map((row) => (
@@ -140,7 +146,7 @@ function BestiaryBookModal({ entry, onClose }) {
               )}
               {seen && regionRows.length > 0 && (
                 <>
-                  <h5>Set regioner</h5>
+                  <h5>{t("bestiary.seenRegions")}</h5>
                   <div className="bestiary-region-list">
                     {regionRows.map((row) => <span key={row.regionId}>{row.regionId}: {row.count}</span>)}
                   </div>
@@ -148,7 +154,7 @@ function BestiaryBookModal({ entry, onClose }) {
               )}
               {killed && (
                 <>
-                  <h5>Drab</h5>
+                  <h5>{t("bestiary.kills")}</h5>
                   <div className="bestiary-stat-grid">
                     <span><b>Normal</b>{discovery.killedNormal ?? 0}</span>
                     <span><b>Elite</b>{discovery.killedElite ?? 0}</span>
@@ -179,7 +185,7 @@ export function BestiaryViewer({ worldState }) {
     <section className="blacksmith-station bestiary-panel">
       <header>
         <h4>{t("panel.bestiary.title")}</h4>
-        <span>{entries.length} vaesener fra monster-config</span>
+        <span>{t("bestiary.entryCount", { count: entries.length })}</span>
       </header>
       <div className="bestiary-list" role="listbox" aria-label={t("panel.bestiary.title")}>
         {entries.map((entry) => {
@@ -193,7 +199,7 @@ export function BestiaryViewer({ worldState }) {
             >
               <MonsterSpriteCanvas monsterId={entry.id} seen={seen} />
               <span>{entry.title}</span>
-              <b>{STAGE_LABELS[entry.stage]}</b>
+              <b>{t(`bestiary.stage.${entry.stage}`) || STAGE_LABELS[entry.stage] || entry.stage}</b>
             </button>
           );
         })}

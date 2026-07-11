@@ -11,6 +11,7 @@ import { SAVE_PERSIST_CONFIG } from "../src/game/config/save-persist-config.js";
 import { createVillageOutskirtsMapRegions } from "../src/game/config/map-region/village-outskirts.js";
 import { questsMethods } from "../src/game/GameEngine/methods/quests.js";
 import { makeQuestInstance, questSavePayload } from "../src/game/GameEngine/helpers/quests.js";
+import { makeQuestItem } from "../src/game/GameEngine/helpers/quests.js";
 
 const ids = [
   "help_hunter_kill_wolfs",
@@ -26,14 +27,15 @@ assert(quests.every((quest) => quest.repeatable === false), "hunter quests must 
 assert(quests.every((quest) => quest.npcIds?.includes("hunter")), "hunter must offer and receive every quest");
 
 const expectedGates = [
-  ["mayor_repair_village_houses", 5],
+  [null, 5],
   ["help_hunter_kill_wolfs", 7],
   ["help_hunter_kill_boars", 9],
   ["help_hunter_find_bow", 9],
   ["help_hunter_find_weddingring", 9],
 ];
 expectedGates.forEach(([previousQuest, regionCount], index) => {
-  assert.deepEqual(quests[index].demands.completedQuests, [previousQuest]);
+  if (previousQuest) assert.deepEqual(quests[index].demands.completedQuests, [previousQuest]);
+  else assert.equal(quests[index].demands.completedQuests, undefined);
   assert.equal(quests[index].demands.unlockedRegionCount.min, regionCount);
 });
 
@@ -59,8 +61,10 @@ expectedGates.forEach(([previousQuest, regionCount], index) => {
   const demands = quests[index].demands;
   assert.equal(questsMethods.questDemandsMet.call(engine, demands, { worldState: worldWithUnlockedRegions(regionCount), player: engine.player }), true);
   assert.equal(questsMethods.questDemandsMet.call(engine, demands, { worldState: worldWithUnlockedRegions(regionCount - 1), player: engine.player }), false);
-  const missingPrevious = demandEngine([]);
-  assert.equal(questsMethods.questDemandsMet.call(missingPrevious, demands, { worldState: worldWithUnlockedRegions(regionCount), player: missingPrevious.player }), false);
+  if (previousQuest) {
+    const missingPrevious = demandEngine([]);
+    assert.equal(questsMethods.questDemandsMet.call(missingPrevious, demands, { worldState: worldWithUnlockedRegions(regionCount), player: missingPrevious.player }), false);
+  }
 });
 
 const matchEngine = {
@@ -139,6 +143,70 @@ for (const namedId of ["hunters_wolf_cape", "hunters_boar_tusk_necklace", "hunte
   const count = NAMED_ITEM_TEMPLATES.filter((item) => item.id === namedId).length;
   assert.equal(count, 1, `${namedId} must be a unique named item definition`);
 }
+
+const hunterNamedRewards = [
+  ["help_hunter_kill_boars", QUEST_DEFS.help_hunter_kill_boars.rewards, "hunters_wolf_cape"],
+  ["help_hunter_find_bow", QUEST_DEFS.help_hunter_find_bow.rewards, "hunters_boar_tusk_necklace"],
+  ["help_hunter_find_flower", flowerQuest.steps[2].rewards, "hunters_bow"],
+];
+for (const [questId, rewards, namedId] of hunterNamedRewards) {
+  assert.deepEqual(rewards.namedItems, [{ namedId }], `${questId} must use its exact named-item definition id`);
+}
+
+function rewardEngine() {
+  return {
+    player: { level: 20, x: 0, y: 0, xp: 0, gold: 0, stats: { goldEarned: 0 }, inventory: [] },
+    cityStats: {},
+    addInventoryItem(item) { this.player.inventory.push(item); return true; },
+    addFloater() {},
+    recordRunItem() {},
+    recordRunXp() {},
+    recordRunGold() {},
+  };
+}
+
+for (const [questId, rewards, namedId] of hunterNamedRewards) {
+  const engine = rewardEngine();
+  const summary = questsMethods.grantQuestRewards.call(engine, { rewards: { namedItems: rewards.namedItems } });
+  assert.equal(summary.items.length, 1, `${questId} must grant its named item`);
+  const granted = engine.player.inventory[0];
+  assert.equal(granted.namedId, namedId, `${questId} must add ${namedId} to inventory`);
+  // Inventory is the source for both published snapshots and the persisted player.inventory payload.
+  assert.equal(SAVE_PERSIST_CONFIG.player.inventory, true, `${questId} named item inventory must be persisted`);
+}
+
+// A second click after a successful turn-in must not re-grant the boar quest cape.
+const boarInstance = makeQuestInstance(QUEST_DEFS.help_hunter_kill_boars, "hunter");
+const boarEngine = {
+  ...rewardEngine(),
+  questState: { active: [boarInstance], completed: [], cityFade: [] },
+  worldState: { flags: {}, counters: {}, values: {} },
+  refreshQuestStepProgress() {},
+  questRewardsCanFit() { return true; },
+  grantQuestRewards: questsMethods.grantQuestRewards,
+  consumeQuestItems() {},
+  applyQuestStepEffects() {},
+  cleanupObsoleteCompletedQuestItems() {},
+  levelUpIfNeeded() {},
+  addToast() {},
+  publishSnapshot() {},
+  saveProgress() {},
+};
+boarEngine.player.inventory.push(makeQuestItem("hunter_boar_tusk", boarInstance.id));
+boarEngine.player.inventory[0].count = 9;
+const originalWarn = console.warn;
+console.warn = () => {};
+let firstCompletion;
+let secondCompletion;
+try {
+  firstCompletion = questsMethods.completeQuest.call(boarEngine, boarInstance.id, "hunter");
+  secondCompletion = questsMethods.completeQuest.call(boarEngine, boarInstance.id, "hunter");
+} finally {
+  console.warn = originalWarn;
+}
+assert.equal(firstCompletion.ok, true);
+assert.equal(secondCompletion, false, "a completed Hunter quest cannot be completed twice");
+assert.equal(boarEngine.player.inventory.filter((item) => item.namedId === "hunters_wolf_cape").length, 1);
 assert.equal(QUEST_ITEM_DEFS.quest_hunters_bow.iconUrl, NAMED_ITEM_TEMPLATES.find((item) => item.id === "hunters_bow").iconUrl);
 
 const flowerAction = ACTION_CONFIG.collect_hunters_love_flower;

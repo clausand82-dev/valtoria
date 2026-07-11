@@ -608,6 +608,9 @@ export const subregionMethods = {
     if (!expedition) return false;
     const currentMapInstanceId = repairLoadedSubregionMapId(this, expedition) ?? currentMapInstanceIdFor(expedition);
     if (!currentMapInstanceId || currentMapInstanceId === expedition?.rootMapInstanceId) return false;
+    for (const monster of this.monsters?.values?.() ?? []) {
+      if (!monster?.isMinion && !monster?.dead) return false;
+    }
     const changed = applySubregionOnClear(this, currentMapInstanceId);
     if (changed) {
       this.updateNearbyActionTarget?.();

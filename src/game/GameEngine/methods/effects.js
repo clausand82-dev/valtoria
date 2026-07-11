@@ -30,6 +30,7 @@ function particleContext(engine) {
     nearbyObjects: () => nearbyObjects,
     objectById: new Map(nearbyObjects.map((object) => [object.id, object])),
     fogPointAlpha: (point) => engine.fogPointAlpha(point),
+    adaptiveSettings: engine.adaptiveRuntimeSettings?.() ?? null,
   };
 }
 
@@ -51,6 +52,11 @@ function particlesForKey(particles, key) {
 
 function countWeatherParticles(particles) {
   return particles.reduce((sum, particle) => sum + (particle.configParticle && particle.weatherParticle ? 1 : 0), 0);
+}
+
+function addTiming(bucket, key, ms) {
+  if (!bucket) return;
+  bucket[key] = (bucket[key] ?? 0) + ms;
 }
 
 function rollRange(range) {
@@ -144,7 +150,10 @@ function getParticleTarget(source, config, key) {
 }
 
 function spawnConfiguredParticle(engine, anchor, config, sourceKey, options = {}) {
-  if (countConfiguredParticles(engine.particles) >= CONFIG_PARTICLE_MAX) return;
+  const adaptive = engine.adaptiveRuntimeSettings?.() ?? {};
+  const density = Math.max(0.05, Math.min(1, Number(adaptive.particleEmissionScale) || 1));
+  if (density < 1 && Math.random() > density) return;
+  if (countConfiguredParticles(engine.particles) >= Math.floor(CONFIG_PARTICLE_MAX * density)) return;
   const angle = Math.random() * Math.PI * 2;
   const distance = Math.random() * config.radius;
   const speed = randomInRange(config.speed);
@@ -208,8 +217,11 @@ function spawnConfiguredParticle(engine, anchor, config, sourceKey, options = {}
 }
 
 function spawnScreenParticle(engine, config, sourceKey) {
-  if (countConfiguredParticles(engine.particles) >= CONFIG_PARTICLE_MAX) return;
-  if (countWeatherParticles(engine.particles) >= WEATHER_PARTICLE_MAX) return;
+  const adaptive = engine.adaptiveRuntimeSettings?.() ?? {};
+  const density = Math.max(0.05, Math.min(1, Number(adaptive.particleEmissionScale) || 1));
+  if (density < 1 && Math.random() > density) return;
+  if (countConfiguredParticles(engine.particles) >= Math.floor(CONFIG_PARTICLE_MAX * density)) return;
+  if (countWeatherParticles(engine.particles) >= Math.floor(WEATHER_PARTICLE_MAX * density)) return;
 
   const speed = randomInRange(config.speed);
   const size = randomInRange(config.size);
@@ -351,65 +363,78 @@ export const effectsMethods = {
   },
 
   updateEffects(dt) {
+    const cleanupTimings = this.cleanupUpdateTimings ??= {};
+    const timedCleanup = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      addTiming(cleanupTimings, key, performance.now() - startedAt);
+      return result;
+    };
     const beforeVisibleFloaters = this.floaters.reduce((count, floater) => (
       count + (this.effectPointVisible?.(floater, 80) ? 1 : 0)
     ), 0);
     const beforeToasts = this.toasts.length;
     let expiredLegacyRemoved = 0;
-    for (let i = this.particles.length - 1; i >= 0; i -= 1) {
-      const p = this.particles[i];
-      if (!Number.isFinite(Number(p.x)) || !Number.isFinite(Number(p.y)) || !Number.isFinite(Number(p.life))) {
-        this.particles.splice(i, 1);
-        expiredLegacyRemoved += 1;
-        continue;
-      }
-      if (p.effectParticle) {
-        p.age += dt;
+    timedCleanup("cleanupEffectArraysMs", () => {
+      for (let i = this.particles.length - 1; i >= 0; i -= 1) {
+        const p = this.particles[i];
+        if (!Number.isFinite(Number(p.x)) || !Number.isFinite(Number(p.y)) || !Number.isFinite(Number(p.life))) {
+          this.particles.splice(i, 1);
+          expiredLegacyRemoved += 1;
+          continue;
+        }
+        if (p.effectParticle) {
+          p.age += dt;
+          p.life -= dt;
+          if (p.life <= 0) {
+            this.particles.splice(i, 1);
+            expiredLegacyRemoved += 1;
+          }
+          continue;
+        }
+        if (p.configParticle) {
+          updateConfiguredParticle(p, dt);
+          p.life -= dt;
+          if (p.life <= 0) {
+            this.particles.splice(i, 1);
+            expiredLegacyRemoved += 1;
+          }
+          continue;
+        }
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.z += p.vz * dt;
+        p.vx *= Math.pow(0.04, dt);
+        p.vy *= Math.pow(0.04, dt);
+        p.vz -= 2.8 * dt;
         p.life -= dt;
         if (p.life <= 0) {
           this.particles.splice(i, 1);
           expiredLegacyRemoved += 1;
         }
-        continue;
       }
-      if (p.configParticle) {
-        updateConfiguredParticle(p, dt);
-        p.life -= dt;
-        if (p.life <= 0) {
-          this.particles.splice(i, 1);
-          expiredLegacyRemoved += 1;
+    });
+
+    timedCleanup("cleanupFloatersMs", () => {
+      for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
+        const f = this.floaters[i];
+        f.z += (Number(f.riseSpeed) || 34) * dt;
+        f.life -= dt;
+        if (f.life <= 0) this.floaters.splice(i, 1);
+      }
+    });
+
+    timedCleanup("cleanupEffectArraysMs", () => {
+      for (let i = this.toasts.length - 1; i >= 0; i -= 1) {
+        const toast = this.toasts[i];
+        toast.life -= dt;
+        if (toast.life <= 0) {
+          this.clearToastTimer(toast.id);
+          this.toasts.splice(i, 1);
         }
-        continue;
       }
-      p.x += p.vx * dt;
-      p.y += p.vy * dt;
-      p.z += p.vz * dt;
-      p.vx *= Math.pow(0.04, dt);
-      p.vy *= Math.pow(0.04, dt);
-      p.vz -= 2.8 * dt;
-      p.life -= dt;
-      if (p.life <= 0) {
-        this.particles.splice(i, 1);
-        expiredLegacyRemoved += 1;
-      }
-    }
-
-    for (let i = this.floaters.length - 1; i >= 0; i -= 1) {
-      const f = this.floaters[i];
-      f.z += (Number(f.riseSpeed) || 34) * dt;
-      f.life -= dt;
-      if (f.life <= 0) this.floaters.splice(i, 1);
-    }
-
-    for (let i = this.toasts.length - 1; i >= 0; i -= 1) {
-      const toast = this.toasts[i];
-      toast.life -= dt;
-      if (toast.life <= 0) {
-        this.clearToastTimer(toast.id);
-        this.toasts.splice(i, 1);
-      }
-    }
-    this.particleEngine?.update(dt, particleContext(this));
+    });
+    timedCleanup("cleanupParticlesMs", () => this.particleEngine?.update(dt, particleContext(this)));
     this.legacyExpiredEffectsRemoved = (this.legacyExpiredEffectsRemoved ?? 0) + expiredLegacyRemoved;
     this.effectVisibilityStatsFrame = -1;
     const visibility = this.effectVisibilityStats?.() ?? { visibleEffectCategories: {} };
@@ -723,7 +748,13 @@ export const effectsMethods = {
   },
 
   addParticles(x, y, color, count, upward = 0.08, options = {}) {
-    const particleCount = Math.floor(Number(count) || 0);
+    const adaptive = this.adaptiveRuntimeSettings?.() ?? {};
+    const density = options.spellInstanceId
+      ? Math.max(0.05, Math.min(1, Number(adaptive.spellVisualScale) || 1))
+      : Math.max(0.05, Math.min(1, Number(adaptive.particleEmissionScale) || 1));
+    const requestedCount = Math.floor(Number(count) || 0);
+    const scaledCount = requestedCount * density;
+    const particleCount = Math.floor(scaledCount) + (Math.random() < scaledCount % 1 ? 1 : 0);
     if (particleCount <= 0) return;
     this.particleEngine?.emitOneShot("hit_sparks", x, y, {
       spellInstanceId: options.spellInstanceId ?? null,
@@ -793,7 +824,10 @@ export const effectsMethods = {
   footstepDustChance(fallback = 0.18) {
     const dustConfig = this.region?.mapRegion?.ambient?.footstepDust ?? {};
     const configured = Number(dustConfig.stepChance ?? dustConfig.chancePerStep);
-    return Number.isFinite(configured) ? Math.max(0, Math.min(1, configured)) : fallback;
+    const adaptive = this.adaptiveRuntimeSettings?.() ?? {};
+    const scale = Math.max(0, Math.min(1, Number(adaptive.footstepDustScale) || 1));
+    const base = Number.isFinite(configured) ? Math.max(0, Math.min(1, configured)) : fallback;
+    return base * scale;
   },
 
   spawnExpandingEnergyRingEffect(x, y, radius, options = {}) {
@@ -861,18 +895,23 @@ export const effectsMethods = {
 
   addFloater(x, y, text, color, life = 0.85, options = {}) {
     const opts = options && typeof options === "object" ? options : {};
+    const adaptive = this.adaptiveRuntimeSettings?.() ?? {};
+    const maxFloaters = Math.max(1, Math.floor(Number(adaptive.maxFloaters) || 999));
+    while ((this.floaters?.length ?? 0) >= maxFloaters) this.floaters.shift();
+    const lifeScale = Math.max(0.2, Math.min(1, Number(adaptive.floaterLifeScale) || 1));
+    const scaledLife = Math.max(0.2, Number(life) * lifeScale);
     this.floaters.push({
       x,
       y,
       z: 68,
       text,
       color,
-      life,
-      maxLife: life,
+      life: scaledLife,
+      maxLife: scaledLife,
       fontSize: Math.max(10, Number(opts.fontSize) || 13),
       fontWeight: Math.max(400, Number(opts.fontWeight) || 700),
       riseSpeed: Math.max(1, Number(opts.riseSpeed) || 34),
-      fadeDuration: Math.max(0.05, Number(opts.fadeDuration) || life),
+      fadeDuration: Math.max(0.05, (Number(opts.fadeDuration) || life) * lifeScale),
     });
     if (this.effectPointVisible?.({ x, y, z: 68 }, 80)) this.markEffectDirtyCategory?.("floaters");
   },
@@ -914,9 +953,15 @@ export const effectsMethods = {
       this.clearToastTimer(id);
       this.toasts = this.toasts.filter((entry) => entry.id !== id);
       this.markRenderDirty?.("toast-expire");
-      this.publishSnapshot();
+      this.markUiOnlySnapshot?.("toast-expire");
+      this.scheduleSnapshotPublish?.("toast-expire");
     }, life * 1000));
     this.markRenderDirty?.("toast");
-    this.publishSnapshot();
+    if (opts.deferSnapshot) {
+      this.markUiOnlySnapshot?.("toast");
+      this.scheduleSnapshotPublish?.("toast");
+    } else {
+      this.publishSnapshot();
+    }
   }
 };

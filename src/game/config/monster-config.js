@@ -690,7 +690,7 @@ export const MONSTER_DEFS = {
     noLoot: true,
     despawnOnDeath: true,
     specialSpawn: {
-      chance: 0.018,
+      chance: 0.005,
       salt: 1107,
       mapSize: { exclude: ["small"] },
       uniquePerRegion: true

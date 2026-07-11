@@ -1,16 +1,18 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "./start-menu.css";
 import { formatSaveTimestamp } from "../save/save-slots.js";
 import { useLocalization } from "../../i18n/index.js";
 import { GAME_VERSION } from "../../game/config/game-constants-config.js";
 
-export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave }) {
+export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave, onExportSave, onImportSaveFile }) {
   const { t } = useLocalization();
   const hasSaves = saveSlots.some((slot) => slot.exists);
+  const importInputRef = useRef(null);
   const [menuImageLoaded, setMenuImageLoaded] = useState(false);
   const [frontpageMessage, setFrontpageMessage] = useState("");
   const [confirmNewGameOpen, setConfirmNewGameOpen] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [saveTransferMessage, setSaveTransferMessage] = useState("");
   useEffect(() => {
     const controller = new AbortController();
     fetch("/frontpage-message.txt", { signal: controller.signal })
@@ -21,6 +23,19 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
       });
     return () => controller.abort();
   }, []);
+
+  const setTransferResultMessage = (result) => {
+    setSaveTransferMessage(result?.messageKey ? t(result.messageKey) : "");
+  };
+
+  const handleImportFileChange = async (event) => {
+    const file = event.target.files?.[0] ?? null;
+    event.target.value = "";
+    if (!file) return;
+    const result = await onImportSaveFile?.(file);
+    setTransferResultMessage(result);
+  };
+
   return (
     <section className={`start-menu-screen ${menuImageLoaded ? "has-menu-image" : ""}`} aria-label={t("menu.main")}>
       <img
@@ -39,7 +54,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
         {view === "main" && (
           <nav className="start-menu-actions" aria-label={t("menu.main")}>
             <button type="button" onClick={() => setConfirmNewGameOpen(true)}>{t("menu.newGame")}</button>
-            <button type="button" onClick={onLoadClick} disabled={!hasSaves}>{t("menu.loadGame")}</button>
+            <button type="button" onClick={onLoadClick} disabled={!hasSaves && !onImportSaveFile}>{t("menu.loadGame")}</button>
             <button type="button" disabled>{t("menu.gameSettings")}</button>
           </nav>
         )}
@@ -64,6 +79,14 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
                   </button>
                   <button
                     type="button"
+                    className="save-slot-export"
+                    onClick={() => setTransferResultMessage(onExportSave?.(slot))}
+                    aria-label={t("menu.exportSaveLabel", { name: slot.label })}
+                  >
+                    {t("menu.exportSave")}
+                  </button>
+                  <button
+                    type="button"
                     className="save-slot-delete danger-action"
                     onClick={() => setDeleteCandidate(slot)}
                     aria-label={t("menu.deleteSaveLabel", { name: slot.label })}
@@ -73,6 +96,19 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
                 </div>
               ))}
               {!hasSaves && <p>{t("menu.noSaves")}</p>}
+            </div>
+            <div className="save-import-panel">
+              <input
+                ref={importInputRef}
+                className="save-import-input"
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImportFileChange}
+              />
+              <button type="button" className="save-import-button" onClick={() => importInputRef.current?.click()}>
+                {t("menu.importSaveFromFile")}
+              </button>
+              {saveTransferMessage && <p className="save-transfer-message">{saveTransferMessage}</p>}
             </div>
           </div>
         )}

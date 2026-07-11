@@ -2535,6 +2535,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     const completionInventory = cityQuestCompletionInventory(quest);
     const backpackComplete = isQuestComplete(quest, engine?.player?.inventory ?? []);
     const cityComplete = isQuestComplete(quest, completionInventory);
+    const resourcesPrepaid = !backpackComplete && cityComplete;
     if (!backpackComplete && cityComplete) {
       if (!engine?.questRewardsCanFit?.(quest)) {
         setActionMessage(t("city.quest.inventoryFullTurnIn"));
@@ -2552,7 +2553,7 @@ function CityQuestPopup({ npcId, engineRef, snapshotRef, progress, npcStates, on
     }
     const result = engine?.completeQuest?.(quest.id ?? quest.questId, npcId, {
       inventoryOverride: completionInventory,
-      resourcesPrepaid: !backpackComplete && cityComplete,
+      resourcesPrepaid,
     });
     if (result?.ok) {
       onChangeProgress?.((current) => {
@@ -5001,7 +5002,7 @@ function fixedSectionAlreadyHasReadable(item, section, slotIndex, storedItems = 
 
 function cityInventoryStackMax(item) {
   if (isResourceItem(item)) {
-    return Math.max(1, Math.floor(Number(item.stackMax ?? resourceStackMax(item.resourceId)) || 1));
+    return Math.max(1, Math.floor(Number(resourceStackMax(item.resourceId)) || 1));
   }
   if (isPotionItem(item)) {
     return Math.max(1, Math.floor(Number(item.stackMax ?? MAX_POTION_STACK) || 1));

@@ -15,6 +15,7 @@ import { ACTION_CONFIG } from "./game/config/action-config.js";
 import { READABLE_DEF_BY_ID } from "./game/config/readable-config.js";
 import { isQuestComplete, questProgressText } from "./game/GameEngine/helpers.js";
 import { saveRepository } from "./storage/saveRepository.js";
+import { buildSaveExportWrapper, importSaveWrapper } from "./app/save/save-import-export.js";
 import { useLocalization } from "./i18n/index.js";
 import { HelpDialog } from "./app/help/index.js";
 import {
@@ -129,12 +130,14 @@ function resolveRuntimePerformanceSettings(settings) {
       disableAmbientCritters: profile.disableAmbientCritters,
       particlesEnabled: true,
       lowPowerMode: Boolean(profile.lowPowerMode),
+      adaptive: Boolean(profile.adaptive),
       useCustom: false,
     };
   }
   return {
     mode: normalized.mode,
     ...normalized.custom,
+    adaptive: false,
     useCustom: true,
   };
 }
@@ -169,7 +172,7 @@ function persistPerformanceSettings(settings) {
 function cityAddonIds() {
   const entries = [];
   for (const building of CITY_BUILDINGS) {
-    const buildingTitle = String(building?.title ?? building?.name ?? building?.label ?? building?.id ?? "Bygning").trim();
+    const buildingTitle = String(building?.title ?? building?.name ?? building?.label ?? building?.id ?? "Building").trim();
     for (const addon of building?.addons ?? []) {
       const id = String(addon?.id ?? "").trim();
       if (!id) continue;
@@ -200,6 +203,23 @@ function localizedRegionNames(text, localize) {
     }
   }
   return result;
+}
+
+function downloadJsonFile(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportFilenameForSlot(slot) {
+  const safeId = String(slot?.id ?? "save").replace(/[^a-z0-9_-]+/gi, "-").replace(/^-+|-+$/g, "") || "save";
+  return `valtoria-${safeId}-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
 function localizedToastText(toast, localize, t) {
@@ -668,7 +688,9 @@ export default function App() {
     const nextProgress = { ...progress, threatLevel: next };
     saveCityProgress(nextProgress, cityStorageKey);
     setCityProgressHud(nextProgress);
-    engineRef.current?.addToast?.(`Trusselsmeter steg med ${rise}%`);
+    engineRef.current?.addToast?.(`Threat meter rose by ${rise}%`, {
+      localization: { type: "ui", key: "messages.threatMeterRose", params: { amount: rise } },
+    });
   }, [snapshot.lastDeath]);
 
   useEffect(() => {
@@ -754,6 +776,17 @@ export default function App() {
     }
     engineRef.current?.renderMinimap(minimapRef.current, minimapDynamicRef.current);
   }, [snapshot, cityOpen, cityMinimapHero]);
+
+  useEffect(() => {
+    if (cityOpen) return undefined;
+    // The game snapshot is intentionally coalesced for UI/save work. The
+    // minimap marker and fog are canvas-only dynamic layers and must not wait
+    // for that scheduler; renderMinimap itself enforces minimapFps (5 = 200ms).
+    const id = window.setInterval(() => {
+      engineRef.current?.renderMinimap(minimapRef.current, minimapDynamicRef.current);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [cityOpen]);
 
   useEffect(() => {
     if (!inventoryOpen) {
@@ -895,10 +928,10 @@ export default function App() {
   );
   const clearCityTargets = useMemo(() => {
     const base = [
-      { value: "all", label: "Alle omraader + bygninger (all)" },
-      { value: "allareas", label: "Alle omraader (allareas)" },
-      { value: "allbuildings", label: "Alle bygninger (allbuildings)" },
-      { value: "alladdons", label: "Alle addons (alladdons)" },
+      { value: "all", label: "All areas + buildings (all)" },
+      { value: "allareas", label: "All areas (allareas)" },
+      { value: "allbuildings", label: "All buildings (allbuildings)" },
+      { value: "alladdons", label: "All addons (alladdons)" },
     ];
     const areaTargets = CITY_AREAS
       .map((entry) => {
@@ -947,6 +980,10 @@ export default function App() {
     engine.setPerformanceMode?.(resolved.mode);
     engine.performanceMode = resolved.mode;
     engine.isCustomPerformanceProfile = Boolean(resolved.useCustom);
+    engine.adaptivePerformanceEnabled = Boolean(resolved.adaptive) && !resolved.useCustom;
+    engine.adaptivePerformanceTier = 0;
+    engine.adaptiveLowFpsSamples = 0;
+    engine.adaptivePerformanceReason = engine.adaptivePerformanceEnabled ? "tier-0" : "disabled";
     engine.lowPowerMode = Boolean(resolved.lowPowerMode);
     engine.disableAmbientCritters = Boolean(resolved.disableAmbientCritters);
     engine.targetFps = clampNumber(resolved.targetFps, 30, 60, engine.targetFps ?? 50);
@@ -980,7 +1017,7 @@ export default function App() {
     if (!CHEAT_SETTINGS.enabled) return;
     const cmd = window?.[CHEAT_SETTINGS.commandName] ?? (CHEAT_SETTINGS.exposeAlias ? window?.[CHEAT_SETTINGS.exposeAlias] : null);
     if (typeof cmd !== "function") {
-      engineRef.current?.addToast?.("Cheat command ikke tilgaengelig");
+      engineRef.current?.addToast?.("Cheat command unavailable");
       return;
     }
     const output = cmd(input, ...args);
@@ -1086,6 +1123,40 @@ export default function App() {
     setSaveSlots(collectSaveSlots());
   };
 
+  const exportSaveSlot = (slot) => {
+    try {
+      const wrapper = buildSaveExportWrapper(slot);
+      if (!wrapper) return { ok: false, messageKey: "menu.exportSaveFailed" };
+      downloadJsonFile(exportFilenameForSlot(slot), wrapper);
+      return { ok: true };
+    } catch (error) {
+      console.warn("[save-import-export] Export failed", error);
+      return { ok: false, messageKey: "menu.exportSaveFailed" };
+    }
+  };
+
+  const importSaveFile = async (file) => {
+    if (!file) return { ok: false, messageKey: "menu.importSaveFailed" };
+    try {
+      const text = await file.text();
+      let parsed = null;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        return { ok: false, messageKey: "menu.invalidSaveFile" };
+      }
+      const result = importSaveWrapper(parsed);
+      if (!result.ok) {
+        return { ok: false, messageKey: result.reason === "invalid" ? "menu.invalidSaveFile" : "menu.importSaveFailed" };
+      }
+      setSaveSlots(collectSaveSlots());
+      return { ok: true, messageKey: "menu.importSaveSuccess" };
+    } catch (error) {
+      console.warn("[save-import-export] Import failed", error);
+      return { ok: false, messageKey: "menu.importSaveFailed" };
+    }
+  };
+
   const openWorldMapFromCity = () => {
     clearToastLogForModeSwitch();
     setRegionMapOpen(true);
@@ -1123,6 +1194,8 @@ export default function App() {
           onBack={() => setMenuView("main")}
           onLoadGame={(slot) => beginSession(slot, false)}
           onDeleteSave={deleteSaveSlot}
+          onExportSave={exportSaveSlot}
+          onImportSaveFile={importSaveFile}
         />
       )}
 

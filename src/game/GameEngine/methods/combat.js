@@ -40,6 +40,7 @@ import {
   ITEM_GOLD_DEATH_LOSS_MAX,
 } from "../../config/durability-config.js";
 import { applyWorldEnergy } from "../../world-energy.js";
+import { normalizeLootTableRefs } from "../../loot.js";
 import { getWorldFlag, incrementWorldCounter, recordMonsterFought, recordMonsterKilled, setWorldFlag } from "../../world-state.js";
 import { addFactionRepOnPlayer, applyFactionRepEffects, getFactionRepFrom, getKnownFactions, setFactionRepOnPlayer } from "../../config/faction-config.js";
 import {
@@ -83,6 +84,12 @@ function damageKindBonusKey(damageKind) {
 
 function damageDebugEnabled() {
   return typeof window !== "undefined" && window.VALTORIA_DEBUG_DAMAGE === true;
+}
+
+function distanceSq(a, b) {
+  const dx = (Number(a?.x) || 0) - (Number(b?.x) || 0);
+  const dy = (Number(a?.y) || 0) - (Number(b?.y) || 0);
+  return dx * dx + dy * dy;
 }
 
 const EXPLICIT_STAT_BONUS_KEYS = [
@@ -146,12 +153,31 @@ export const combatMethods = {
   },
 
   updateMonsters(dt) {
+    const timings = this.monsterUpdateTimings ?? {};
+    const timedMonster = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      timings[key] = (timings[key] ?? 0) + performance.now() - startedAt;
+      return result;
+    };
     this.processStatusEffects(this.player, dt, true);
-    const nearby = this.nearbyMonsters(2);
-    const nearbyIds = new Set(nearby.map((monster) => monster.id));
+    const allNearby = timedMonster("monsterCandidateCollectionMs", () => this.nearbyMonsters(2));
+    const adaptive = this.adaptiveRuntimeSettings?.() ?? {};
+    const nearbyBudget = Number(adaptive.nearbyMonsterUpdateBudget);
+    const nearby = Number.isFinite(nearbyBudget) && allNearby.length > nearbyBudget
+      ? [...allNearby].sort((a, b) => {
+        const da = distance(this.player, a);
+        const db = distance(this.player, b);
+        const ca = da < Math.max(0, Number(a.aggro) || 0) || a.attackCooldown <= 0 || a.spellCooldown <= 0 ? 0 : 1;
+        const cb = db < Math.max(0, Number(b.aggro) || 0) || b.attackCooldown <= 0 || b.spellCooldown <= 0 ? 0 : 1;
+        return ca - cb || da - db;
+      }).slice(0, Math.max(1, Math.floor(nearbyBudget)))
+      : allNearby;
+    const nearbyIds = timedMonster("monsterNearbySetUpdateMs", () => new Set(nearby.map((monster) => monster.id)));
+    const passiveWanderScale = Math.max(0, Math.min(1, Number(adaptive.passiveMonsterWanderScale) || 0));
     for (const monster of nearby) {
       if (monster.dead) continue;
-      if (!monster.bestiarySeenRecorded && this.isPointVisible(monster)) {
+      if (!monster.bestiarySeenRecorded && timedMonster("monsterVisibilityUpdateMs", () => this.isPointVisible(monster))) {
         monster.bestiarySeenRecorded = this.recordBestiarySeen?.(monster) || true;
       }
       this.processStatusEffects(monster, dt, false);
@@ -164,6 +190,7 @@ export const combatMethods = {
       const beforeY = monster.y;
       const d = distance(this.player, monster);
       const stunned = this.isStunned(monster);
+      const aiStartedAt = performance.now();
       if (stunned) {
         monster.vx = 0;
         monster.vy = 0;
@@ -186,25 +213,28 @@ export const combatMethods = {
           const critical = Math.random() < (Number(monster.critChance) || 0);
           this.applyMonsterMeleeHit(monster, critical);
         }
-      } else if (Math.random() < 0.004) {
+      } else if (Math.random() < 0.004 * passiveWanderScale) {
         const a = Math.random() * Math.PI * 2;
         monster.vx = Math.cos(a) * monster.speed * 0.28;
         monster.vy = Math.sin(a) * monster.speed * 0.28;
       }
+      timings.monsterAiMs = (timings.monsterAiMs ?? 0) + performance.now() - aiStartedAt;
 
       if (!stunned && Math.hypot(monster.vx, monster.vy) > 0.01) {
         const n = normalize(monster.vx, monster.vy);
         monster.facingX = n.x || monster.facingX;
         monster.facingY = n.y || monster.facingY;
-        this.moveEntity(monster, monster.vx * this.statusSpeedMultiplier(monster) * dt, monster.vy * this.statusSpeedMultiplier(monster) * dt);
+        timedMonster("monsterCollisionMs", () => this.moveEntity(monster, monster.vx * this.statusSpeedMultiplier(monster) * dt, monster.vy * this.statusSpeedMultiplier(monster) * dt));
         monster.vx *= Math.pow(0.04, dt);
         monster.vy *= Math.pow(0.04, dt);
       }
+      const animationStartedAt = performance.now();
       monster.moving = Math.hypot(monster.x - beforeX, monster.y - beforeY) > 0.002;
       const rawSpeed = dt > 0 ? Math.hypot(monster.x - beforeX, monster.y - beforeY) / dt : 0;
       monster.moveSpeed = lerp(monster.moveSpeed || 0, rawSpeed, monster.moving ? 0.42 : 0.15);
       if (monster.moveSpeed > 0.02) monster.gait += dt * (6.4 + monster.moveSpeed * 2.1);
       if (monster.moving && Math.random() < (this.footstepDustChance?.(0.035) ?? 0.035)) this.addDust(monster.x, monster.y, 1);
+      timings.monsterAnimationMs = (timings.monsterAnimationMs ?? 0) + performance.now() - animationStartedAt;
     }
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead || nearbyIds.has(monster.id)) continue;
@@ -221,6 +251,7 @@ export const combatMethods = {
       ...(this.monsterActivityDebug ?? {}),
       totalMonsters: this.monsters?.size ?? 0,
       nearbyUpdatedMonsters: nearby.length,
+      nearbyTotalMonsters: allNearby.length,
     };
   },
 
@@ -437,54 +468,133 @@ export const combatMethods = {
   },
 
   updateProjectiles(dt) {
+    const timings = {
+      projectileMovementMs: 0,
+      projectileCollisionMonstersMs: 0,
+      projectileCollisionObjectsMs: 0,
+      projectileCollisionTerrainMs: 0,
+      projectileRemovalMs: 0,
+      projectileSpawnMs: 0,
+      projectileImpactMs: 0,
+      projectileImpactDamageMs: 0,
+      projectileImpactTargetCollectionMs: 0,
+      projectileImpactDamageApplyMs: 0,
+      projectileImpactAoEMs: 0,
+      projectileImpactStatusEffectMs: 0,
+      projectileImpactDeathHandlingMs: 0,
+      projectileImpactKillMs: 0,
+      projectileImpactSpawnEffectsMs: 0,
+      projectileImpactHazardSpawnMs: 0,
+      projectileImpactLootDropMs: 0,
+      projectileImpactDirtyMs: 0,
+    };
+    const timed = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      timings[key] = (timings[key] ?? 0) + (performance.now() - startedAt);
+      return result;
+    };
     const beforeProjectileCount = this.projectiles.length;
+    const projectileCount = beforeProjectileCount;
+    const needsMonsterCandidates = projectileCount > 0 && this.projectiles.some((projectile) => (
+      projectile && projectile.owner !== "monster" && !projectile.noCollision
+    ));
+    const needsObjectCandidates = projectileCount > 0 && this.projectiles.some((projectile) => (
+      projectile?.owner === "player" && !projectile.noCollision && Array.isArray(projectile.sourceConfig?.target)
+    ));
+    const monsterCandidates = needsMonsterCandidates
+      ? this.nearbyMonsters(2).filter((monster) => !monster.dead)
+      : [];
+    const objectCandidates = needsObjectCandidates
+      ? this.nearbyDestructibleObjects(1)
+      : [];
+    const critterCandidates = needsMonsterCandidates ? (this.nearbyCritters?.() ?? []) : [];
+    this.activeProjectileUpdateTimings = timings;
     for (let i = this.projectiles.length - 1; i >= 0; i -= 1) {
       const projectile = this.projectiles[i];
-      projectile.x += projectile.vx * dt;
-      projectile.y += projectile.vy * dt;
-      projectile.life -= dt;
-      this.addParticles(projectile.x, projectile.y, projectile.color, projectile.type === "burst" ? 1 : 0, 0.04, {
-        spellInstanceId: projectile.spellInstanceId,
+      timed("projectileMovementMs", () => {
+        projectile.x += projectile.vx * dt;
+        projectile.y += projectile.vy * dt;
+        projectile.life -= dt;
       });
+      timed("projectileSpawnMs", () => this.addParticles(projectile.x, projectile.y, projectile.color, projectile.type === "burst" ? 1 : 0, 0.04, {
+        spellInstanceId: projectile.spellInstanceId,
+      }));
 
       const expired = projectile.life <= 0;
-      let remove = expired || (!projectile.ignoreBlocking && this.isBlocked(projectile.x, projectile.y, 0.12));
+      let remove = expired;
+      if (!remove && !projectile.ignoreBlocking) {
+        remove = timed("projectileCollisionTerrainMs", () => this.isBlocked(projectile.x, projectile.y, 0.12));
+      }
       if (!remove) {
-        for (const monster of this.nearbyMonsters(2)) {
-          if (monster.dead || projectile.owner === "monster") continue;
-          if (projectile.noCollision) continue;
-          if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) continue;
-          if (Math.hypot(monster.x - projectile.x, monster.y - projectile.y) <= monster.radius + projectile.radius) {
-            this.applySpellImpact(projectile, projectile.x, projectile.y, monster);
-            remove = true;
+        let impactTarget = null;
+        if (projectile.owner !== "monster" && !projectile.noCollision) timed("projectileCollisionMonstersMs", () => {
+          for (const monster of monsterCandidates) {
+            if (monster.dead) continue;
+            const radius = (Number(monster.radius) || 0) + (Number(projectile.radius) || 0);
+            if (distanceSq(monster, projectile) > radius * radius) continue;
+            if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) continue;
+            impactTarget = monster;
             break;
           }
+        });
+        if (impactTarget) {
+          timed("projectileImpactMs", () => this.applySpellImpact(projectile, projectile.x, projectile.y, impactTarget, { monsters: monsterCandidates, objects: objectCandidates, critters: critterCandidates }));
+          remove = true;
         }
         if (!remove && projectile.owner === "player" && !projectile.noCollision && Array.isArray(projectile.sourceConfig?.target)) {
-          for (const object of this.nearbyDestructibleObjects(1)) {
-            if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) continue;
-            if (Math.hypot(object.x - projectile.x, object.y - projectile.y) <= object.radius + projectile.radius) {
-              this.applySpellImpact(projectile, projectile.x, projectile.y, object);
-              remove = true;
+          impactTarget = null;
+          timed("projectileCollisionObjectsMs", () => {
+            for (const object of objectCandidates) {
+              if (!isDestructibleObject(object)) continue;
+              const radius = (Number(object.radius) || 0) + (Number(projectile.radius) || 0);
+              if (distanceSq(object, projectile) > radius * radius) continue;
+              if (!canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) continue;
+              impactTarget = object;
               break;
             }
+          });
+          if (impactTarget) {
+            timed("projectileImpactMs", () => this.applySpellImpact(projectile, projectile.x, projectile.y, impactTarget, { monsters: monsterCandidates, objects: objectCandidates, critters: critterCandidates }));
+            remove = true;
           }
         }
-        if (!remove && !projectile.noCollision && projectile.owner === "monster" && Math.hypot(this.player.x - projectile.x, this.player.y - projectile.y) <= this.player.radius + projectile.radius) {
-          this.applySpellImpact(projectile, projectile.x, projectile.y, this.player);
-          remove = true;
+        if (!remove && !projectile.noCollision && projectile.owner === "monster") {
+          let hitPlayer = false;
+          timed("projectileCollisionMonstersMs", () => {
+            const radius = (Number(this.player.radius) || 0) + (Number(projectile.radius) || 0);
+            if (distanceSq(this.player, projectile) > radius * radius) return;
+            hitPlayer = true;
+          });
+          if (hitPlayer) {
+            timed("projectileImpactMs", () => this.applySpellImpact(projectile, projectile.x, projectile.y, this.player, { monsters: monsterCandidates, objects: objectCandidates, critters: critterCandidates }));
+            remove = true;
+          }
         }
       }
       if (expired && projectile.explodeOnEnd) {
-        this.applySpellImpact(projectile, projectile.x, projectile.y, null);
+        timed("projectileImpactMs", () => this.applySpellImpact(projectile, projectile.x, projectile.y, null, { monsters: monsterCandidates, objects: objectCandidates, critters: critterCandidates }));
       }
       if (remove) {
-        this.particleEngine?.removeEmittersByOwner(projectile.id);
-        this.projectiles.splice(i, 1);
-        this.markRenderDirty?.("projectile-remove");
+        timed("projectileRemovalMs", () => {
+          const cleanupStartedAt = performance.now();
+          this.particleEngine?.removeEmittersByOwner(projectile.id);
+          this.projectiles.splice(i, 1);
+          this.markRenderDirty?.("projectile-remove");
+          if (this.cleanupUpdateTimings) {
+            this.cleanupUpdateTimings.cleanupProjectileArraysMs = (this.cleanupUpdateTimings.cleanupProjectileArraysMs ?? 0) + (performance.now() - cleanupStartedAt);
+          }
+        });
       }
     }
     if (beforeProjectileCount !== this.projectiles.length) this.markRenderDirty?.("projectiles");
+    this.projectileUpdateTimings = {
+      ...timings,
+      projectileCandidatesMonsters: monsterCandidates.length,
+      projectileCandidatesObjects: objectCandidates.length,
+      projectileCandidatesCritters: critterCandidates.length,
+    };
+    this.activeProjectileUpdateTimings = null;
   },
 
   primaryAttack(target = null) {
@@ -541,7 +651,7 @@ export const combatMethods = {
         source: { type: "weapon", id: weapon?.id ?? "weapon" },
         sourceConfig: weapon,
       }).damage;
-      this.damageMonster(target, finalDamage, "melee", critical);
+      this.damageMonster(target, finalDamage, "melee", critical, { type: "melee", id: weapon?.id ?? "weapon" });
       this.triggerWeaponOnHitEffects({
         weapon: this.player.equipment?.weapon,
         player: this.player,
@@ -621,7 +731,7 @@ export const combatMethods = {
       source: { type: "weaponEffect", id: effect.id ?? "weapon_target_effect" },
       sourceConfig: effect,
     }).damage;
-    this.damageMonster(target, damage, effect.damageType ?? "magic", false);
+    this.damageMonster(target, damage, effect.damageType ?? "magic", false, { type: "weaponEffect", id: effect.id ?? "weapon_target_effect" });
     this.addParticles(target.x, target.y, effect.color ?? "#ff7b38", 8, 0.08);
   },
 
@@ -650,7 +760,7 @@ export const combatMethods = {
         source: { type: "weaponEffect", id: effect.id ?? "weapon_effect" },
         sourceConfig: effect,
       }).damage;
-      this.damageMonster(monster, damage, damageType, false);
+      this.damageMonster(monster, damage, damageType, false, { type: "weaponEffect", id: effect.id ?? "weapon_effect" });
     }
 
     for (const critter of this.nearbyCritters?.() ?? []) {
@@ -1076,36 +1186,54 @@ export const combatMethods = {
     }
   },
 
-  applySpellImpact(projectile, x, y, directTarget = null) {
-    const targets = [];
-    if (projectile.owner === "player") {
-      for (const monster of this.nearbyMonsters(2)) {
+  applySpellImpact(projectile, x, y, directTarget = null, candidates = null) {
+    const addProjectileImpactTiming = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      if (this.activeProjectileUpdateTimings) {
+        this.activeProjectileUpdateTimings[key] = (this.activeProjectileUpdateTimings[key] ?? 0) + (performance.now() - startedAt);
+      }
+      return result;
+    };
+    const targets = addProjectileImpactTiming("projectileImpactTargetCollectionMs", () => {
+      const collected = [];
+      if (projectile.owner === "player") {
+      for (const monster of candidates?.monsters ?? this.nearbyMonsters(2)) {
         if (monster.dead) continue;
         const direct = directTarget === monster;
         const inArea = projectile.areaRadius > 0 && Math.hypot(monster.x - x, monster.y - y) <= projectile.areaRadius + monster.radius;
-        if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) targets.push(monster);
+        if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(monster))) collected.push(monster);
       }
-      for (const critter of this.nearbyCritters?.() ?? []) {
+      for (const critter of candidates?.critters ?? this.nearbyCritters?.() ?? []) {
         if (critter.dead || critter.canTakeAreaDamage === false) continue;
         const inArea = projectile.areaRadius > 0 && Math.hypot(critter.x - x, critter.y - y) <= projectile.areaRadius + critter.radius;
-        if (inArea && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(critter))) targets.push(critter);
+        if (inArea && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(critter))) collected.push(critter);
       }
       if (Array.isArray(projectile.sourceConfig?.target)) {
-        for (const object of this.nearbyDestructibleObjects(2)) {
+        for (const object of candidates?.objects ?? this.nearbyDestructibleObjects(2)) {
           const direct = directTarget === object;
           const inArea = projectile.areaRadius > 0 && Math.hypot(object.x - x, object.y - y) <= projectile.areaRadius + object.radius;
-          if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) targets.push(object);
+          if ((direct || inArea) && canDamageTargetWithSource(projectile.sourceConfig, "spell", this.targetMetadataFor(object))) collected.push(object);
         }
       }
     } else {
       const direct = directTarget === this.player;
       const inArea = projectile.areaRadius > 0 && Math.hypot(this.player.x - x, this.player.y - y) <= projectile.areaRadius + this.player.radius;
-      if (direct || inArea) targets.push(this.player);
+      if (direct || inArea) collected.push(this.player);
+    }
+      return collected;
+    });
+    if (this.activeProjectileUpdateTimings) {
+      const candidateCount = (candidates?.monsters?.length ?? 0) + (candidates?.objects?.length ?? 0) + (candidates?.critters?.length ?? 0);
+      this.activeProjectileUpdateTimings.projectileImpactCandidateCount = candidateCount;
+      this.activeProjectileUpdateTimings.projectileImpactAffectedTargetCount = (this.activeProjectileUpdateTimings.projectileImpactAffectedTargetCount ?? 0) + targets.length;
+      this.activeProjectileUpdateTimings.projectileImpactSpellId = projectile.spellId ?? projectile.type ?? "unknown";
+      this.activeProjectileUpdateTimings.projectileImpactAoERadius = Number(projectile.areaRadius) || 0;
     }
 
     for (const target of targets) {
       const direct = target === directTarget;
-      const damage = direct
+      const damage = addProjectileImpactTiming("projectileImpactAoEMs", () => direct
         ? this.calculateDamage({
           caster: { level: projectile.casterLevel },
           casterStats: projectile.casterStats,
@@ -1128,35 +1256,47 @@ export const combatMethods = {
           magicScale: projectile.areaMagicScale ?? 0,
           source: { type: "spell", id: projectile.spellId ?? "spell" },
           sourceConfig: projectile.sourceConfig,
-        }).damage;
+        }).damage);
       if (target === this.player) {
-        if (projectile.casterTypeName) this.recordBestiaryFought?.({ typeName: projectile.casterTypeName });
-        this.damagePlayer(damage, { typeName: projectile.casterTypeName ?? projectile.spellId }, projectile.critical && direct);
+        addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => {
+          if (projectile.casterTypeName) this.recordBestiaryFought?.({ typeName: projectile.casterTypeName });
+          this.damagePlayer(damage, { typeName: projectile.casterTypeName ?? projectile.spellId }, projectile.critical && direct);
+        }));
       } else if (target.runtimeType === "critter" || target.type === "critter") {
-        this.damageCritter?.(target, damage, "magic", false);
+        addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageCritter?.(target, damage, "magic", false)));
       } else if (isDestructibleObject(target)) {
-        this.damageObject(target, damage);
+        addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageObject(target, damage)));
       } else {
-        this.damageMonster(target, damage, "magic", projectile.critical && direct);
+        const wasAlive = !target.dead;
+        const killStartedAt = performance.now();
+        addProjectileImpactTiming("projectileImpactDamageApplyMs", () => addProjectileImpactTiming("projectileImpactDamageMs", () => this.damageMonster(target, damage, "magic", projectile.critical && direct, {
+          type: "projectile", id: projectile.id ?? null, spellId: projectile.spellId ?? null,
+        })));
+        if (wasAlive && target.dead && this.activeProjectileUpdateTimings) {
+          this.activeProjectileUpdateTimings.projectileImpactKillMs = (this.activeProjectileUpdateTimings.projectileImpactKillMs ?? 0) + (performance.now() - killStartedAt);
+          this.activeProjectileUpdateTimings.projectileImpactDeathHandlingMs = (this.activeProjectileUpdateTimings.projectileImpactDeathHandlingMs ?? 0) + (performance.now() - killStartedAt);
+        }
       }
-      if (!target.dead && !(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) this.applyProjectileStatus(target, projectile);
+      if (!target.dead && !(target.runtimeType === "critter" || target.type === "critter" || isDestructibleObject(target))) addProjectileImpactTiming("projectileImpactStatusEffectMs", () => this.applyProjectileStatus(target, projectile));
       this.spawnImpactBeamVisual(projectile, target);
     }
     const impact = projectile.particleVisuals?.impact;
-    if (impact?.type) {
-      this.particleEngine?.emitOneShot(impact.type, x, y, {
-        ...impact,
-        spellInstanceId: projectile.spellInstanceId,
-        layer: impact.layer ?? "effects",
-        oneShotCount: impact.oneShotCount ?? (projectile.areaRadius > 0 ? 30 : 14),
-      });
-    } else {
-      this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08, {
-        spellInstanceId: projectile.spellInstanceId,
-      });
-    }
+    addProjectileImpactTiming("projectileImpactSpawnEffectsMs", () => {
+      if (impact?.type) {
+        this.particleEngine?.emitOneShot(impact.type, x, y, {
+          ...impact,
+          spellInstanceId: projectile.spellInstanceId,
+          layer: impact.layer ?? "effects",
+          oneShotCount: impact.oneShotCount ?? (projectile.areaRadius > 0 ? 30 : 14),
+        });
+      } else {
+        this.addParticles(x, y, projectile.color, projectile.areaRadius > 0 ? 26 : 9, 0.08, {
+          spellInstanceId: projectile.spellInstanceId,
+        });
+      }
+    });
     if (projectile.hazardDuration > 0 && projectile.areaRadius > 0) {
-      this.spawnGroundHazard(projectile, x, y);
+      addProjectileImpactTiming("projectileImpactHazardSpawnMs", () => this.spawnGroundHazard(projectile, x, y));
     }
   },
 
@@ -1232,23 +1372,41 @@ export const combatMethods = {
 
   updateGroundHazards(dt) {
     if (!Array.isArray(this.groundHazards) || this.groundHazards.length === 0) return;
+    const timedHazard = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      if (this.groundHazardUpdateTimings) {
+        this.groundHazardUpdateTimings[key] = (this.groundHazardUpdateTimings[key] ?? 0) + (performance.now() - startedAt);
+      }
+      return result;
+    };
+    const needsPlayerTargetCandidates = this.groundHazards.some((hazard) => hazard?.owner === "player" && (Number(hazard.tick) || 0) <= dt);
+    const candidates = needsPlayerTargetCandidates ? {
+      monsters: this.nearbyMonsters(2),
+      critters: this.nearbyCritters?.() ?? [],
+      objects: this.nearbyDestructibleObjects(2),
+    } : null;
     for (let i = this.groundHazards.length - 1; i >= 0; i -= 1) {
       const hazard = this.groundHazards[i];
-      hazard.life -= dt;
-      hazard.tick -= dt;
+      timedHazard("groundHazardUpdateMs", () => {
+        hazard.life -= dt;
+        hazard.tick -= dt;
+      });
       if (hazard.tick <= 0) {
         hazard.tick += hazard.tickInterval;
-        this.applyGroundHazardTick(hazard);
+        timedHazard("groundHazardDamageMs", () => this.applyGroundHazardTick(hazard, candidates));
       }
       if (hazard.life <= 0) {
-        const wasVisible = this.isWorldPointNearViewport?.(hazard.x, hazard.y, 0, Math.max(180, (Number(hazard.radius) || 0) * 96));
-        if (hazard.particleEmitterId) {
-          this.particleEngine?.removeEmitter(hazard.particleEmitterId);
-        }
-        this.removeHazardLegacyParticles(hazard);
-        this.removeHazardAreaParticles(hazard);
-        this.groundHazards.splice(i, 1);
-        if (wasVisible) this.markRenderDirty?.("hazard-remove");
+        timedHazard("groundHazardCleanupMs", () => {
+          const wasVisible = this.isWorldPointNearViewport?.(hazard.x, hazard.y, 0, Math.max(180, (Number(hazard.radius) || 0) * 96));
+          if (hazard.particleEmitterId) {
+            this.particleEngine?.removeEmitter(hazard.particleEmitterId);
+          }
+          this.removeHazardLegacyParticles(hazard);
+          this.removeHazardAreaParticles(hazard);
+          this.groundHazards.splice(i, 1);
+          if (wasVisible) this.markRenderDirty?.("hazard-remove");
+        });
       }
     }
   },
@@ -1283,7 +1441,8 @@ export const combatMethods = {
   cleanupSpellVisuals(spellInstanceId, spellId = null) {
     if (!spellInstanceId) return;
     this.particleEngine?.removeEmittersByConfig("spellInstanceId", spellInstanceId);
-    this.particleEngine?.fadeParticlesByConfig?.("spellInstanceId", spellInstanceId, 0.55);
+    this.particleEngine?.removeParticlesByConfig?.("spellInstanceId", spellInstanceId);
+    this.particles = (this.particles ?? []).filter((entry) => entry?.spellInstanceId !== spellInstanceId);
     if (spellId === "blizzard") {
       const frostTypes = new Set(["cast_ice", "trail_ice", "impact_ice", "frost_ground", "status_frozen", "hit_sparks"]);
       this.particleEngine?.removeEmittersWhere?.((emitter) => {
@@ -1325,12 +1484,24 @@ export const combatMethods = {
     if (hazard.particleEmitterId) this.particleEngine?.removeParticlesByEmitter(hazard.particleEmitterId);
   },
 
-  applyGroundHazardTick(hazard) {
+  applyGroundHazardTick(hazard, candidates = null) {
     if (hazard.owner === "player") {
-      for (const monster of this.nearbyMonsters(2)) {
+      const candidateCount = (candidates?.monsters?.length ?? 0) + (candidates?.critters?.length ?? 0) + (candidates?.objects?.length ?? 0);
+      if (this.groundHazardUpdateTimings) {
+        this.groundHazardUpdateTimings.groundHazardCandidateCount += candidateCount;
+        this.groundHazardUpdateTimings.groundHazardType = hazard.spellId ?? "hazard";
+      }
+      for (const monster of candidates?.monsters ?? this.nearbyMonsters(2)) {
         if (monster.dead) continue;
-        if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(monster))) continue;
-        if (Math.hypot(monster.x - hazard.x, monster.y - hazard.y) > hazard.radius + monster.radius) continue;
+        const collides = (() => {
+          const startedAt = performance.now();
+          const result = canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(monster))
+            && Math.hypot(monster.x - hazard.x, monster.y - hazard.y) <= hazard.radius + monster.radius;
+          if (this.groundHazardUpdateTimings) this.groundHazardUpdateTimings.groundHazardCollisionMs += performance.now() - startedAt;
+          return result;
+        })();
+        if (!collides) continue;
+        if (this.groundHazardUpdateTimings) this.groundHazardUpdateTimings.groundHazardAffectedTargetCount += 1;
         const damage = this.calculateDamage({
           caster: { level: hazard.casterLevel },
           casterStats: hazard.casterStats,
@@ -1342,9 +1513,30 @@ export const combatMethods = {
           source: { type: "spell", id: hazard.spellId ?? "hazard" },
           sourceConfig: hazard.sourceConfig,
         }).damage;
-        this.damageMonster(monster, damage, "magic", false);
+        const wasAlive = !monster.dead;
+        const lootBefore = this.pendingLootDrops?.length ?? 0;
+        const killStartedAt = performance.now();
+        this.damageMonster(monster, damage, "magic", false, {
+          type: "groundHazard",
+          id: hazard.id ?? null,
+          spellId: hazard.spellId ?? null,
+        });
+        const killElapsed = performance.now() - killStartedAt;
+        const deathDetectionStartedAt = performance.now();
+        const died = wasAlive && monster.dead;
+        if (this.groundHazardUpdateTimings) this.groundHazardUpdateTimings.groundHazardDeathDetectionMs += performance.now() - deathDetectionStartedAt;
+        if (wasAlive && monster.dead && this.groundHazardUpdateTimings) {
+          this.groundHazardUpdateTimings.groundHazardKillMs += killElapsed;
+          // Loot tables stay deferred. This bucket intentionally measures only the
+          // queue observation/enqueue boundary, never the full death callback path.
+          const enqueueStartedAt = performance.now();
+          if ((this.pendingLootDrops?.length ?? 0) > lootBefore) {
+            this.groundHazardUpdateTimings.groundHazardLootJobEnqueueMs += performance.now() - enqueueStartedAt;
+            this.groundHazardUpdateTimings.groundHazardLootDropMs += performance.now() - enqueueStartedAt;
+          }
+        }
       }
-      for (const critter of this.nearbyCritters?.() ?? []) {
+      for (const critter of candidates?.critters ?? this.nearbyCritters?.() ?? []) {
         if (critter.dead || critter.canTakeAreaDamage === false) continue;
         if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(critter))) continue;
         if (Math.hypot(critter.x - hazard.x, critter.y - hazard.y) > hazard.radius + critter.radius) continue;
@@ -1362,7 +1554,7 @@ export const combatMethods = {
         this.damageCritter?.(critter, damage, "magic", false);
       }
       if (Array.isArray(hazard.sourceConfig?.target)) {
-        for (const object of this.nearbyDestructibleObjects(2)) {
+        for (const object of candidates?.objects ?? this.nearbyDestructibleObjects(2)) {
           if (Math.hypot(object.x - hazard.x, object.y - hazard.y) > hazard.radius + object.radius) continue;
           if (!canDamageTargetWithSource(hazard.sourceConfig, "spell", this.targetMetadataFor(object))) continue;
           const damage = this.calculateDamage({
@@ -1471,7 +1663,7 @@ export const combatMethods = {
             this.addFloater(entity.x, entity.y, `-${damage}`, effect.color ?? "#87d65a");
             if (entity.hp <= 0) this.player.stats.deaths += 1;
           } else {
-            this.damageMonster(entity, damage, "magic", false);
+            this.damageMonster(entity, damage, "magic", false, { type: "dot", id: effect.sourceId ?? "dot", spellId: effect.sourceId ?? null });
           }
         }
       } else if (effect.type === "regen" && isPlayer) {
@@ -1549,7 +1741,7 @@ export const combatMethods = {
       }
   },
 
-  damageMonster(monster, amount, sourceType, critical = false) {
+  damageMonster(monster, amount, sourceType, critical = false, deathSource = null) {
     if (monster?.runtimeType === "critter" || monster?.type === "critter") {
       this.damageCritter?.(monster, amount, sourceType, critical);
       return;
@@ -1575,7 +1767,11 @@ export const combatMethods = {
       this.player.hp = Math.min(stats.maxHp, this.player.hp + heal);
       this.spawnHeroHealingEffect?.();
     }
-    if (monster.hp <= 0) this.killMonster(monster);
+    if (monster.hp <= 0) this.killMonster(monster, {
+      type: deathSource?.type ?? sourceType,
+      id: deathSource?.id ?? null,
+      spellId: deathSource?.spellId ?? null,
+    });
   },
 
   damageObject(object, amount) {
@@ -1676,33 +1872,142 @@ export const combatMethods = {
     }
   },
 
-  killMonster(monster) {
-    if (monster.dead) return;
-    this.clearStatusEffectParticles(monster);
-    monster.dead = true;
-    this.markRenderDirty?.("monster-death");
-    this.recordBestiaryKilled?.(monster);
-    this.recordMonsterKill(monster);
+  killMonster(monster, deathSource = {}) {
+    const timings = this.monsterDeathTimings ?? (this.monsterDeathTimings = {});
+    const timedDeath = (key, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      timings[key] = (timings[key] ?? 0) + performance.now() - startedAt;
+      return result;
+    };
+    const totalStartedAt = performance.now();
+    const runDeathCallback = (id, details, action) => {
+      const startedAt = performance.now();
+      const result = action();
+      const ms = performance.now() - startedAt;
+      const entry = { id, ms, ...details };
+      timings.monsterDeathCallbackTimings ??= [];
+      timings.monsterDeathCallbackTimings.push(entry);
+      timings.monsterDeathCallbackCount = (timings.monsterDeathCallbackCount ?? 0) + 1;
+      timings.monsterDeathCallbackIds ??= [];
+      timings.monsterDeathCallbackIds.push(id);
+      if (ms >= (timings.monsterDeathSlowestCallbackMs ?? 0)) {
+        timings.monsterDeathSlowestCallbackId = id;
+        timings.monsterDeathSlowestCallbackMs = ms;
+      }
+      timings.monsterDeathCallbacksMs = (timings.monsterDeathCallbacksMs ?? 0) + ms;
+      return result;
+    };
+    const canProcess = timedDeath("monsterDeathValidationMs", () => Boolean(monster) && !monster.dead && monster.deathState !== "dying" && monster.deathState !== "dead");
+    if (!canProcess) {
+      timings.duplicateDeathCallsIgnored = (timings.duplicateDeathCallsIgnored ?? 0) + 1;
+      timings.duplicateDeathEventsIgnored = (timings.duplicateDeathEventsIgnored ?? 0) + 1;
+      return false;
+    }
+    timings.killedMonsterId = monster.id ?? null;
+    timings.killedMonsterType = monster.typeName ?? null;
+    timings.killedMonsterLevel = Math.max(0, Math.floor(Number(monster.lootLevel ?? monster.level) || 0));
+    timings.deathSourceType = deathSource.type ?? null;
+    timings.deathSourceId = deathSource.id ?? null;
+    timings.deathSourceSpellId = deathSource.spellId ?? null;
+    this.monsterDeathsThisFrame = (this.monsterDeathsThisFrame ?? 0) + 1;
+    timedDeath("monsterDeathStateMutationMs", () => {
+      // Set this before any callbacks so simultaneous hazard/projectile hits cannot re-enter death work.
+      monster.deathState = "dying";
+      this.clearStatusEffectParticles(monster);
+      monster.hp = 0;
+      monster.dead = true;
+      monster.deathState = "dead";
+    });
+    timedDeath("monsterDeathAnimationSetupMs", () => {});
+    timedDeath("monsterDeathDirtyMarkMs", () => this.markRenderDirty?.("monster-death"));
+    timedDeath("monsterDeathBestiaryProgressMs", () => runDeathCallback("bestiary-progress", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: false,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: [],
+    }, () => {
+      timings.bestiaryEntriesChecked = (timings.bestiaryEntriesChecked ?? 0) + (monster.isMinion ? 0 : 1);
+      this.recordBestiaryKilled?.(monster);
+    }));
+    timedDeath("monsterDeathAchievementProgressMs", () => runDeathCallback("kill-statistics", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: false,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: [],
+    }, () => {
+      // Kill statistics are consumed by achievement UI; there is no global achievement scan here.
+      timings.achievementsChecked = (timings.achievementsChecked ?? 0);
+      this.recordMonsterKill(monster);
+    }));
     if (monster.elite) {
       // Elite killed — game UI already shows effects, no debug toast needed
     }
     const xp = this.modifiedXp?.(monster.xp) ?? monster.xp;
-    this.player.xp += xp;
-    this.recordRunXp?.(xp);
-    this.recordRunKill?.(monster);
-    if (!monster.isMinion) this.applyQuestKill(monster);
-    if (!monster.isMinion) this.applyCurrentSubregionClear?.();
-    this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95);
-    if (!monster.isMinion) this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
-    if (!monster.isMinion) this.applyMonsterKillWorldEnergy(monster);
-    this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
-    if (!monster.isMinion && !monster.noLoot && !monster.despawnOnDeath) this.dropLoot(monster);
-    if (!monster.isMinion) this.despawnMonsterMinions(monster.id);
-    if (monster.despawnOnDeath) {
-      this.addFloater(monster.x, monster.y, "Forsvinder", monster.color, 0.95);
-      this.addParticles(monster.x, monster.y, monster.color, 36, 0.18);
+    runDeathCallback("xp-and-run-statistics", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: false,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: [],
+    }, () => {
+      this.player.xp += xp;
+      this.recordRunXp?.(xp);
+      this.recordRunKill?.(monster);
+    });
+    if (!monster.isMinion) timedDeath("monsterDeathQuestProgressMs", () => runDeathCallback("quest-kill-progress", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: false,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: ["snapshot"],
+    }, () => {
+      const result = this.applyQuestKill(monster, { publishSnapshot: false, diagnostics: timings });
+      if (result?.changed) this.scheduleSnapshotPublish?.("monster-death-quest-progress");
+    }));
+    if (!monster.isMinion) runDeathCallback("subregion-clear-progress", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: false,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: [],
+    }, () => {
+      this.applyCurrentSubregionClear?.();
+    });
+    timedDeath("monsterDeathFloatersMs", () => this.addFloater(monster.x, monster.y, `+${xp} xp`, "#e0aa3f", 0.95));
+    if (!monster.isMinion) runDeathCallback("world-energy-and-popularity", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: true,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: ["floaters"],
+    }, () => {
+      this.changePopularity(monsterPopularityDelta(monster, this.player.level), monster.x, monster.y);
+      this.applyMonsterKillWorldEnergy(monster);
+    });
+    timedDeath("monsterDeathParticlesMs", () => {
+      this.addParticles(monster.x, monster.y, monster.color, 24, 0.16);
+      timings.particlesCreated = (timings.particlesCreated ?? 0) + 24;
+    });
+    if (!monster.isMinion && !monster.noLoot && !monster.despawnOnDeath) {
+      const queuedBefore = this.pendingLootDrops?.length ?? 0;
+      const startedAt = performance.now();
+      this.activeMonsterDeathTimings = timings;
+      this.activeMonsterDeathSource = deathSource;
+      timedDeath("monsterDeathLootJobEnqueueMs", () => this.dropLoot(monster));
+      this.activeMonsterDeathTimings = null;
+      this.activeMonsterDeathSource = null;
+      timings.lootJobsQueued = (timings.lootJobsQueued ?? 0) + Math.max(0, (this.pendingLootDrops?.length ?? 0) - queuedBefore);
+      timings.lootTablesReferenced = (timings.lootTablesReferenced ?? 0)
+        + normalizeLootTableRefs(monster).length + normalizeLootTableRefs({ lootTables: monster.instanceLootTables }).length;
+      if (this.activeProjectileUpdateTimings) {
+        this.activeProjectileUpdateTimings.projectileImpactLootDropMs = (this.activeProjectileUpdateTimings.projectileImpactLootDropMs ?? 0) + (performance.now() - startedAt);
+      }
     }
-    this.levelUpIfNeeded();
+    if (!monster.isMinion) runDeathCallback("minion-despawn", {
+      mutatesPersistentState: false, gameplayCritical: true, createsVisualOnlyWork: true,
+      scansGlobalConfigurationOrWorldState: true, causesEventDispatch: false, schedules: ["particles"],
+    }, () => {
+      this.despawnMonsterMinions(monster.id);
+    });
+    if (monster.despawnOnDeath) {
+      timedDeath("monsterDeathFloatersMs", () => this.addFloater(monster.x, monster.y, "Forsvinder", monster.color, 0.95));
+      timedDeath("monsterDeathParticlesMs", () => {
+        this.addParticles(monster.x, monster.y, monster.color, 36, 0.18);
+        timings.particlesCreated = (timings.particlesCreated ?? 0) + 36;
+      });
+    }
+    runDeathCallback("level-up-check", {
+      mutatesPersistentState: true, gameplayCritical: true, createsVisualOnlyWork: true,
+      scansGlobalConfigurationOrWorldState: false, causesEventDispatch: false, schedules: ["ui", "audio", "particles"],
+    }, () => this.levelUpIfNeeded());
+    timings.callbacksExecuted = timings.monsterDeathCallbackCount ?? 0;
+    timings.monsterDeathTotalMs = (timings.monsterDeathTotalMs ?? 0) + performance.now() - totalStartedAt;
+    return true;
   },
 
   applyMonsterKillWorldEnergy(monster) {

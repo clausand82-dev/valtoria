@@ -187,6 +187,12 @@ export const localSaveRepository = {
     return writeJson(writeSavePayloadStorageKey(slotIdOrKey), payload);
   },
 
+  saveGameSerializedSync(slotIdOrKey = SAVE_STORAGE_KEY, serializedPayload) {
+    if (!SAVE_PERSIST_CONFIG.storage.playerSave) return false;
+    if (typeof serializedPayload !== "string") return false;
+    return writeText(writeSavePayloadStorageKey(slotIdOrKey), serializedPayload);
+  },
+
   async deleteSave(slotIdOrKey) {
     return this.deleteSaveSync(slotIdOrKey);
   },

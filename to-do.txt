@@ -3,22 +3,14 @@ Små rettelse observeret igennem spil test:
 - skal city areas og building besatte mobs kun kunne bekæmpes af hero og ikke army?
 - man skal kunne skyde spells udover sorte huller 
 - en para til at bestemme afstand imellem objects (på object eller generelt)
-- underlig fejl ved indlevering af første basement quest
 - lidt periodisk lag ved lonline run
 - lidt loade forsinkelse af grafik ved online run
-- nogle ting er da ved eng
+- i city map run er exit ofte næsten umulig at se
 
-Uncaught ReferenceError: resourcesPrepaid is not defined
-    at index-CLWqNRrI.js:1471:216461
-    at Ks (index-CLWqNRrI.js:48:50745)
-    at vg (index-CLWqNRrI.js:48:51665)
-    at Qm (index-CLWqNRrI.js:48:50785)
-    at Object.useState (index-CLWqNRrI.js:48:63063)
-    at QT.St.useState (index-CLWqNRrI.js:17:7526)
-    at p9 (index-CLWqNRrI.js:1471:172446)
-    at fg (index-CLWqNRrI.js:48:48429)
-    at Dg (index-CLWqNRrI.js:48:71302)
-    at $1 (index-CLWqNRrI.js:48:81694)
+
+
+
+
 
 
 
@@ -34,8 +26,25 @@ ARCHIVEMENTS
 
 CITY QUESTS:
 
+Find_the_tombstones (ret stavefejl)
+Caelen er ved at skrive en bog, men mangler tre citater fra tre gravstene, der står i tre forskellige regioner. Regionerne er Kvaernen, The forest og Elvbakken. Hver sten er en lille prefab der maks er 3x3 med stenen i midten. Brug object_gravestone.png (måske den skal oprettes) og brug 1, 2 og 3 som gravstene - en i hver region. Runestenen skal have en action hvor man kan læse dens citat.
+Find tre forskellige personer der er begravet og tre "citater" der kan stå på graven. Jeg tænker med flag noteres det om en sten er læst.
+Quest kan kun gennemføres engang og kræver priest_veldors_letter quest er gennemført. Questen åbner ikke for uåbnede områder - så er områder ikke låst op, må man vente. Reward er forhøjet faith i byen.
+
+
+annelise_lost_loves_letter
+Et brev til Annelise, der random kan dukker op fra skeleter. Brevet indeholder en længere kærligheds erklæring til Annelise, men også et farvel fordi han er faldet ned i en grotte og brækket benet, og frygter han ikke kan komme ud. Selve brevet er et item, man skal afleverer til Annelise. Der kan altid kun være et af dette brev i world (loot på jorden, player inventory eller city inventory og dropepr aldrig efter quest er afsluttet). Drop rate er 0.005. Brevet skal læses for at starte quest og afleveres for at afslutte quest.
+
+mayors_letter_about_lost_daughter
+Et brev til borgmesteren, der random kan dukke op fra foilage (main plant). Brevet fortæller om en, der har set borgmesterens forsvundne datter i elvindale skoven for flere uger siden. Borgmesteren er ked af detm ne glad for beskeden. Brevet skal afleveres til borgmesteren for at afsluttet quest. Der kan altid kun være et af dette brev i world (loot på jorden, player inventory eller city inventory og dropepr aldrig efter quest er afsluttet). Drop rate er 0.005. Brevet skal læses for at starte quest og afleveres for at afslutte quest.
+
+
+INN quests:
+Kvinde leder efter sit tabte hårsmykke (new quest item). only once quest. Smykke kan droppe fra village1-6.
+
 
 ARTIFACTS:
+hornpiece from battel troll: Et stort afknækket horn fra en stor trold, giver +5 i faith, kræver 1xbattle troll horn (new rare item - kan kun droppe hvis artifact ikke er lavet, eller player ikke har item i player inventory eller city invnetory, drop rate 0.001 fra trolls, - i village outskirt area kan giant troll dukke op med 0.005 sandsynlighed i forest region )
 
 
 VEJRSYSTEM
@@ -75,7 +84,6 @@ Wizard quest --> snak med borgmester --> glad borgmester --> reward: +20 rep og 
 Når alle quest er lavet i village outskirt, ber Borgmesteren om at man sørge for at alle åbne regions bliver corruption = 0. Denne quest åbner permanent for elvindale (der mangler en del quest før denne her - så bare note til senere)
 
 
-- random loot i wild (breve - et til annelise fra lost lover, en til borgmester fra forsvunden datter, en til Marla (cook) fra succes fuld søn)
 
 - Flere quest fra borgmester til andre steder (et par quest mere i village)
 

@@ -30,7 +30,7 @@ export const RESTRICTED_DROPS = [
   },
 ];
 
-// Chance (0–1) of a unique item dropping per source type.
+// Chance (0–1) of a unique item dropping per source type. - MÅSKE LAGECY FROM BEFORE LOOT TABLES SYSTEM
 export const UNIQUE_DROP_CHANCES = {
   monster: 0.0015,
   chest: 0.08,
