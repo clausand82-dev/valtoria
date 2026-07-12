@@ -184,6 +184,8 @@ export const regionMethods = {
     const weatherId = String(preparedRegionConfig.weather?.id ?? "");
     const weatherAmbience = ["rain", "light_rain", "heavy_rain", "thunderstorm"].includes(weatherId) ? ["rain_ambience"] : [];
     audioManager.setRegionAudio({ ...(preparedRegionConfig.audio ?? {}), ambience: [...(preparedRegionConfig.audio?.ambience ?? []), ...weatherAmbience] });
+    // Bounded to the entered region config; no world or live-monster scan is performed.
+    audioManager.preloadRegion(preparedRegionConfig);
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();
