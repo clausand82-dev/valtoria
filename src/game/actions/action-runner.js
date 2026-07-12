@@ -19,6 +19,7 @@ import {
 } from "../GameEngine/helpers/items.js";
 import { makeQuestItem, questItemCanStack } from "../GameEngine/helpers/quests.js";
 import { inventoryUnlockedSlotCount } from "../config/game-constants-config.js";
+import { audioManager } from "../audio-manager.js";
 
 const IMPLEMENTED_TYPES = new Set([
   "inspect",
@@ -433,6 +434,16 @@ function runImplementedHandler(engine, action, target = null, context = {}) {
   return { ok: true, changed: false };
 }
 
+function playActionSuccessAudio(engine, action, target = null) {
+  const soundId = action?.audio?.success;
+  if (!soundId) return;
+  audioManager.playSound(soundId, {
+    position: target ?? engine.player,
+    listener: engine.player,
+    maxDistance: 14,
+  });
+}
+
 export function runAction({
   actionId,
   target = null,
@@ -512,6 +523,7 @@ export function runAction({
   }
 
   engine.recordRunAction?.(action);
+  playActionSuccessAudio(engine, action, target);
 
   if (changed) {
     engine.updateNearbyActionTarget?.();

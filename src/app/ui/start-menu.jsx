@@ -4,7 +4,7 @@ import { formatSaveTimestamp } from "../save/save-slots.js";
 import { useLocalization } from "../../i18n/index.js";
 import { GAME_VERSION } from "../../game/config/game-constants-config.js";
 
-export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave, onExportSave, onImportSaveFile, onMenuHighlight }) {
+export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onLoadGame, onDeleteSave, onExportSave, onImportSaveFile, onMenuHighlight, onSettingsClick }) {
   const { t } = useLocalization();
   const hasSaves = saveSlots.some((slot) => slot.exists);
   const importInputRef = useRef(null);
@@ -62,7 +62,7 @@ export function StartMenu({ view, saveSlots, onNewGame, onLoadClick, onBack, onL
           <nav className="start-menu-actions" aria-label={t("menu.main")}>
             <button type="button" onClick={() => setConfirmNewGameOpen(true)}>{t("menu.newGame")}</button>
             <button type="button" onClick={onLoadClick} disabled={!hasSaves && !onImportSaveFile}>{t("menu.loadGame")}</button>
-            <button type="button" disabled>{t("menu.gameSettings")}</button>
+            <button type="button" onClick={onSettingsClick}>{t("menu.gameSettings")}</button>
           </nav>
         )}
         {view === "load" && (

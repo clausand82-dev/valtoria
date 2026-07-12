@@ -955,6 +955,7 @@ export const combatMethods = {
     this.player.spellCooldown = Math.max(0, Number(options.cooldown ?? spell.cooldown) || 0);
     this.player.castAnim = 0.38;
     this.setFacing(n.x, n.y);
+    audioManager.playSound("spell_cast", { position: this.player, listener: this.player, maxDistance: 14 });
     const visuals = spellParticleVisuals(spell);
     const spellInstanceId = createId();
     this.scheduleSpellVisualCleanup(spell, spellInstanceId);
@@ -1070,6 +1071,7 @@ export const combatMethods = {
     if (!n.x && !n.y) return;
     monster.spellCooldown = spell.cooldown + Math.random() * 0.8;
     monster.attackAnim = 0.24;
+    audioManager.playSound("spell_cast", { position: monster, listener: this.player, maxDistance: 14 });
     const visuals = spellParticleVisuals(spell);
     if (visuals.cast?.type) {
       this.particleEngine?.emitOneShot(visuals.cast.type, monster.x, monster.y, {

@@ -526,10 +526,13 @@ export default function App() {
   }, [gameSession]);
 
   useEffect(() => {
-    if (gameSession) return;
+    if (gameSession || appLoading.active) return;
     audioManager.stopAmbience();
     audioManager.playMusic("menu");
-  }, [gameSession]);
+    // Start as soon as the visible menu is ready. Browsers that block autoplay
+    // keep the desired menu track and retry it through the next UI gesture.
+    audioManager.unlock();
+  }, [appLoading.active, gameSession]);
 
   useEffect(() => {
     audioManager.setSettings(audioSettings);
@@ -1296,11 +1299,13 @@ export default function App() {
           onExportSave={exportSaveSlot}
           onImportSaveFile={importSaveFile}
           onMenuHighlight={() => audioManager.playSound("menu_highlight")}
+          onSettingsClick={() => setCitySettingsOpen(true)}
         />
       )}
 
       {gameSession && <canvas ref={canvasRef} className="game-canvas" aria-label="Valtoria isometric game" />}
 
+      <>
       {gameSession && (
       <>
       <GameHud
@@ -1365,7 +1370,10 @@ export default function App() {
         </div>
       )}
 
-      {citySettingsOpen && cityOpen && (
+      </>
+      )}
+
+      {citySettingsOpen && (cityOpen || !gameSession) && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
             <h2 id="city-settings-title">{t("panel.settings.title")}</h2>
@@ -1564,7 +1572,7 @@ export default function App() {
               </div>
             )}
 
-            {CHEAT_SETTINGS.enabled && (
+            {CHEAT_SETTINGS.enabled && cityOpen && (
               <div className="city-settings-section">
                 <h3>Cheats</h3>
                 <div className="city-settings-cheat-grid">
@@ -1671,6 +1679,8 @@ export default function App() {
         </div>
       )}
 
+      {gameSession && (
+      <>
       {questOverviewOpen && (
         <QuestOverviewDialog
           activeQuests={displayActiveQuests}
@@ -1938,6 +1948,7 @@ export default function App() {
       )}
       </>
       )}
+      </>
       {(appLoading.active || snapshot.subregionTransition?.active) && (
         <AppLoadingScreen state={appLoading.active ? appLoading : snapshot.subregionTransition} />
       )}

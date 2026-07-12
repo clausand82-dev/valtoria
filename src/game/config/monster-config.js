@@ -16,6 +16,12 @@ const monsterSprite = (sprite) => ({
   sequences: sprite.sequences ?? DEFAULT_MONSTER_SEQUENCES_3X4
 });
 
+const monsterAudioProfile = (def) => def.audioProfile
+  ?? (def.speciesId === "demon" ? "demon" : null)
+  ?? (def.sprite?.id === "skeleton" ? "skeleton" : null);
+
+// set audioProfile: "xxx", in MONSTER_DEFS for monsters that should have a specific audio profile, otherwise it will be inferred from speciesId or sprite.id
+
 export const BOSS_TINT = { color: "#d8313d", tintAlpha: 0.34 };
 
 export const MONSTER_DEFS = {
@@ -489,6 +495,7 @@ export const MONSTER_DEFS = {
   //#endregion: Monster: Raider
   //#region Monster: Knight
   Knight: {
+    audio: { hit: "sword_hit_iron" },
     sprite: monsterSprite({
       id: "knight", url: "/assets/generated/mobs/knight_animated_sheet.png",
       rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
@@ -921,7 +928,7 @@ export const MONSTER_STATS = Object.fromEntries(
         eliteKillLydra: Math.max(0, Number(def.eliteKillLydra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillLydra) || 0),
         eliteKillNetdra: Math.max(0, Number(def.eliteKillNetdra ?? DEFAULT_MONSTER_WORLD_ENERGY.eliteKillNetdra) || 0),
         speciesId: def.speciesId,
-        audioProfile: def.audioProfile ?? null,
+        audioProfile: monsterAudioProfile(def),
         audio: def.audio ? { ...def.audio } : null,
         factionId: inferMonsterFaction(type, def),
         tags: Array.isArray(def.tags) ? [...def.tags] : [],

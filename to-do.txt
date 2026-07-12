@@ -11,7 +11,8 @@ Små rettelse observeret igennem spil test:
 - en genvejs tast til mute
 - mulighed for at gå tilbage til start menu
 
-FØLG OP PÅ LYD OG MUSIK - SE CHATGPT
+
+
 
 
 konventer wav til ogg med denne her (inklusiv stereo til mono konventering):

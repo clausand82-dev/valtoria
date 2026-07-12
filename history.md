@@ -8,7 +8,9 @@ History over changes
 - changed stack size on some resources (from 100 to 1000)
 - fixed a bug where 1000 stack resourcer changed to 100 stack size in city inventory
 - fixed a bug where item reward was not rewarded in some hunters quest - NEED TEST
-- added sfx and music support (ongoing)
+- added sfx and music support
+- added sfx sounds and music (some UI sounds added, wolf, spider, demon and skeleton have sounds)
+- settings is now avaiable in start menu also
 
 *V. 1.11
 - fixed an bug where questreward crashed game

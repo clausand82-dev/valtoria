@@ -10,6 +10,7 @@ try {
   const { calculateCityStats, cityMobOccupationStatusText, cityMobVisualDiagnostics, pickCityBattleRegion } = await server.ssrLoadModule("/src/app/city-systems.jsx");
   const { questsMethods } = await server.ssrLoadModule("/src/game/GameEngine/methods/quests.js");
   const { CITY_MOB_BATTLE_PROFILES } = await server.ssrLoadModule("/src/game/config/city-mobs-battle-config.js");
+  const { MUSIC_PROFILES, MUSIC_TRACKS } = await server.ssrLoadModule("/src/game/config/music-config.js");
   const { REGION_OBJECT_DEFS } = await server.ssrLoadModule("/src/game/config/region-object-config.js");
   const { resolveMapRegionConfig } = await server.ssrLoadModule("/src/game/world-state.js");
   const mob = (id, areaId, extra = {}) => ({
@@ -137,6 +138,11 @@ try {
     bankVaultWealthGate: !lowWealthBankBattle.objects.some((entry) => entry.id === "object_vault")
       && sufficientWealthBankBattle.objects.some((entry) => entry.id === "object_vault" && !entry.cityStat),
     battleObjectIdsValid: missingBattleObjectIds.length === 0,
+    battleMusicProfilesValid: CITY_MOB_BATTLE_PROFILES.every((profile) => MUSIC_TRACKS[MUSIC_PROFILES[profile.audio?.musicProfile]?.trackId]),
+    battleMusicPassedToRegion: bankBattle?.region?.audio?.musicProfile === "cellar"
+      && innBattle?.region?.audio?.musicProfile === "village_troubled"
+      && marketBattle?.region?.audio?.musicProfile === "village_troubled"
+      && outerBattle?.region?.audio?.musicProfile === "ruined_outpost",
     battleEntryConditions: conditionalBattleRegion.objects.length === 2
       && conditionalBattleRegion.objects.every((entry) => !entry.conditions && !entry.questActive && !entry.blockedBy)
       && conditionalBattleRegion.mobs.length === 3

@@ -29,6 +29,7 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       labelX: 38,
       labelY: 10,
+      audio: { musicProfile: "mainland_paths" },
       cityStatVariants: [
         { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
       ],
@@ -71,6 +72,10 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       labelX: 35,
       labelY: 26,
+      audio: [
+        { musicProfile: "mainland_paths", questCompleted: "clear_and_repair_the_lookout_post" },
+        { musicProfile: "ruined_outpost", ambience: ["demon_ambience", "scary_forest_ambience"] },
+      ],
       cityStatVariants: [
         { questCompleted: "clear_and_repair_the_lookout_post", corruption: 0, stats: { city_defence: 50 } },
       ],
@@ -123,6 +128,7 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 72,
       labelY: 14,
+      audio: { musicProfile: "ancient_shrine" },
       // TODO:DELETE: weights: { pillar: 2, ruin: 2, tree: 4, rock: 3, foilage: 5 }
       weights: { foilage: 5 },
       objects: [
@@ -162,6 +168,7 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 89,
       labelY: 13,
+      audio: { musicProfile: "mainland_paths" },
       // TODO:DELETE: weights: { tree: 8, rock: 2, foilage: 9, fireplace: 1 }
       weights: { foilage: 9 },
       objects: [
@@ -200,6 +207,7 @@ export function createVillageOutskirtsMapRegions(region) {
       ],
       labelX: 70,
       labelY: 73,
+      audio: { musicProfile: "fields" },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
         { id: "object_hay", weight: 3 },
@@ -225,7 +233,7 @@ export function createVillageOutskirtsMapRegions(region) {
     },
       labelX: 49, labelY: 79,
       mapSize: "small",
-      audio: { musicProfile: "forest", ambience: ["forest_ambience"] },
+      audio: { musicProfile: "riverlands", ambience: ["forest_ambience"] },
       cityStats: {
         population: 10,
         water: 20,
@@ -309,6 +317,7 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       labelX: 25,
       labelY: 77,
+      audio: { musicProfile: "mainland_paths" },
       cityStatVariants: [
         { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
       ],
@@ -353,6 +362,10 @@ export function createVillageOutskirtsMapRegions(region) {
       labelY: 45,
       corrupted: true,
       cityStats: { population: 5, trade: 25, supply: 10 },
+      audio: [
+        { musicProfile: "village_troubled", corruption: { min: 5 } },
+        { musicProfile: "village", corruption: { max: 4 } },
+      ],
       weather: {
         possible: [
           { id: "light_rain", weight: 25 },
@@ -421,6 +434,7 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       labelX: 53,
       labelY: 52,
+      audio: { musicProfile: "riverlands" },
       layout: {
         pool: [
           { id: "central_clearing", weight: 1 },
@@ -455,6 +469,10 @@ export function createVillageOutskirtsMapRegions(region) {
       i18n: { da: { label: "Kroen Den Gode Eg" } },
       corrupted: true,
       cityStats: { population: 5, supply: 20, trade: 10, culture: 5, },
+      audio: [
+        { musicProfile: "village_troubled", corruption: { min: 5 } },
+        { musicProfile: "village_lively", corruption: { max: 4 } },
+      ],
       mapSize: "small",
       color: "#7fb172",
       //tileset: "tileset/tileset_bricktiles.png",
@@ -589,6 +607,7 @@ export function createVillageOutskirtsMapRegions(region) {
       mapSize: "small",
       color: "#c4a86a",
       cityStats: { population: 5, provision: 50, trade: 5, wealth: 5 },
+      audio: { musicProfile: "fields" },
       unlock: {
       any: [
         { questActive: "vitlias_kings_relics" },
@@ -647,6 +666,7 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { locked: true, text: "Unlock by completing quests in the village.", i18n: { da: { text: "Laas op ved at fuldfoere quests i landsbyen." } } },
       labelX: 83,
       labelY: 57,
+      audio: { musicProfile: "fields" },
       // TODO:DELETE: weights: { house: 3, tree: 3, rock: 2, foilage: 4, fireplace: 1 }
       weights: { foilage: 4 },
       objects: [
@@ -677,6 +697,10 @@ export function createVillageOutskirtsMapRegions(region) {
       },
       labelX: 93,
       labelY: 45,
+      audio: [
+        { musicProfile: "forest_dark", corruption: { min: 5 } },
+        { musicProfile: "forest", corruption: { max: 4 } },
+      ],
       cityStatVariants: [
         { questCompleted: "light_the_beacons", corruption: { max: 4 }, stats: { city_defence: 5, faith: 2 } },
       ],
@@ -713,6 +737,7 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { questCompleted: ["rebuild_blacksmith"] },
       labelX: 44,
       labelY: 35,
+      audio: { musicProfile: "village" },
       spawnCounts:
       {
         objects: 24,
@@ -788,6 +813,7 @@ export function createVillageOutskirtsMapRegions(region) {
       unlock: { completedQuests: ["lost_watch"] },
       labelX: 72,
       labelY: 39,
+      audio: { musicProfile: "fields" },
       mobs: [{ type: "Skeleton", weight: 5 }, "Spider", "Wolf", "Bone Warden", "Gate Warden"],
       objects: [
         { id: "object_hay", weight: 3, blockedBy: {questActive: "villager_help_collect_hay"}},
@@ -812,6 +838,10 @@ export function createVillageOutskirtsMapRegions(region) {
       color: "#d7a85b",
       mapSize: "medium",
       cityStats: { population: 50 },
+      audio: [
+        { musicProfile: "village_troubled", corruption: { min: 5 } },
+        { musicProfile: "village", corruption: { max: 4 } },
+      ],
       spawnCounts: {
         value: { objects: 15, foliage: 28, decals: 24, monsters: { min: 8, max: 12 }, water: 0 },
         variants: [
@@ -914,7 +944,10 @@ export function createVillageOutskirtsMapRegions(region) {
       i18n: { da: { label: "Skoven" } },
       color: "#7fb172",
       mapSize: "large",
-      audio: { musicProfile: "forest", ambience: ["forest_ambience"] },
+      audio: [
+        { musicProfile: "forest_dark", ambience: ["forest_ambience"], corruption: { min: 5 } },
+        { musicProfile: "forest", ambience: ["forest_ambience"], corruption: { max: 4 } },
+      ],
       cityStats: { population: 20 },
       tileset: { fileName: "tileset/tileset_grass.png" },
         spawnCounts: {                                            // Per chunk spawn counts.

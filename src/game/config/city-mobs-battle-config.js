@@ -12,6 +12,7 @@ Asset fields use the same formats as map-region-config.js:
 - decay
 - weights
 - antiDrops
+- audio (the same musicProfile/ambience structure as map-region-config.js)
 
 Target fields:
 - buildingIds: exact occupiedBuildingId matches (highest priority)
@@ -29,6 +30,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-nw-ruins",
     label: "City NW Ruins",
+    audio: { musicProfile: "ruined_outpost" },
     spawnZoneIds: ["NW_SPAWN_BORDER", "NW_SPAWN_CORNER", "NW_SPAWN_BRIDGE", "NW_SPAWN_CLOSE"],
     tileset: [
       { fileName: "tileset/tileset_debris.png" },
@@ -43,10 +45,11 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { fileName: "object/object_gravestone.png", weight: 0, scale: 0.7 },
     ],
     objects: [
-      { id: "object_tree", weight: 6, destructible: true },
+      { id: "object_tree_mainland", weight: 6, destructible: true },
       { id: "object_fallentree", weight: 4, destructible: true },
-      { id: "object_pillar", weight: 1, destructible: true },
-      { id: "object_tree_dead", weight: 1, destructible: false },
+      { id: "object_pillar_stone", weight: 1, destructible: true },
+      { id: "object_pillar_wood", weight: 1, destructible: true },
+      { id: "object_tree_lava", weight: 1, destructible: false },
       { id: "object_wagons", weight: 1, destructible: true },
     ],
     decay: [
@@ -60,6 +63,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-sw-fields",
     label: "City SW Fields",
+    audio: { musicProfile: "village_troubled" },
     spawnZoneIds: ["SW_SPAWN_BORDER", "SW_SPAWN_BRIDGE", "SW_SPAWN_CLOSE", "W_SPAWN_EDGE"],
     tileset: [
       { fileName: "tileset/tileset_field.png" },
@@ -87,6 +91,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-ne-flooded-road",
     label: "City NE Flooded Road",
+    audio: { musicProfile: "riverlands" },
     spawnZoneIds: ["NE_SPAWN_BORDER_UPPER", "NE_SPAWN_BORDER_LOWER", "NE_SPAWN_BRIDGE", "NE_SPAWN_CLOSE"],
     tileset: [
       { fileName: "tileset/tileset_swamp.png" },
@@ -115,6 +120,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-se-broken-stones",
     label: "City SE Broken Stones",
+    audio: { musicProfile: "rocky_highlands" },
     spawnZoneIds: ["SE_SPAWN_BORDER", "SE_SPAWN_CORNER", "SE_SPAWN_BRIDGE", "SE_SPAWN_CLOSE"],
     tileset: [
       { fileName: "tileset/tileset_rock.png" },
@@ -128,7 +134,6 @@ export const CITY_MOB_BATTLE_PROFILES = [
     objects: [
       { id: "object_stone_cluster", weight: 8, destructible: true },
       { id: "object_pillar_stone", weight: 2, destructible: true },
-      { id: "object_pillar_stone", weight: 1, destructible: false },
       { id: "object_woodboxes_ground", weight: 2, destructible: true },
     ],
     decay: [
@@ -142,6 +147,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-bank-vault",
     label: "Occupied Bank Vault",
+    audio: { musicProfile: "cellar" },
     buildingIds: ["bank"],
     tileset: [{
       fileName: "tileset/tileset_bricktiles.png",
@@ -178,6 +184,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-inn-taproom",
     label: "Occupied Inn",
+    audio: { musicProfile: "village_troubled" },
     buildingIds: ["inn"],
     tileset: [{ fileName: "tileset/tileset_brickstone_02.png", x:1, y:1,weight: 4 }, { fileName: "tileset/tileset_brickstone_01.png", x: 1, y: 1,weight: 1 }],
     foliageSet: [
@@ -207,6 +214,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-merchant-shop",
     label: "Occupied Merchant Shop",
+    audio: { musicProfile: "village_troubled" },
     buildingIds: ["merchant"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_food.png", weight: 6, scale: 0.7 }, { fileName: "foilage/foilage_village_items_broken.png", weight: 5, scale: 0.7 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
@@ -218,6 +226,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-blacksmith-forge",
     label: "Occupied Blacksmith",
+    audio: { musicProfile: "dungeon_danger" },
     buildingIds: ["blacksmith"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
     foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 9, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 7, scale: 0.7 }, { fileName: "foilage/foilage_metalparts.png", weight: 6, scale: 0.65 }],
@@ -229,6 +238,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-town-hall-chambers",
     label: "Occupied Town Hall",
+    audio: { musicProfile: "village_troubled" },
     buildingIds: ["town_hall"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 7, scale: 0.75 }, { fileName: "foilage/foilage_cityplant.png", weight: 3, scale: 0.7 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
@@ -240,6 +250,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-sanctuary-nave",
     label: "Occupied Sanctuary",
+    audio: { musicProfile: "ancient_shrine" },
     buildingIds: ["sanctuary"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }, { fileName: "tileset/tileset_rock.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_boneparts.png", weight: 6, scale: 0.55 }, { fileName: "foilage/foilage_bones.png", weight: 4, scale: 0.55 }, { fileName: "foilage/foilage_cityplant.png", weight: 2, scale: 0.7 }],
@@ -251,6 +262,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-barracks-yard",
     label: "Occupied Barracks",
+    audio: { musicProfile: "dungeon_danger" },
     buildingIds: ["barracks"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
     foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 7, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 6, scale: 0.7 }, { fileName: "foilage/foilage_village_debris.png", weight: 3, scale: 0.7 }],
@@ -262,6 +274,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-armory-store",
     label: "Occupied Armory",
+    audio: { musicProfile: "dungeon_danger" },
     buildingIds: ["armory"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_metalplates.png", weight: 10, scale: 0.7 }, { fileName: "foilage/foilage_metalchains.png", weight: 8, scale: 0.7 }, { fileName: "foilage/foilage_metalparts.png", weight: 7, scale: 0.65 }],
@@ -273,6 +286,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-market",
     label: "Raided Market Area",
+    audio: { musicProfile: "village_troubled" },
     areaIds: ["market"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_food.png", weight: 7 }, { fileName: "foilage/foilage_cityplant.png", weight: 3 }, { fileName: "foilage/foilage_village_debris.png", weight: 4 }],
@@ -283,6 +297,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-mystic-quarter",
     label: "Raided Mystic Quarter",
+    audio: { musicProfile: "ancient_shrine" },
     areaIds: ["mystic_quarter"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_rock.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 5 }, { fileName: "foilage/foilage_roots.png", weight: 4 }, { fileName: "foilage/foilage_boneparts.png", weight: 3, scale: 0.5 }],
@@ -293,6 +308,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-crafting-quarter",
     label: "Raided Crafting Quarter",
+    audio: { musicProfile: "dungeon_danger" },
     areaIds: ["crafting_quarter"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_debris.png", weight: 2 }],
     foliageSet: [{ fileName: "foilage/foilage_metalparts.png", weight: 8 }, { fileName: "foilage/foilage_metalplates.png", weight: 7 }, { fileName: "foilage/foilage_metalchains.png", weight: 5 }],
@@ -303,6 +319,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-town-center",
     label: "Raided Town Center",
+    audio: { musicProfile: "village_troubled" },
     areaIds: ["town_center"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 4 }],
     foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 5 }, { fileName: "foilage/foilage_village_items_broken.png", weight: 4 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
@@ -313,6 +330,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-training-grounds",
     label: "Raided Training Grounds",
+    audio: { musicProfile: "dungeon_danger" },
     areaIds: ["training_grounds"],
     tileset: [{ fileName: "tileset/tileset_debris.png", weight: 2 }, { fileName: "tileset/tileset_bricktiles.png", weight: 2 }],
     foliageSet: [{ fileName: "foilage/foilage_metalparts.png", weight: 6 }, { fileName: "foilage/foilage_metalplates.png", weight: 5 }, { fileName: "foilage/foilage_village_debris.png", weight: 3 }],
@@ -323,6 +341,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-housing",
     label: "Raided Housing Area",
+    audio: { musicProfile: "village_troubled" },
     areaIds: ["housing_area"],
     tileset: [{ fileName: "tileset/tileset_woodplank.png", weight: 2 }, { fileName: "tileset/tileset_bricktiles.png", weight: 2 }],
     foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 7 }, { fileName: "foilage/foilage_food.png", weight: 4 }, { fileName: "foilage/foilage_garbage_001.png", weight: 3 }],
@@ -333,6 +352,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-park",
     label: "Raided Park",
+    audio: { musicProfile: "forest_dark" },
     areaIds: ["park"],
     tileset: [{ fileName: "tileset/tileset_grass.png", weight: 3 }, { fileName: "tileset/tileset_bricktiles.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_cityplant.png", weight: 8 }, { fileName: "foilage/foilage_plants_mainland.png", weight: 6 }, { fileName: "foilage/foilage_roots.png", weight: 3 }],
@@ -343,6 +363,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-education",
     label: "Raided Education Area",
+    audio: { musicProfile: "ancient_shrine" },
     areaIds: ["education_area"],
     tileset: [{ fileName: "tileset/tileset_bricktiles.png", weight: 3 }, { fileName: "tileset/tileset_woodplank.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_village_items_broken.png", weight: 6 }, { fileName: "foilage/foilage_cityplant.png", weight: 3 }, { fileName: "foilage/foilage_garbage_001.png", weight: 2 }],
@@ -353,6 +374,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
   {
     id: "city-area-empty-district",
     label: "Raided Empty District",
+    audio: { musicProfile: "ruined_outpost" },
     areaIds: ["empty_district_1"],
     tileset: [{ fileName: "tileset/tileset_debris.png", weight: 3 }, { fileName: "tileset/tileset_bricktiles.png", weight: 1 }],
     foliageSet: [{ fileName: "foilage/foilage_deadvillages.png", weight: 7, scale: 1.2 }, { fileName: "foilage/foilage_village_debris.png", weight: 5 }, { fileName: "foilage/foilage_garbage_001.png", weight: 3 }],

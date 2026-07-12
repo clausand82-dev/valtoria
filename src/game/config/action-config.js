@@ -507,6 +507,7 @@ export const ACTION_CONFIG = {
   bury_village_dead: {
     id: "bury_village_dead",
     type: "cleanse",
+    audio: { success: "cleanse_a_soul" },
     label: "Bury villager",
     i18n: { da: { label: "Begrav landsbyboer" } },
     prompt: "Begrav den doede landsbyboer",
@@ -814,6 +815,7 @@ export const ACTION_CONFIG = {
     id: "bury_city_mob_dead",
     type: "cleanse",
     label: "Bury villager",
+    audio: { success: "cleanse_a_soul" },
     i18n: {
       da: {
         label: "Begrav landsbyboer",
