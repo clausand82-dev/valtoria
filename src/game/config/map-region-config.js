@@ -320,6 +320,15 @@ Conditional config notes:
   These use percent balance, not raw points.
 - Automatic worldState currently tracks region.{id}.unlocked/explored/corrupted, region.{id}.visits, region.{id}.cleared on return, and mob.{typeName}.seen on hover/combat.
 
+Region audio supports all three forms without changing ambience sound-id lists:
+audio: { musicProfile: "forest", ambience: ["forest_ambience"] }, // Direct object.
+audio: { value: { musicProfile: "forest" }, variants: [{ corruption: { min: 5 }, value: { musicProfile: "forest_corrupted" } }] }, // Existing conditional value/variants form.
+audio: [ // Shorthand entries are checked top to bottom; the first matching entry wins.
+  { musicProfile: "forest_corrupted", ambience: ["dark_forest_ambience"], corruption: { min: 5 } },
+  { musicProfile: "forest", ambience: ["forest_ambience"] }, // No conditions: unconditional fallback.
+]
+- Only the top-level region.audio array is shorthand-conditioned. ambience: ["forest_ambience", "river_ambience"] remains a normal sound-id list.
+
 Shorthand conditions:
 - List entries can add simple condition tags directly. Multiple tags on the same entry are AND.
 - Direct all/any/not also works on entries, for example { id: "x", all: [{ flag: "a" }, { notFlag: "b" }] }.

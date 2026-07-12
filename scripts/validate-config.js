@@ -13,6 +13,7 @@ import { LOOT_TABLES } from "../src/game/config/loot-tables-config.js";
 import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
 import { CITY_ACHIEVEMENTS } from "../src/game/config/city-achievement-config.js";
 import { validateBeastLocalization } from "../src/i18n/beast/monster-localization.js";
+import { hasWorldConditionFields, stripWorldConditionFields } from "../src/game/world-state.js";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
 const RUNTIME_LOOT_TABLE_REFS = new Set([
@@ -87,6 +88,27 @@ function collectRegionEntries() {
     });
   }
   return regions;
+}
+
+function validateRegionAudio(region, owner) {
+  if (!Array.isArray(region?.audio)) return;
+  if (!region.audio.length) {
+    addWarning(`${owner}.audio shorthand array is empty`);
+    return;
+  }
+  let sawUnconditionalEntry = false;
+  region.audio.forEach((entry, index) => {
+    const entryOwner = `${owner}.audio[${index}]`;
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      addWarning(`${entryOwner} shorthand entry must be an object`);
+      return;
+    }
+    const hasConditions = hasWorldConditionFields(entry);
+    const payload = stripWorldConditionFields(entry);
+    if (!Object.keys(payload).length) addWarning(`${entryOwner} contains ${hasConditions ? "conditions but no audio payload" : "no audio payload"}`);
+    if (sawUnconditionalEntry) addWarning(`${entryOwner} is unreachable because an earlier unconditional audio fallback wins first`);
+    if (!hasConditions) sawUnconditionalEntry = true;
+  });
 }
 
 function checkQuestRef(questId, owner, questIds) {
@@ -240,9 +262,11 @@ function main() {
 
   for (const { setId, index, region } of collectRegionEntries()) {
     const id = idOf(region);
+    const regionOwner = `region "${id || `${setId}[${index}]`}"`;
     if (!id) addError(`region ${setId}[${index}] is missing id`);
     else if (regionIds.has(id)) addError(`duplicate region id "${id}" in ${regionIds.get(id)} and ${setId}[${index}]`);
     else regionIds.set(id, `${setId}[${index}]`);
+    validateRegionAudio(region, regionOwner);
 
     for (const [listKey, entries] of Object.entries({ objects: region.objects, foliage: region.foliageSet ?? region.foliageSets ?? region.foliage, npcs: region.npcs })) {
       if (!Array.isArray(entries)) continue;

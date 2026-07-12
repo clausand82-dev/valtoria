@@ -760,13 +760,18 @@ export function worldEntryAllowed(entry, worldState = EMPTY_WORLD_STATE, context
   return entryAllowed(entry, normalizeWorldState(worldState), context);
 }
 
-function stripConditionFields(entry) {
+export function stripWorldConditionFields(entry) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) return entry;
   const rest = {};
   for (const [key, value] of Object.entries(entry)) {
     if (!CONDITION_KEYS.has(key)) rest[key] = value;
   }
   return rest;
+}
+
+export function hasWorldConditionFields(entry) {
+  return Boolean(entry && typeof entry === "object" && !Array.isArray(entry)
+    && Object.keys(entry).some((key) => CONDITION_KEYS.has(key)));
 }
 
 function matchingVariant(variants = [], worldState, context) {
@@ -796,7 +801,7 @@ function patchList(baseList, patchListValue, mergeKeys, worldState, context) {
   const result = (Array.isArray(baseList) ? baseList : []).map((entry) => clone(entry));
   for (const rawPatch of Array.isArray(patchListValue) ? patchListValue : []) {
     if (!entryAllowed(rawPatch, worldState, context)) continue;
-    const patch = stripConditionFields(rawPatch);
+    const patch = stripWorldConditionFields(rawPatch);
     const key = mergeKeyFor(patch, mergeKeys);
     const index = key ? result.findIndex((entry) => mergeKeyFor(entry, mergeKeys) === key) : -1;
     if (index >= 0) {
@@ -831,7 +836,7 @@ export function filterWorldList(rawValue, worldState = EMPTY_WORLD_STATE, contex
   if (!Array.isArray(rawValue)) return clone(rawValue);
   return rawValue
     .filter((entry) => entryAllowed(entry, worldState, context))
-    .map((entry) => stripConditionFields(resolveWorldValue(entry, worldState, context)));
+    .map((entry) => stripWorldConditionFields(resolveWorldValue(entry, worldState, context)));
 }
 
 function resolveNestedConditionalLists(value, worldState, context) {
@@ -839,7 +844,7 @@ function resolveNestedConditionalLists(value, worldState, context) {
     return value
       .filter((entry) => entryAllowed(entry, worldState, context))
       .map((entry) => resolveNestedConditionalLists(
-        stripConditionFields(resolveWorldValue(entry, worldState, context)),
+        stripWorldConditionFields(resolveWorldValue(entry, worldState, context)),
         worldState,
         context,
       ));
@@ -854,8 +859,20 @@ function resolveNestedConditionalLists(value, worldState, context) {
   return result;
 }
 
+// Region audio supports a field-specific shorthand array. Entries are checked top to bottom;
+// the first matching entry wins, so broad unconditional fallbacks belong last.
+export function resolveRegionAudio(audioConfig, worldState = EMPTY_WORLD_STATE, context = {}) {
+  if (Array.isArray(audioConfig)) {
+    const matchingEntry = audioConfig.find((entry) => worldEntryAllowed(entry, worldState, context));
+    return matchingEntry ? clone(stripWorldConditionFields(matchingEntry)) : null;
+  }
+  const resolved = resolveWorldValue(audioConfig, worldState, context);
+  return resolveNestedConditionalLists(resolved, worldState, context);
+}
+
 function resolveMapRegionField(key, value, worldState, context) {
   if (MAP_REGION_SKIP_KEYS.has(key)) return clone(value);
+  if (key === "audio") return resolveRegionAudio(value, worldState, context);
   const mergeKeys = MAP_REGION_PATCH_KEYS[key] ?? ["id", "type", "fileName"];
   if (key === "prefabRules" && value && typeof value === "object" && !isConditionalValue(value)) {
     return {
