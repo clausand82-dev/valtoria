@@ -1,5 +1,7 @@
 import { SOUND_DEFS } from "./config/sound-config.js";
 import { MUSIC_PROFILES, MUSIC_TRACKS } from "./config/music-config.js";
+import { AUDIO_MIX_CONFIG } from "./config/audio-mix-config.js";
+import { relativeIsoHorizontalTiles } from "./iso.js";
 
 const DEFAULT_SETTINGS = Object.freeze({ masterVolume: 1, musicVolume: 0.7, ambienceVolume: 0.55, sfxVolume: 0.8, uiVolume: 0.7, audioMuted: false });
 const BUS_SETTING = Object.freeze({ music: "musicVolume", ambience: "ambienceVolume", sfx: "sfxVolume", ui: "uiVolume" });
@@ -41,8 +43,12 @@ class AudioManager {
     try {
       this.context = new Context();
       const master = this.context.createGain(); const sfx = this.context.createGain(); const ui = this.context.createGain();
-      sfx.connect(master); ui.connect(master); master.connect(this.context.destination);
-      this.buses = { master, sfx, ui };
+      const sfxLowShelf = this.context.createBiquadFilter(); const sfxHighShelf = this.context.createBiquadFilter();
+      const { lowShelf, highShelf } = AUDIO_MIX_CONFIG.sfxEq;
+      sfxLowShelf.type = "lowshelf"; sfxLowShelf.frequency.value = lowShelf.frequency; sfxLowShelf.gain.value = lowShelf.enabled ? lowShelf.gainDb : 0;
+      sfxHighShelf.type = "highshelf"; sfxHighShelf.frequency.value = highShelf.frequency; sfxHighShelf.gain.value = highShelf.enabled ? highShelf.gainDb : 0;
+      sfxLowShelf.connect(sfxHighShelf); sfxHighShelf.connect(sfx); sfx.connect(master); ui.connect(master); master.connect(this.context.destination);
+      this.buses = { master, sfx, ui, sfxLowShelf, sfxHighShelf };
       this.applyWebAudioVolumes();
       return this.context;
     } catch (error) { this.warnWebAudioUnavailable(error); return null; }
@@ -90,13 +96,23 @@ class AudioManager {
     this.bufferLoads.set(file, load); return load;
   }
   gain(definition, attenuation = 1) { const bus = definition?.bus ?? "sfx"; return this.settings.audioMuted ? 0 : clamp(definition?.volume, 1) * this.settings.masterVolume * (this.settings[BUS_SETTING[bus]] ?? 1) * attenuation; }
-  spatial(options = {}) { if (!options.position || !options.listener) return { gain: 1, pan: 0 }; const dx = (Number(options.position.x) || 0) - (Number(options.listener.x) || 0); const dy = (Number(options.position.y) || 0) - (Number(options.listener.y) || 0); const maxDistance = Math.max(0.1, Number(options.maxDistance) || 12); const distance = Math.hypot(dx, dy); if (distance > maxDistance) return null; return { gain: Math.max(0, 1 - distance / maxDistance), pan: Math.max(-1, Math.min(1, dx / maxDistance)) }; }
+  spatial(options = {}, definition = null) {
+    if (!options.position || !options.listener) return { gain: 1, pan: 0 };
+    const dx = (Number(options.position.x) || 0) - (Number(options.listener.x) || 0); const dy = (Number(options.position.y) || 0) - (Number(options.listener.y) || 0);
+    const maxDistance = Math.max(0.1, Number(options.maxDistance) || 12); const distance = Math.hypot(dx, dy); if (distance > maxDistance) return null;
+    const override = definition?.spatial && typeof definition.spatial === "object" ? definition.spatial : {};
+    const fullPanDistanceTiles = Math.max(0.1, Number(override.fullPanDistanceTiles) || AUDIO_MIX_CONFIG.spatial.fullPanDistanceTiles);
+    const maxPan = clamp(override.panStrength ?? AUDIO_MIX_CONFIG.spatial.maxPan, AUDIO_MIX_CONFIG.spatial.maxPan);
+    const projectedHorizontalTiles = relativeIsoHorizontalTiles(options.position, options.listener);
+    const pan = Math.max(-1, Math.min(1, (projectedHorizontalTiles / fullPanDistanceTiles) * maxPan));
+    return { gain: Math.max(0, 1 - distance / maxDistance), pan };
+  }
   voiceKey(id, definition) { return definition.voiceGroup || id; }
   activeVoices(key) { return (this.voices.get(key) ?? []).filter((entry) => !entry.ended); }
   canPlayVoice(id, definition) { return this.activeVoices(this.voiceKey(id, definition)).length < Math.max(1, Number(definition.maxVoices) || 1); }
   playSound(id, options = {}) {
     const definition = SOUND_DEFS[id]; if (!definition || !this.unlocked) return false;
-    const spatial = definition.spatial === false || definition.bus === "ui" ? { gain: 1, pan: 0 } : this.spatial(options); if (!spatial) return false;
+    const spatial = definition.spatial === false || definition.bus === "ui" ? { gain: 1, pan: 0 } : this.spatial(options, definition); if (!spatial) return false;
     if (!this.canPlayVoice(id, definition)) return false;
     const file = fileFor(definition); if (!file || this.unavailable.has(file)) return false;
     const context = this.ensureContext();
@@ -118,7 +134,7 @@ class AudioManager {
     gain.gain.setValueAtTime(fadeIn > 0 ? 0 : initialGain, now); if (fadeIn > 0) gain.gain.linearRampToValueAtTime(initialGain, now + fadeIn);
     let tail = source; if (definition.spatial !== false && definition.bus !== "ui" && typeof context.createStereoPanner === "function") { const panner = context.createStereoPanner(); panner.pan.value = spatial.pan; source.connect(panner); tail = panner; }
     for (const [field, type] of [["highpassHz", "highpass"], ["lowpassHz", "lowpass"]]) { const hz = Number(definition[field]); if (hz > 0) { const filter = context.createBiquadFilter(); filter.type = type; filter.frequency.value = hz; tail.connect(filter); tail = filter; } }
-    tail.connect(gain); gain.connect(this.buses[definition.bus === "ui" ? "ui" : "sfx"]);
+    tail.connect(gain); gain.connect(this.buses[definition.bus === "ui" ? "ui" : "sfxLowShelf"]);
     const key = this.voiceKey(id, definition); const entry = { id, key, definition, source, gain, attenuation: spatial.gain, ended: false, rate };
     const cleanup = () => { if (entry.ended) return; entry.ended = true; if (entry.stopTimer) clearTimeout(entry.stopTimer); try { source.disconnect(); gain.disconnect(); } catch {} this.voices.set(key, this.activeVoices(key).filter((voice) => voice !== entry)); };
     entry.cleanup = cleanup; source.addEventListener("ended", cleanup, { once: true }); this.voices.set(key, [...this.activeVoices(key), entry]);
@@ -153,7 +169,7 @@ class AudioManager {
   applyWebAudioVolumes() { if (!this.buses) return; this.buses.master.gain.value = this.settings.audioMuted ? 0 : this.settings.masterVolume; this.buses.sfx.gain.value = this.settings.sfxVolume; this.buses.ui.gain.value = this.settings.uiVolume; }
   applyVolumes() { this.applyWebAudioVolumes(); for (const entries of this.voices.values()) for (const entry of entries) if (entry.audio) entry.audio.volume = this.gain(entry.definition, entry.attenuation); for (const entry of this.ambience.values()) this.applyLoopVolume(entry); this.applyLoopVolume(this.music); }
   stopAll() { this.stopMusic({ fadeMs: 0 }); this.stopAmbience(); for (const entries of this.voices.values()) for (const entry of entries) this.fadeAndStopVoice(entry, 0); this.voices.clear(); }
-  cleanup() { this.stopAll(); for (const template of this.templates.values()) { template.pause(); template.src = ""; } this.templates.clear(); this.buffers.clear(); this.bufferLoads.clear(); if (this.context && this.context.state !== "closed") this.context.close().catch(() => {}); this.context = null; this.buses = null; this.unlocked = false; }
+  cleanup() { this.stopAll(); for (const template of this.templates.values()) { template.pause(); template.src = ""; } this.templates.clear(); this.buffers.clear(); this.bufferLoads.clear(); for (const node of Object.values(this.buses ?? {})) try { node.disconnect?.(); } catch {} if (this.context && this.context.state !== "closed") this.context.close().catch(() => {}); this.context = null; this.buses = null; this.unlocked = false; }
 }
 
 export const audioManager = new AudioManager();

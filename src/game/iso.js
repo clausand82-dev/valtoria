@@ -7,6 +7,14 @@ export function worldToIso(x, y, z = 0) {
   };
 }
 
+// Uses the same horizontal basis as worldToIso, expressed in isometric tile widths.
+// It deliberately excludes camera translation and zoom for stable spatial audio.
+export function relativeIsoHorizontalTiles(source, listener) {
+  const sourceIso = worldToIso(Number(source?.x) || 0, Number(source?.y) || 0);
+  const listenerIso = worldToIso(Number(listener?.x) || 0, Number(listener?.y) || 0);
+  return (sourceIso.x - listenerIso.x) / (TILE_W / 2);
+}
+
 export function worldToScreen(x, y, z, camera) {
   const iso = worldToIso(x, y, z);
   return {
