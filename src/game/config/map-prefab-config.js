@@ -1,6 +1,9 @@
+import { GENERATED_MAP_PREFABS } from "./generated-prefabs/index.js";
+import { mergePrefabRegistries } from "./prefab-registry.js";
+
 export const DEBUG_MAP_PREFABS = false;
 
-export const MAP_PREFABS = {
+export const HANDWRITTEN_MAP_PREFABS = {
   hunter_sacred_flower_site: {
     id: "hunter_sacred_flower_site",
     label: "Sacred Flower",
@@ -592,3 +595,5 @@ export const MAP_PREFABS = {
     ],
   },
 };
+
+export const MAP_PREFABS = mergePrefabRegistries(HANDWRITTEN_MAP_PREFABS, GENERATED_MAP_PREFABS);

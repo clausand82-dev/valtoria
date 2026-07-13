@@ -49,7 +49,7 @@ export const CITY_MOB_BATTLE_PROFILES = [
       { id: "object_fallentree", weight: 4, destructible: true },
       { id: "object_pillar_stone", weight: 1, destructible: true },
       { id: "object_pillar_wood", weight: 1, destructible: true },
-      { id: "object_tree_lava", weight: 1, destructible: false },
+      { id: "object_tree_lava", weight: 1, destructible: true },
       { id: "object_wagons", weight: 1, destructible: true },
     ],
     decay: [

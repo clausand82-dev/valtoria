@@ -214,7 +214,7 @@ export const SPELL_DEFS = {
     i18n: { da: { title: "Ildregn", description: "Lader brændende skår regne over et stort område og efterlader ild på jorden. Effektiv mod samlede fjender og brændbare genstande." } },
     castMode: "skyfall",
     manaCost: 36,
-    cooldown: 0.6, //standard er 4.6 - 0.6 er blot test kørsel
+    cooldown: 4.6, //standard er 4.6 - 0.6 er blot test kørsel
     range: 6.8,
     speed: 12.2,
     element: "fire",

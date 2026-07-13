@@ -1,6 +1,11 @@
 import { MAP_LAYOUTS } from "../config/map-layout-config.js";
 import { DEBUG_MAP_PREFABS, MAP_PREFABS } from "../config/map-prefab-config.js";
 import { worldEntryAllowed } from "../world-state.js";
+import { normalizePrefabContent } from "./prefabs/prefab-normalization.js";
+import { buildPrefabGroundOverrideMap, prefabGroundEntries } from "./prefabs/prefab-ground-overrides.js";
+import { transformedPrefabSize, transformPrefabEntries } from "./prefabs/prefab-transforms.js";
+
+export { normalizePrefabContent } from "./prefabs/prefab-normalization.js";
 
 export function chooseWeighted(rng, pool = []) {
   const entries = Array.isArray(pool)
@@ -35,6 +40,7 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
   if (!region) return [];
   if (!region.reservedTiles) region.reservedTiles = new Set();
   region.prefabInstances = [];
+  region.prefabGroundOverrides = new Map();
 
   const rules = regionConfig?.prefabRules;
   const conditionContext = regionConfig?.__conditionContext ?? {};
@@ -84,7 +90,7 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
 
     const rotation = prefab.rotate ? [0, 90, 180, 270][Math.floor(rng(11000 + attempts * 19) * 4)] : 0;
     const mirrored = Boolean(prefab.mirror && rng(12000 + attempts * 23) >= 0.5);
-    const size = transformedSize(prefab, rotation);
+    const size = transformedPrefabSize(prefab, rotation);
     const candidates = findPrefabAnchorCandidates(region, prefab, rules, size);
     if (!candidates.length) {
       skipped.push({ id: prefab.id, reason: "no_anchor_candidates" });
@@ -118,6 +124,8 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
     if (!placed) skipped.push({ id: prefab.id, reason: "blocked" });
   }
 
+  region.prefabGroundOverrides = buildPrefabGroundOverrideMap(region.prefabInstances);
+
   region.prefabDebug = {
     attempts,
     placed: region.prefabInstances.map((entry) => ({ id: entry.id, x: entry.x, y: entry.y })),
@@ -138,18 +146,6 @@ export function placeRegionPrefabs(region, regionConfig, rng, options = {}) {
 export function prefabInstancesForChunk(region, chunkBounds) {
   const instances = Array.isArray(region?.prefabInstances) ? region.prefabInstances : [];
   return instances.filter((instance) => boundsOverlap(instance.bounds, chunkBounds));
-}
-
-export function normalizePrefabContent(prefab) {
-  const fromLegend = prefabContentFromLegend(prefab);
-  return {
-    objects: [...fromLegend.objects, ...(Array.isArray(prefab?.objects) ? prefab.objects : [])],
-    foliage: [...fromLegend.foliage, ...(Array.isArray(prefab?.foliage) ? prefab.foliage : [])],
-    decals: [...fromLegend.decals, ...(Array.isArray(prefab?.decals) ? prefab.decals : [])],
-    monsters: [...fromLegend.monsters, ...(Array.isArray(prefab?.monsters) ? prefab.monsters : [])],
-    chests: [...fromLegend.chests, ...(Array.isArray(prefab?.chests) ? prefab.chests : [])],
-    npcs: [...fromLegend.npcs, ...(Array.isArray(prefab?.npcs) ? prefab.npcs : [])],
-  };
 }
 
 function isValidPrefab(prefab) {
@@ -208,7 +204,7 @@ function findPrefabAnchorCandidates(region, prefab, rules, size) {
 }
 
 function canPlacePrefab(region, prefab, x, y, options = {}) {
-  const size = options.size ?? transformedSize(prefab, options.rotation ?? 0);
+  const size = options.size ?? transformedPrefabSize(prefab, options.rotation ?? 0);
   const avoidStart = Math.max(0, Number(prefab.avoidStart) || 0);
   const avoidExit = Math.max(0, Number(prefab.avoidExit) || 0);
   const center = { x: x + size.w / 2, y: y + size.h / 2 };
@@ -251,12 +247,9 @@ function reservePrefabTiles(region, instance) {
 }
 
 function buildPrefabInstance(prefab, x, y, rotation, mirrored, index) {
-  const size = transformedSize(prefab, rotation);
+  const size = transformedPrefabSize(prefab, rotation);
   const content = normalizePrefabContent(prefab);
-  const transformItems = (items = []) => items.map((item) => {
-    const local = transformLocalPoint(Number(item.x) || 0, Number(item.y) || 0, prefab.w, prefab.h, rotation, mirrored);
-    return { ...item, x: local.x, y: local.y };
-  });
+  const transformItems = (items = []) => transformPrefabEntries(items, prefab, rotation, mirrored);
 
   return {
     id: prefab.id,
@@ -276,124 +269,8 @@ function buildPrefabInstance(prefab, x, y, rotation, mirrored, index) {
     monsters: transformItems(content.monsters),
     chests: transformItems(content.chests),
     npcs: transformItems(content.npcs),
+    ground: prefabGroundEntries(prefab, rotation, mirrored),
   };
-}
-
-function prefabContentFromLegend(prefab) {
-  const result = { objects: [], foliage: [], decals: [], monsters: [], chests: [], npcs: [] };
-  const tiles = Array.isArray(prefab?.tiles) ? prefab.tiles : [];
-  const legend = prefab?.legend && typeof prefab.legend === "object" ? prefab.legend : null;
-  if (!tiles.length || !legend) return result;
-
-  for (let y = 0; y < tiles.length; y += 1) {
-    const row = String(tiles[y] ?? "");
-    for (let x = 0; x < row.length; x += 1) {
-      const entry = legend[row[x]];
-      if (!entry || entry.type === "keep") continue;
-      addLegendEntry(result, entry, x, y);
-    }
-  }
-  return result;
-}
-
-function addLegendEntry(result, entry, x, y) {
-  const base = { x, y };
-  if (entry.object) {
-    result.objects.push({
-      ...base,
-      id: entry.object,
-      blocking: entry.blocking,
-      destructible: entry.destructible,
-      size: entry.size,
-      radius: entry.radius,
-      rotation: entry.rotation,
-      visualScale: entry.visualScale,
-      variant: entry.variant,
-      variantCount: entry.variantCount,
-      spawnDamage: entry.spawnDamage ?? entry.damageState ?? entry.damageSpawn,
-      spawnTags: entry.spawnTags,
-      avoidSpawnTags: entry.avoidSpawnTags,
-      spawnAvoidRadius: entry.spawnAvoidRadius,
-      foregroundFade: entry.foregroundFade,
-      foregroundFadeAlpha: entry.foregroundFadeAlpha,
-      actionId: entry.actionId,
-      actions: entry.actions,
-      questTargetKey: entry.questTargetKey,
-    });
-  }
-  if (entry.foliage) {
-    const foliage = typeof entry.foliage === "object" && entry.foliage !== null
-      ? entry.foliage
-      : { id: entry.foliage };
-    result.foliage.push({
-      ...base,
-      ...foliage,
-      id: foliage.id,
-      variant: entry.variant ?? foliage.variant,
-      cell: entry.cell ?? foliage.cell,
-      size: entry.size ?? foliage.size,
-      scale: entry.scale ?? foliage.scale,
-      rotation: entry.rotation ?? foliage.rotation,
-      visualScale: entry.visualScale ?? foliage.visualScale,
-    });
-  }
-  if (entry.decal) {
-    result.decals.push({
-      ...base,
-      type: entry.decal,
-      decayId: entry.decayId,
-      variant: entry.variant,
-      cell: entry.cell,
-      size: entry.size,
-      rotation: entry.rotation,
-      alpha: entry.alpha,
-      renderScale: entry.renderScale,
-      particles: entry.particles,
-    });
-  }
-  if (entry.monster) {
-    result.monsters.push({
-      ...base,
-      type: entry.monster,
-      levelOffset: entry.levelOffset,
-    });
-  }
-  if (entry.chest) {
-    result.chests.push({
-      ...base,
-      id: entry.chest,
-      blocking: entry.blocking,
-    });
-  }
-  if (entry.npc || entry.npcId) {
-    const npc = typeof (entry.npc ?? entry.npcId) === "object" && (entry.npc ?? entry.npcId) !== null
-      ? (entry.npc ?? entry.npcId)
-      : { npcId: entry.npc ?? entry.npcId };
-    result.npcs.push({
-      ...base,
-      ...npc,
-      npcId: npc.npcId ?? npc.id,
-      facing: entry.facing ?? npc.facing,
-      actionId: entry.actionId ?? npc.actionId,
-      actions: entry.actions ?? npc.actions,
-      conditions: entry.conditions ?? npc.conditions,
-    });
-  }
-}
-
-function transformedSize(prefab, rotation) {
-  const w = Math.floor(Number(prefab.w)) || 1;
-  const h = Math.floor(Number(prefab.h)) || 1;
-  return rotation === 90 || rotation === 270 ? { w: h, h: w } : { w, h };
-}
-
-function transformLocalPoint(x, y, w, h, rotation, mirrored) {
-  let px = mirrored ? w - 1 - x : x;
-  let py = y;
-  if (rotation === 90) return { x: h - 1 - py, y: px };
-  if (rotation === 180) return { x: w - 1 - px, y: h - 1 - py };
-  if (rotation === 270) return { x: py, y: w - 1 - px };
-  return { x: px, y: py };
 }
 
 function boundsOverlap(a, b) {

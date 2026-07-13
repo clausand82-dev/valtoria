@@ -37,6 +37,8 @@ import {
   placeRegionPrefabs,
   prefabInstancesForChunk,
 } from "./world/map-prefab-placement.js";
+import { applyPrefabGroundOverride, prefabGroundOverrideAt } from "./world/prefabs/prefab-ground-overrides.js";
+import { resolvePrefabMonsterLevel } from "./world/prefabs/prefab-normalization.js";
 import { resolveAttachedObjectParticleConfigs } from "./objects/object-attached-effects.js";
 
 let nextId = 1;
@@ -881,6 +883,7 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
     rooms,
     mask,
     prefabInstances: [],
+    prefabGroundOverrides: new Map(),
     reservedTiles: new Set(),
     prefabDebug: null,
   };
@@ -999,9 +1002,10 @@ export function createChunk(cx, cy, region = null) {
         ? pickWeightedTileset(regionTileset, noise / 4294967295)
         : regionTileset;
       const groundSheetId = chosenTileset?.sheetId ?? DEFAULT_GROUND_SHEET_ID;
+      const groundOverride = prefabGroundOverrideAt(region, worldX, worldY);
       const edgeMask = region ? regionEdgeMask(region, worldX, worldY) : 0;
       const water = waterTiles.get(`${worldX},${worldY}`);
-      chunk.tiles.push({
+      const tile = {
         x: worldX,
         y: worldY,
         groundSheetId,
@@ -1014,7 +1018,8 @@ export function createChunk(cx, cy, region = null) {
         crack: noise % 9 === 0,
         moss: noise % 13 === 0,
         edgeMask,
-      });
+      };
+      chunk.tiles.push(applyPrefabGroundOverride(tile, groundOverride));
       if (edgeMask) chunk.edgeTiles.push({ x: worldX, y: worldY, edgeMask, variant: noise });
     }
   }
@@ -1577,7 +1582,8 @@ function addPrefabMonsters(chunk, instance) {
     const { x, y } = prefabWorldPoint(instance, item);
     if (!pointInChunk(chunk, x, y)) continue;
     if (!isRegionPointPlayable(chunk.region, x, y, 0.5) || isWaterAt(chunk, x, y)) continue;
-    const level = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 7990 + i) * 2);
+    const proceduralLevel = chunk.level + Math.floor(rand01(chunk.cx, chunk.cy, 7990 + i) * 2);
+    const level = resolvePrefabMonsterLevel(proceduralLevel, item);
     const hp = Math.floor(base.hp * (1 + level * 0.18));
     chunk.monsters.push({
       id: createId(),

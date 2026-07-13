@@ -8,6 +8,8 @@ Små rettelse observeret igennem spil test:
 - i city map run er exit ofte næsten umulig at se
 - teste om questreward på hunters quests virker
 
+- spell nedtælling i ikon i expedition virker ikke korrekt
+
 
 - i bibliotek skal man kunne lave papir om til scrolls (hvis den mulighed ikke allerede findes)
 - scrolls skal kunen laves om til bøger (der ligesom frugt tønder) er en resource der kan doneres for at få faith eller culture eller knowledge

@@ -11,9 +11,12 @@ import { READABLE_ITEM_DEFS } from "../src/game/config/readable-config.js";
 import { RARITIES } from "../src/game/config/rarity-config.js";
 import { LOOT_TABLES } from "../src/game/config/loot-tables-config.js";
 import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
+import { DECAY_SET_DEFS } from "../src/game/config/decay-config.js";
 import { CITY_ACHIEVEMENTS } from "../src/game/config/city-achievement-config.js";
 import { validateBeastLocalization } from "../src/i18n/beast/monster-localization.js";
 import { hasWorldConditionFields, stripWorldConditionFields } from "../src/game/world-state.js";
+import { normalizePrefabContent } from "../src/game/world/prefabs/prefab-normalization.js";
+import { validatePrefabRegistry } from "../src/game/world/prefabs/prefab-validation.js";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
 const RUNTIME_LOOT_TABLE_REFS = new Set([
@@ -254,6 +257,15 @@ function main() {
   const achievementIds = new Set((CITY_ACHIEVEMENTS ?? []).map((achievement) => String(achievement.id)).filter(Boolean));
   const usedLootTableIds = new Set([...RUNTIME_LOOT_TABLE_REFS].filter((tableId) => lootTableIds.has(tableId)));
 
+  validatePrefabRegistry(MAP_PREFABS, {
+    knownIds: {
+      objects: new Set(Object.keys(REGION_OBJECT_DEFS ?? {})),
+      decals: new Set(Object.keys(DECAY_SET_DEFS ?? {})),
+      monsters: new Set(Object.keys(MONSTER_DEFS ?? {})),
+      npcs: new Set(Object.keys(QUEST_NPCS ?? {})),
+    },
+  }).forEach(addError);
+
   for (const [tableId, entries] of Object.entries(LOOT_TABLES ?? {})) {
     if (!Array.isArray(entries)) addError(`lootTable "${tableId}" must be an array`);
     else if (!entries.length) addError(`lootTable "${tableId}" is empty`);
@@ -305,7 +317,8 @@ function main() {
   }
 
   for (const [prefabId, prefab] of entriesOf(MAP_PREFABS)) {
-    for (const [listKey, entries] of Object.entries({ objects: prefab.objects, npcs: prefab.npcs })) {
+    const content = normalizePrefabContent(prefab);
+    for (const [listKey, entries] of Object.entries({ objects: content.objects, npcs: content.npcs })) {
       if (!Array.isArray(entries)) continue;
       entries.forEach((entry, index) => {
         const owner = `prefab "${prefabId}".${listKey}[${index}]`;

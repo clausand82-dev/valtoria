@@ -18,6 +18,7 @@ import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
 import { MAP_PREFABS } from "./config/map-prefab-config.js";
 import { normalizePrefabContent } from "./world/map-prefab-placement.js";
+import { collectPrefabGroundSpecs } from "./world/prefabs/prefab-ground-overrides.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
 import {
   collectRegionAssetOverrides,
@@ -276,7 +277,8 @@ function buildFullRegionAssetManifest() {
         fileName: entry.fileName,
       }))),
     groundSpecs: Object.entries(GROUND_SHEETS).map(([biomeId, config]) => groundSpecFromConfig(biomeId, config))
-      .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry))),
+      .concat(regionAssetOverrides.groundSheets.map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry)))
+      .concat(collectPrefabGroundSpecs(Object.values(MAP_PREFABS)).map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry))),
     treeSpecs: Object.entries(TREE_SHEETS).map(([biomeId, fileName]) => ({ biomeId, fileName })),
     foliageSpecs: Object.entries(FOLIAGE_SHEETS).map(([id, config]) => normalizeFoliageSheetSpec(id, config, 8))
       .concat(regionAssetOverrides.foliageSheets.map((entry) => ({
@@ -316,6 +318,7 @@ export function buildRegionAssetManifest(input) {
       cols: entry.cols,
     }));
   const prefabDefs = prefabsForRegionConfig(regionConfig);
+  groundSpecs.push(...collectPrefabGroundSpecs(prefabDefs).map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry)));
   const prefabFoliageIds = new Set();
   const prefabFoliageSpecs = new Map();
   for (const prefab of prefabDefs) {
