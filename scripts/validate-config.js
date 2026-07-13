@@ -16,7 +16,8 @@ import { CITY_ACHIEVEMENTS } from "../src/game/config/city-achievement-config.js
 import { validateBeastLocalization } from "../src/i18n/beast/monster-localization.js";
 import { hasWorldConditionFields, stripWorldConditionFields } from "../src/game/world-state.js";
 import { normalizePrefabContent } from "../src/game/world/prefabs/prefab-normalization.js";
-import { validatePrefabRegistry } from "../src/game/world/prefabs/prefab-validation.js";
+import { validatePrefab, validatePrefabRegistry } from "../src/game/world/prefabs/prefab-validation.js";
+import fs from "node:fs";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
 const RUNTIME_LOOT_TABLE_REFS = new Set([
@@ -239,6 +240,28 @@ function checkPrefabRefs(prefabIds) {
   }
 }
 
+function validateGeneratedPrefabFiles(knownIds) {
+  const directory = new URL("../src/game/config/generated-prefabs/", import.meta.url);
+  const files = fs.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name);
+  const jsonIds = new Set(files.filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5)));
+  for (const id of jsonIds) {
+    const owner = `generated prefab file "${id}.json"`;
+    if (!/^[a-z][a-z0-9_]*$/.test(id)) addError(`${owner} has an unsafe file name`);
+    let document;
+    try { document = JSON.parse(fs.readFileSync(new URL(`${id}.json`, directory), "utf8")); } catch (error) { addError(`${owner} cannot be loaded: ${error.message}`); continue; }
+    if (document?.id !== id) addError(`${owner} must have id "${id}" so the registry key matches the prefab id`);
+    if (document?.editor?.managed !== true) addError(`${owner} must set editor.managed to true`);
+    if (document?.tiles !== undefined || document?.legend !== undefined) addError(`${owner} must use canonical direct arrays without active tiles/legend shorthand`);
+    validatePrefab(document, { registryKey: id, knownIds }).forEach(addError);
+    if (!files.includes(`${id}.js`)) addError(`${owner} is missing its generated runtime module "${id}.js"`);
+    if (!Object.prototype.hasOwnProperty.call(MAP_PREFABS, id)) addError(`${owner} is missing from GENERATED_MAP_PREFABS`);
+  }
+  for (const name of files.filter((entry) => entry.endsWith(".js") && entry !== "index.js")) {
+    const id = name.slice(0, -3);
+    if (!jsonIds.has(id)) addError(`generated runtime module "${name}" is missing its canonical editor JSON document`);
+  }
+}
+
 function main() {
   validateBeastLocalization({ warn: addWarning });
   const actionIds = checkDuplicateIds("action", ACTION_CONFIG);
@@ -265,6 +288,12 @@ function main() {
       npcs: new Set(Object.keys(QUEST_NPCS ?? {})),
     },
   }).forEach(addError);
+  validateGeneratedPrefabFiles({
+    objects: new Set(Object.keys(REGION_OBJECT_DEFS ?? {})),
+    decals: new Set(Object.keys(DECAY_SET_DEFS ?? {})),
+    monsters: new Set(Object.keys(MONSTER_DEFS ?? {})),
+    npcs: new Set(Object.keys(QUEST_NPCS ?? {})),
+  });
 
   for (const [tableId, entries] of Object.entries(LOOT_TABLES ?? {})) {
     if (!Array.isArray(entries)) addError(`lootTable "${tableId}" must be an array`);

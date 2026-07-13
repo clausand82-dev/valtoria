@@ -11,8 +11,9 @@
     "build": "vite build",
     "validate": "npm run validate:config",
     "validate:config": "node scripts/validate-config.js",
-    "test": "npm run test:audio-config && npm run test:save-persistence && npm run test:minimap-rendering && npm run test:terrain-layer-cache && npm run test:tile-edge-walls && npm run test:ground-render-overrides && npm run test:map-prefabs && npm run test:region-object-variants && npm run test:city-mob-visuals && npm run test:hunter-questline",
+    "test": "npm run test:audio-config && npm run test:save-persistence && npm run test:minimap-rendering && npm run test:terrain-layer-cache && npm run test:tile-edge-walls && npm run test:ground-render-overrides && npm run test:map-prefabs && npm run test:area-editor && npm run test:region-object-variants && npm run test:city-mob-visuals && npm run test:hunter-questline",
     "test:audio-config": "node scripts/test-region-audio-config.js",
+    "test:area-editor": "node scripts/test-area-editor.js",
     "test:city-mob-visuals": "node scripts/test-city-mob-visuals.js",
     "test:ground-render-overrides": "node scripts/test-ground-render-overrides.js",
     "test:hunter-questline": "node scripts/test-hunter-questline.js",
@@ -23,8 +24,9 @@
     "test:save-persistence": "node scripts/test-save-persistence.js",
     "test:terrain-layer-cache": "node scripts/test-terrain-layer-cache.js",
     "test:tile-edge-walls": "node scripts/test-tile-edge-walls.js",
-    "check": "npm run validate:config && npm test && npm run build",
-    "preview": "vite preview --host 127.0.0.1"
+    "check": "npm run validate:config && npm test && npm run build && npm run verify:production-editor",
+    "preview": "vite preview --host 127.0.0.1",
+    "verify:production-editor": "node scripts/verify-production-editor-guard.js"
   },
   "dependencies": {
     "react": "^19.2.7",

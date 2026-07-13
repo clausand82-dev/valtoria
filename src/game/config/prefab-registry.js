@@ -5,6 +5,9 @@ export function mergePrefabRegistries(...registries) {
   for (let registryIndex = 0; registryIndex < registries.length; registryIndex += 1) {
     for (const [key, prefab] of Object.entries(registries[registryIndex] ?? {})) {
       const id = String(prefab?.id ?? key).trim();
+      if (prefab?.id !== undefined && id !== key) {
+        throw new Error(`Prefab registry key "${key}" must exactly match prefab id "${id}"`);
+      }
       if (keyOwners.has(key)) {
         throw new Error(`Duplicate prefab registry key "${key}" in registries ${keyOwners.get(key)} and ${registryIndex}`);
       }

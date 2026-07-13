@@ -1,0 +1,56 @@
+.area-editor-page, .area-editor-home { position: fixed; inset: 0; z-index: 1000; overflow: auto; background: #0b1012; color: #e8e3d8; font: 14px/1.4 Inter, system-ui, sans-serif; }
+.area-editor-page button, .area-editor-home button, .area-editor-page input, .area-editor-page select, .area-editor-page textarea { border: 1px solid #40514f; border-radius: 4px; background: #182124; color: #e8e3d8; }
+.area-editor-page button, .area-editor-home button { min-height: 30px; padding: 5px 9px; cursor: pointer; }
+.area-editor-page button:hover, .area-editor-home button:hover, .area-editor-page button.active, .area-editor-home button.active { border-color: #e3c66f; background: #2a332f; }
+.area-editor-page button:disabled { cursor: default; opacity: .45; }
+.area-editor-page .danger-action, .area-editor-home .danger-action { border-color: #7d4444; color: #ffb7b0; }
+.area-editor-topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 48px; padding: 7px 12px; border-bottom: 1px solid #31403f; background: #121a1d; }
+.area-editor-topbar > div { display: flex; align-items: center; gap: 8px; }
+.area-editor-dirty { border-radius: 999px; padding: 2px 8px; background: #6b4b1b; color: #ffe4a0; font-size: 12px; }
+.area-editor-toolbar { display: flex; align-items: center; gap: 5px; min-height: 42px; padding: 5px 12px; border-bottom: 1px solid #31403f; background: #101719; text-transform: capitalize; }
+.area-editor-separator { width: 1px; height: 26px; margin: 0 5px; background: #40514f; }
+.area-editor-layout { display: grid; grid-template-columns: 260px minmax(420px, 1fr) 330px; height: calc(100vh - 91px); min-height: 540px; }
+.area-editor-sidebar { overflow: auto; padding: 12px; background: #11191b; }
+.area-editor-layers { border-right: 1px solid #31403f; }
+.area-editor-inspector { border-left: 1px solid #31403f; }
+.area-editor-sidebar h2 { margin: 12px 0 8px; color: #e8cf86; font-family: Georgia, serif; font-size: 16px; }
+.area-editor-layers > div { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px; margin-bottom: 4px; }
+.area-editor-layers > div > button { display: flex; justify-content: space-between; text-align: left; }
+.area-editor-layers > div.active > button { border-color: #e3c66f; }
+.area-editor-layers label { display: flex; gap: 2px; font-size: 10px; }
+.area-editor-stage { position: relative; min-width: 0; overflow: hidden; background: #0b1113; }
+.area-editor-canvas { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+.area-editor-hint, .area-editor-statusbar { position: absolute; left: 12px; bottom: 12px; max-width: calc(100% - 24px); border: 1px solid #5c6d68; border-radius: 4px; padding: 7px 10px; background: rgba(10, 14, 15, .92); }
+.area-editor-statusbar { left: auto; right: 12px; color: #f1d78f; }
+.area-editor-form { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.area-editor-form label, .area-editor-inspector > label { display: grid; gap: 3px; color: #aebbb7; font-size: 11px; }
+.area-editor-form input, .area-editor-form select, .area-editor-inspector input, .area-editor-inspector textarea { box-sizing: border-box; width: 100%; min-height: 30px; padding: 5px 7px; }
+.area-editor-check { grid-template-columns: auto 1fr !important; align-items: center; }
+.area-editor-check input { width: auto !important; min-height: 0 !important; }
+.area-editor-catalog { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; max-height: 300px; margin-top: 7px; overflow: auto; }
+.area-editor-catalog button { display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; align-items: center; min-height: 52px; padding: 3px; text-align: left; overflow: hidden; }
+.area-editor-catalog img, .area-editor-catalog button > span { grid-row: 1 / 3; width: 30px; height: 30px; object-fit: contain; background: #0d1214; }
+.area-editor-catalog small, .area-editor-catalog em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.area-editor-catalog em { color: #7f918d; font-style: normal; }
+.area-editor-cell-list { display: grid; gap: 3px; max-height: 130px; overflow: auto; }
+.area-editor-cell-list button { text-align: left; font-size: 11px; }
+.area-editor-selection-actions { display: flex; gap: 5px; margin: 8px 0; }
+.area-editor-validation { display: grid; gap: 5px; }
+.area-editor-validation button, .area-editor-validation p { margin: 0; padding: 6px; text-align: left; font-size: 11px; }
+.area-editor-validation .error { border-color: #8a4444; color: #ffb7b0; }
+.area-editor-validation .warning { color: #efd080; background: #352d18; }
+.area-editor-validation .valid { color: #9ee1aa; background: #17321d; }
+.area-editor-home { box-sizing: border-box; padding: 28px clamp(18px, 4vw, 64px); }
+.area-editor-home header { display: flex; align-items: start; justify-content: space-between; gap: 20px; }
+.area-editor-home h1 { margin: 2px 0; color: #f0d487; font-family: Georgia, serif; font-size: 36px; }
+.area-editor-home h2 { margin-top: 28px; color: #e8cf86; font-family: Georgia, serif; }
+.area-editor-kicker { color: #73b8a7; font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+.area-editor-home-actions { display: flex; gap: 8px; margin: 18px 0; }
+.area-editor-doc-grid { display: grid; gap: 8px; }
+.area-editor-doc-grid article { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid #31403f; border-radius: 6px; padding: 11px 13px; background: #121a1d; }
+.area-editor-doc-grid article > div { display: flex; align-items: center; gap: 10px; }
+.area-editor-doc-grid article > div:first-child { display: grid; gap: 3px; }
+.area-editor-doc-grid code { color: #8fc7b9; }
+.area-editor-doc-grid small { color: #82938f; }
+.area-editor-status, .area-editor-errors { border: 1px solid #69582d; padding: 10px; background: #292414; color: #efd080; }
+@media (max-width: 1100px) { .area-editor-layout { grid-template-columns: 210px minmax(360px, 1fr) 270px; } .area-editor-catalog { grid-template-columns: repeat(2, 1fr); } }

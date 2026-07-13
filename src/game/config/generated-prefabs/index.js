@@ -1,3 +1,3 @@
-// Editor-managed prefab modules will be registered here. The runtime registry
-// intentionally remains valid while no generated prefabs exist.
-export const GENERATED_MAP_PREFABS = {};
+// Editor-managed prefab registry. Registry keys must exactly match prefab IDs.
+export const GENERATED_MAP_PREFABS = {
+};

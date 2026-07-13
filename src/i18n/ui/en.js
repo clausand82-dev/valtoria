@@ -32,6 +32,12 @@ export const EN_UI_LOCALE = Object.freeze({
   "settings.audio.title": "Audio", "settings.audio.mute": "Mute audio ({hotkey})", "settings.audio.master": "Master",
   "settings.audio.music": "Music", "settings.audio.ambience": "Ambience", "settings.audio.effects": "Sound effects",
   "settings.audio.ui": "UI", "settings.audio.reset": "Reset audio settings",
+  "areaEditor.settingsTitle": "Development tools", "areaEditor.settingsDescription": "Create and edit runtime-compatible prefabs on this local development server.",
+  "areaEditor.open": "Open Area Editor", "areaEditor.loading": "Loading Area Editor...", "areaEditor.title": "Valtoria Area Editor",
+  "areaEditor.devOnly": "Local development only", "areaEditor.browserHelp": "Create, reopen, duplicate, import, and validate editor-managed prefabs.",
+  "areaEditor.returnSettings": "Return to Settings", "areaEditor.newPrefab": "New prefab", "areaEditor.importJson": "Import JSON",
+  "areaEditor.managedPrefabs": "Editor-managed prefabs", "areaEditor.handwrittenPrefabs": "Handwritten prefabs",
+  "areaEditor.unsavedPrompt": "You have unsaved area-editor changes. Discard them?",
 
   "bestiary.entryCount": "{count} creatures from monster config",
   "bestiary.unknownCreature": "Unknown creature", "bestiary.lockedPage": "This page is locked. Find the creature in the wild to begin the notes.",

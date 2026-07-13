@@ -93,12 +93,12 @@ const generated = { editor_house: { id: "editor_house", w: 1, h: 1 } };
 const merged = mergePrefabRegistries({ handwritten: { id: "handwritten", w: 1, h: 1 } }, generated);
 assert.deepEqual(Object.keys(merged), ["handwritten", "editor_house"]);
 assert.throws(
-  () => mergePrefabRegistries({ first: { id: "duplicate" } }, { second: { id: "duplicate" } }),
-  /Duplicate prefab id "duplicate".*"first".*"second"/,
+  () => mergePrefabRegistries({ duplicate: { id: "duplicate" } }, { duplicate: { id: "duplicate" } }),
+  /Duplicate prefab registry key "duplicate"/,
 );
 assert.throws(
   () => mergePrefabRegistries({ same_key: { id: "first" } }, { same_key: { id: "second" } }),
-  /Duplicate prefab registry key "same_key"/,
+  /must exactly match prefab id/,
 );
 
 const groundPrefab = {

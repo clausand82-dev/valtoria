@@ -17,6 +17,7 @@ import { READABLE_DEF_BY_ID } from "./game/config/readable-config.js";
 import { isQuestComplete, questProgressText } from "./game/GameEngine/helpers.js";
 import { saveRepository } from "./storage/saveRepository.js";
 import { buildSaveExportWrapper, importSaveWrapper } from "./app/save/save-import-export.js";
+import { isAreaEditorAvailable } from "./app/dev-feature-guard.js";
 import { useLocalization } from "./i18n/index.js";
 import { HelpDialog } from "./app/help/index.js";
 import {
@@ -347,6 +348,8 @@ export default function App() {
   const [selectedCityStatId, setSelectedCityStatId] = useState(null);
   const [hoveredCityStatId, setHoveredCityStatId] = useState(null);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
+  const [AreaEditorComponent, setAreaEditorComponent] = useState(null);
+  const [areaEditorLoading, setAreaEditorLoading] = useState(false);
   const [helpState, setHelpState] = useState({ open: false, topicId: null });
   const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
   const [settingsDraft, setSettingsDraft] = useState(() => readPerformanceSettings());
@@ -1385,6 +1388,28 @@ export default function App() {
   );
   const showingOverlappingLoot = overlappingActionAndLoot && snapshot.nearbyInteractionMode === "loot";
 
+  const areaEditorAvailable = isAreaEditorAvailable({
+    dev: import.meta.env.DEV,
+    hostname: typeof window === "undefined" ? "" : window.location.hostname,
+  });
+  const openAreaEditor = async () => {
+    if (!areaEditorAvailable || gameSession || areaEditorLoading) return;
+    setAreaEditorLoading(true);
+    try {
+      const editorModulePath = "/src/dev/area-editor/AreaEditorPage.jsx";
+      const module = await import(/* @vite-ignore */ editorModulePath);
+      if (!isAreaEditorAvailable({ dev: import.meta.env.DEV, hostname: window.location.hostname })) return;
+      setCitySettingsOpen(false);
+      setAreaEditorComponent(() => module.default);
+    } finally {
+      setAreaEditorLoading(false);
+    }
+  };
+
+  if (AreaEditorComponent && areaEditorAvailable && !gameSession) {
+    return <AreaEditorComponent onClose={() => { setAreaEditorComponent(null); setCitySettingsOpen(true); }} />;
+  }
+
   return (
     <main className={`game-shell ${gameSession ? "game-active" : "menu-active"} ${cityOpen ? "city-open" : ""}`} onPointerDownCapture={handleUiPointerDown} onClickCapture={handleUiClick}>
       {!gameSession && !appLoading.active && (
@@ -1511,6 +1536,15 @@ export default function App() {
                 ))}
               </select>
             </div>
+            {areaEditorAvailable && !gameSession && (
+              <div className="city-settings-section">
+                <h3>{t("areaEditor.settingsTitle")}</h3>
+                <p>{t("areaEditor.settingsDescription")}</p>
+                <button type="button" data-testid="open-area-editor" onClick={openAreaEditor} disabled={areaEditorLoading}>
+                  {areaEditorLoading ? t("areaEditor.loading") : t("areaEditor.open")}
+                </button>
+              </div>
+            )}
             <div className="city-settings-section">
               <h3>{t("settings.performance.profileTitle")}</h3>
               <label>

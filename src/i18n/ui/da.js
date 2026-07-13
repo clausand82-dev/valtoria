@@ -32,6 +32,12 @@ export const DA_UI_LOCALE = Object.freeze({
   "settings.audio.title": "Lyd", "settings.audio.mute": "Slå lyd fra ({hotkey})", "settings.audio.master": "Master",
   "settings.audio.music": "Musik", "settings.audio.ambience": "Atmosfære", "settings.audio.effects": "Lydeffekter",
   "settings.audio.ui": "UI", "settings.audio.reset": "Nulstil lydindstillinger",
+  "areaEditor.settingsTitle": "Udviklingsvaerktoejer", "areaEditor.settingsDescription": "Opret og rediger runtime-kompatible prefabs paa denne lokale udviklingsserver.",
+  "areaEditor.open": "Aabn Area Editor", "areaEditor.loading": "Indlaeser Area Editor...", "areaEditor.title": "Valtoria Area Editor",
+  "areaEditor.devOnly": "Kun lokal udvikling", "areaEditor.browserHelp": "Opret, genaabn, dupliker, importer og validér editor-styrede prefabs.",
+  "areaEditor.returnSettings": "Tilbage til indstillinger", "areaEditor.newPrefab": "Ny prefab", "areaEditor.importJson": "Importer JSON",
+  "areaEditor.managedPrefabs": "Editor-styrede prefabs", "areaEditor.handwrittenPrefabs": "Haandskrevne prefabs",
+  "areaEditor.unsavedPrompt": "Du har ugemte aendringer i Area Editor. Kassér dem?",
 
   "hero.stat.hp.help": "Dit nuværende liv sammenlignet med dit maksimale liv. Du dør, når det når nul.",
   "hero.stat.mana.help": "Din nuværende mana sammenlignet med din maksimale mana. Mana bruges, når du kaster spells.",

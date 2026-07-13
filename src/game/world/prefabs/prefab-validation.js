@@ -119,6 +119,7 @@ export function validatePrefabRegistry(registry, options = {}) {
     const id = String(prefab?.id ?? "").trim();
     errors.push(...validatePrefab(prefab, { ...options, registryKey: key }));
     if (!id) continue;
+    if (key !== id) errors.push(`prefab registry key "${key}" must exactly match prefab id "${id}"`);
     if (seen.has(id)) errors.push(`duplicate prefab id "${id}" in "${seen.get(id)}" and "${key}"`);
     else seen.set(id, key);
   }
