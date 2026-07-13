@@ -18,6 +18,8 @@ const monsterSprite = (sprite) => ({
 
 const monsterAudioProfile = (def) => def.audioProfile
   ?? (def.speciesId === "demon" ? "demon" : null)
+  ?? (def.speciesId === "boar" ? "boar" : null)
+  ?? (def.speciesId === "rat" ? "rat" : null)
   ?? (def.sprite?.id === "skeleton" ? "skeleton" : null);
 
 // set audioProfile: "xxx", in MONSTER_DEFS for monsters that should have a specific audio profile, otherwise it will be inferred from speciesId or sprite.id
@@ -361,6 +363,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 68, damage: 13, speed: 1.35, range: 0.58, radius: 0.3, color: "#927458", xp: 24 },
     popularity: { change: -0.35 },
@@ -375,6 +378,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 74, damage: 14, speed: 1.28, range: 0.6, radius: 0.31, color: "#7b6b55", xp: 26 },
     popularity: { change: -0.4 },
@@ -403,6 +407,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 70, damage: 13, speed: 1.32, range: 0.58, radius: 0.3, color: "#8d7258", xp: 25 },
     popularity: { change: -0.35 },
@@ -417,6 +422,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 72, damage: 14, speed: 1.3, range: 0.6, radius: 0.31, color: "#806952", xp: 26 },
     popularity: { change: -0.38 },
@@ -431,6 +437,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 69, damage: 13, speed: 1.36, range: 0.58, radius: 0.3, color: "#95785d", xp: 25 },
     popularity: { change: -0.36 },
@@ -445,6 +452,7 @@ export const MONSTER_DEFS = {
       scale: 0.35, shadowW: 32, shadowH: 10, shadowAlpha: 0.34, yOffset: 44
     }),
     speciesId: "human",
+    audioProfile: "female_villager",
     tags: ["humanoid", "human", "medium"],
     stats: { hp: 75, damage: 14, speed: 1.26, range: 0.6, radius: 0.31, color: "#74654f", xp: 27 },
     popularity: { change: -0.4 },

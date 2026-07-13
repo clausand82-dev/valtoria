@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import "./hud.css";
 import { CHEAT_SETTINGS } from "../../game/config/cheat-config.js";
 import { CITY_STATUS_EFFECT_ICON_URLS, cityEventEntries } from "../../game/config/city-config.js";
@@ -481,6 +481,7 @@ export function GameHud({
   popularityValue,
   setConfirmMapAbandonOpen,
   setCitySettingsOpen,
+  onReturnToStartMenu,
   setHoveredCityStatId,
   setSelectedCityStatId,
   setCityStorageOpen,
@@ -500,6 +501,7 @@ export function GameHud({
   const [regionDebugOpen, setRegionDebugOpen] = useState(false);
   const [regionDebugStats, setRegionDebugStats] = useState(null);
   const [regionDebugLiveStats, setRegionDebugLiveStats] = useState(null);
+  const [cityMapLayout, setCityMapLayout] = useState(null);
   const questBadgeCount = Math.max(0, (snapshot.quests?.active ?? []).filter((quest) => quest.complete).length);
   const toastLogCount = Math.max(0, Number(toastLogUnreadCount) || 0);
   const handleOpenPicker = (slotId) => setOpenPicker(slotId);
@@ -522,6 +524,27 @@ export function GameHud({
   useEffect(() => {
     if (CHEAT_SETTINGS.enabled && regionDebugOpen) refreshRegionDebug();
   }, [engineRef, regionDebugOpen, snapshot.regionStats]);
+
+  useLayoutEffect(() => {
+    if (!cityOpen) {
+      setCityMapLayout(null);
+      return undefined;
+    }
+    const mapFrame = document.querySelector(".city-map-frame");
+    if (!mapFrame) return undefined;
+    const updateLayout = () => {
+      const { left, width } = mapFrame.getBoundingClientRect();
+      setCityMapLayout({ center: left + width / 2, width });
+    };
+    updateLayout();
+    const resizeObserver = new ResizeObserver(updateLayout);
+    resizeObserver.observe(mapFrame);
+    window.addEventListener("resize", updateLayout);
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateLayout);
+    };
+  }, [cityOpen]);
 
   useEffect(() => {
     if (!CHEAT_SETTINGS.enabled || !regionDebugOpen) return undefined;
@@ -644,7 +667,7 @@ export function GameHud({
         </section>
       )}
 
-      {getPlayerLevel(player) >= HELP_ACCESS_CONFIG.floatingButtonUnlockLevel && (
+      {!cityOpen && getPlayerLevel(player) >= HELP_ACCESS_CONFIG.floatingButtonUnlockLevel && (
         <button
           type="button"
           className="floating-help-button"
@@ -657,7 +680,14 @@ export function GameHud({
       )}
 
       {cityOpen ? (
-        <section className="city-menu-bar" aria-label={t("hud.cityMenu")}>
+        <section
+          className="city-menu-bar"
+          aria-label={t("hud.cityMenu")}
+          style={cityMapLayout ? {
+            "--city-menu-center": `${cityMapLayout.center}px`,
+            "--city-menu-width": `${Math.min(1550, cityMapLayout.width)}px`,
+          } : undefined}
+        >
           <button type="button" className="city-menu-button" onClick={() => setInventoryOpen((value) => !value)}>
             <ImageIcon src="/assets/generated/icon_backpack.png" />
             <span>{t("hud.backpack")}</span>
@@ -685,9 +715,19 @@ export function GameHud({
             <ImageIcon src="/assets/generated/item/item_book_lore.png" />
             <span>{t("hud.settings")}</span>
           </button>
+          {getPlayerLevel(player) >= HELP_ACCESS_CONFIG.floatingButtonUnlockLevel && (
+            <button type="button" className="city-menu-button" onClick={() => openHelpTopic("getting-started")}>
+              <span className="city-menu-help-icon" aria-hidden="true">?</span>
+              <span>{t("hud.help")}</span>
+            </button>
+          )}
           <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
             <ImageIcon src="/assets/generated/icon_map.png" />
             <span>{t("hud.worldMap")}</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={onReturnToStartMenu}>
+            <ImageIcon src="/assets/generated/menu.png" />
+            <span>{t("hud.returnToMainMenu")}</span>
           </button>
 
         </section>
@@ -724,6 +764,9 @@ export function GameHud({
         <button type="button" className="skill" title={t("panel.messageLog.title")} onClick={onOpenToastLog}>
           <ImageIcon src="/assets/generated/item/item_book_lore.png" />
           {toastLogCount > 0 && <b className="skill-badge">{Math.min(99, toastLogCount)}</b>}
+        </button>
+        <button type="button" className="skill" title={t("hud.settings")} onClick={() => setCitySettingsOpen(true)}>
+          <ImageIcon src="/assets/generated/item/item_book_lore.png" />
         </button>
         <button
           type="button"

@@ -567,11 +567,11 @@
 .city-menu-bar {
   position: fixed;
   z-index: 31;
-  left: 50%;
+  left: var(--city-menu-center, 50%);
   bottom: 10px;
   display: grid;
-  grid-template-columns: repeat(7, minmax(118px, 1fr));
-  width: min(1350px, calc(100vw - 36px));
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  width: min(var(--city-menu-width, 1350px), calc(100vw - 36px));
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid rgba(185, 133, 51, 0.62);
@@ -602,7 +602,7 @@
     rgba(16, 12, 8, 0.9);
   color: #f4da96;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 800;
   text-align: left;
   text-shadow: 0 2px 3px rgba(0, 0, 0, 0.82);
@@ -634,6 +634,17 @@
 .city-menu-button .hud-image-icon {
   width: 30px;
   height: 30px;
+}
+
+.city-menu-help-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(226, 174, 79, 0.72);
+  border-radius: 50%;
+  color: #f4da96;
+  font: 800 22px/1 Georgia, "Times New Roman", serif;
 }
 
 .city-menu-button span:not(.city-menu-storage-icon):not(.city-menu-settings-icon) {
@@ -2274,4 +2285,3 @@
       grid-template-columns: 1fr;
     }
 }
-

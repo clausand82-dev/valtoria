@@ -271,7 +271,6 @@ function CityPage({
   skipMobProgressForVisit = false,
   regionCorruption = {},
   onMobProgressSkipConsumed,
-  onClose,
   onQuestCompleted,
   onProgressChange,
   onStartCityMobBattle,
@@ -537,12 +536,14 @@ function CityPage({
     });
 
     const onKeyDown = (event) => {
-      const key = event.key.toLowerCase();
-      if (key === "escape") {
-        event.preventDefault();
-        onClose();
-        return;
-      }
+      if (event.key.toLowerCase() !== "escape") return;
+      event.preventDefault();
+      if (armyBattleResult) setArmyBattleResult(null);
+      else if (selectedQuestNpcId) setSelectedQuestNpcId(null);
+      else if (selectedBuildingId) setSelectedBuildingId(null);
+      else if (storageOpen) onCloseStorage?.();
+      else if (selectedCityMobId) setSelectedCityMobId(null);
+      else if (clickedAreaId) setClickedAreaId(null);
     };
 
     window.addEventListener("keydown", onKeyDown);
@@ -552,7 +553,7 @@ function CityPage({
       engineRef.current?.setReadableMergeStation?.("backpack");
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [onClose]);
+  }, [armyBattleResult, clickedAreaId, onCloseStorage, selectedBuildingId, selectedCityMobId, selectedQuestNpcId, storageOpen]);
 
   const unlockArea = (area) => {
     if (!area || isCityAreaUnlocked(cityProgressRef.current, area)) return;

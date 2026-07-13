@@ -21,12 +21,17 @@ export const EN_UI_LOCALE = Object.freeze({
   "hud.settings": "Settings", "hud.hero": "Hero", "hud.skills": "Skills", "hud.bestiary": "Bestiary",
   "hud.army": "Army", "hud.help": "Help", "hud.backpack": "Backpack", "hud.quickSlots": "Quick slots",
   "hud.storage": "Storage", "hud.messages": "Messages", "hud.worldMap": "World map", "hud.openHelp": "Open help",
+  "hud.returnToMainMenu": "Main menu",
   "hud.cityMenu": "City menu", "hud.battleQuickbar": "Battle quickbar", "hud.activeQuests": "Active quests",
 
   "panel.inventory.title": "Inventory", "panel.questLog.title": "Quest Log", "panel.map.title": "Map",
   "panel.city.title": "City", "panel.settings.title": "Settings", "panel.hero.title": "Hero",
   "panel.skills.title": "Skills", "panel.bestiary.title": "Bestiary", "panel.army.title": "Army",
   "panel.help.title": "Valtoria Help", "panel.messageLog.title": "Message Log",
+
+  "settings.audio.title": "Audio", "settings.audio.mute": "Mute audio ({hotkey})", "settings.audio.master": "Master",
+  "settings.audio.music": "Music", "settings.audio.ambience": "Ambience", "settings.audio.effects": "Sound effects",
+  "settings.audio.ui": "UI", "settings.audio.reset": "Reset audio settings",
 
   "bestiary.entryCount": "{count} creatures from monster config",
   "bestiary.unknownCreature": "Unknown creature", "bestiary.lockedPage": "This page is locked. Find the creature in the wild to begin the notes.",

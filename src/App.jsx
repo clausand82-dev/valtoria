@@ -577,6 +577,17 @@ export default function App() {
     });
   };
 
+  const resetAudioSettings = () => updateAudioSettings(DEFAULT_AUDIO_SETTINGS);
+
+  const toggleAudioMuted = () => {
+    setAudioSettings((current) => {
+      const next = normalizeAudioSettings({ ...current, audioMuted: !current.audioMuted });
+      persistAudioSettings(next);
+      audioManager.setSettings(next);
+      return next;
+    });
+  };
+
   const handleUiPointerDown = () => {
     audioManager.unlock();
     if (!gameSessionRef.current && !menuAudioStartedRef.current) {
@@ -806,6 +817,14 @@ export default function App() {
 
   useEffect(() => {
     const handleKey = (event) => {
+      const target = event.target;
+      const isEditing = target instanceof HTMLElement
+        && (target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName));
+      if (event.key.toLowerCase() === "u" && !event.repeat && !isEditing) {
+        event.preventDefault();
+        toggleAudioMuted();
+        return;
+      }
       if (!gameSessionRef.current) return;
       // Allow inventory/map/hero hotkeys while city is open; city should not
       // block access to quickbar functionality.
@@ -894,6 +913,61 @@ export default function App() {
       if (timerId !== null) window.clearTimeout(timerId);
     };
   }, [cityOpen]);
+
+  useEffect(() => {
+    const handleEscape = (event) => {
+      if (event.key !== "Escape") return;
+
+      let closeTopModal = null;
+      if (runSummary) closeTopModal = () => setRunSummary(null);
+      else if (helpState.open) closeTopModal = () => setHelpState({ open: false, topicId: null });
+      else if (citySettingsOpen) closeTopModal = () => setCitySettingsOpen(false);
+      else if (confirmMapAbandonOpen) closeTopModal = () => setConfirmMapAbandonOpen(false);
+      else if (readableDialog) closeTopModal = () => setReadableDialog(null);
+      else if (mergeChoice) closeTopModal = () => setMergeChoice(null);
+      else if (questRewardModal) closeTopModal = () => setQuestRewardModal(null);
+      else if (acceptedQuestNotice) closeTopModal = () => setAcceptedQuestNotice(null);
+      else if (viewedQuest) closeTopModal = () => setViewedQuest(null);
+      else if (questOffer) closeTopModal = () => {
+        engineRef.current?.declineWildernessQuest?.();
+        setQuestOffer(null);
+      };
+      else if (questOverviewOpen) closeTopModal = () => setQuestOverviewOpen(false);
+      else if (toastLogOpen) closeTopModal = () => setToastLogOpen(false);
+      else if (inventoryOpen) closeTopModal = () => setInventoryOpen(false);
+      else if (heroOpen) closeTopModal = () => setHeroOpen(false);
+      else if (regionMapOpen) closeTopModal = () => setRegionMapOpen(false);
+      else if (mapOpen) closeTopModal = () => setMapOpen(false);
+      else if (snapshotRef.current.exitPrompt && !cityOpen) closeTopModal = () => engineRef.current?.dismissExitPrompt?.();
+      else if (cityStorageOpen) closeTopModal = () => setCityStorageOpen(false);
+
+      if (!closeTopModal) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeTopModal();
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [
+    acceptedQuestNotice,
+    cityOpen,
+    citySettingsOpen,
+    cityStorageOpen,
+    confirmMapAbandonOpen,
+    helpState.open,
+    heroOpen,
+    inventoryOpen,
+    mapOpen,
+    mergeChoice,
+    questOffer,
+    questOverviewOpen,
+    questRewardModal,
+    readableDialog,
+    regionMapOpen,
+    runSummary,
+    toastLogOpen,
+    viewedQuest,
+  ]);
 
   useEffect(() => {
     if (!inventoryOpen) {
@@ -1239,6 +1313,20 @@ export default function App() {
     setSaveSlots(collectSaveSlots());
   };
 
+  const returnToStartMenu = () => {
+    if (!cityOpen) return;
+    setMenuView("main");
+    setCitySettingsOpen(false);
+    setCityStorageOpen(false);
+    setInventoryOpen(false);
+    setHeroOpen(false);
+    setQuestOverviewOpen(false);
+    setToastLogOpen(false);
+    setGameSession(null);
+    setCityOpen(false);
+    setSaveSlots(collectSaveSlots());
+  };
+
   const exportSaveSlot = (slot) => {
     try {
       const wrapper = buildSaveExportWrapper(slot);
@@ -1341,6 +1429,7 @@ export default function App() {
         popularityValue={effectivePopularity}
         setConfirmMapAbandonOpen={setConfirmMapAbandonOpen}
         setCitySettingsOpen={setCitySettingsOpen}
+        onReturnToStartMenu={returnToStartMenu}
         setHoveredCityStatId={setHoveredCityStatId}
         setSelectedCityStatId={setSelectedCityStatId}
         setCityStorageOpen={setCityStorageOpen}
@@ -1388,25 +1477,26 @@ export default function App() {
       </>
       )}
 
-      {citySettingsOpen && (cityOpen || !gameSession) && (
+      {citySettingsOpen && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog city-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="city-settings-title">
             <h2 id="city-settings-title">{t("panel.settings.title")}</h2>
             <p className="city-settings-note">{t("settings.performance.note")}</p>
             <div className="city-settings-section">
-              <h3>Audio</h3>
+              <h3>{t("settings.audio.title")}</h3>
               <label className="city-settings-check">
                 <input type="checkbox" checked={audioSettings.audioMuted} onChange={(event) => updateAudioSettings({ audioMuted: event.target.checked })} />
-                Mute audio
+                {t("settings.audio.mute", { hotkey: "U" })}
               </label>
               {[
-                ["masterVolume", "Master"], ["musicVolume", "Music"], ["ambienceVolume", "Ambience"], ["sfxVolume", "Sound effects"], ["uiVolume", "UI"],
+                ["masterVolume", t("settings.audio.master")], ["musicVolume", t("settings.audio.music")], ["ambienceVolume", t("settings.audio.ambience")], ["sfxVolume", t("settings.audio.effects")], ["uiVolume", t("settings.audio.ui")],
               ].map(([key, label]) => (
                 <label key={key}>
                   {label}
                   <input type="range" min="0" max="1" step="0.01" value={audioSettings[key]} onChange={(event) => updateAudioSettings({ [key]: Number(event.target.value) })} />
                 </label>
               ))}
+              <button type="button" onClick={resetAudioSettings}>{t("settings.audio.reset")}</button>
             </div>
             <div className="city-settings-section">
               <h3>{localize(LANGUAGE_SETTING, "label")}</h3>
@@ -1958,7 +2048,6 @@ export default function App() {
           onMobProgressSkipConsumed={() => setSkipCityMobProgressReturnId(null)}
           storageOpen={cityStorageOpen}
           onCloseStorage={() => setCityStorageOpen(false)}
-          onClose={openWorldMapFromCity}
         />
       )}
       </>

@@ -20,13 +20,18 @@ export const DA_UI_LOCALE = Object.freeze({
   "hud.inventory": "Inventory", "hud.questLog": "Questlog", "hud.map": "Kort", "hud.city": "By",
   "hud.settings": "Indstillinger", "hud.hero": "Helt", "hud.skills": "Skills", "hud.bestiary": "Bestiary",
   "hud.army": "Hær", "hud.help": "Hjælp", "hud.backpack": "Backpack", "hud.quickSlots": "Quick slots",
-  "hud.storage": "Storage", "hud.messages": "Beskeder", "hud.worldMap": "Verdenskort", "hud.openHelp": "Åbn hjælp",
+  "hud.storage": "Storage", "hud.messages": "Beskeder", "hud.worldMap": "Kort", "hud.openHelp": "Åbn hjælp",
+  "hud.returnToMainMenu": "Hovedmenu",
   "hud.cityMenu": "Bymenu", "hud.battleQuickbar": "Kampens quickbar", "hud.activeQuests": "Aktive quests",
 
   "panel.inventory.title": "Inventory", "panel.questLog.title": "Questlog", "panel.map.title": "Kort",
   "panel.city.title": "By", "panel.settings.title": "Indstillinger", "panel.hero.title": "Helt",
   "panel.skills.title": "Skills", "panel.bestiary.title": "Bestiary", "panel.army.title": "Hær",
   "panel.help.title": "Valtoria Hjælp", "panel.messageLog.title": "Beskedlog",
+
+  "settings.audio.title": "Lyd", "settings.audio.mute": "Slå lyd fra ({hotkey})", "settings.audio.master": "Master",
+  "settings.audio.music": "Musik", "settings.audio.ambience": "Atmosfære", "settings.audio.effects": "Lydeffekter",
+  "settings.audio.ui": "UI", "settings.audio.reset": "Nulstil lydindstillinger",
 
   "hero.stat.hp.help": "Dit nuværende liv sammenlignet med dit maksimale liv. Du dør, når det når nul.",
   "hero.stat.mana.help": "Din nuværende mana sammenlignet med din maksimale mana. Mana bruges, når du kaster spells.",

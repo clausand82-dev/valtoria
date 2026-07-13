@@ -1,7 +1,15 @@
 History over changes
 
 *V. 1.13
-
+- run some code and performance optimizing
+- added reset to music/sound settings
+- added a mute shotcut
+- added access to settings in expedition mode
+- added option to go back to start screen from city mode
+- moved city menu to be centered around city map instead of screen
+- moved help icon into menu
+- esc will now close open modals instead of open map
+- added sounds for monsters (villagers, boars and rats) - attack, aggro, hurt and death
 
 *V. 1.12
 - fixed an error where hay wasn't destructable - only meant to been diabled when villager_help_collect_hay was active

@@ -7,10 +7,14 @@ Små rettelse observeret igennem spil test:
 - lidt loade forsinkelse af grafik ved online run
 - i city map run er exit ofte næsten umulig at se
 - teste om questreward på hunters quests virker
-- en setting i expedition mode
-- en genvejs tast til mute
-- mulighed for at gå tilbage til start menu
-- en reset sound i indstillinger
+
+
+- i bibliotek skal man kunne lave papir om til scrolls (hvis den mulighed ikke allerede findes)
+- scrolls skal kunen laves om til bøger (der ligesom frugt tønder) er en resource der kan doneres for at få faith eller culture eller knowledge
+ - tre bøger (religiøse bøger der giver faith), roman der giver culture og fagbøger der giver knowledge
+ - religiøse bøger koster 100 papir, 20 scroll, 1 læder, 1 kul (giver 2 i faith)
+ - roman koster 75 papir, 5 scroll, 1 læder, 1 kul (giver 2 i culture)
+ - fagbog koster 50 papir, 3 scroll, 1 læder og 1 kul (giver 2 i knowledge)
 
 
 
