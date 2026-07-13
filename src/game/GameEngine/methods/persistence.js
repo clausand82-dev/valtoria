@@ -148,6 +148,27 @@ export const persistenceMethods = {
     return this.saveStorageKey || SAVE_STORAGE_KEY;
   },
 
+  autosaveStateSignature() {
+    const player = this.player ?? {};
+    const activeRegion = this.activeMapRegion ?? {};
+    return [
+      this.persistentStateVersion ?? 0,
+      activeRegion.areaMapId ?? "",
+      activeRegion.regionId ?? "",
+      Math.round((Number(player.x) || 0) * 10),
+      Math.round((Number(player.y) || 0) * 10),
+      Math.ceil(Number(player.hp) || 0),
+      Math.floor(Number(player.mana) || 0),
+      Math.floor(Number(player.xp) || 0),
+      Math.floor(Number(player.gold) || 0),
+      Math.floor(Number(player.level) || 0),
+      player.inventory?.length ?? 0,
+      Object.values(player.equipment ?? {}).filter(Boolean).length,
+      this.questState?.active?.length ?? 0,
+      this.questState?.completed?.length ?? 0,
+    ].join("|");
+  },
+
   readSavePayload() {
     if (!SAVE_PERSIST_CONFIG.storage.playerSave) return null;
     const parsed = saveRepository.loadSaveSync(this.currentSaveStorageKey());
@@ -570,8 +591,35 @@ export const persistenceMethods = {
       }
     };
     const force = Boolean(options?.force);
-    if (this.activeMapRegion && !force && !this.currentExpedition) return false;
-    if (!SAVE_PERSIST_CONFIG.storage.playerSave) return false;
+    const reason = String(options?.reason ?? (force ? "force" : "manual"));
+    const autosaveSignature = reason === "autosave" ? this.autosaveStateSignature?.() ?? null : null;
+    const diagnostics = this.saveDiagnostics ??= {};
+    diagnostics.requests = (diagnostics.requests ?? 0) + 1;
+    diagnostics.reasonCounts ??= {};
+    diagnostics.reasonCounts[reason] = (diagnostics.reasonCounts[reason] ?? 0) + 1;
+    if (force) {
+      diagnostics.forced = (diagnostics.forced ?? 0) + 1;
+      diagnostics.forcedReasonCounts ??= {};
+      diagnostics.forcedReasonCounts[reason] = (diagnostics.forcedReasonCounts[reason] ?? 0) + 1;
+    }
+    const recordSkippedSave = (status) => {
+      if (status === "skipped-clean") diagnostics.skippedClean = (diagnostics.skippedClean ?? 0) + 1;
+      if (status === "skipped-identical") diagnostics.skippedIdentical = (diagnostics.skippedIdentical ?? 0) + 1;
+      this.lastSaveInfo = {
+        savedAt: null,
+        sizeKb: 0,
+        status,
+        reason,
+        timings: { ...saveTimings },
+        diagnostics: { ...diagnostics },
+      };
+      return false;
+    };
+    if (this.activeMapRegion && !force && !this.currentExpedition) return recordSkippedSave("skipped-map-transition");
+    if (reason === "autosave" && !this.saveDirty && (
+      autosaveSignature === null || autosaveSignature === this.lastPersistedAutosaveSignature
+    )) return recordSkippedSave("skipped-clean");
+    if (!SAVE_PERSIST_CONFIG.storage.playerSave) return recordSkippedSave("disabled");
     if (this.currentExpedition?.currentMapInstanceId) {
       this.storeCurrentMapSnapshot?.(this.currentExpedition.currentMapInstanceId);
     }
@@ -660,6 +708,9 @@ export const persistenceMethods = {
       const serializeStartedAt = performance.now();
       serializedPayload = JSON.stringify(payload);
       addSaveTiming("autosaveSerializeMs", performance.now() - serializeStartedAt);
+      diagnostics.serialized = (diagnostics.serialized ?? 0) + 1;
+      diagnostics.serializationMs = (diagnostics.serializationMs ?? 0) + saveTimings.autosaveSerializeMs;
+      diagnostics.payloadBytes = (diagnostics.payloadBytes ?? 0) + serializedPayload.length;
       saveSizeKb = Math.round((new Blob([serializedPayload]).size / 1024) * 10) / 10;
       if (saveSizeKb > 2500) {
         console.warn(`[save] CRITICAL large save payload: ${saveSizeKb} KB`, {
@@ -684,16 +735,28 @@ export const persistenceMethods = {
       : saveRepository.saveGameSync(this.currentSaveStorageKey(), payload);
     addSaveTiming("autosaveStorageWriteMs", performance.now() - storageStartedAt);
     addSaveTiming("autosaveTotalMs", performance.now() - saveStartedAt);
+    diagnostics.storageWriteMs = (diagnostics.storageWriteMs ?? 0) + saveTimings.autosaveStorageWriteMs;
+    if (saved) diagnostics.written = (diagnostics.written ?? 0) + 1;
+    else {
+      diagnostics.failedWrites = (diagnostics.failedWrites ?? 0) + 1;
+      // A failed synchronous localStorage write must be retried by a later
+      // autosave or a critical flush, even when the caller was a forced save.
+      this.saveDirty = true;
+      this.saveDirtyReasons ??= {};
+      this.saveDirtyReasons["write-failed"] = true;
+    }
     this.lastSaveInfo = {
       savedAt: payload.savedAt,
       sizeKb: saveSizeKb,
       status: saved ? "OK" : "failed",
-      reason: options?.reason ?? (force ? "force" : "manual"),
+      reason,
       timings: { ...saveTimings },
+      diagnostics: { ...diagnostics },
     };
     if (saved) {
       this.saveDirty = false;
       this.saveDirtyReasons = {};
+      this.lastPersistedAutosaveSignature = this.autosaveStateSignature?.() ?? null;
     }
     this.warnPerformanceThreshold?.("autosaveTotalMs", saveTimings.autosaveTotalMs, 1.5, {
       save: {
@@ -717,6 +780,6 @@ export const persistenceMethods = {
     if (saved && this.onSave) {
       this.onSave(payload);
     }
-    return true;
+    return Boolean(saved);
   }
 };

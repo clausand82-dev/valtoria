@@ -470,6 +470,11 @@ export const regionStatsMethods = {
         minimapScaleCopyMs: formatMs(timings.minimapScaleCopyMs),
         minimapTotalDrawMs: formatMs(timings.minimapTotalDrawMs),
         minimapBudgetBackoff: Boolean(timings.minimapBudgetBackoff),
+        minimapDiagnostics: {
+          ...(this.minimapDiagnostics ?? {}),
+          invalidationReasons: { ...(this.minimapDiagnostics?.invalidationReasons ?? {}) },
+        },
+        terrainLayerDiagnostics: { ...(this.terrainLayerDiagnostics ?? {}) },
         uiMs: formatMs(timings.uiMs),
         overlayMs: formatMs(timings.overlayMs),
       },
@@ -492,6 +497,11 @@ export const regionStatsMethods = {
         saveDirtyReasons: { ...(this.saveDirtyReasons ?? {}) },
         saveDirtyReasonCountsCumulative: { ...(this.saveDirtyReasonCounts ?? {}) },
         uiDirtyReasonCountsCumulative: { ...(this.uiDirtyReasons ?? {}) },
+        saveDiagnostics: {
+          ...(this.saveDiagnostics ?? {}),
+          reasonCounts: { ...(this.saveDiagnostics?.reasonCounts ?? {}) },
+          forcedReasonCounts: { ...(this.saveDiagnostics?.forcedReasonCounts ?? {}) },
+        },
       },
       save: this.lastSaveInfo ? { ...this.lastSaveInfo } : null,
       counts: {
@@ -868,6 +878,11 @@ export const regionStatsMethods = {
         minimapScaleCopyMs: formatMs(timings.minimapScaleCopyMs),
         minimapTotalDrawMs: formatMs(timings.minimapTotalDrawMs),
         minimapBudgetBackoff: Boolean(timings.minimapBudgetBackoff),
+        minimapDiagnostics: {
+          ...(this.minimapDiagnostics ?? {}),
+          invalidationReasons: { ...(this.minimapDiagnostics?.invalidationReasons ?? {}) },
+        },
+        terrainLayerDiagnostics: { ...(this.terrainLayerDiagnostics ?? {}) },
       },
       snapshot: this.lastSnapshotInfo ? {
         reason: this.lastSnapshotInfo.reason ?? null,
@@ -887,6 +902,11 @@ export const regionStatsMethods = {
         saveDirtyReasons: { ...(this.saveDirtyReasons ?? {}) },
         saveDirtyReasonCountsCumulative: { ...(this.saveDirtyReasonCounts ?? {}) },
         uiDirtyReasonCountsCumulative: { ...(this.uiDirtyReasons ?? {}) },
+        saveDiagnostics: {
+          ...(this.saveDiagnostics ?? {}),
+          reasonCounts: { ...(this.saveDiagnostics?.reasonCounts ?? {}) },
+          forcedReasonCounts: { ...(this.saveDiagnostics?.forcedReasonCounts ?? {}) },
+        },
       },
       counts: {
         drawables: counts.drawables ?? 0,

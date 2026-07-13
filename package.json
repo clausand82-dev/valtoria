@@ -3,22 +3,34 @@
   "version": "0.2.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
-    "validate": "node scripts/validate-config.js",
+    "validate": "npm run validate:config",
+    "validate:config": "node scripts/validate-config.js",
+    "test": "npm run test:audio-config && npm run test:save-persistence && npm run test:minimap-rendering && npm run test:terrain-layer-cache && npm run test:tile-edge-walls && npm run test:ground-render-overrides && npm run test:region-object-variants && npm run test:city-mob-visuals && npm run test:hunter-questline",
+    "test:audio-config": "node scripts/test-region-audio-config.js",
+    "test:city-mob-visuals": "node scripts/test-city-mob-visuals.js",
+    "test:ground-render-overrides": "node scripts/test-ground-render-overrides.js",
     "test:hunter-questline": "node scripts/test-hunter-questline.js",
-    "test:region-audio-config": "node scripts/test-region-audio-config.js",
+    "test:minimap-rendering": "node scripts/test-minimap-rendering.js",
+    "test:region-audio-config": "npm run test:audio-config",
+    "test:region-object-variants": "node scripts/test-region-object-variants.js",
+    "test:save-persistence": "node scripts/test-save-persistence.js",
+    "test:terrain-layer-cache": "node scripts/test-terrain-layer-cache.js",
     "test:tile-edge-walls": "node scripts/test-tile-edge-walls.js",
-    "check": "npm run validate && npm run build",
+    "check": "npm run validate:config && npm test && npm run build",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "@vitejs/plugin-react": "^5.2.0",
+    "vite": "^7.3.6"
   }
 }

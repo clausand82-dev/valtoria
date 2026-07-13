@@ -116,6 +116,8 @@ export const lifecycleMethods = {
     window.addEventListener("keydown", this.handleKeyDown);
     window.addEventListener("keyup", this.handleKeyUp);
     window.addEventListener("pointerup", this.handlePointerUp);
+    document.addEventListener("visibilitychange", this.handleDocumentVisibilityChange);
+    window.addEventListener("pagehide", this.handlePageHide);
     this.canvas.addEventListener("pointermove", this.handlePointerMove);
     this.canvas.addEventListener("pointerdown", this.handlePointerDown);
     this.canvas.addEventListener("pointerleave", this.handlePointerLeave);
@@ -172,7 +174,7 @@ export const lifecycleMethods = {
       this.pendingSnapshotTimer = null;
       this.pendingSnapshotClear = null;
     }
-    this.saveProgress();
+    this.saveProgress({ force: true, reason: "engine-stop" });
     for (const timerId of this.toastTimers.values()) {
       clearTimeout(timerId);
     }
@@ -186,6 +188,8 @@ export const lifecycleMethods = {
     window.removeEventListener("keydown", this.handleKeyDown);
     window.removeEventListener("keyup", this.handleKeyUp);
     window.removeEventListener("pointerup", this.handlePointerUp);
+    document.removeEventListener("visibilitychange", this.handleDocumentVisibilityChange);
+    window.removeEventListener("pagehide", this.handlePageHide);
     this.canvas.removeEventListener("pointermove", this.handlePointerMove);
     this.canvas.removeEventListener("pointerdown", this.handlePointerDown);
     this.canvas.removeEventListener("pointerleave", this.handlePointerLeave);
@@ -207,6 +211,14 @@ export const lifecycleMethods = {
     this.fogOverlayCanvas = null;
     this.updateCamera(1);
     this.markRenderDirty("resize");
+  },
+
+  handleDocumentVisibilityChange() {
+    if (document.hidden) this.saveProgress({ force: true, reason: "visibility-hidden" });
+  },
+
+  handlePageHide() {
+    this.saveProgress({ force: true, reason: "pagehide" });
   },
 
   loop(now) {

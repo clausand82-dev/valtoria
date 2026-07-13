@@ -9,18 +9,22 @@ import {
   tileEdgeWallCacheKey,
 } from "../src/game/GameEngine/helpers/tile-edge-walls.js";
 
+// Rendering is intentionally disabled in the game config. Exercise the edge
+// calculation with a test-only enabled copy so this test remains meaningful.
+const wallConfig = { ...TILE_EDGE_WALLS, enabled: true };
+
 function regionFromTiles(tiles) {
   return { mask: new Set(tiles.map(([x, y]) => `${x},${y}`)) };
 }
 
 const acrossChunkRegion = regionFromTiles([[15, 4], [16, 4], [16, 3]]);
 assert.equal(hasPlayableTileAt(acrossChunkRegion, 16, 4), true);
-assert.deepEqual(getTileWallEdges({ x: 16, y: 4 }, acrossChunkRegion, TILE_EDGE_WALLS), []);
-assert.deepEqual(getTileWallEdges({ x: 15, y: 4 }, acrossChunkRegion, TILE_EDGE_WALLS), ["back", "left"]);
+assert.deepEqual(getTileWallEdges({ x: 16, y: 4 }, acrossChunkRegion, wallConfig), []);
+assert.deepEqual(getTileWallEdges({ x: 15, y: 4 }, acrossChunkRegion, wallConfig), ["back", "left"]);
 
 const irregularRegion = regionFromTiles([[2, 3], [3, 2], [3, 3], [8, 8]]);
-assert.deepEqual(getTileWallEdges({ x: 3, y: 3 }, irregularRegion, TILE_EDGE_WALLS), []);
-assert.deepEqual(getTileWallEdges({ x: 8, y: 8 }, irregularRegion, TILE_EDGE_WALLS), ["back", "left"]);
+assert.deepEqual(getTileWallEdges({ x: 3, y: 3 }, irregularRegion, wallConfig), []);
+assert.deepEqual(getTileWallEdges({ x: 8, y: 8 }, irregularRegion, wallConfig), ["back", "left"]);
 
 const backAnchors = getTileEdgeWallAnchors("back", 100, 80, TILE_EDGE_WALLS.overlapPx);
 const leftAnchors = getTileEdgeWallAnchors("left", 100, 80, TILE_EDGE_WALLS.overlapPx);

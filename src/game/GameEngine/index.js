@@ -68,6 +68,14 @@ export class GameEngine {
     this.minimapStaticRevision = 1;
     this.minimapStaticRebuildReason = "init";
     this.minimapCanvasStates = new WeakMap();
+    this.minimapDiagnostics = {
+      staticRebuilds: 0,
+      fogRenders: 0,
+      dynamicRenders: 0,
+      skippedUnchanged: 0,
+      skippedThrottled: 0,
+      invalidationReasons: {},
+    };
     this.maxIdleRenderIntervalMs = Math.max(250, Number(options.maxIdleRenderIntervalMs) || 1000);
     this.visualActivityLevel = "idle";
     this.visualActivityReasons = [];
@@ -111,8 +119,34 @@ export class GameEngine {
     this.adaptiveLowFpsSamples = 0;
     this.adaptivePerformanceReason = "tier-0";
     this.terrainLayersCleared = 0;
+    this.terrainLayerDiagnostics = {
+      builds: 0,
+      buildMs: 0,
+      tileOrderBuilds: 0,
+      tileOrderMs: 0,
+      wallOrderBuilds: 0,
+      wallOrderMs: 0,
+      tilesDrawn: 0,
+    };
     this.tileEdgeWallImage = null;
     this.lastSaveInfo = null;
+    this.saveDirty = false;
+    this.saveDirtyReasons = {};
+    this.saveDirtyReasonCounts = {};
+    this.saveDiagnostics = {
+      requests: 0,
+      serialized: 0,
+      written: 0,
+      skippedClean: 0,
+      skippedIdentical: 0,
+      failedWrites: 0,
+      forced: 0,
+      reasonCounts: {},
+      forcedReasonCounts: {},
+      serializationMs: 0,
+      storageWriteMs: 0,
+      payloadBytes: 0,
+    };
     this.time = 0;
     this.frame = 0;
     this.raf = 0;
@@ -202,6 +236,8 @@ export class GameEngine {
     this.handlePointerDown = this.handlePointerDown.bind(this);
     this.handlePointerLeave = this.handlePointerLeave.bind(this);
     this.handlePointerUp = this.handlePointerUp.bind(this);
+    this.handleDocumentVisibilityChange = this.handleDocumentVisibilityChange.bind(this);
+    this.handlePageHide = this.handlePageHide.bind(this);
     this.handleKeyDown = this.handleKeyDown.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
   }

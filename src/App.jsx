@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MAX_INVENTORY } from "./game/data.js";
 import { GameEngine } from "./game/GameEngine.js";
-import { loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
+import { getAssetCacheDiagnostics, loadAnimationSheets, loadGeneratedAtlas } from "./game/assets.js";
 import { CITY_AREAS } from "./game/config/city-areas-config.js";
 import { CITY_STATS_RULES } from "./game/config/city-stats-rules-config.js";
 import { CITY_BUILDINGS } from "./game/config/city-buildings-config.js";
@@ -625,10 +625,14 @@ export default function App() {
     });
     engineRef.current = engine;
     if (typeof window !== "undefined") window.VALTORIA_ENGINE = engine;
+    if (import.meta.env.DEV && typeof window !== "undefined") {
+      window.VALTORIA_ASSET_CACHE_DIAGNOSTICS = getAssetCacheDiagnostics;
+    }
     engine.start();
     if (gameSession.newGame) engine.saveProgress({ force: true });
     return () => {
       if (typeof window !== "undefined" && window.VALTORIA_ENGINE === engine) delete window.VALTORIA_ENGINE;
+      if (import.meta.env.DEV && typeof window !== "undefined") delete window.VALTORIA_ASSET_CACHE_DIAGNOSTICS;
       engine.stop();
       engineRef.current = null;
     };
@@ -873,11 +877,22 @@ export default function App() {
     if (cityOpen) return undefined;
     // The game snapshot is intentionally coalesced for UI/save work. The
     // minimap marker and fog are canvas-only dynamic layers and must not wait
-    // for that scheduler; renderMinimap itself enforces minimapFps (5 = 200ms).
-    const id = window.setInterval(() => {
-      engineRef.current?.renderMinimap(minimapRef.current, minimapDynamicRef.current);
-    }, 100);
-    return () => window.clearInterval(id);
+    // for that scheduler. Schedule at the current engine cadence rather than
+    // waking React every 100 ms only to hit the engine throttle.
+    let timerId = null;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      const engine = engineRef.current;
+      engine?.renderMinimap(minimapRef.current, minimapDynamicRef.current);
+      const delay = Math.max(50, Number(engine?.minimapIntervalMs) || 200);
+      timerId = window.setTimeout(tick, delay);
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timerId !== null) window.clearTimeout(timerId);
+    };
   }, [cityOpen]);
 
   useEffect(() => {

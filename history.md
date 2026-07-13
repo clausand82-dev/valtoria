@@ -1,5 +1,8 @@
 History over changes
 
+*V. 1.13
+
+
 *V. 1.12
 - fixed an error where hay wasn't destructable - only meant to been diabled when villager_help_collect_hay was active
 - added export/import to start menu (can be used to transfer save game between browser/pc)

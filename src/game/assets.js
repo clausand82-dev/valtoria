@@ -103,6 +103,59 @@ const animationPartCache = {
   monsterPromises: new Map(),
 };
 
+function countEntries(value) {
+  if (value instanceof Map || value instanceof Set) return value.size;
+  return value && typeof value === "object" ? Object.keys(value).length : 0;
+}
+
+function collectCanvasMetrics(value, seen = new Set(), metrics = { canvases: 0, pixels: 0 }) {
+  if (!value || typeof value !== "object" || seen.has(value)) return metrics;
+  seen.add(value);
+  const width = Number(value.width) || 0;
+  const height = Number(value.height) || 0;
+  if (width > 0 && height > 0 && typeof value.getContext === "function") {
+    metrics.canvases += 1;
+    metrics.pixels += width * height;
+    return metrics;
+  }
+  if (value instanceof Map) {
+    for (const entry of value.values()) collectCanvasMetrics(entry, seen, metrics);
+  } else if (Array.isArray(value)) {
+    for (const entry of value) collectCanvasMetrics(entry, seen, metrics);
+  } else {
+    for (const entry of Object.values(value)) collectCanvasMetrics(entry, seen, metrics);
+  }
+  return metrics;
+}
+
+export function getAssetCacheDiagnostics() {
+  if (!import.meta.env?.DEV) return null;
+  const canvasMetrics = collectCanvasMetrics({
+    imageCanvasCache,
+    generatedAtlasCache,
+    animationSheetsCache,
+    atlasPartCache,
+    animationPartCache,
+  });
+  return {
+    imageCanvasEntries: imageCanvasCache.size,
+    generatedAtlasCached: Boolean(generatedAtlasCache),
+    animationSheetsCached: Boolean(animationSheetsCache),
+    atlas: {
+      groundSheets: countEntries(atlasPartCache.groundSheets), groundPromises: atlasPartCache.groundPromises.size,
+      treeSheets: countEntries(atlasPartCache.treeSheets), treePromises: atlasPartCache.treePromises.size,
+      waterSheets: countEntries(atlasPartCache.waterSheets), waterPromises: atlasPartCache.waterPromises.size,
+      foliageSheets: countEntries(atlasPartCache.foliageSheets), foliagePromises: atlasPartCache.foliagePromises.size,
+      decaySheets: countEntries(atlasPartCache.decaySheets), decayPromises: atlasPartCache.decayPromises.size,
+      objectTypes: countEntries(atlasPartCache.objectSheets), objectPromises: atlasPartCache.objectPromises.size,
+    },
+    animation: { monsters: countEntries(animationPartCache.monsters), monsterPromises: animationPartCache.monsterPromises.size },
+    canvasCount: canvasMetrics.canvases,
+    canvasPixels: canvasMetrics.pixels,
+    estimatedCanvasMiB: Math.round((canvasMetrics.pixels * 4 / (1024 * 1024)) * 10) / 10,
+  };
+}
+
 const OBJECT_FRAME = {
   tree: "tree",
   house: "house",
@@ -427,6 +480,7 @@ function loadMonsterAnimationSheets(manifest) {
           cfg,
         }])
         .catch((error) => {
+          animationPartCache.monsterPromises.delete(cfg.id);
           console.warn(`Monster sheet load failed for ${cfg.id}: ${cfg.url}`, error);
           return [cfg.id, null];
         }));
@@ -532,6 +586,7 @@ function loadGroundSheets(manifest = buildFullRegionAssetManifest()) {
         baseAlpha: spec.baseAlpha,
       })])
         .catch((error) => {
+          atlasPartCache.groundPromises.delete(spec.biomeId);
           console.warn(`Ground sheet load failed for ${spec.biomeId}: ${spec.fileName}`, error);
           return [spec.biomeId, null];
         }));
@@ -567,6 +622,7 @@ function loadWaterSheets(manifest = buildFullRegionAssetManifest()) {
         atlasPartCache.waterPromises.set(spec.sheetId, loadRawImage(`/assets/generated/${spec.fileName}`)
           .then((canvas) => [spec.sheetId, makeTileSheet(canvas, 4, 4)])
           .catch((error) => {
+            atlasPartCache.waterPromises.delete(spec.sheetId);
             console.warn(`Water sheet load failed for ${spec.sheetId}: ${spec.fileName}`, error);
             return [spec.sheetId, null];
           }));
@@ -594,6 +650,7 @@ function loadTreeSheets(manifest = buildFullRegionAssetManifest()) {
         atlasPartCache.treePromises.set(biomeId, loadImageCanvas(`/assets/generated/${fileName}`).then(makeTreeSheet)
         .then((sheet) => [biomeId, sheet])
         .catch((error) => {
+          atlasPartCache.treePromises.delete(biomeId);
           console.warn(`Tree sheet load failed for ${biomeId}: ${fileName}`, error);
           return [biomeId, null];
         }));
@@ -640,6 +697,7 @@ function loadFoliageSheet(manifest = buildFullRegionAssetManifest()) {
         .then((canvas) => makeFoliageSheet(canvas, { rows: spec.rows, cols: spec.cols, fileName: spec.fileName }))
         .then((sheet) => [spec.id, sheet])
         .catch((error) => {
+          atlasPartCache.foliagePromises.delete(spec.id);
           console.warn(`Foliage sheet load failed for ${spec.id}: ${spec.fileName}`, error);
           return [spec.id, null];
         }));
@@ -692,6 +750,7 @@ function loadDecaySheets(manifest = buildFullRegionAssetManifest()) {
         ...renderConfig,
       }])
       .catch((error) => {
+        atlasPartCache.decayPromises.delete(sheetId);
         console.warn(`Decay sheet load failed: ${id} (${def.fileName})`, error);
         return [sheetId, null];
       });
@@ -721,7 +780,11 @@ function loadObjectSheets(manifest = buildFullRegionAssetManifest()) {
         continue;
       }
       if (!atlasPartCache.objectPromises.has(cacheKey)) {
-        atlasPartCache.objectPromises.set(cacheKey, loadObjectSheetConfig(config));
+        atlasPartCache.objectPromises.set(cacheKey, loadObjectSheetConfig(config).catch((error) => {
+          atlasPartCache.objectPromises.delete(cacheKey);
+          console.warn(`Object sheet load failed: ${config.fileName ?? config.frameFiles?.join(", ") ?? cacheKey}`, error);
+          return null;
+        }));
       }
       entries.push(
         atlasPartCache.objectPromises.get(cacheKey).then((sheet) => [type, biomeId, sheet, config]),
@@ -761,11 +824,7 @@ function loadObjectSheetConfig(config) {
       .then((frames) => makeObjectFrameSheet(frames, {
         animated: config.animated ?? false,
         normalizeAnimation: config.normalizeAnimation ?? true,
-      }))
-      .catch((error) => {
-        console.warn(`Object frame sequence load failed: ${config.frameFiles.join(", ")}`, error);
-        return null;
-      });
+      }));
   }
 
   const makeSheet = (canvas) => makeObjectSheet(canvas, config.rows, config.cols, {
@@ -786,11 +845,7 @@ function loadObjectSheetConfig(config) {
         ...(damaged ? { damaged } : {}),
         ...(destroyed ? { destroyed } : {}),
       },
-    }))
-    .catch((error) => {
-      console.warn(`Object sheet load failed: ${config.fileName}`, error);
-      return null;
-    });
+    }));
 }
 
 function objectSheetFileNames(config) {

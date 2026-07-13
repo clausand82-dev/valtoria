@@ -510,13 +510,22 @@ export const renderingMethods = {
     if (chunk.terrainLayer?.tileEdgeWallCacheKey === wallCacheKey) return chunk.terrainLayer;
     chunk.terrainLayer = null;
 
+    const buildStartedAt = performance.now();
+    const diagnostics = this.terrainLayerDiagnostics ??= {};
     const { originX, originY, width, height } = getTerrainLayerLayout(this.tileEdgeWallImage);
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext("2d");
 
-    const tiles = [...chunk.tiles].sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
+    let tiles = chunk.terrainDrawTiles;
+    if (!tiles) {
+      const orderStartedAt = performance.now();
+      tiles = [...chunk.tiles].sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
+      chunk.terrainDrawTiles = tiles;
+      diagnostics.tileOrderBuilds = (diagnostics.tileOrderBuilds ?? 0) + 1;
+      diagnostics.tileOrderMs = (diagnostics.tileOrderMs ?? 0) + (performance.now() - orderStartedAt);
+    }
     for (const tile of tiles) {
       const tx = tile.x - chunk.x;
       const ty = tile.y - chunk.y;
@@ -535,17 +544,24 @@ export const renderingMethods = {
     }
 
     if (TILE_EDGE_WALLS.enabled && this.tileEdgeWallImage && chunk.region) {
-      const wallEntries = [];
-      for (const tile of tiles) {
-        for (const side of getTileWallEdges(tile, chunk.region, TILE_EDGE_WALLS)) {
-          wallEntries.push({ tile, side });
+      let wallEntries = chunk.terrainWallEntries?.entries;
+      if (chunk.terrainWallEntries?.cacheKey !== wallCacheKey || !wallEntries) {
+        const orderStartedAt = performance.now();
+        wallEntries = [];
+        for (const tile of tiles) {
+          for (const side of getTileWallEdges(tile, chunk.region, TILE_EDGE_WALLS)) {
+            wallEntries.push({ tile, side });
+          }
         }
+        wallEntries.sort((a, b) => (
+          (a.tile.x + a.tile.y) - (b.tile.x + b.tile.y)
+          || a.tile.x - b.tile.x
+          || (TILE_EDGE_WALL_SIDE_PRIORITY.get(a.side) ?? 0) - (TILE_EDGE_WALL_SIDE_PRIORITY.get(b.side) ?? 0)
+        ));
+        chunk.terrainWallEntries = { cacheKey: wallCacheKey, entries: wallEntries };
+        diagnostics.wallOrderBuilds = (diagnostics.wallOrderBuilds ?? 0) + 1;
+        diagnostics.wallOrderMs = (diagnostics.wallOrderMs ?? 0) + (performance.now() - orderStartedAt);
       }
-      wallEntries.sort((a, b) => (
-        (a.tile.x + a.tile.y) - (b.tile.x + b.tile.y)
-        || a.tile.x - b.tile.x
-        || (TILE_EDGE_WALL_SIDE_PRIORITY.get(a.side) ?? 0) - (TILE_EDGE_WALL_SIDE_PRIORITY.get(b.side) ?? 0)
-      ));
 
       // Walls belong to the cached terrain pass, never object depth sorting.
       // This pass stays outside the region clip so vertical faces remain intact.
@@ -596,6 +612,9 @@ export const renderingMethods = {
     }
 
     chunk.terrainLayer = { canvas, originX, originY, width, height, tileEdgeWallCacheKey: wallCacheKey };
+    diagnostics.builds = (diagnostics.builds ?? 0) + 1;
+    diagnostics.buildMs = (diagnostics.buildMs ?? 0) + (performance.now() - buildStartedAt);
+    diagnostics.tilesDrawn = (diagnostics.tilesDrawn ?? 0) + tiles.length;
     this.markRenderDirty?.("terrain-layer");
     return chunk.terrainLayer;
   },
@@ -1085,11 +1104,19 @@ export const renderingMethods = {
   invalidateMinimapStatic(reason = "data-change") {
     this.minimapStaticRevision = (this.minimapStaticRevision ?? 0) + 1;
     this.minimapStaticRebuildReason = String(reason || "data-change");
+    this.minimapDiagnostics ??= { invalidationReasons: {} };
+    this.minimapDiagnostics.invalidationReasons ??= {};
+    const key = this.minimapStaticRebuildReason;
+    this.minimapDiagnostics.invalidationReasons[key] = (this.minimapDiagnostics.invalidationReasons[key] ?? 0) + 1;
   },
 
   invalidateMinimapFogOverlay(reason = "fog") {
     this.minimapFogRevision = (this.minimapFogRevision ?? 0) + 1;
     this.minimapFogRebuildReason = String(reason || "fog");
+    this.minimapDiagnostics ??= { invalidationReasons: {} };
+    this.minimapDiagnostics.invalidationReasons ??= {};
+    const key = this.minimapFogRebuildReason;
+    this.minimapDiagnostics.invalidationReasons[key] = (this.minimapDiagnostics.invalidationReasons[key] ?? 0) + 1;
   },
 
   minimapDynamicSignature(size, scale, includeLoot = true) {
@@ -1130,6 +1157,9 @@ export const renderingMethods = {
     // is the dynamic cadence, normally 5 FPS (200ms).
     const interval = this.minimapIntervalMs ?? 200;
     const emptyTimings = (reason) => {
+      this.minimapDiagnostics ??= {};
+      if (reason === "unchanged") this.minimapDiagnostics.skippedUnchanged = (this.minimapDiagnostics.skippedUnchanged ?? 0) + 1;
+      if (reason === "throttled") this.minimapDiagnostics.skippedThrottled = (this.minimapDiagnostics.skippedThrottled ?? 0) + 1;
       this.renderTimings = {
         ...(this.renderTimings ?? {}),
         minimapMs: performance.now() - startedAt,
@@ -1169,8 +1199,9 @@ export const renderingMethods = {
     const dynamicSignature = this.minimapDynamicSignature(size, scale, !budgetBackoff);
     const viewChanged = state.lastViewSignature !== viewSignature;
     const markersChanged = state.lastDynamicSignature !== dynamicSignature;
+    const fogChanged = state.lastFogRevision !== (this.minimapFogRevision ?? 0);
 
-    if (!needsStaticRebuild && !viewChanged && !markersChanged) {
+    if (!needsStaticRebuild && !viewChanged && !markersChanged && !fogChanged) {
       this.minimapCanvasStates.set(canvas, state);
       emptyTimings("unchanged");
       return false;
@@ -1219,6 +1250,8 @@ export const renderingMethods = {
       state.staticRevision = this.minimapStaticRevision ?? 0;
       rebuildReason = anchorDrifted && hadStaticCanvas ? "map-window" : (this.minimapStaticRebuildReason ?? "data-change");
       staticMs = performance.now() - staticStartedAt;
+      this.minimapDiagnostics ??= {};
+      this.minimapDiagnostics.staticRebuilds = (this.minimapDiagnostics.staticRebuilds ?? 0) + 1;
     }
 
     const separateDynamicLayer = dynamicCanvas && dynamicCanvas !== canvas;
@@ -1248,6 +1281,8 @@ export const renderingMethods = {
     const fogStartedAt = performance.now();
     this.drawMinimapFog(markerCtx, center, scale, this.player);
     fogOverlayMs += performance.now() - fogStartedAt;
+    this.minimapDiagnostics ??= {};
+    this.minimapDiagnostics.fogRenders = (this.minimapDiagnostics.fogRenders ?? 0) + 1;
     const markerStartedAt = performance.now();
     for (const monster of this.monsters?.values?.() ?? []) {
       if (monster.dead || !this.isPointVisible(monster)) continue;
@@ -1275,6 +1310,7 @@ export const renderingMethods = {
     markerCtx.fill();
     const dynamicMarkersMs = performance.now() - markerStartedAt;
     const dynamicMs = performance.now() - dynamicStartedAt;
+    this.minimapDiagnostics.dynamicRenders = (this.minimapDiagnostics.dynamicRenders ?? 0) + 1;
     const totalDrawMs = performance.now() - totalDrawStartedAt;
     const totalMs = performance.now() - startedAt;
     if (totalMs > 6) state.slowUntil = now + 3000;

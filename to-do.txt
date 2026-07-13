@@ -10,6 +10,7 @@ Små rettelse observeret igennem spil test:
 - en setting i expedition mode
 - en genvejs tast til mute
 - mulighed for at gå tilbage til start menu
+- en reset sound i indstillinger
 
 
 

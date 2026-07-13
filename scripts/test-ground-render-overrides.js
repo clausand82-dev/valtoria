@@ -172,18 +172,16 @@ const bankBattle = buildCityMobBattleRegion(bankProfile, {
 });
 const bankRegion = createRegion(2, 456, null, bankBattle);
 const bankTileset = bankRegion.mapRegion.tileset[0];
-assert.equal(bankTileset.lockedVariant, 0);
+// The live bank-vault profile intentionally uses the standard randomized tile
+// treatment rather than the old fixed first cell.
+assert.equal(bankTileset.lockedVariant, null);
 assert.deepEqual({
   sourceInset: bankTileset.sourceInset,
   edgeFeather: bankTileset.edgeFeather,
+  textureAlpha: bankTileset.textureAlpha,
   visualScale: bankTileset.visualScale,
   baseAlpha: bankTileset.baseAlpha,
-}, {
-  sourceInset: 0,
-  edgeFeather: 0,
-  visualScale: 1,
-  baseAlpha: 0,
-});
+}, DEFAULT_CUSTOM_GROUND_RENDER);
 
 console.log("[ground-render-overrides] OK", {
   legacyDefaults: true,
