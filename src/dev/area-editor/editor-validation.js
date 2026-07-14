@@ -4,10 +4,18 @@ import { MONSTER_DEFS } from "../../game/config/monster-config.js";
 import { QUEST_NPCS } from "../../game/config/npc-config.js";
 import { validatePrefab } from "../../game/world/prefabs/prefab-validation.js";
 import { editorDocumentToRuntimePrefab } from "./prefab-document-adapter.js";
+import { validateAreaBlueprint } from "../../game/world/blueprints/blueprint-validation.js";
+import { serializeAreaBlueprint } from "../../game/world/blueprints/blueprint-normalization.js";
 
 export const EDITOR_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 export function validateEditorDocument(document, existingIds = [], previousId = null) {
+  if (document?.documentType === "blueprint") {
+    const result = validateAreaBlueprint(serializeAreaBlueprint(document));
+    const errors = result.errors.map((message) => ({ severity: "error", message }));
+    if (existingIds.includes(result.blueprint.id) && result.blueprint.id !== previousId) errors.push({ severity: "error", path: "id", message: `Blueprint ID "${result.blueprint.id}" already exists.` });
+    return { errors, warnings: result.warnings.map((message) => ({ severity: "warning", message })), canSave: errors.length === 0 };
+  }
   const runtime = editorDocumentToRuntimePrefab(document);
   const errors = validatePrefab(runtime, { knownIds: {
     objects: new Set(Object.keys(REGION_OBJECT_DEFS)), decals: new Set(Object.keys(DECAY_SET_DEFS)), monsters: new Set(Object.keys(MONSTER_DEFS)), npcs: new Set(Object.keys(QUEST_NPCS)),

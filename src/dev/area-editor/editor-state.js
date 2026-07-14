@@ -1,6 +1,7 @@
-import { EDITOR_LAYERS } from "./editor-document.js";
+import { editorLayersForDocument } from "./editor-document.js";
 
 export function createEditorUiState(document) {
+  const layers = editorLayersForDocument(document);
   return {
     tool: "select",
     activeLayer: "ground",
@@ -8,8 +9,8 @@ export function createEditorUiState(document) {
     zoom: Number(document?.editor?.zoom) || 1,
     panX: Number(document?.editor?.panX) || 0,
     panY: Number(document?.editor?.panY) || 0,
-    visibility: Object.fromEntries(EDITOR_LAYERS.map((layer) => [layer, !(document?.editor?.hiddenLayers ?? []).includes(layer)])),
-    locked: Object.fromEntries(EDITOR_LAYERS.map((layer) => [layer, (document?.editor?.lockedLayers ?? []).includes(layer)])),
+    visibility: Object.fromEntries(layers.map((layer) => [layer, !(document?.editor?.hiddenLayers ?? []).includes(layer)])),
+    locked: Object.fromEntries(layers.map((layer) => [layer, (document?.editor?.lockedLayers ?? []).includes(layer)])),
     selection: null,
     selectedCell: null,
     rectangleStart: null,
@@ -19,6 +20,7 @@ export function createEditorUiState(document) {
 }
 
 export function persistEditorView(document, ui) {
+  const layers = editorLayersForDocument(document);
   return {
     ...document,
     editor: {
@@ -27,8 +29,8 @@ export function persistEditorView(document, ui) {
       zoom: ui.zoom,
       panX: ui.panX,
       panY: ui.panY,
-      hiddenLayers: EDITOR_LAYERS.filter((layer) => ui.visibility[layer] === false),
-      lockedLayers: EDITOR_LAYERS.filter((layer) => ui.locked[layer] === true),
+      hiddenLayers: layers.filter((layer) => ui.visibility[layer] === false),
+      lockedLayers: layers.filter((layer) => ui.locked[layer] === true),
     },
   };
 }

@@ -54,3 +54,4 @@
 .area-editor-doc-grid small { color: #82938f; }
 .area-editor-status, .area-editor-errors { border: 1px solid #69582d; padding: 10px; background: #292414; color: #efd080; }
 @media (max-width: 1100px) { .area-editor-layout { grid-template-columns: 210px minmax(360px, 1fr) 270px; } .area-editor-catalog { grid-template-columns: repeat(2, 1fr); } }
+.area-editor-frame-preview { display: block; width: 52px; height: 52px; margin: 0 auto; background-repeat: no-repeat; background-color: #182124; image-rendering: auto; border-radius: 4px; }

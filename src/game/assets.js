@@ -17,6 +17,7 @@ import { REGION_OBJECT_DECORATORS } from "./config/region-object-decorator-confi
 import { CITY_MOB_BATTLE_PROFILES } from "./config/city-mobs-battle-config.js";
 import { MAP_REGION_SETS } from "./config/map-region-config.js";
 import { MAP_PREFABS } from "./config/map-prefab-config.js";
+import { AREA_BLUEPRINTS } from "./config/area-blueprint-config.js";
 import { normalizePrefabContent } from "./world/map-prefab-placement.js";
 import { collectPrefabGroundSpecs } from "./world/prefabs/prefab-ground-overrides.js";
 import { MONSTER_STATS, MONSTER_SHEETS, monsterSpriteId } from "./config/monster-config.js";
@@ -302,10 +303,11 @@ export function buildRegionAssetManifest(input) {
   for (const tileset of tilesets) groundSpecs.push(customGroundSpec(tileset.sheetId, tileset.fileName, tileset));
   if (!groundSpecs.length && GROUND_SHEETS.mainland) groundSpecs.push(groundSpecFromConfig("mainland", GROUND_SHEETS.mainland));
 
+  const blueprintDefs = blueprintsForRegionConfig(regionConfig);
   const waterSpecs = normalizeRegionWaterSets(regionConfig).map((entry) => ({
     sheetId: entry.sheetId,
     fileName: entry.fileName,
-  }));
+  })).concat(blueprintDefs.flatMap((blueprint) => (blueprint.water?.palette ?? []).filter(Boolean).map((entry) => ({ sheetId: entry.sheetId ?? `water-custom:${entry.fileName}`, fileName: entry.fileName }))));
 
   const foliageSets = normalizeRegionFoliageSets(regionConfig);
   const directFoliageSpecs = (regionConfig.foliage ?? [])
@@ -317,7 +319,7 @@ export function buildRegionAssetManifest(input) {
       rows: entry.rows,
       cols: entry.cols,
     }));
-  const prefabDefs = prefabsForRegionConfig(regionConfig);
+  const prefabDefs = [...prefabsForRegionConfig(regionConfig), ...blueprintDefs];
   groundSpecs.push(...collectPrefabGroundSpecs(prefabDefs).map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry)));
   const prefabFoliageIds = new Set();
   const prefabFoliageSpecs = new Map();
@@ -411,7 +413,7 @@ export function buildAnimationAssetManifest(input) {
     const base = MONSTER_STATS[type];
     if (base?.sprite) monsterIds.add(base.sprite);
   }
-  for (const prefab of prefabsForRegionConfig(regionConfig)) {
+  for (const prefab of [...prefabsForRegionConfig(regionConfig), ...blueprintsForRegionConfig(regionConfig)]) {
     const content = normalizePrefabContent(prefab);
     for (const item of content.monsters ?? []) {
       const type = item?.type ?? item?.typeName;
@@ -437,6 +439,10 @@ function prefabsForRegionConfig(regionConfig) {
   return pool
     .map((entry) => MAP_PREFABS[entry?.id])
     .filter(Boolean);
+}
+
+function blueprintsForRegionConfig(regionConfig) {
+  return (Array.isArray(regionConfig?.blueprints) ? regionConfig.blueprints : []).map((entry) => AREA_BLUEPRINTS[entry?.id]).filter(Boolean);
 }
 
 function loadHeroAnimationSheet() {

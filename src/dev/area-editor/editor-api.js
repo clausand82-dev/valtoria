@@ -1,6 +1,7 @@
 import { HANDWRITTEN_MAP_PREFABS } from "../../game/config/map-prefab-config.js";
 
 const API_ROOT = "/__valtoria-dev/area-editor/prefabs";
+const BLUEPRINT_API_ROOT = "/__valtoria-dev/area-editor/blueprints";
 
 async function parseResponse(response) {
   const payload = await response.json().catch(() => ({}));
@@ -9,9 +10,15 @@ async function parseResponse(response) {
 }
 
 export async function listEditorPrefabs() {
-  const payload = await parseResponse(await fetch(API_ROOT, { headers: { Accept: "application/json" } }));
-  return { ...payload, handwritten: Object.values(HANDWRITTEN_MAP_PREFABS) };
+  const [payload, blueprints] = await Promise.all([parseResponse(await fetch(API_ROOT, { headers: { Accept: "application/json" } })), parseResponse(await fetch(BLUEPRINT_API_ROOT, { headers: { Accept: "application/json" } }))]);
+  return { ...payload, handwritten: Object.values(HANDWRITTEN_MAP_PREFABS), blueprints: blueprints.generated, invalidBlueprints: blueprints.invalid };
 }
+
+export async function saveEditorBlueprint(document, previousId = null) {
+  return parseResponse(await fetch(BLUEPRINT_API_ROOT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document, previousId }) }));
+}
+
+export async function deleteEditorBlueprint(id) { return parseResponse(await fetch(`${BLUEPRINT_API_ROOT}/${encodeURIComponent(id)}`, { method: "DELETE" })); }
 
 export async function saveEditorPrefab(document, previousId = null) {
   return parseResponse(await fetch(API_ROOT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ document, previousId }) }));

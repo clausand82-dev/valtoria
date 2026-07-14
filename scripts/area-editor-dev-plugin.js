@@ -7,9 +7,13 @@ import { MONSTER_DEFS } from "../src/game/config/monster-config.js";
 import { QUEST_NPCS } from "../src/game/config/npc-config.js";
 import { validatePrefab } from "../src/game/world/prefabs/prefab-validation.js";
 import { serializeEditorDocument } from "../src/dev/area-editor/editor-document.js";
+import { serializeAreaBlueprint } from "../src/game/world/blueprints/blueprint-normalization.js";
+import { validateAreaBlueprint } from "../src/game/world/blueprints/blueprint-validation.js";
 
 export const AREA_EDITOR_API_ROOT = "/__valtoria-dev/area-editor/prefabs";
+export const AREA_EDITOR_BLUEPRINT_API_ROOT = "/__valtoria-dev/area-editor/blueprints";
 export const GENERATED_PREFAB_DIRECTORY = "src/game/config/generated-prefabs";
+export const GENERATED_BLUEPRINT_DIRECTORY = "src/game/config/generated-blueprints";
 export const EDITOR_PREFAB_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
 const KNOWN_IDS = {
@@ -40,6 +44,13 @@ export function buildGeneratedPrefabIndex(ids) {
   return `${imports}${imports ? "\n\n" : ""}// Editor-managed prefab registry. Registry keys must exactly match prefab IDs.\nexport const GENERATED_MAP_PREFABS = {\n${entries}${entries ? "\n" : ""}};\n`;
 }
 
+export function buildGeneratedBlueprintIndex(ids) {
+  const sorted = [...new Set(ids.map(sanitizeEditorPrefabId))].sort();
+  const imports = sorted.map((id) => `import ${id} from "./${id}.js";`).join("\n");
+  const entries = sorted.map((id) => `  ${id},`).join("\n");
+  return `${imports}${imports ? "\n\n" : ""}// Editor-managed blueprint registry. Registry keys must exactly match blueprint IDs.\nexport const GENERATED_AREA_BLUEPRINTS = {\n${entries}${entries ? "\n" : ""}};\n`;
+}
+
 export function handwrittenPrefabIdsFromSource(source) {
   const ids = new Set();
   const pattern = /^\s{2}([a-zA-Z][a-zA-Z0-9_]*):\s*\{\r?\n\s{4}id:\s*["']([^"']+)["']/gm;
@@ -59,6 +70,37 @@ export function validateGeneratedDocument(input) {
   });
   if (errors.length) throw new Error(errors.join("\n"));
   return document;
+}
+
+export function validateGeneratedBlueprint(input) {
+  const document = serializeAreaBlueprint(input);
+  const id = sanitizeEditorPrefabId(document.id);
+  if (document.editor?.managed !== true) throw new Error("Generated blueprint must have editor.managed set to true.");
+  const result = validateAreaBlueprint(document, { knownIds: KNOWN_IDS });
+  if (!result.valid) throw new Error(result.errors.join("\n"));
+  return result.blueprint;
+}
+
+function loopbackAddress(value) {
+  const address = String(value ?? "").toLowerCase().split("%")[0];
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+export function validateAreaEditorLocalRequest(request) {
+  const hostHeader = String(request?.headers?.host ?? "").trim();
+  let host;
+  try { host = new URL(`http://${hostHeader}`); } catch { throw Object.assign(new Error("Area-editor API requires a valid local Host header."), { statusCode: 403, code: "LOCAL_REQUEST_REQUIRED" }); }
+  if (!["localhost", "127.0.0.1", "[::1]", "::1"].includes(host.hostname.toLowerCase())) throw Object.assign(new Error("Area-editor API is available only through localhost or a loopback address."), { statusCode: 403, code: "LOCAL_REQUEST_REQUIRED" });
+  const remoteAddress = request?.socket?.remoteAddress;
+  if (remoteAddress && !loopbackAddress(remoteAddress)) throw Object.assign(new Error("Area-editor API rejected a nonlocal client connection."), { statusCode: 403, code: "LOCAL_REQUEST_REQUIRED" });
+  const originHeader = String(request?.headers?.origin ?? "").trim();
+  if (originHeader) {
+    let origin;
+    try { origin = new URL(originHeader); } catch { throw Object.assign(new Error("Area-editor API rejected an invalid Origin header."), { statusCode: 403, code: "LOCAL_ORIGIN_REQUIRED" }); }
+    const originHost = origin.host.toLowerCase();
+    if (!["http:", "https:"].includes(origin.protocol) || originHost !== hostHeader.toLowerCase() || !["localhost", "127.0.0.1", "[::1]", "::1"].includes(origin.hostname.toLowerCase())) throw Object.assign(new Error("Area-editor API requires a same-origin local Vite request."), { statusCode: 403, code: "LOCAL_ORIGIN_REQUIRED" });
+  }
+  return true;
 }
 
 async function atomicWrite(filePath, contents) {
@@ -115,53 +157,62 @@ function sendJson(response, status, payload) {
 }
 
 function structuredError(error) {
-  return { error: { code: "AREA_EDITOR_ERROR", message: error instanceof Error ? error.message : String(error) } };
+  return { error: { code: error?.code ?? "AREA_EDITOR_ERROR", message: error instanceof Error ? error.message : String(error) } };
 }
 
 export function areaEditorDevPlugin() {
   let directory;
+  let blueprintDirectory;
   let handwrittenConfigPath;
   return {
     name: "valtoria-area-editor-dev-api",
     apply: "serve",
     configResolved(config) {
       directory = path.resolve(config.root, GENERATED_PREFAB_DIRECTORY);
+      blueprintDirectory = path.resolve(config.root, GENERATED_BLUEPRINT_DIRECTORY);
       handwrittenConfigPath = path.resolve(config.root, "src/game/config/map-prefab-config.js");
     },
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const rawUrl = String(request.url ?? "");
-        if (!rawUrl.startsWith(AREA_EDITOR_API_ROOT)) return next();
+        const isPrefabRequest = rawUrl.startsWith(AREA_EDITOR_API_ROOT);
+        const isBlueprintRequest = rawUrl.startsWith(AREA_EDITOR_BLUEPRINT_API_ROOT);
+        if (!isPrefabRequest && !isBlueprintRequest) return next();
         try {
-          await fs.mkdir(directory, { recursive: true });
+          validateAreaEditorLocalRequest(request);
+          const activeDirectory = isBlueprintRequest ? blueprintDirectory : directory;
+          const apiRoot = isBlueprintRequest ? AREA_EDITOR_BLUEPRINT_API_ROOT : AREA_EDITOR_API_ROOT;
+          await fs.mkdir(activeDirectory, { recursive: true });
           const parsedUrl = new URL(rawUrl, "http://127.0.0.1");
-          const suffix = parsedUrl.pathname.slice(AREA_EDITOR_API_ROOT.length);
+          const suffix = parsedUrl.pathname.slice(apiRoot.length);
           if (/%(?:2e|2f|5c)/i.test(rawUrl)) throw new Error("Encoded path traversal is not allowed.");
 
           if (request.method === "GET" && suffix === "") {
-            const generated = await readGeneratedDocuments(directory);
+            const generated = isBlueprintRequest
+              ? await readGeneratedDocumentsWith(activeDirectory, validateGeneratedBlueprint, "blueprint")
+              : await readGeneratedDocuments(directory);
             return sendJson(response, 200, { generated: generated.documents, invalid: generated.invalid });
           }
 
           if (request.method === "POST" && suffix === "") {
             const body = await readJsonBody(request);
-            const document = validateGeneratedDocument(body.document);
+            const document = isBlueprintRequest ? validateGeneratedBlueprint(body.document) : validateGeneratedDocument(body.document);
             const id = sanitizeEditorPrefabId(document.id);
             const previousId = body.previousId ? sanitizeEditorPrefabId(body.previousId) : null;
-            const handwrittenIds = handwrittenPrefabIdsFromSource(await fs.readFile(handwrittenConfigPath, "utf8"));
+            const handwrittenIds = isBlueprintRequest ? new Set() : handwrittenPrefabIdsFromSource(await fs.readFile(handwrittenConfigPath, "utf8"));
             if (handwrittenIds.has(id)) throw new Error(`Prefab ID "${id}" belongs to a handwritten prefab and cannot be overwritten.`);
-            const current = await readGeneratedDocuments(directory);
+            const current = isBlueprintRequest ? await readGeneratedDocumentsWith(activeDirectory, validateGeneratedBlueprint, "blueprint") : await readGeneratedDocuments(directory);
             if (current.invalid.length) throw new Error(`Generated prefab registry contains invalid files: ${current.invalid.map((entry) => entry.id).join(", ")}`);
             if (current.documents.some((entry) => entry.id === id) && previousId !== id) throw new Error(`Generated prefab ID "${id}" already exists.`);
 
-            await atomicWrite(path.join(directory, `${id}.json`), deterministicJson(document));
-            await atomicWrite(path.join(directory, `${id}.js`), serializeGeneratedPrefabModule(document));
+            await atomicWrite(path.join(activeDirectory, `${id}.json`), deterministicJson(document));
+            await atomicWrite(path.join(activeDirectory, `${id}.js`), serializeGeneratedPrefabModule(document).replace("local Valtoria area editor", `local Valtoria area editor (${isBlueprintRequest ? "blueprint" : "prefab"})`));
+            const ids = (await generatedIds(activeDirectory)).filter((entryId) => !previousId || previousId === id || entryId !== previousId);
+            await atomicWrite(path.join(activeDirectory, "index.js"), isBlueprintRequest ? buildGeneratedBlueprintIndex(ids) : buildGeneratedPrefabIndex(ids));
             if (previousId && previousId !== id) {
-              await fs.rm(path.join(directory, `${previousId}.json`), { force: true });
-              await fs.rm(path.join(directory, `${previousId}.js`), { force: true });
+              await fs.rm(path.join(activeDirectory, `${previousId}.json`), { force: true });
+              await fs.rm(path.join(activeDirectory, `${previousId}.js`), { force: true });
             }
-            const ids = await generatedIds(directory);
-            await atomicWrite(path.join(directory, "index.js"), buildGeneratedPrefabIndex(ids));
             return sendJson(response, 200, { ok: true, id, document });
           }
 
@@ -169,17 +220,27 @@ export function areaEditorDevPlugin() {
             const rawId = suffix.slice(1);
             if (!rawId || rawId.includes("/") || rawId.includes("\\") || rawId.includes("..")) throw new Error("Invalid prefab deletion path.");
             const id = sanitizeEditorPrefabId(decodeURIComponent(rawId));
-            await fs.rm(path.join(directory, `${id}.json`), { force: true });
-            await fs.rm(path.join(directory, `${id}.js`), { force: true });
-            await atomicWrite(path.join(directory, "index.js"), buildGeneratedPrefabIndex(await generatedIds(directory)));
+            const remainingIds = (await generatedIds(activeDirectory)).filter((entryId) => entryId !== id);
+            await atomicWrite(path.join(activeDirectory, "index.js"), isBlueprintRequest ? buildGeneratedBlueprintIndex(remainingIds) : buildGeneratedPrefabIndex(remainingIds));
+            await fs.rm(path.join(activeDirectory, `${id}.json`), { force: true });
+            await fs.rm(path.join(activeDirectory, `${id}.js`), { force: true });
             return sendJson(response, 200, { ok: true, id });
           }
 
           return sendJson(response, 405, { error: { code: "METHOD_NOT_ALLOWED", message: "Unsupported area-editor API operation." } });
         } catch (error) {
-          return sendJson(response, 400, structuredError(error));
+          return sendJson(response, error?.statusCode ?? 400, structuredError(error));
         }
       });
     },
   };
+}
+
+async function readGeneratedDocumentsWith(directory, validator, kind) {
+  const documents = []; const invalid = [];
+  for (const id of await generatedIds(directory)) {
+    try { const document = validator(JSON.parse(await fs.readFile(path.join(directory, `${id}.json`), "utf8"))); if (document.id !== id) throw new Error(`Registry key/file name "${id}" must equal ${kind} id "${document.id}".`); documents.push(document); }
+    catch (error) { invalid.push({ id, message: error.message }); }
+  }
+  return { documents, invalid };
 }

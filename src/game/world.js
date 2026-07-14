@@ -40,6 +40,8 @@ import {
 import { applyPrefabGroundOverride, prefabGroundOverrideAt } from "./world/prefabs/prefab-ground-overrides.js";
 import { resolvePrefabMonsterLevel } from "./world/prefabs/prefab-normalization.js";
 import { resolveAttachedObjectParticleConfigs } from "./objects/object-attached-effects.js";
+import { resolveRegionBlueprint } from "./world/blueprints/blueprint-resolver.js";
+import { applyBlueprintToRegion } from "./world/blueprints/blueprint-region-builder.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
@@ -623,7 +625,7 @@ function spawnCount(chunk, key) {
   return Math.max(0, Math.round(Number(chunk.region?.mapRegion?.spawnCounts?.[key]) || 0));
 }
 
-export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
+export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
   const normalizedTileset = normalizeRegionTileset(regionConfig?.tileset);
   const normalizedTilesetArray = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : null);
   const normalizedWaterSets = normalizeRegionWaterSets(regionConfig ?? {});
@@ -893,6 +895,18 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
   return region;
 }
 
+export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
+  const conditionContext = regionConfig?.__conditionContext ?? {};
+  const selection = resolveRegionBlueprint(regionConfig, conditionContext.worldState, conditionContext);
+  const region = createProceduralRegion(regionIndex, seed, biomeId, regionConfig);
+  region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
+  if (!selection.blueprint) {
+    if (selection.diagnostics.length && (conditionContext.development === true || import.meta.env?.DEV)) console.warn(`[area-blueprint] ${selection.diagnostics[0]}`);
+    return region;
+  }
+  return applyBlueprintToRegion(region, selection.blueprint);
+}
+
 export function isRegionTilePlayable(region, x, y) {
   if (!region) return true;
   return region.mask.has(`${Math.floor(x)},${Math.floor(y)}`);
@@ -900,6 +914,8 @@ export function isRegionTilePlayable(region, x, y) {
 
 export function isRegionWaterTile(region, x, y) {
   if (!region) return false;
+  const override = region.blueprintWaterOverrides?.get(`${Math.floor(x)},${Math.floor(y)}`);
+  if (override) return true;
   if (Math.max(0, Number(region.mapRegion?.spawnCounts?.water) || 0) <= 0) return false;
   if (!(region.mapRegion?.waterSets?.length)) return false;
   const tileX = Math.floor(x);
@@ -929,6 +945,8 @@ function pickWaterVariant(set, tileX, tileY, salt) {
 }
 
 function regionWaterTile(region, tileX, tileY) {
+  const blueprintWater = region?.blueprintWaterOverrides?.get(`${tileX},${tileY}`);
+  if (blueprintWater) return blueprintWater;
   const patchCount = Math.max(0, Number(region?.mapRegion?.spawnCounts?.water) || 0);
   if (!region || patchCount <= 0 || !(region.mapRegion?.waterSets?.length)) return null;
   if (isReservedTile(region, tileX, tileY)) return null;
@@ -1026,6 +1044,7 @@ export function createChunk(cx, cy, region = null) {
 
   if (!chunk.tiles.length) return chunk;
   addPrefabContent(chunk);
+  if (region?.blueprint) return chunk;
   addObjects(chunk, safeChunk);
   addFoliage(chunk, safeChunk);
   addDecals(chunk, safeChunk);
@@ -1057,6 +1076,14 @@ function regionEdgeMask(region, x, y) {
 
 function buildChunkWaterTiles(region, cx, cy) {
   const waterTiles = new Map();
+  if (region?.blueprintWaterOverrides) {
+    const left = cx * CHUNK_SIZE; const right = left + CHUNK_SIZE - 1;
+    const top = cy * CHUNK_SIZE; const bottom = top + CHUNK_SIZE - 1;
+    for (let y = top; y <= bottom; y += 1) for (let x = left; x <= right; x += 1) {
+      const water = region.blueprintWaterOverrides.get(`${x},${y}`); if (water) waterTiles.set(`${x},${y}`, water);
+    }
+    return waterTiles;
+  }
   const waterCount = Math.max(0, Number(region?.mapRegion?.spawnCounts?.water) || 0);
   if (!region || waterCount <= 0 || !(region.mapRegion?.waterSets?.length)) return waterTiles;
 

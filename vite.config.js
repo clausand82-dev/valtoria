@@ -9,6 +9,9 @@ export default defineConfig(async ({ command, isPreview }) => {
   }
   return {
     plugins,
+    // The area-editor middleware performs the stricter Host/Origin/remote-loopback
+    // check itself so rejected API calls receive a structured JSON 403.
+    server: { allowedHosts: true },
     publicDir: "public", // Ensure public directory is correctly set
     build: {
       assetsDir: "assets", // Ensure assets are served from the correct directory

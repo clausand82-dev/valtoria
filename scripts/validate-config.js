@@ -1,5 +1,6 @@
 import { ACTION_CONFIG } from "../src/game/config/action-config.js";
 import { MAP_PREFABS } from "../src/game/config/map-prefab-config.js";
+import { AREA_BLUEPRINTS } from "../src/game/config/area-blueprint-config.js";
 import { MAP_REGION_SETS } from "../src/game/config/map-region-config.js";
 import { SUBREGION_CONFIG } from "../src/game/config/subregion-config.js";
 import { QUEST_DEFS, QUEST_ITEM_DEFS } from "../src/game/config/quest-config.js";
@@ -17,6 +18,7 @@ import { validateBeastLocalization } from "../src/i18n/beast/monster-localizatio
 import { hasWorldConditionFields, stripWorldConditionFields } from "../src/game/world-state.js";
 import { normalizePrefabContent } from "../src/game/world/prefabs/prefab-normalization.js";
 import { validatePrefab, validatePrefabRegistry } from "../src/game/world/prefabs/prefab-validation.js";
+import { validateAreaBlueprint } from "../src/game/world/blueprints/blueprint-validation.js";
 import fs from "node:fs";
 
 const RESERVED_ACTION_TYPES = new Set(["questStart", "questAdvance", "summon"]);
@@ -262,12 +264,29 @@ function validateGeneratedPrefabFiles(knownIds) {
   }
 }
 
+function validateGeneratedBlueprintFiles(knownIds) {
+  const directory = new URL("../src/game/config/generated-blueprints/", import.meta.url);
+  const files = fs.readdirSync(directory, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name);
+  const jsonIds = new Set(files.filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -5)));
+  for (const id of jsonIds) {
+    const owner = `generated blueprint file "${id}.json"`; let document;
+    try { document = JSON.parse(fs.readFileSync(new URL(`${id}.json`, directory), "utf8")); } catch (error) { addError(`${owner} cannot be loaded: ${error.message}`); continue; }
+    if (document?.id !== id) addError(`${owner} must have id "${id}" so its registry key matches`);
+    if (document?.editor?.managed !== true) addError(`${owner} must set editor.managed to true`);
+    validateAreaBlueprint(document, { knownIds }).errors.forEach(addError);
+    if (!files.includes(`${id}.js`)) addError(`${owner} is missing its generated runtime module`);
+    if (!Object.prototype.hasOwnProperty.call(AREA_BLUEPRINTS, id)) addError(`${owner} is missing from GENERATED_AREA_BLUEPRINTS`);
+  }
+  for (const name of files.filter((entry) => entry.endsWith(".js") && entry !== "index.js")) if (!jsonIds.has(name.slice(0, -3))) addError(`generated blueprint module "${name}" is missing its JSON document`);
+}
+
 function main() {
   validateBeastLocalization({ warn: addWarning });
   const actionIds = checkDuplicateIds("action", ACTION_CONFIG);
   const questIds = checkDuplicateIds("quest", QUEST_DEFS);
   const npcIds = checkDuplicateIds("NPC", QUEST_NPCS);
   const prefabIds = checkDuplicateIds("prefab", MAP_PREFABS);
+  const blueprintIds = checkDuplicateIds("blueprint", AREA_BLUEPRINTS);
   const subregionIds = checkDuplicateIds("subregion", SUBREGION_CONFIG);
   const regionIds = new Map();
   const resourceIds = new Set(Object.keys(RESOURCE_DEFS ?? {}));
@@ -294,6 +313,7 @@ function main() {
     monsters: new Set(Object.keys(MONSTER_DEFS ?? {})),
     npcs: new Set(Object.keys(QUEST_NPCS ?? {})),
   });
+  validateGeneratedBlueprintFiles({ objects: new Set(Object.keys(REGION_OBJECT_DEFS ?? {})), decals: new Set(Object.keys(DECAY_SET_DEFS ?? {})), monsters: new Set(Object.keys(MONSTER_DEFS ?? {})), npcs: new Set(Object.keys(QUEST_NPCS ?? {})) });
 
   for (const [tableId, entries] of Object.entries(LOOT_TABLES ?? {})) {
     if (!Array.isArray(entries)) addError(`lootTable "${tableId}" must be an array`);
@@ -308,6 +328,12 @@ function main() {
     else if (regionIds.has(id)) addError(`duplicate region id "${id}" in ${regionIds.get(id)} and ${setId}[${index}]`);
     else regionIds.set(id, `${setId}[${index}]`);
     validateRegionAudio(region, regionOwner);
+    if (region.blueprints !== undefined && !Array.isArray(region.blueprints)) addError(`${regionOwner}.blueprints must be an array`);
+    if (Array.isArray(region.blueprints)) region.blueprints.forEach((candidate, candidateIndex) => {
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate) || !candidate.id) addError(`${regionOwner}.blueprints[${candidateIndex}] must reference a blueprint id`);
+      else if (!blueprintIds.has(String(candidate.id))) addError(`${regionOwner}.blueprints[${candidateIndex}] references missing blueprint "${candidate.id}"`);
+      if (candidateIndex < region.blueprints.length - 1 && !hasWorldConditionFields(candidate)) addWarning(`${regionOwner}.blueprints[${candidateIndex}] is unconditional, so later blueprint candidates are unreachable`);
+    });
 
     for (const [listKey, entries] of Object.entries({ objects: region.objects, foliage: region.foliageSet ?? region.foliageSets ?? region.foliage, npcs: region.npcs })) {
       if (!Array.isArray(entries)) continue;
@@ -408,7 +434,7 @@ function main() {
     if (!usedLootTableIds.has(tableId)) addWarning(`lootTable "${tableId}" is not referenced by config or known runtime defaults`);
   }
 
-  const summary = `${actionIds.size} actions, ${questIds.size} quests, ${npcIds.size} npcs, ${regionIds.size} regions, ${prefabIds.size} prefabs, ${subregionIds.size} subregions, ${lootTableIds.size} lootTables checked`;
+  const summary = `${actionIds.size} actions, ${questIds.size} quests, ${npcIds.size} npcs, ${regionIds.size} regions, ${prefabIds.size} prefabs, ${blueprintIds.size} blueprints, ${subregionIds.size} subregions, ${lootTableIds.size} lootTables checked`;
   if (errors.length) {
     console.error(`[validate] FAILED: ${errors.length} errors, ${warnings.length} warnings; ${summary}`);
     process.exit(1);

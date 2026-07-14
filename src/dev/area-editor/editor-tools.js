@@ -10,6 +10,14 @@ export function ensureGroundPaletteEntry(document, asset) {
   return { document: next, paletteIndex: next.ground.palette.length - 1 };
 }
 
+function ensurePaletteEntry(document, layer, asset) {
+  if (layer === "ground") return ensureGroundPaletteEntry(document, asset);
+  const palette = document[layer]?.palette ?? []; const index = palette.findIndex((entry) => entry?.fileName === asset.fileName && Number(entry.variant) === Number(asset.variant));
+  if (index >= 0) return { document, paletteIndex: index };
+  const next = cloneEditorValue(document); next[layer] ??= { palette: [], rows: [] }; next[layer].palette.push({ fileName: asset.fileName, variant: Number(asset.variant) });
+  return { document: next, paletteIndex: next[layer].palette.length - 1 };
+}
+
 export function paintGroundCell(document, x, y, asset) {
   const ensured = ensureGroundPaletteEntry(document, asset);
   const next = cloneEditorValue(ensured.document);
@@ -78,4 +86,35 @@ export function duplicateEntity(document, selection) {
   const x = Math.min(document.w - 1, Number(entry.x) + 1);
   const y = Math.min(document.h - 1, Number(entry.y) + 1);
   return placeEntity(document, selection.layer, x, y, entry);
+}
+
+export function applyEditorBrushStroke(document, { layer, cells = [], mode = "paint", asset = null } = {}) {
+  let next = document; let selection = null;
+  const uniqueCells = [...new Map(cells.map((cell) => [`${cell.x},${cell.y}`, cell])).values()]
+    .filter((cell) => cell.x >= 0 && cell.y >= 0 && cell.x < document.w && cell.y < document.h);
+  for (const cell of uniqueCells) {
+    if (layer === "ground") next = mode === "erase" ? eraseGroundCell(next, cell.x, cell.y) : asset ? paintGroundCell(next, cell.x, cell.y, asset) : next;
+    else if (layer === "playableMask") { next = cloneEditorValue(next); next.playableMask.rows[cell.y][cell.x] = mode !== "erase"; }
+    else if (layer === "water") { next = cloneEditorValue(next); if (mode === "erase") next.water.rows[cell.y][cell.x] = null; else if (asset) { const ensured = ensurePaletteEntry(next, "water", asset); next = cloneEditorValue(ensured.document); next.water.rows[cell.y][cell.x] = ensured.paletteIndex; } }
+    else if (layer === "start") { next = cloneEditorValue(next); next.start = mode === "erase" ? null : { x: cell.x, y: cell.y }; selection = { layer: "start", index: 0 }; }
+    else if (layer === "exits") { next = cloneEditorValue(next); if (mode === "erase") next.exits = (next.exits ?? []).filter((entry) => Number(entry.x) !== cell.x || Number(entry.y) !== cell.y); else if (!(next.exits ?? []).some((entry) => Number(entry.x) === cell.x && Number(entry.y) === cell.y)) { next.exits = [...(next.exits ?? []), { id: next.exits?.length ? `exit_${next.exits.length + 1}` : "primary", x: cell.x, y: cell.y, primary: !(next.exits?.length) }]; selection = { layer: "exits", index: next.exits.length - 1 }; } }
+    else if (mode === "erase") {
+      const index = (next[layer] ?? []).map((entry, index) => ({ entry, index })).filter(({ entry }) => Number(entry.x) === cell.x && Number(entry.y) === cell.y).pop()?.index;
+      if (index !== undefined) next = deleteEntity(next, { layer, index });
+    } else if (asset?.template) {
+      const identity = asset.template.id ?? asset.template.decayId ?? asset.template.type ?? asset.template.npcId;
+      const exists = (next[layer] ?? []).some((entry) => Number(entry.x) === cell.x && Number(entry.y) === cell.y && (entry.id ?? entry.decayId ?? entry.type ?? entry.npcId) === identity);
+      if (!exists) { const result = placeEntity(next, layer, cell.x, cell.y, asset.template); next = result.document; selection = result.selection; }
+    }
+  }
+  return { document: next, selection, cells: uniqueCells };
+}
+
+export function fillEditorLayer(document, layer, start, asset = null) {
+  if (layer === "ground") return fillGround(document, start, asset);
+  if (!["playableMask", "water"].includes(layer)) return document;
+  const rows = layer === "playableMask" ? document.playableMask.rows : document.water.rows;
+  const target = rows[start.y][start.x] ?? null; const cells = []; const seen = new Set(); const queue = [start];
+  while (queue.length) { const cell = queue.shift(); const key = `${cell.x},${cell.y}`; if (seen.has(key) || cell.x < 0 || cell.y < 0 || cell.x >= document.w || cell.y >= document.h) continue; seen.add(key); if ((rows[cell.y][cell.x] ?? null) !== target) continue; cells.push(cell); queue.push({ x: cell.x + 1, y: cell.y }, { x: cell.x - 1, y: cell.y }, { x: cell.x, y: cell.y + 1 }, { x: cell.x, y: cell.y - 1 }); }
+  return applyEditorBrushStroke(document, { layer, cells, mode: "paint", asset }).document;
 }

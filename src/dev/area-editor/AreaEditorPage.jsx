@@ -1,20 +1,23 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocalization } from "../../i18n/index.js";
 import { PREFAB_CONTENT_LAYERS } from "../../game/world/prefabs/prefab-normalization.js";
-import { buildAreaEditorAssetCatalog, filterAssetCatalog } from "./asset-catalog.js";
-import { deleteEditorPrefab, downloadEditorDocument, listEditorPrefabs, readEditorJsonFile, saveEditorPrefab } from "./editor-api.js";
+import { assetFrameStyle, buildAreaEditorAssetCatalog, filterAssetCatalog } from "./asset-catalog.js";
+import { deleteEditorBlueprint, deleteEditorPrefab, downloadEditorDocument, listEditorPrefabs, readEditorJsonFile, saveEditorBlueprint, saveEditorPrefab } from "./editor-api.js";
 import { createEditorHistory, commitEditorHistory, redoEditorHistory, undoEditorHistory } from "./editor-history.js";
-import { createEditorDocument, cloneEditorValue, editorDocumentFingerprint, EDITOR_LAYERS, resizeEditorDocument, resizeImpact } from "./editor-document.js";
+import { createBlueprintEditorDocument, createEditorDocument, cloneEditorValue, editorDocumentFingerprint, editorLayersForDocument, resizeEditorDocument, resizeImpact } from "./editor-document.js";
 import { createEditorUiState, persistEditorView } from "./editor-state.js";
 import { isCellInBounds, pointerToGrid, gridToIsometric, gridToTopDown, ISO_TILE_H, ISO_TILE_W, TOP_TILE_SIZE } from "./editor-renderer.js";
 import { entitiesAtCell, cycleCellSelection } from "./editor-selection.js";
-import { deleteEntity, duplicateEntity, eraseGroundCell, fillGround, paintGroundCell, paintGroundRectangle, placeEntity, updateEntity } from "./editor-tools.js";
+import { applyEditorBrushStroke, deleteEntity, duplicateEntity, eraseGroundCell, fillEditorLayer, fillGround, paintGroundCell, paintGroundRectangle, placeEntity, updateEntity } from "./editor-tools.js";
 import { PREFAB_PROPERTY_SCHEMA, schemaForLayer } from "./property-schemas.js";
 import { editorDocumentToRuntimePrefab, importPrefabAsCopy, openGeneratedPrefab } from "./prefab-document-adapter.js";
 import { validateEditorDocument } from "./editor-validation.js";
+import { serializeAreaBlueprint } from "../../game/world/blueprints/blueprint-normalization.js";
+import { MAP_REGION_SETS } from "../../game/config/map-region-config.js";
+import { worldEntryAllowed } from "../../game/world-state.js";
 import "./area-editor.css";
 
-const LAYER_LABELS = { ground: "Ground", decals: "Decay / decals", foliage: "Foliage", objects: "Objects", monsters: "Monsters", npcs: "NPCs", chests: "Chests" };
+const LAYER_LABELS = { playableMask: "Playable mask", ground: "Ground", water: "Water", start: "Start position", exits: "Exit positions", decals: "Decay / decals", foliage: "Foliage", objects: "Objects", monsters: "Monsters", npcs: "NPCs", chests: "Chests" };
 const LAYER_COLORS = { decals: "#9f6f5f", foliage: "#5ea66f", objects: "#d49b56", monsters: "#c75c65", npcs: "#65a7d8", chests: "#e3c45f" };
 const TOOLS = ["select", "paint", "erase", "rectangle", "fill", "eyedropper", "move", "pan"];
 
@@ -27,6 +30,10 @@ function uniqueCopyId(base, ids) {
 }
 
 function countLayer(document, layer) {
+  if (layer === "playableMask") return document.playableMask?.rows?.flat().filter(Boolean).length ?? 0;
+  if (layer === "water") return document.water?.rows?.flat().filter((cell) => cell !== null && cell !== undefined).length ?? 0;
+  if (layer === "start") return document.start ? 1 : 0;
+  if (layer === "exits") return document.exits?.length ?? 0;
   if (layer !== "ground") return document[layer]?.length ?? 0;
   return document.ground?.rows?.reduce((sum, row) => sum + row.filter((cell) => cell !== null && cell !== undefined).length, 0) ?? 0;
 }
@@ -42,13 +49,14 @@ function PropertyField({ field, value, onChange }) {
   return <label>{field.label}<input type={field.type} min={field.min} max={field.max} step={field.step} value={fieldValue(value, field)} onChange={(event) => onChange(field.type === "number" ? Number(event.target.value) : event.target.value)} /></label>;
 }
 
-function DocumentBrowser({ data, onNew, onOpenGenerated, onPreviewHandwritten, onImport, onDuplicate, onDelete, onImportJson, onClose, status }) {
+function DocumentBrowser({ data, onNew, onNewBlueprint, onOpenGenerated, onOpenBlueprint, onPreviewHandwritten, onImport, onDuplicate, onDelete, onDeleteBlueprint, onImportJson, onClose, status }) {
   const { t } = useLocalization();
   const fileRef = useRef(null);
   return <main className="area-editor-home" data-testid="area-editor-home">
     <header><div><span className="area-editor-kicker">{t("areaEditor.devOnly")}</span><h1>{t("areaEditor.title")}</h1><p>{t("areaEditor.browserHelp")}</p></div><button type="button" onClick={onClose}>{t("areaEditor.returnSettings")}</button></header>
     <div className="area-editor-home-actions">
       <button type="button" onClick={onNew}>{t("areaEditor.newPrefab")}</button>
+      <button type="button" onClick={onNewBlueprint}>New full-area blueprint</button>
       <button type="button" onClick={() => fileRef.current?.click()}>{t("areaEditor.importJson")}</button>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={(event) => { const file = event.target.files?.[0]; if (file) onImportJson(file); event.target.value = ""; }} />
     </div>
@@ -58,13 +66,17 @@ function DocumentBrowser({ data, onNew, onOpenGenerated, onPreviewHandwritten, o
       {(data?.generated ?? []).map((document) => <article key={document.id}><div><strong>{document.label || document.id}</strong><code>{document.id}</code><small>{document.w}×{document.h} · schema {document.schemaVersion ?? 1} · editor-managed · valid</small></div><div><button type="button" onClick={() => onOpenGenerated(document)}>Open</button><button type="button" onClick={() => onDuplicate(document)}>Duplicate</button><button type="button" className="danger-action" onClick={() => onDelete(document)}>Delete</button></div></article>)}
       {!(data?.generated?.length) && <p>No editor-managed prefabs yet.</p>}
     </div></section>
+    <section><h2>Editor-managed full-area blueprints</h2><p>Blueprints replace physical region generation only when an ordered region candidate matches; otherwise procedural generation remains automatic.</p><div className="area-editor-doc-grid">
+      {(data?.blueprints ?? []).map((document) => <article key={document.id}><div><strong>{document.label || document.id}</strong><code>{document.id}</code><small>{document.w}×{document.h} · full-area blueprint · schema {document.schemaVersion ?? 1}</small></div><div><button type="button" onClick={() => onOpenBlueprint(document)}>Open</button><button type="button" onClick={() => onDuplicate(document)}>Duplicate</button><button type="button" className="danger-action" onClick={() => onDeleteBlueprint(document)}>Delete</button></div></article>)}
+      {!(data?.blueprints?.length) && <p>No editor-managed blueprints yet.</p>}
+    </div></section>
     <section><h2>{t("areaEditor.handwrittenPrefabs")}</h2><p>Handwritten prefabs are read-only. Import one to edit a canonical direct-array copy.</p><div className="area-editor-doc-grid">
       {(data?.handwritten ?? []).map((document) => <article key={document.id}><div><strong>{document.label || document.id}</strong><code>{document.id}</code><small>{document.w}×{document.h} · handwritten · read-only</small></div><div><button type="button" onClick={() => onPreviewHandwritten(document)}>Preview</button><button type="button" onClick={() => onImport(document)}>Import as copy</button></div></article>)}
     </div></section>
   </main>;
 }
 
-function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, onPanStart, onWheel }) {
+function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, onPanStart, onWheel, onStrokeStart, onStrokeMove, onStrokeEnd }) {
   const width = 1100;
   const height = 720;
   const originX = width / 2 + ui.panX;
@@ -85,16 +97,26 @@ function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, 
     callback(pointerToGrid(localX, localY, ui.view, conversionView), event);
   };
   const entities = PREFAB_CONTENT_LAYERS.flatMap((layer) => ui.visibility[layer] === false ? [] : (document[layer] ?? []).map((entry, index) => ({ layer, entry, index }))).sort((a, b) => (Number(a.entry.x) + Number(a.entry.y)) - (Number(b.entry.x) + Number(b.entry.y)) || PREFAB_CONTENT_LAYERS.indexOf(a.layer) - PREFAB_CONTENT_LAYERS.indexOf(b.layer));
-  return <svg className="area-editor-canvas" viewBox={`0 0 ${width} ${height}`} onPointerDown={(event) => handlePointer(event, (cell, original) => original.button === 1 || ui.tool === "pan" ? onPanStart(original) : onCell(cell))} onPointerMove={(event) => handlePointer(event, onHover)} onPointerLeave={() => onHover(null)} onWheel={onWheel} data-testid="area-editor-canvas">
+  return <svg className="area-editor-canvas" viewBox={`0 0 ${width} ${height}`} onPointerDown={(event) => handlePointer(event, (cell, original) => {
+    if (original.button === 1 || ui.tool === "pan") onPanStart(original);
+    else if (["paint", "erase"].includes(ui.tool)) { original.currentTarget.setPointerCapture?.(original.pointerId); onStrokeStart(cell); }
+    else onCell(cell);
+  })} onPointerMove={(event) => handlePointer(event, (cell) => { onHover(cell); if (event.buttons & 1) onStrokeMove(cell); })} onPointerUp={onStrokeEnd} onPointerCancel={onStrokeEnd} onPointerLeave={() => onHover(null)} onWheel={onWheel} data-testid="area-editor-canvas">
     <rect width={width} height={height} fill="#11171a" />
     {cells.map((cell) => {
       const pos = point(cell.x, cell.y);
       const overrideIndex = document.ground?.rows?.[cell.y]?.[cell.x];
+      const playable = document.documentType !== "blueprint" || document.playableMask?.rows?.[cell.y]?.[cell.x] === true;
+      const water = document.documentType === "blueprint" && document.water?.rows?.[cell.y]?.[cell.x] !== null && document.water?.rows?.[cell.y]?.[cell.x] !== undefined;
+      const groundEntry = document.ground?.palette?.[overrideIndex];
+      const groundAsset = groundEntry ? [...catalogByKey.values()].find((asset) => asset.layer === "ground" && asset.fileName === groundEntry.fileName && Number(asset.variant) === Number(groundEntry.variant)) : null;
       const selected = ui.selectedCell?.x === cell.x && ui.selectedCell?.y === cell.y;
       const hovered = hoverCell?.x === cell.x && hoverCell?.y === cell.y;
-      if (ui.view === "topdown") return <rect key={`${cell.x},${cell.y}`} x={pos.x} y={pos.y} width={tileW} height={tileH} fill={overrideIndex === null || overrideIndex === undefined ? "#1c2927" : `hsl(${(overrideIndex * 47) % 360} 35% 32%)`} stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : "#38504b"} strokeWidth={selected || hovered ? 3 : 1} />;
+      const frame = groundAsset ? { col: groundAsset.variant % groundAsset.cols, row: Math.floor(groundAsset.variant / groundAsset.cols), cols: groundAsset.cols, rows: groundAsset.rows } : null;
+      if (ui.view === "topdown") return <g key={`${cell.x},${cell.y}`}><rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{frame && playable && <svg x={pos.x} y={pos.y} width={tileW} height={tileH} viewBox={`${frame.col} ${frame.row} 1 1`} preserveAspectRatio="none"><image href={groundAsset.previewUrl} x="0" y="0" width={frame.cols} height={frame.rows} preserveAspectRatio="none" /></svg>}{water && <rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="#247c9d" opacity="0.72" />}<rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
       const points = `${pos.x},${pos.y} ${pos.x + tileW / 2},${pos.y + tileH / 2} ${pos.x},${pos.y + tileH} ${pos.x - tileW / 2},${pos.y + tileH / 2}`;
-      return <polygon key={`${cell.x},${cell.y}`} points={points} fill={overrideIndex === null || overrideIndex === undefined ? "#1c2927" : `hsl(${(overrideIndex * 47) % 360} 35% 32%)`} stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : "#38504b"} strokeWidth={selected || hovered ? 3 : 1} />;
+      const clipId = `ground-${cell.x}-${cell.y}`;
+      return <g key={`${cell.x},${cell.y}`}><defs><clipPath id={clipId}><polygon points={points} /></clipPath></defs><polygon points={points} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{frame && playable && <svg x={pos.x - tileW / 2} y={pos.y} width={tileW} height={tileH} viewBox={`${frame.col} ${frame.row} 1 1`} preserveAspectRatio="none" clipPath={`url(#${clipId})`}><image href={groundAsset.previewUrl} x="0" y="0" width={frame.cols} height={frame.rows} preserveAspectRatio="none" /></svg>}{water && <polygon points={points} fill="#247c9d" opacity="0.72" />}<polygon points={points} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
     })}
     {entities.map(({ layer, entry, index }) => {
       const pos = point(Number(entry.x), Number(entry.y));
@@ -109,6 +131,8 @@ function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, 
         <text x={cx} y={cy + 5} textAnchor="middle" fill="#fff" fontSize="9" fontWeight="800">{layer.slice(0, 1).toUpperCase()}</text>
       </g>;
     })}
+    {document.documentType === "blueprint" && document.start && (() => { const pos = point(document.start.x, document.start.y); const cx = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x; const cy = ui.view === "topdown" ? pos.y + tileH / 2 : pos.y + tileH / 2; return <g><circle cx={cx} cy={cy} r="15" fill="#4fd77d" stroke="#fff" strokeWidth="3" /><text x={cx} y={cy + 5} textAnchor="middle" fontWeight="800">S</text></g>; })()}
+    {document.documentType === "blueprint" && (document.exits ?? []).map((exit, index) => { const pos = point(exit.x, exit.y); const cx = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x; const cy = ui.view === "topdown" ? pos.y + tileH / 2 : pos.y + tileH / 2; return <g key={`exit:${index}`}><circle cx={cx} cy={cy} r="15" fill={exit.primary ? "#f2bd4a" : "#d58ae8"} stroke="#fff" strokeWidth="3" /><text x={cx} y={cy + 5} textAnchor="middle" fontWeight="800">E</text></g>; })}
     <text x="16" y="24" fill="#9eb0ad" fontSize="13">{ui.view} · zoom {ui.zoom.toFixed(2)} · {document.w}×{document.h}</text>
   </svg>;
 }
@@ -127,11 +151,14 @@ export default function AreaEditorPage({ onClose }) {
   const [category, setCategory] = useState("all");
   const [hoverCell, setHoverCell] = useState(null);
   const [advancedText, setAdvancedText] = useState("{}");
+  const [conditionPreviewText, setConditionPreviewText] = useState("{\n  \"worldState\": { \"flags\": {}, \"values\": {}, \"counters\": {} },\n  \"cityStats\": {}\n}");
+  const [conditionPreviewCommon, setConditionPreviewCommon] = useState({ activeQuests: "", completedQuests: "", flags: "", corruption: "", cityThreat: "" });
   const panRef = useRef(null);
+  const strokeRef = useRef(null);
   const catalog = useMemo(buildAreaEditorAssetCatalog, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((entry) => [entry.key, entry])), [catalog]);
   const dirty = Boolean(document && savedFingerprint !== editorDocumentFingerprint(persistEditorView(document, ui)));
-  const allIds = useMemo(() => [...(data?.generated ?? []), ...(data?.handwritten ?? [])].map((entry) => entry.id), [data]);
+  const allIds = useMemo(() => document?.documentType === "blueprint" ? (data?.blueprints ?? []).map((entry) => entry.id) : [...(data?.generated ?? []), ...(data?.handwritten ?? [])].map((entry) => entry.id), [data, document?.documentType]);
   const validation = useMemo(() => document ? validateEditorDocument(persistEditorView(document, ui), allIds, originalId) : { errors: [], warnings: [], canSave: false }, [document, ui, allIds, originalId]);
 
   const refresh = useCallback(async () => {
@@ -158,18 +185,44 @@ export default function AreaEditorPage({ onClose }) {
   }, [canLeave]);
   const closeDocument = () => { if (canLeave()) { setHistory(null); setUi(null); setReadOnly(false); setOriginalId(null); refresh(); } };
   const commit = useCallback((next) => setHistory((current) => commitEditorHistory(current, typeof next === "function" ? next(current.present) : next)), []);
+  const beginStroke = useCallback((cell) => {
+    if (readOnly || !isCellInBounds(document, cell) || ui.visibility[ui.activeLayer] === false || ui.locked[ui.activeLayer]) return;
+    const asset = ui.catalogAsset ? catalogByKey.get(ui.catalogAsset) : null;
+    if (ui.tool === "paint" && !asset && !["playableMask", "start", "exits"].includes(ui.activeLayer)) return;
+    strokeRef.current = { base: cloneEditorValue(document), cells: [], keys: new Set(), layer: ui.activeLayer, mode: ui.tool, asset };
+    const add = (target) => { const key = `${target.x},${target.y}`; if (!strokeRef.current.keys.has(key)) { strokeRef.current.keys.add(key); strokeRef.current.cells.push(target); } };
+    add(cell);
+    const result = applyEditorBrushStroke(strokeRef.current.base, strokeRef.current);
+    setHistory((current) => ({ ...current, present: result.document }));
+    if (result.selection) setUi((current) => ({ ...current, selection: result.selection, selectedCell: cell }));
+  }, [catalogByKey, document, readOnly, ui]);
+  const extendStroke = useCallback((cell) => {
+    const stroke = strokeRef.current; if (!stroke || !isCellInBounds(stroke.base, cell)) return;
+    const key = `${cell.x},${cell.y}`; if (stroke.keys.has(key)) return; stroke.keys.add(key); stroke.cells.push(cell);
+    const result = applyEditorBrushStroke(stroke.base, stroke); setHistory((current) => ({ ...current, present: result.document }));
+    if (result.selection) setUi((current) => ({ ...current, selection: result.selection, selectedCell: cell }));
+  }, []);
+  const endStroke = useCallback(() => {
+    const stroke = strokeRef.current; if (!stroke) return; strokeRef.current = null;
+    setHistory((current) => commitEditorHistory({ ...current, present: stroke.base }, current.present));
+  }, []);
 
   const newDocument = () => {
     const id = uniqueCopyId("new_prefab", allIds);
     openDocument(createEditorDocument({ id, label: "New Prefab" }), { dirty: true });
+  };
+  const newBlueprint = () => {
+    const ids = (data?.blueprints ?? []).map((entry) => entry.id);
+    openDocument(createBlueprintEditorDocument({ id: uniqueCopyId("new_blueprint", ids) }), { dirty: true });
   };
   const importHandwritten = (prefab) => {
     const id = uniqueCopyId(prefab.id, allIds);
     openDocument(importPrefabAsCopy(prefab, id), { dirty: true, message: `Imported read-only prefab "${prefab.id}" as canonical copy "${id}".` });
   };
   const duplicateManaged = (prefab) => {
-    const id = uniqueCopyId(prefab.id, allIds);
-    openDocument(createEditorDocument({ ...cloneEditorValue(prefab), id, label: `${prefab.label ?? prefab.id} Copy`, editor: { ...prefab.editor, managed: true, duplicatedFrom: prefab.id } }), { dirty: true });
+    const ids = prefab.documentType === "blueprint" ? (data?.blueprints ?? []).map((entry) => entry.id) : allIds;
+    const id = uniqueCopyId(prefab.id, ids); const create = prefab.documentType === "blueprint" ? createBlueprintEditorDocument : createEditorDocument;
+    openDocument(create({ ...cloneEditorValue(prefab), id, label: `${prefab.label ?? prefab.id} Copy`, editor: { ...prefab.editor, managed: true, duplicatedFrom: prefab.id } }), { dirty: true });
   };
 
   const save = async (asCopy = false) => {
@@ -177,7 +230,7 @@ export default function AreaEditorPage({ onClose }) {
     let target = persistEditorView(document, ui);
     let previous = originalId;
     if (asCopy) {
-      const proposed = window.prompt("Save copy as prefab ID", uniqueCopyId(document.id, allIds));
+      const proposed = window.prompt(`Save copy as ${document.documentType === "blueprint" ? "blueprint" : "prefab"} ID`, uniqueCopyId(document.id, allIds));
       if (!proposed) return;
       target = { ...target, id: proposed, label: `${target.label} Copy`, editor: { ...target.editor, duplicatedFrom: document.id } };
       previous = null;
@@ -185,8 +238,9 @@ export default function AreaEditorPage({ onClose }) {
     const check = validateEditorDocument(target, allIds, previous);
     if (!check.canSave) { setStatus(check.errors.map((entry) => entry.message).join(" · ")); return; }
     try {
-      const payload = await saveEditorPrefab(editorDocumentToRuntimePrefab(target), previous);
-      const opened = openGeneratedPrefab(payload.document);
+      const blueprint = document.documentType === "blueprint";
+      const payload = blueprint ? await saveEditorBlueprint(serializeAreaBlueprint(target), previous) : await saveEditorPrefab(editorDocumentToRuntimePrefab(target), previous);
+      const opened = blueprint ? createBlueprintEditorDocument(payload.document) : openGeneratedPrefab(payload.document);
       const nextUi = createEditorUiState(opened);
       setHistory(createEditorHistory(opened));
       setUi(nextUi);
@@ -204,7 +258,9 @@ export default function AreaEditorPage({ onClose }) {
 
   const deleteSelection = useCallback(() => {
     if (!document || !ui.selection || readOnly) return;
-    commit(deleteEntity(document, ui.selection));
+    if (ui.selection.layer === "start") commit({ ...document, start: null });
+    else if (ui.selection.layer === "exits") { const next = cloneEditorValue(document); next.exits.splice(ui.selection.index, 1); commit(next); }
+    else commit(deleteEntity(document, ui.selection));
     setUi((current) => ({ ...current, selection: null }));
   }, [commit, document, readOnly, ui?.selection]);
   const duplicateSelection = useCallback(() => {
@@ -231,12 +287,14 @@ export default function AreaEditorPage({ onClose }) {
     return () => window.removeEventListener("keydown", keydown);
   }, [commit, deleteSelection, document, selectedEntry, ui?.clipboard]);
 
-  if (!document) return <DocumentBrowser data={data} status={status} onClose={onClose} onNew={newDocument} onOpenGenerated={(prefab) => openDocument(openGeneratedPrefab(prefab), { originalId: prefab.id })} onPreviewHandwritten={(prefab) => openDocument(importPrefabAsCopy(prefab, prefab.id), { readOnly: true, originalId: null, message: "Read-only normalized preview. Import as a copy to edit." })} onImport={importHandwritten} onDuplicate={duplicateManaged} onDelete={async (prefab) => { if (!window.confirm(`Delete generated prefab "${prefab.id}"?`)) return; try { await deleteEditorPrefab(prefab.id); await refresh(); } catch (error) { setStatus(error.message); } }} onImportJson={async (file) => { try { const imported = createEditorDocument(await readEditorJsonFile(file)); const id = allIds.includes(imported.id) ? uniqueCopyId(imported.id, allIds) : imported.id; openDocument({ ...imported, id }, { dirty: true }); } catch (error) { setStatus(error.message); } }} />;
+  if (!document) return <DocumentBrowser data={data} status={status} onClose={onClose} onNew={newDocument} onNewBlueprint={newBlueprint} onOpenGenerated={(prefab) => openDocument(openGeneratedPrefab(prefab), { originalId: prefab.id })} onOpenBlueprint={(blueprint) => openDocument(createBlueprintEditorDocument(blueprint), { originalId: blueprint.id })} onPreviewHandwritten={(prefab) => openDocument(importPrefabAsCopy(prefab, prefab.id), { readOnly: true, originalId: null, message: "Read-only normalized preview. Import as a copy to edit." })} onImport={importHandwritten} onDuplicate={duplicateManaged} onDelete={async (prefab) => { if (!window.confirm(`Delete generated prefab "${prefab.id}"?`)) return; try { await deleteEditorPrefab(prefab.id); await refresh(); } catch (error) { setStatus(error.message); } }} onDeleteBlueprint={async (blueprint) => { if (!window.confirm(`Delete generated blueprint "${blueprint.id}"? Region references will fall back procedurally.`)) return; try { await deleteEditorBlueprint(blueprint.id); await refresh(); } catch (error) { setStatus(error.message); } }} onImportJson={async (file) => { try { const raw = await readEditorJsonFile(file); const create = raw.documentType === "blueprint" ? createBlueprintEditorDocument : createEditorDocument; const imported = create(raw); const ids = imported.documentType === "blueprint" ? (data?.blueprints ?? []).map((entry) => entry.id) : [...(data?.generated ?? []), ...(data?.handwritten ?? [])].map((entry) => entry.id); const id = ids.includes(imported.id) ? uniqueCopyId(imported.id, ids) : imported.id; openDocument({ ...imported, id }, { dirty: true }); } catch (error) { setStatus(error.message); } }} />;
 
   const availableCategories = [...new Set(catalog.filter((entry) => entry.layer === ui.activeLayer).map((entry) => entry.category))];
   const filteredCatalog = filterAssetCatalog(catalog, { layer: ui.activeLayer, search, category });
   const selectedCatalog = ui.catalogAsset ? catalogByKey.get(ui.catalogAsset) : null;
+  const editorLayers = editorLayersForDocument(document);
   const cellCandidates = ui.selectedCell ? entitiesAtCell(document, ui.selectedCell.x, ui.selectedCell.y, ui.visibility) : [];
+  const blueprintUsages = document.documentType === "blueprint" ? Object.values(MAP_REGION_SETS).flatMap((regions) => Array.isArray(regions) ? regions : []).flatMap((region) => (region.blueprints ?? []).map((candidate, index) => ({ region, candidate, index })).filter((entry) => entry.candidate.id === document.id)) : [];
 
   const handleCell = (cell) => {
     if (!isCellInBounds(document, cell)) return;
@@ -247,13 +305,23 @@ export default function AreaEditorPage({ onClose }) {
       return;
     }
     if (ui.locked[ui.activeLayer] || ui.visibility[ui.activeLayer] === false) return;
-    if (ui.tool === "select") { const next = cycleCellSelection(entitiesAtCell(document, cell.x, cell.y, ui.visibility), ui.selection); setUi((current) => ({ ...current, selection: next })); return; }
+    if (ui.tool === "select") {
+      if (document.documentType === "blueprint" && document.start?.x === cell.x && document.start?.y === cell.y) { setUi((current) => ({ ...current, selection: { layer: "start", index: 0 } })); return; }
+      const exitIndex = document.documentType === "blueprint" ? (document.exits ?? []).findIndex((entry) => entry.x === cell.x && entry.y === cell.y) : -1;
+      if (exitIndex >= 0) { setUi((current) => ({ ...current, selection: { layer: "exits", index: exitIndex } })); return; }
+      const next = cycleCellSelection(entitiesAtCell(document, cell.x, cell.y, ui.visibility), ui.selection); setUi((current) => ({ ...current, selection: next })); return;
+    }
     if (ui.tool === "eyedropper") {
-      if (ui.activeLayer === "ground") { const index = document.ground.rows[cell.y][cell.x]; const entry = document.ground.palette[index]; if (entry) { const found = catalog.find((asset) => asset.layer === "ground" && asset.fileName === entry.fileName && asset.variant === entry.variant); if (found) setUi((current) => ({ ...current, catalogAsset: found.key, tool: "paint" })); } }
+      if (["ground", "water"].includes(ui.activeLayer)) { const layer = document[ui.activeLayer]; const index = layer.rows[cell.y][cell.x]; const entry = layer.palette[index]; if (entry) { const found = catalog.find((asset) => asset.layer === ui.activeLayer && asset.fileName === entry.fileName && asset.variant === entry.variant); if (found) setUi((current) => ({ ...current, catalogAsset: found.key, tool: "paint" })); } }
       else { const foundEntity = entitiesAtCell(document, cell.x, cell.y, ui.visibility).filter((entry) => entry.layer === ui.activeLayer).pop(); if (foundEntity) { const id = foundEntity.entry.id ?? foundEntity.entry.decayId ?? foundEntity.entry.type ?? foundEntity.entry.npcId; const found = catalog.find((asset) => asset.layer === ui.activeLayer && asset.id === id); if (found) setUi((current) => ({ ...current, catalogAsset: found.key, tool: "paint", selection: foundEntity })); } }
       return;
     }
-    if (ui.tool === "move" && ui.selection) { commit(updateEntity(document, ui.selection, cell)); return; }
+    if (ui.tool === "move" && ui.selection) {
+      if (ui.selection.layer === "start") commit({ ...document, start: cell });
+      else if (ui.selection.layer === "exits") { const next = cloneEditorValue(document); next.exits[ui.selection.index] = { ...next.exits[ui.selection.index], ...cell }; commit(next); }
+      else commit(updateEntity(document, ui.selection, cell));
+      return;
+    }
     if (ui.tool === "erase") {
       if (ui.activeLayer === "ground") commit(eraseGroundCell(document, cell.x, cell.y));
       else { const target = entitiesAtCell(document, cell.x, cell.y, ui.visibility).filter((entry) => entry.layer === ui.activeLayer).pop(); if (target) commit(deleteEntity(document, target)); }
@@ -261,7 +329,10 @@ export default function AreaEditorPage({ onClose }) {
     }
     if (ui.tool === "rectangle") {
       if (!ui.rectangleStart) { setUi((current) => ({ ...current, rectangleStart: cell })); return; }
-      if (ui.activeLayer === "ground" && selectedCatalog) commit(paintGroundRectangle(document, ui.rectangleStart, cell, selectedCatalog));
+      if (["ground", "water", "playableMask"].includes(ui.activeLayer)) {
+        const cells = []; for (let y = Math.min(ui.rectangleStart.y, cell.y); y <= Math.max(ui.rectangleStart.y, cell.y); y += 1) for (let x = Math.min(ui.rectangleStart.x, cell.x); x <= Math.max(ui.rectangleStart.x, cell.x); x += 1) cells.push({ x, y });
+        commit(applyEditorBrushStroke(document, { layer: ui.activeLayer, cells, mode: "paint", asset: selectedCatalog }).document);
+      }
       else if (selectedCatalog) {
         let next = document;
         let selection = null;
@@ -273,10 +344,10 @@ export default function AreaEditorPage({ onClose }) {
       setUi((current) => ({ ...current, rectangleStart: null }));
       return;
     }
-    if (ui.tool === "fill" && ui.activeLayer === "ground" && selectedCatalog) { commit(fillGround(document, cell, selectedCatalog)); return; }
-    if (ui.tool === "paint" && selectedCatalog) {
+    if (ui.tool === "fill" && ["ground", "water", "playableMask"].includes(ui.activeLayer) && (selectedCatalog || ui.activeLayer === "playableMask")) { commit(fillEditorLayer(document, ui.activeLayer, cell, selectedCatalog)); return; }
+    if (ui.tool === "paint" && (selectedCatalog || ["playableMask", "start", "exits"].includes(ui.activeLayer))) {
       if (ui.activeLayer === "ground") commit(paintGroundCell(document, cell.x, cell.y, selectedCatalog));
-      else { const result = placeEntity(document, ui.activeLayer, cell.x, cell.y, selectedCatalog.template); commit(result.document); setUi((current) => ({ ...current, selection: result.selection })); }
+      else { const result = applyEditorBrushStroke(document, { layer: ui.activeLayer, cells: [cell], mode: "paint", asset: selectedCatalog }); commit(result.document); if (result.selection) setUi((current) => ({ ...current, selection: result.selection })); }
     }
   };
 
@@ -284,14 +355,14 @@ export default function AreaEditorPage({ onClose }) {
     if (readOnly) return;
     if (["w", "h"].includes(field.key)) {
       const impact = resizeImpact(document, field.key === "w" ? value : document.w, field.key === "h" ? value : document.h);
-      if (impact.total > 0 && !window.confirm(`Shrinking removes ${impact.groundCells} ground overrides and ${impact.entities} entities. Continue?`)) return;
+      if (impact.total > 0 && !window.confirm(`Shrinking removes ${impact.groundCells} ground overrides, ${impact.waterCells ?? 0} water cells, ${impact.maskCells ?? 0} mask cells, ${impact.markers ?? 0} critical markers, and ${impact.entities} entities. Continue?`)) return;
       commit(resizeEditorDocument(document, impact.w, impact.h));
     } else commit({ ...document, [field.key]: value });
   };
   const updateSelected = (field, value) => { if (!readOnly) commit(updateEntity(document, ui.selection, { [field.key]: value })); };
 
   return <main className="area-editor-page" data-testid="area-editor-page">
-    <header className="area-editor-topbar"><div><button type="button" onClick={closeDocument}>← Documents</button><strong>{document.label || document.id}</strong>{dirty && <span className="area-editor-dirty">Modified</span>}{readOnly && <span>Read-only preview</span>}</div><div><button type="button" onClick={() => setHistory(undoEditorHistory)} disabled={!history.past.length || readOnly}>Undo</button><button type="button" onClick={() => setHistory(redoEditorHistory)} disabled={!history.future.length || readOnly}>Redo</button><button type="button" onClick={() => downloadEditorDocument(editorDocumentToRuntimePrefab(persistEditorView(document, ui)))}>Download JSON</button><button type="button" onClick={() => save(true)} disabled={readOnly}>Save as copy</button><button type="button" onClick={() => save(false)} disabled={readOnly || !validation.canSave}>Save</button></div></header>
+    <header className="area-editor-topbar"><div><button type="button" onClick={closeDocument}>← Documents</button><strong>{document.label || document.id}</strong><span>{document.documentType === "blueprint" ? "Full-area blueprint" : "Prefab"}</span>{dirty && <span className="area-editor-dirty">Modified</span>}{readOnly && <span>Read-only preview</span>}</div><div><button type="button" onClick={() => setHistory(undoEditorHistory)} disabled={!history.past.length || readOnly}>Undo</button><button type="button" onClick={() => setHistory(redoEditorHistory)} disabled={!history.future.length || readOnly}>Redo</button><button type="button" onClick={() => downloadEditorDocument(document.documentType === "blueprint" ? serializeAreaBlueprint(persistEditorView(document, ui)) : editorDocumentToRuntimePrefab(persistEditorView(document, ui)))}>Download JSON</button><button type="button" onClick={() => save(true)} disabled={readOnly}>Save as copy</button><button type="button" onClick={() => save(false)} disabled={readOnly || !validation.canSave}>Save</button></div></header>
     <div className="area-editor-toolbar">
       {TOOLS.map((tool) => <button type="button" key={tool} className={ui.tool === tool ? "active" : ""} onClick={() => setUi((current) => ({ ...current, tool, rectangleStart: null }))}>{tool}</button>)}
       <span className="area-editor-separator" />
@@ -300,21 +371,22 @@ export default function AreaEditorPage({ onClose }) {
       <button type="button" onClick={() => setUi((current) => ({ ...current, zoom: Math.max(0.45, current.zoom - 0.1) }))}>−</button><button type="button" onClick={() => setUi((current) => ({ ...current, zoom: Math.min(2.5, current.zoom + 0.1) }))}>+</button>
     </div>
     <div className="area-editor-layout">
-      <aside className="area-editor-sidebar area-editor-layers"><h2>Layers</h2>{EDITOR_LAYERS.map((layer) => <div key={layer} className={ui.activeLayer === layer ? "active" : ""}><button type="button" onClick={() => { setCategory("all"); setUi((current) => ({ ...current, activeLayer: layer, selection: null })); }}>{LAYER_LABELS[layer]} <b>{countLayer(document, layer)}</b></button><label title="Visible"><input type="checkbox" checked={ui.visibility[layer]} onChange={(event) => setUi((current) => ({ ...current, visibility: { ...current.visibility, [layer]: event.target.checked } }))} />V</label><label title="Locked"><input type="checkbox" checked={ui.locked[layer]} onChange={(event) => setUi((current) => ({ ...current, locked: { ...current.locked, [layer]: event.target.checked } }))} />L</label></div>)}
-        <button type="button" onClick={() => setUi((current) => ({ ...current, visibility: Object.fromEntries(EDITOR_LAYERS.map((layer) => [layer, layer === current.activeLayer])) }))}>Show only active</button>
-        <button type="button" className="danger-action" disabled={readOnly} onClick={() => { if (!window.confirm(`Clear ${LAYER_LABELS[ui.activeLayer]}?`)) return; if (ui.activeLayer === "ground") commit({ ...document, ground: { ...document.ground, rows: document.ground.rows.map((row) => row.map(() => null)) } }); else commit({ ...document, [ui.activeLayer]: [] }); }}>Clear layer</button>
-        <h2>Prefab</h2><div className="area-editor-form">{PREFAB_PROPERTY_SCHEMA.map((field) => <PropertyField key={field.key} field={field} value={document[field.key]} onChange={(value) => updateMetadata(field, value)} />)}</div>
+      <aside className="area-editor-sidebar area-editor-layers"><h2>Layers</h2>{editorLayers.map((layer) => <div key={layer} className={ui.activeLayer === layer ? "active" : ""}><button type="button" onClick={() => { setCategory("all"); setUi((current) => ({ ...current, activeLayer: layer, selection: null, catalogAsset: null })); }}>{LAYER_LABELS[layer]} <b>{countLayer(document, layer)}</b></button><label title="Visible"><input type="checkbox" checked={ui.visibility[layer]} onChange={(event) => setUi((current) => ({ ...current, visibility: { ...current.visibility, [layer]: event.target.checked } }))} />V</label><label title="Locked"><input type="checkbox" checked={ui.locked[layer]} onChange={(event) => setUi((current) => ({ ...current, locked: { ...current.locked, [layer]: event.target.checked } }))} />L</label></div>)}
+        <button type="button" onClick={() => setUi((current) => ({ ...current, visibility: Object.fromEntries(editorLayers.map((layer) => [layer, layer === current.activeLayer])) }))}>Show only active</button>
+        <button type="button" className="danger-action" disabled={readOnly} onClick={() => { if (!window.confirm(`Clear ${LAYER_LABELS[ui.activeLayer]}?`)) return; const layer = ui.activeLayer; if (["ground", "water"].includes(layer)) commit({ ...document, [layer]: { ...document[layer], rows: document[layer].rows.map((row) => row.map(() => null)) } }); else if (layer === "playableMask") commit({ ...document, playableMask: { ...document.playableMask, rows: document.playableMask.rows.map((row) => row.map(() => false)) } }); else if (layer === "start") commit({ ...document, start: null }); else commit({ ...document, [layer]: [] }); }}>Clear layer</button>
+        <h2>{document.documentType === "blueprint" ? "Blueprint" : "Prefab"}</h2><div className="area-editor-form">{PREFAB_PROPERTY_SCHEMA.filter((field) => document.documentType !== "blueprint" || ["id", "label", "w", "h"].includes(field.key)).map((field) => <PropertyField key={field.key} field={field} value={document[field.key]} onChange={(value) => updateMetadata(field, value)} />)}</div>
       </aside>
       <section className="area-editor-stage">
-        <EditorCanvas document={document} ui={ui} catalogByKey={catalogByKey} hoverCell={hoverCell} onHover={(cell) => setHoverCell(cell && isCellInBounds(document, cell) ? cell : null)} onCell={handleCell} onWheel={(event) => { event.preventDefault(); setUi((current) => ({ ...current, zoom: Math.max(0.45, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))) })); }} onPanStart={(event) => { panRef.current = { x: event.clientX, y: event.clientY, panX: ui.panX, panY: ui.panY }; event.currentTarget.setPointerCapture?.(event.pointerId); const move = (moveEvent) => setUi((current) => ({ ...current, panX: panRef.current.panX + moveEvent.clientX - panRef.current.x, panY: panRef.current.panY + moveEvent.clientY - panRef.current.y })); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} />
+        <EditorCanvas document={document} ui={ui} catalogByKey={catalogByKey} hoverCell={hoverCell} onHover={(cell) => setHoverCell(cell && isCellInBounds(document, cell) ? cell : null)} onCell={handleCell} onStrokeStart={beginStroke} onStrokeMove={extendStroke} onStrokeEnd={endStroke} onWheel={(event) => { event.preventDefault(); setUi((current) => ({ ...current, zoom: Math.max(0.45, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))) })); }} onPanStart={(event) => { panRef.current = { x: event.clientX, y: event.clientY, panX: ui.panX, panY: ui.panY }; event.currentTarget.setPointerCapture?.(event.pointerId); const move = (moveEvent) => setUi((current) => ({ ...current, panX: panRef.current.panX + moveEvent.clientX - panRef.current.x, panY: panRef.current.panY + moveEvent.clientY - panRef.current.y })); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} />
         {ui.rectangleStart && <div className="area-editor-hint">Choose the opposite rectangle corner.</div>}
         {status && <div className="area-editor-statusbar">{status}</div>}
       </section>
       <aside className="area-editor-sidebar area-editor-inspector">
-        <h2>Asset catalog</h2><input type="search" placeholder="Search assets" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Asset category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">All categories</option>{availableCategories.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="area-editor-catalog">{filteredCatalog.slice(0, 180).map((asset) => <button type="button" key={asset.key} className={ui.catalogAsset === asset.key ? "active" : ""} onClick={() => setUi((current) => ({ ...current, catalogAsset: asset.key, tool: current.tool === "select" ? "paint" : current.tool }))}>{asset.previewUrl ? <img src={asset.previewUrl} alt="" /> : <span>?</span>}<small>{asset.label}</small><em>{asset.variantCount} variant{asset.variantCount === 1 ? "" : "s"}</em></button>)}</div>
+        <h2>Asset catalog</h2><input type="search" placeholder="Search assets" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Asset category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">All categories</option>{availableCategories.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="area-editor-catalog">{filteredCatalog.slice(0, 240).map((asset) => <button type="button" key={asset.key} className={ui.catalogAsset === asset.key ? "active" : ""} onClick={() => setUi((current) => ({ ...current, catalogAsset: asset.key, tool: current.tool === "select" ? "paint" : current.tool }))}>{asset.previewUrl ? <span className="area-editor-frame-preview" style={assetFrameStyle(asset)} aria-label={`Variant ${asset.variant ?? 0}`} /> : <span>?</span>}<small>{asset.label}</small><em>{asset.variantCount} variant{asset.variantCount === 1 ? "" : "s"}</em></button>)}</div>
         <h2>Selection</h2>{ui.selectedCell && <p>Cell {ui.selectedCell.x}, {ui.selectedCell.y} · {cellCandidates.length} entities</p>}<div className="area-editor-cell-list">{cellCandidates.map((candidate) => <button type="button" key={`${candidate.layer}:${candidate.index}`} className={ui.selection?.layer === candidate.layer && ui.selection?.index === candidate.index ? "active" : ""} onClick={() => setUi((current) => ({ ...current, selection: candidate }))}>{candidate.layer}: {candidate.entry.id ?? candidate.entry.decayId ?? candidate.entry.type ?? candidate.entry.npcId}</button>)}</div>
         {selectedEntry && <><div className="area-editor-selection-actions"><button type="button" onClick={duplicateSelection} disabled={readOnly}>Duplicate</button><button type="button" onClick={deleteSelection} disabled={readOnly}>Delete</button></div><div className="area-editor-form">{schemaForLayer(ui.selection.layer).map((field) => <PropertyField key={field.key} field={field} value={selectedEntry[field.key]} onChange={(value) => updateSelected(field, value)} />)}</div><label>Advanced properties JSON<textarea rows="10" value={advancedText} onChange={(event) => setAdvancedText(event.target.value)} /></label><button type="button" disabled={readOnly} onClick={() => { try { const parsed = JSON.parse(advancedText); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Advanced properties must be an object."); commit(updateEntity(document, ui.selection, parsed)); setStatus("Advanced properties applied."); } catch (error) { setStatus(`Invalid advanced properties: ${error.message}`); } }}>Apply advanced JSON</button></>}
         <h2>Validation</h2><div className="area-editor-validation">{validation.errors.map((issue, index) => <button type="button" key={`e${index}`} className="error" onClick={() => issue.path?.layer && setUi((current) => ({ ...current, activeLayer: issue.path.layer, selection: { layer: issue.path.layer, index: issue.path.index }, selectedCell: document[issue.path.layer]?.[issue.path.index] ? { x: document[issue.path.layer][issue.path.index].x, y: document[issue.path.layer][issue.path.index].y } : current.selectedCell }))}>{issue.message}</button>)}{validation.warnings.map((issue, index) => <p key={`w${index}`} className="warning">{issue.message}</p>)}{validation.canSave && <p className="valid">Runtime-compatible and safe to save.</p>}</div>
+        {document.documentType === "blueprint" && <section><h2>Region usage / assignment</h2><p>Candidate order is authoritative: the first matching entry wins. No match, missing data, or an invalid matched blueprint uses procedural generation.</p>{blueprintUsages.length ? blueprintUsages.map(({ region, index }) => <p key={`${region.id}:${index}`}><b>{region.id}</b> candidate {index + 1}</p>) : <p>No handwritten region references discovered.</p>}<button type="button" onClick={() => navigator.clipboard?.writeText(`blueprints: [\n  { id: "${document.id}", questCompleted: "quest_id" },\n],`)}>Copy assignment snippet</button><div className="area-editor-form"><label>Active quests (comma separated)<input value={conditionPreviewCommon.activeQuests} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, activeQuests: event.target.value }))} /></label><label>Completed quests<input value={conditionPreviewCommon.completedQuests} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, completedQuests: event.target.value }))} /></label><label>World flags<input value={conditionPreviewCommon.flags} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, flags: event.target.value }))} /></label><label>Corruption<input type="number" value={conditionPreviewCommon.corruption} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, corruption: event.target.value }))} /></label><label>City threat<input type="number" value={conditionPreviewCommon.cityThreat} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, cityThreat: event.target.value }))} /></label></div><label>Advanced context JSON (quest steps, inventory, player, factions, kills, region state)<textarea rows="7" value={conditionPreviewText} onChange={(event) => setConditionPreviewText(event.target.value)} /></label><button type="button" onClick={() => { try { const preview = JSON.parse(conditionPreviewText); const list = (value) => value.split(",").map((entry) => entry.trim()).filter(Boolean); const worldState = { ...(preview.worldState ?? {}), flags: { ...(preview.worldState?.flags ?? {}), ...Object.fromEntries(list(conditionPreviewCommon.flags).map((id) => [id, true])) }, values: { ...(preview.worldState?.values ?? {}), ...(conditionPreviewCommon.corruption === "" ? {} : { [`region:${blueprintUsages[0]?.region?.id ?? "preview"}:corruption`]: Number(conditionPreviewCommon.corruption) }) } }; const context = { ...preview, worldState, questState: { ...(preview.questState ?? {}), active: list(conditionPreviewCommon.activeQuests), completed: list(conditionPreviewCommon.completedQuests) }, cityStats: { ...(preview.cityStats ?? {}), ...(conditionPreviewCommon.cityThreat === "" ? {} : { cityThreat: Number(conditionPreviewCommon.cityThreat) }) }, regionConfig: blueprintUsages[0]?.region }; const candidate = blueprintUsages[0]?.candidate ?? { id: document.id }; const matched = worldEntryAllowed(candidate, worldState, context); setStatus(matched ? "Condition preview: matched." : "Condition preview: not matched."); } catch (error) { setStatus(`Condition preview: invalid condition context (${error.message}).`); } }}>Preview first usage condition</button></section>}
       </aside>
     </div>
   </main>;

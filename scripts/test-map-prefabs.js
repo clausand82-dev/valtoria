@@ -87,8 +87,9 @@ assert.deepEqual(legendContent.monsters[0], { x: 2, y: 0, levelOffset: 3, type: 
 assert.deepEqual(legendContent.npcs[0], { x: 1, y: 1, facing: "south", npcId: "wiseman", actionId: undefined, actions: undefined, conditions: undefined });
 assert.deepEqual(legendContent.chests[0], { x: 2, y: 1, blocking: true, id: "basic_chest" });
 
-assert.deepEqual(GENERATED_MAP_PREFABS, {});
-assert.equal(Object.keys(MAP_PREFABS).length, Object.keys(HANDWRITTEN_MAP_PREFABS).length);
+for (const [key, prefab] of Object.entries(GENERATED_MAP_PREFABS)) assert.equal(key, prefab.id);
+assert.equal(Object.keys(MAP_PREFABS).length, Object.keys(HANDWRITTEN_MAP_PREFABS).length + Object.keys(GENERATED_MAP_PREFABS).length);
+assert.deepEqual(mergePrefabRegistries(HANDWRITTEN_MAP_PREFABS, {}), HANDWRITTEN_MAP_PREFABS, "an empty generated registry remains supported");
 const generated = { editor_house: { id: "editor_house", w: 1, h: 1 } };
 const merged = mergePrefabRegistries({ handwritten: { id: "handwritten", w: 1, h: 1 } }, generated);
 assert.deepEqual(Object.keys(merged), ["handwritten", "editor_house"]);

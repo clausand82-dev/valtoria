@@ -91,6 +91,8 @@ const MAP_REGION_SKIP_KEYS = new Set([
   "color",
   "targetMapId",
   "areaMapId",
+  // Candidate conditions must remain intact until the ordered blueprint resolver runs.
+  "blueprints",
 ]);
 
 function clone(value) {

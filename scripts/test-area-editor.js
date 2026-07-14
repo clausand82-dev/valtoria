@@ -5,6 +5,7 @@ import { createEditorDocument, editorDocumentFingerprint, importHandwrittenPrefa
 import { createEditorHistory, commitEditorHistory, redoEditorHistory, undoEditorHistory } from "../src/dev/area-editor/editor-history.js";
 import { gridToIsometric, gridToTopDown, isometricToGrid, topDownToGrid } from "../src/dev/area-editor/editor-renderer.js";
 import { importPrefabAsCopy, openGeneratedPrefab } from "../src/dev/area-editor/prefab-document-adapter.js";
+import { assetFrameStyle, buildAreaEditorAssetCatalog } from "../src/dev/area-editor/asset-catalog.js";
 import { buildGeneratedPrefabIndex, deterministicJson, handwrittenPrefabIdsFromSource, sanitizeEditorPrefabId, serializeGeneratedPrefabModule, validateGeneratedDocument } from "./area-editor-dev-plugin.js";
 
 const created = createEditorDocument({ id: "editor_test", label: "Editor Test", w: 5, h: 4 });
@@ -65,7 +66,7 @@ const resizeSource = createEditorDocument({
   ground: { palette: [{ fileName: "tileset/tileset_grass.png", variant: 1 }], rows: [[null, null, null, null], [null, null, null, null], [null, null, 0, null], [null, null, null, 0]] },
   objects: [{ id: "object_well", x: 3, y: 3 }, { id: "object_well", x: 1, y: 1 }],
 });
-assert.deepEqual(resizeImpact(resizeSource, 3, 3), { w: 3, h: 3, groundCells: 1, entities: 1, total: 2 });
+assert.deepEqual(resizeImpact(resizeSource, 3, 3), { w: 3, h: 3, groundCells: 1, waterCells: 0, maskCells: 0, markers: 0, entities: 1, total: 2 });
 const resized = resizeEditorDocument(resizeSource, 3, 3);
 assert.equal(resized.objects.length, 1);
 assert.equal(resized.ground.rows.length, 3);
@@ -93,6 +94,11 @@ assert.equal(isAllowedLocalHostname("0.0.0.0"), false);
 assert.equal(isAreaEditorAvailable({ dev: true, hostname: "localhost" }), true);
 assert.equal(isAreaEditorAvailable({ dev: false, hostname: "localhost" }), false);
 assert.equal(isAreaEditorAvailable({ dev: true, hostname: "valtoria.example" }), false);
+
+const catalog = buildAreaEditorAssetCatalog();
+for (const layer of ["ground", "water", "foliage", "decals", "objects"]) assert.ok(catalog.some((entry) => entry.layer === layer && Number.isInteger(entry.variant)), `${layer} must expose visual variant entries`);
+const frameStyle = assetFrameStyle(catalog.find((entry) => entry.layer === "ground" && entry.variant === 3));
+assert.match(frameStyle.backgroundSize, /400% 400%/);
 
 const directImported = importHandwrittenPrefab(shorthand, "legacy_copy_two");
 assert.equal(directImported.tiles, undefined);

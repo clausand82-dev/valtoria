@@ -1,0 +1,346 @@
+{
+  "id": "new_prefab_editor",
+  "label": "New Prefab",
+  "schemaVersion": 1,
+  "w": 12,
+  "h": 10,
+  "anchor": "room",
+  "rotate": false,
+  "mirror": false,
+  "clearArea": true,
+  "avoidStart": 0,
+  "avoidExit": 0,
+  "editor": {
+    "lastView": "isometric",
+    "zoom": 1.5000000000000004,
+    "panX": 137.5999755859375,
+    "panY": 10.39996337890625,
+    "hiddenLayers": [],
+    "lockedLayers": [],
+    "managed": true
+  },
+  "ground": {
+    "palette": [
+      {
+        "fileName": "tileset/tileset_grass.png",
+        "variant": 0,
+        "sheetId": "ground-custom:tileset/tileset_grass.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_grass.png",
+        "variant": 4,
+        "sheetId": "ground-custom:tileset/tileset_grass.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_lava.png",
+        "variant": 10,
+        "sheetId": "ground-custom:tileset/tileset_lava.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      }
+    ],
+    "rows": [
+      [
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null
+      ],
+      [
+        null,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        2,
+        2,
+        0,
+        0,
+        0,
+        1,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        2,
+        2,
+        0,
+        0,
+        0,
+        1,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        2,
+        2,
+        1,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        2,
+        2,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        2,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        2,
+        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        2,
+        null,
+        null,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ],
+      [
+        null,
+        null,
+        null,
+        null,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        null,
+        null
+      ]
+    ]
+  },
+  "objects": [],
+  "foliage": [
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 6
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 6
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 8,
+      "y": 3
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 8,
+      "y": 3
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 8,
+      "y": 4
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 8,
+      "y": 6
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 9,
+      "y": 6
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 10,
+      "y": 5
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 10,
+      "y": 3
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 9,
+      "y": 8
+    },
+    {
+      "fileName": "foilage/foilage_metalplates.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 6,
+      "y": 8
+    },
+    {
+      "fileName": "foilage/foilage_smashed_smallanimals.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 1
+    },
+    {
+      "fileName": "foilage/foilage_smashed_smallanimals.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 1
+    },
+    {
+      "fileName": "foilage/foilage_smashed_smallanimals.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 1
+    },
+    {
+      "fileName": "foilage/foilage_smashed_smallanimals.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 1
+    },
+    {
+      "fileName": "foilage/foilage_smashed_smallanimals.png",
+      "rows": 4,
+      "cols": 4,
+      "x": 7,
+      "y": 1
+    }
+  ],
+  "decals": [
+    {
+      "decayId": "decay_blood",
+      "x": 3,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "x": 4,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "x": 4,
+      "y": 3
+    },
+    {
+      "decayId": "decay_blood",
+      "x": 6,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "x": 4,
+      "y": 6
+    }
+  ],
+  "monsters": [],
+  "npcs": [],
+  "chests": []
+}
