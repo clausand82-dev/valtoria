@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { mergeBlueprintRegistries } from "../src/game/config/blueprint-registry.js";
 import { AREA_BLUEPRINTS } from "../src/game/config/area-blueprint-config.js";
-import { createChunk, createProceduralRegion, createRegion } from "../src/game/world.js";
+import { createChunk, createProceduralRegion, createRegion, isRegionWaterTile } from "../src/game/world.js";
 import { normalizeAreaBlueprint, serializeAreaBlueprint } from "../src/game/world/blueprints/blueprint-normalization.js";
 import { applyBlueprintToRegion } from "../src/game/world/blueprints/blueprint-region-builder.js";
 import { resolveRegionBlueprint } from "../src/game/world/blueprints/blueprint-resolver.js";
@@ -11,6 +11,8 @@ import { applyEditorBrushStroke } from "../src/dev/area-editor/editor-tools.js";
 import { createBlueprintEditorDocument } from "../src/dev/area-editor/editor-document.js";
 import { commitEditorHistory, createEditorHistory, undoEditorHistory } from "../src/dev/area-editor/editor-history.js";
 import { validateAreaEditorLocalRequest, validateGeneratedBlueprint } from "./area-editor-dev-plugin.js";
+import { buildRegionConditionPreview } from "../src/dev/area-editor/condition-preview.js";
+import { worldEntryAllowed } from "../src/game/world-state.js";
 
 function blueprint(overrides = {}) {
   const w = overrides.w ?? 8; const h = overrides.h ?? 6;
@@ -53,6 +55,24 @@ assert.deepEqual(roundTrip.start, valid.start); assert.deepEqual(roundTrip.exits
 const unreachable = blueprint({ playableMask: { rows: Array.from({ length: 6 }, (_, y) => Array.from({ length: 8 }, (_, x) => (x < 2 && y > 3) || (x > 5 && y < 2))) } });
 assert.equal(blueprintConnectivity(unreachable).unreachableExits.length, 1); assert.equal(validateAreaBlueprint(unreachable).valid, false);
 
+const waterRows = (w, h, cells = []) => {
+  const keys = new Set(cells.map(({ x, y }) => `${x},${y}`));
+  return Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => keys.has(`${x},${y}`) ? 0 : null));
+};
+const waterLayer = (w, h, cells) => ({ palette: [{ fileName: "tileset/tileset_water.png", variant: 2 }], rows: waterRows(w, h, cells) });
+const startOnWater = blueprint({ water: waterLayer(8, 6, [{ x: 0, y: 5 }]) });
+assert.match(validateAreaBlueprint(startOnWater).errors.join("\n"), /start must not be on water/);
+const exitOnWater = blueprint({ water: waterLayer(8, 6, [{ x: 7, y: 0 }]) });
+assert.match(validateAreaBlueprint(exitOnWater).errors.join("\n"), /exits\[0\] must not be on water/);
+const barrierCells = Array.from({ length: 6 }, (_, y) => ({ x: 3, y }));
+const blockedByWater = blueprint({ start: { x: 1, y: 2 }, exits: [{ id: "primary", x: 6, y: 2, primary: true }], water: waterLayer(8, 6, barrierCells) });
+assert.equal(blueprintConnectivity(blockedByWater).unreachableExits.length, 1);
+assert.match(validateAreaBlueprint(blockedByWater).errors.join("\n"), /unreachable from start/);
+const routeAroundWater = blueprint({ start: { x: 1, y: 2 }, exits: [{ id: "primary", x: 6, y: 2, primary: true }], water: waterLayer(8, 6, barrierCells.filter(({ y }) => y !== 3)) });
+assert.equal(blueprintConnectivity(routeAroundWater).unreachableExits.length, 0);
+const connectedWithoutWater = blueprint({ water: { palette: [], rows: waterRows(8, 6) } });
+assert.equal(blueprintConnectivity(connectedWithoutWater).unreachableExits.length, 0);
+
 const strokeStart = createBlueprintEditorDocument({ id: "stroke_test", w: 5, h: 5 }); const history = createEditorHistory(strokeStart);
 const stroke = applyEditorBrushStroke(strokeStart, { layer: "ground", cells: [{ x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }], mode: "paint", asset: { fileName: "tileset/tileset_grass.png", variant: 2 } });
 const committed = commitEditorHistory(history, stroke.document); assert.equal(committed.past.length, 1); assert.equal(committed.present.ground.rows[1].filter((cell) => cell !== null).length, 3); assert.deepEqual(undoEditorHistory(committed).present, strokeStart);
@@ -69,4 +89,28 @@ const selectedRuntime = createRegion(4, 321, null, { id: "selected", blueprints:
 delete AREA_BLUEPRINTS.test_area;
 assert.equal(selectedRuntime.blueprint.id, "test_area"); assert.equal(selectedRuntime.width, valid.w);
 
-console.log("[area-blueprints] OK", { fallback: true, orderedConditions: true, builder: true, roundTrip: true, connectivity: true, strokes: true, localApiGuard: true, runtimeSelection: true });
+const proceduralWaterConfig = { id: "watery", water: [{ fileName: "tileset/tileset_water.png" }], spawnCounts: { water: 80 } };
+const dry = blueprint({ id: "dry_area", water: { palette: [], rows: waterRows(8, 6) } });
+let proceduralPhysicalCalls = 0;
+const dryRuntime = createRegion(5, 87654, null, { ...proceduralWaterConfig, blueprints: [{ id: "dry_area" }] }, {
+  blueprintRegistry: { dry_area: dry },
+  proceduralFactory: () => { proceduralPhysicalCalls += 1; throw new Error("selected blueprint invoked procedural physical generation"); },
+});
+assert.equal(proceduralPhysicalCalls, 0);
+assert.equal(createChunk(0, 0, dryRuntime).tiles.some((tile) => tile.water), false);
+assert.equal(isRegionWaterTile(dryRuntime, 2, 2), false);
+const wet = blueprint({ id: "wet_area", water: waterLayer(8, 6, [{ x: 3, y: 3 }]) });
+const wetRuntime = createRegion(5, 87654, null, { ...proceduralWaterConfig, blueprints: [{ id: "wet_area" }] }, { blueprintRegistry: { wet_area: wet } });
+assert.equal(createChunk(0, 0, wetRuntime).tiles.some((tile) => tile.x === 3 && tile.y === 3 && tile.water), true);
+assert.equal(isRegionWaterTile(wetRuntime, 3, 3), true);
+assert.equal(isRegionWaterTile(wetRuntime, 2, 2), false);
+const proceduralWater = createProceduralRegion(5, 87654, null, proceduralWaterConfig);
+assert.equal(Array.from({ length: proceduralWater.height }, (_, y) => Array.from({ length: proceduralWater.width }, (_, x) => isRegionWaterTile(proceduralWater, x, y))).flat().some(Boolean), true);
+
+const previewRegion = { id: "condition_preview_region", corruptionLevel: 1 };
+const corruptionPreview = buildRegionConditionPreview({}, { corruption: "7", activeQuests: "", completedQuests: "", flags: "", cityThreat: "" }, previewRegion);
+assert.equal(corruptionPreview.worldState.values["region.condition_preview_region.corruptionLevel"], 7);
+assert.equal(worldEntryAllowed({ corruption: { gte: 7 } }, corruptionPreview.worldState, corruptionPreview.context), true);
+assert.equal(worldEntryAllowed({ corruption: { gt: 7 } }, corruptionPreview.worldState, corruptionPreview.context), false);
+
+console.log("[area-blueprints] OK", { fallback: true, orderedConditions: true, builder: true, roundTrip: true, waterAwareConnectivity: true, authoritativeBlueprintWater: true, selectedSkipsProceduralPhysical: true, corruptionPreview: true, strokes: true, localApiGuard: true, runtimeSelection: true });

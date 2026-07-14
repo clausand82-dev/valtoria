@@ -3,7 +3,7 @@ import { MONSTER_DEFS } from "../../config/monster-config.js";
 import { QUEST_NPCS } from "../../config/npc-config.js";
 import { REGION_OBJECT_DEFS } from "../../config/region-object-config.js";
 import { validatePrefab } from "../prefabs/prefab-validation.js";
-import { BLUEPRINT_ENTITY_LAYERS, blueprintCellIsPlayable, normalizeAreaBlueprint } from "./blueprint-normalization.js";
+import { BLUEPRINT_ENTITY_LAYERS, blueprintCellHasWater, blueprintCellIsPlayable, blueprintCellIsTraversable, normalizeAreaBlueprint } from "./blueprint-normalization.js";
 
 export const BLUEPRINT_ID_PATTERN = /^[a-z][a-z0-9_]*$/;
 
@@ -12,13 +12,15 @@ function inBounds(doc, cell) { return Number.isInteger(cell?.x) && Number.isInte
 
 export function blueprintConnectivity(blueprint) {
   const doc = normalizeAreaBlueprint(blueprint);
-  if (!inBounds(doc, doc.start) || !blueprintCellIsPlayable(doc, doc.start.x, doc.start.y)) return { reachable: new Set(), unreachableExits: [...doc.exits] };
+  if (!inBounds(doc, doc.start) || !blueprintCellIsTraversable(doc, doc.start.x, doc.start.y)) return { reachable: new Set(), unreachableExits: [...doc.exits] };
   const reachable = new Set([cellKey(doc.start)]); const queue = [{ ...doc.start }];
   while (queue.length) {
     const cell = queue.shift();
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    // Runtime movement resolves both axes independently, and procedural-mask
+    // connectivity uses the same eight-neighbor topology.
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
       const next = { x: cell.x + dx, y: cell.y + dy }; const key = cellKey(next);
-      if (!reachable.has(key) && inBounds(doc, next) && blueprintCellIsPlayable(doc, next.x, next.y)) { reachable.add(key); queue.push(next); }
+      if (!reachable.has(key) && blueprintCellIsTraversable(doc, next.x, next.y)) { reachable.add(key); queue.push(next); }
     }
   }
   return { reachable, unreachableExits: doc.exits.filter((entry) => !reachable.has(cellKey(entry))) };
@@ -43,9 +45,9 @@ export function validateAreaBlueprint(input, options = {}) {
     }
     layer.palette.forEach((entry, index) => { if (!entry?.fileName) errors.push(`${prefix}.${layerName}.palette[${index}].fileName is required`); if (!Number.isInteger(Number(entry?.variant)) || Number(entry.variant) < 0 || Number(entry.variant) >= Math.max(1, Number(entry.variantCount) || 16)) errors.push(`${prefix}.${layerName}.palette[${index}].variant is invalid`); });
   }
-  if (!inBounds(doc, doc.start)) errors.push(`${prefix}.start must be one in-bounds cell`); else if (!blueprintCellIsPlayable(doc, doc.start.x, doc.start.y)) errors.push(`${prefix}.start is outside the playable mask`);
+  if (!inBounds(doc, doc.start)) errors.push(`${prefix}.start must be one in-bounds cell`); else if (!blueprintCellIsPlayable(doc, doc.start.x, doc.start.y)) errors.push(`${prefix}.start is outside the playable mask`); else if (blueprintCellHasWater(doc, doc.start.x, doc.start.y)) errors.push(`${prefix}.start must not be on water`);
   if (!doc.exits.length) errors.push(`${prefix}.exits requires at least one exit`);
-  doc.exits.forEach((entry, index) => { if (!inBounds(doc, entry)) errors.push(`${prefix}.exits[${index}] is out of bounds`); else if (!blueprintCellIsPlayable(doc, entry.x, entry.y)) errors.push(`${prefix}.exits[${index}] is outside the playable mask`); });
+  doc.exits.forEach((entry, index) => { if (!inBounds(doc, entry)) errors.push(`${prefix}.exits[${index}] is out of bounds`); else if (!blueprintCellIsPlayable(doc, entry.x, entry.y)) errors.push(`${prefix}.exits[${index}] is outside the playable mask`); else if (blueprintCellHasWater(doc, entry.x, entry.y)) errors.push(`${prefix}.exits[${index}] must not be on water`); });
   if (doc.exits.filter((entry) => entry.primary).length !== 1) errors.push(`${prefix}.exits must contain exactly one primary exit`);
   const connectivity = blueprintConnectivity(doc); if (connectivity.unreachableExits.length) errors.push(`${prefix}.exits contains ${connectivity.unreachableExits.length} exit(s) unreachable from start`);
   const prefabErrors = validatePrefab({ ...doc, id: doc.id, ground: undefined }, { knownIds: options.knownIds ?? { objects: new Set(Object.keys(REGION_OBJECT_DEFS)), decals: new Set(Object.keys(DECAY_SET_DEFS)), monsters: new Set(Object.keys(MONSTER_DEFS)), npcs: new Set(Object.keys(QUEST_NPCS)) } });

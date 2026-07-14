@@ -625,7 +625,7 @@ function spawnCount(chunk, key) {
   return Math.max(0, Math.round(Number(chunk.region?.mapRegion?.spawnCounts?.[key]) || 0));
 }
 
-export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
+function createRegionBase(regionIndex, seed, regionConfig, generateProceduralPhysical = false) {
   const normalizedTileset = normalizeRegionTileset(regionConfig?.tileset);
   const normalizedTilesetArray = Array.isArray(normalizedTileset) ? normalizedTileset : (normalizedTileset ? [normalizedTileset] : null);
   const normalizedWaterSets = normalizeRegionWaterSets(regionConfig ?? {});
@@ -633,12 +633,14 @@ export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.r
   const normalizedObjects = normalizeRegionObjects(regionConfig ?? {});
   const normalizedDecaySets = normalizeRegionDecaySets(regionConfig ?? {});
   const normalizedSpawnCounts = normalizeSpawnCounts(regionConfig?.spawnCounts ?? {});
-  const sizeMult = MAP_SIZE_SCALES[regionConfig?.mapSize] ?? 1.0;
-  const regionW = Math.round(REGION_W * sizeMult);
-  const regionH = Math.round(REGION_H * sizeMult);
-  const start = { x: 5.5 * sizeMult, y: (42 + seededRand(seed, 2) * 4) * sizeMult };
-  const end = { x: regionW - 7.5 * sizeMult, y: (7 + seededRand(seed, 3) * 10) * sizeMult };
-  const layoutDef = chooseLayoutForRegion(regionConfig, () => seededRand(seed, 8600 + regionIndex * 31));
+  const sizeMult = generateProceduralPhysical ? (MAP_SIZE_SCALES[regionConfig?.mapSize] ?? 1.0) : 1;
+  const regionW = generateProceduralPhysical ? Math.round(REGION_W * sizeMult) : 0;
+  const regionH = generateProceduralPhysical ? Math.round(REGION_H * sizeMult) : 0;
+  const start = generateProceduralPhysical ? { x: 5.5 * sizeMult, y: (42 + seededRand(seed, 2) * 4) * sizeMult } : null;
+  const end = generateProceduralPhysical ? { x: regionW - 7.5 * sizeMult, y: (7 + seededRand(seed, 3) * 10) * sizeMult } : null;
+  const layoutDef = generateProceduralPhysical
+    ? chooseLayoutForRegion(regionConfig, () => seededRand(seed, 8600 + regionIndex * 31))
+    : null;
   const layoutRoomCount = Math.max(1, Math.floor(Number(layoutDef?.roomCount) || 9));
   const bendScale = layoutDef ? Number(layoutDef.bendScale ?? 1) || 1 : 1;
   const wobbleScale = layoutDef ? Number(layoutDef.wobbleScale ?? 1) || 1 : 1;
@@ -647,6 +649,7 @@ export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.r
   const rooms = [];
   const mask = new Set();
 
+  if (generateProceduralPhysical) {
   for (let i = 0; i < 18; i += 1) {
     const t = i / 17;
     const bend = Math.sin(t * Math.PI * 2.2 + seededRand(seed, 10) * Math.PI * 2) * 7 * sizeMult * bendScale;
@@ -728,6 +731,7 @@ export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.r
     }
     mask.clear();
     for (const k of visited) mask.add(k);
+  }
   }
 
   const region = {
@@ -889,21 +893,29 @@ export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.r
     reservedTiles: new Set(),
     prefabDebug: null,
   };
-  placeRegionPrefabs(region, regionConfig, (salt = 0) => seededRand(seed, 8800 + regionIndex * 97 + salt), {
-    isPointPlayable: isRegionPointPlayable,
-  });
+  if (generateProceduralPhysical) {
+    placeRegionPrefabs(region, regionConfig, (salt = 0) => seededRand(seed, 8800 + regionIndex * 97 + salt), {
+      isPointPlayable: isRegionPointPlayable,
+    });
+  }
   return region;
 }
 
-export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
+export function createProceduralRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null) {
+  return createRegionBase(regionIndex, seed, regionConfig, true);
+}
+
+export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 1000000), biomeId = null, regionConfig = null, options = {}) {
   const conditionContext = regionConfig?.__conditionContext ?? {};
-  const selection = resolveRegionBlueprint(regionConfig, conditionContext.worldState, conditionContext);
-  const region = createProceduralRegion(regionIndex, seed, biomeId, regionConfig);
-  region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
+  const selection = resolveRegionBlueprint(regionConfig, conditionContext.worldState, conditionContext, options.blueprintRegistry);
   if (!selection.blueprint) {
     if (selection.diagnostics.length && (conditionContext.development === true || import.meta.env?.DEV)) console.warn(`[area-blueprint] ${selection.diagnostics[0]}`);
+    const region = (options.proceduralFactory ?? createProceduralRegion)(regionIndex, seed, biomeId, regionConfig);
+    region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
     return region;
   }
+  const region = createRegionBase(regionIndex, seed, regionConfig, false);
+  region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
   return applyBlueprintToRegion(region, selection.blueprint);
 }
 
@@ -914,8 +926,8 @@ export function isRegionTilePlayable(region, x, y) {
 
 export function isRegionWaterTile(region, x, y) {
   if (!region) return false;
-  const override = region.blueprintWaterOverrides?.get(`${Math.floor(x)},${Math.floor(y)}`);
-  if (override) return true;
+  const key = `${Math.floor(x)},${Math.floor(y)}`;
+  if (region.blueprint) return region.blueprintWaterOverrides?.has(key) === true;
   if (Math.max(0, Number(region.mapRegion?.spawnCounts?.water) || 0) <= 0) return false;
   if (!(region.mapRegion?.waterSets?.length)) return false;
   const tileX = Math.floor(x);
@@ -946,7 +958,7 @@ function pickWaterVariant(set, tileX, tileY, salt) {
 
 function regionWaterTile(region, tileX, tileY) {
   const blueprintWater = region?.blueprintWaterOverrides?.get(`${tileX},${tileY}`);
-  if (blueprintWater) return blueprintWater;
+  if (region?.blueprint) return blueprintWater ?? null;
   const patchCount = Math.max(0, Number(region?.mapRegion?.spawnCounts?.water) || 0);
   if (!region || patchCount <= 0 || !(region.mapRegion?.waterSets?.length)) return null;
   if (isReservedTile(region, tileX, tileY)) return null;
@@ -1076,11 +1088,11 @@ function regionEdgeMask(region, x, y) {
 
 function buildChunkWaterTiles(region, cx, cy) {
   const waterTiles = new Map();
-  if (region?.blueprintWaterOverrides) {
+  if (region?.blueprint) {
     const left = cx * CHUNK_SIZE; const right = left + CHUNK_SIZE - 1;
     const top = cy * CHUNK_SIZE; const bottom = top + CHUNK_SIZE - 1;
     for (let y = top; y <= bottom; y += 1) for (let x = left; x <= right; x += 1) {
-      const water = region.blueprintWaterOverrides.get(`${x},${y}`); if (water) waterTiles.set(`${x},${y}`, water);
+      const water = region.blueprintWaterOverrides?.get(`${x},${y}`); if (water) waterTiles.set(`${x},${y}`, water);
     }
     return waterTiles;
   }

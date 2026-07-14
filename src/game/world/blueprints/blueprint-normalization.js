@@ -50,3 +50,19 @@ export function serializeAreaBlueprint(input) {
 export function blueprintCellIsPlayable(blueprint, x, y) {
   return blueprint?.playableMask?.rows?.[y]?.[x] === true;
 }
+
+export function blueprintCellHasWater(blueprint, x, y) {
+  const value = blueprint?.water?.rows?.[y]?.[x];
+  return value !== null && value !== undefined;
+}
+
+export function blueprintCellIsTraversable(blueprint, x, y) {
+  return Number.isInteger(x)
+    && Number.isInteger(y)
+    && x >= 0
+    && y >= 0
+    && x < Number(blueprint?.w)
+    && y < Number(blueprint?.h)
+    && blueprintCellIsPlayable(blueprint, x, y)
+    && !blueprintCellHasWater(blueprint, x, y);
+}
