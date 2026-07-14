@@ -37,6 +37,8 @@ export class GameEngine {
     this.cityProgressSaver = typeof options.saveCityProgress === "function" ? options.saveCityProgress : null;
     this.onCityProgressChange = typeof options.onCityProgressChange === "function" ? options.onCityProgressChange : null;
     this.newGame = Boolean(options.newGame);
+    this.persistenceDisabled = Boolean(options.disablePersistence);
+    this.ignoreRegionExit = Boolean(options.ignoreRegionExit);
     this.deferAssetLoad = Boolean(options.deferAssetLoad);
     const performanceProfile = resolvePerformanceProfile(options.performanceMode);
     this.performanceMode = performanceProfile.id;

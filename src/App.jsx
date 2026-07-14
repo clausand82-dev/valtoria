@@ -349,6 +349,8 @@ export default function App() {
   const [hoveredCityStatId, setHoveredCityStatId] = useState(null);
   const [citySettingsOpen, setCitySettingsOpen] = useState(false);
   const [AreaEditorComponent, setAreaEditorComponent] = useState(null);
+  const [AreaEditorPlaytestComponent, setAreaEditorPlaytestComponent] = useState(null);
+  const [areaEditorResumeState, setAreaEditorResumeState] = useState(null);
   const [areaEditorLoading, setAreaEditorLoading] = useState(false);
   const [helpState, setHelpState] = useState({ open: false, topicId: null });
   const [performanceSettings, setPerformanceSettings] = useState(() => readPerformanceSettings());
@@ -457,7 +459,7 @@ export default function App() {
     return token;
   };
 
-  const preloadWildernessAssets = async (title = t("loading.map"), region = null) => {
+  const preloadWildernessAssets = async (title = t("loading.map"), region = null, assetInput = region) => {
     const token = loadTokenRef.current + 1;
     loadTokenRef.current = token;
     const update = (patch) => {
@@ -473,9 +475,9 @@ export default function App() {
         detail: t("loading.detail.wilderness"),
         error: "",
       });
-      const atlas = await loadGeneratedAtlas(region);
+      const atlas = await loadGeneratedAtlas(assetInput);
       update({ percent: 68, label: t("loading.combat"), detail: t("loading.detail.combat") });
-      const animationSheets = await loadAnimationSheets(region);
+      const animationSheets = await loadAnimationSheets(assetInput);
       preloadedGameAssetsRef.current = { atlas, animationSheets };
       if (engineRef.current) {
         engineRef.current.atlas = atlas;
@@ -611,6 +613,8 @@ export default function App() {
     const engine = new GameEngine(canvasRef.current, setSnapshot, {
       saveStorageKey: slot.saveKey,
       newGame: gameSession.newGame,
+      disablePersistence: Boolean(gameSession.editorTest),
+      ignoreRegionExit: Boolean(gameSession.editorTest?.ignoreRegionExit),
       performanceMode: runtimePerformance.mode,
       lowPowerMode: runtimePerformance.lowPowerMode,
       disableAmbientCritters: runtimePerformance.disableAmbientCritters,
@@ -624,15 +628,15 @@ export default function App() {
       particlesEnabled: runtimePerformance.particlesEnabled,
       useCustomPerformanceProfile: runtimePerformance.useCustom,
       cityStorageKey: slot.cityStorageKey,
-      loadCityProgress,
-      saveCityProgress,
-      onCityProgressChange: (progress) => {
+      loadCityProgress: gameSession.editorTest ? () => cityProgressHud : loadCityProgress,
+      saveCityProgress: gameSession.editorTest ? () => {} : saveCityProgress,
+      onCityProgressChange: gameSession.editorTest ? () => {} : (progress) => {
         syncCityProgress(progress, { refreshCityPage: true });
       },
       atlas: preloadedGameAssetsRef.current.atlas,
       animationSheets: preloadedGameAssetsRef.current.animationSheets,
       deferAssetLoad: true,
-      onSave: (payload) => {
+      onSave: gameSession.editorTest ? null : (payload) => {
         if (!slot.legacy) upsertSaveSlot({ ...slot, updatedAt: payload?.savedAt ?? Date.now() });
         setSaveSlots(collectSaveSlots());
       },
@@ -643,7 +647,17 @@ export default function App() {
       window.VALTORIA_ASSET_CACHE_DIAGNOSTICS = getAssetCacheDiagnostics;
     }
     engine.start();
-    if (gameSession.newGame) engine.saveProgress({ force: true });
+    if (gameSession.editorTest) {
+      const playtest = gameSession.editorTest;
+      const started = engine.startMapRegion("area_editor_test", playtest.regionConfig, {
+        createRegionOptions: { blueprintRegistry: { [playtest.blueprint.id]: playtest.blueprint } },
+        sessionMetadata: { editorTest: true, editorDocumentKind: playtest.kind },
+      });
+      if (!started) {
+        setAppLoading((current) => ({ ...current, active: false, error: "Area Editor playable test could not start." }));
+        setGameSession(null);
+      }
+    } else if (gameSession.newGame) engine.saveProgress({ force: true });
     return () => {
       if (typeof window !== "undefined" && window.VALTORIA_ENGINE === engine) delete window.VALTORIA_ENGINE;
       if (import.meta.env.DEV && typeof window !== "undefined") delete window.VALTORIA_ASSET_CACHE_DIAGNOSTICS;
@@ -683,11 +697,13 @@ export default function App() {
   }, [cityOpen, gameSession?.sessionId]);
 
   useEffect(() => {
+    if (gameSession?.editorTest) return;
     if (!gameSession?.slot?.regionCorruptionStorageKey) return;
     saveRegionCorruption(regionCorruption, gameSession.slot.regionCorruptionStorageKey);
   }, [gameSession?.slot?.regionCorruptionStorageKey, regionCorruption]);
 
   useEffect(() => {
+    if (gameSession?.editorTest) return;
     if (!gameSession?.slot?.regionMapLastIdStorageKey) return;
     saveRepository.saveLastRegionMapIdSync(gameSession.slot.regionMapLastIdStorageKey, regionMapInitialId);
   }, [gameSession?.slot?.regionMapLastIdStorageKey, regionMapInitialId]);
@@ -697,6 +713,7 @@ export default function App() {
   }, [gameSession?.slot?.cityStorageKey, cityOpen]);
 
   useEffect(() => {
+    if (gameSessionRef.current?.editorTest) return;
     const mapReturn = snapshot.mapReturn;
     if (!mapReturn?.id || lastMapReturnIdRef.current === mapReturn.id) return;
     lastMapReturnIdRef.current = mapReturn.id;
@@ -782,6 +799,7 @@ export default function App() {
   }, [snapshot.mapReturn, regionCorruption]);
 
   useEffect(() => {
+    if (gameSessionRef.current?.editorTest) return;
     const lastDeath = snapshot.lastDeath;
     if (!lastDeath?.id || lastDeathIdRef.current === lastDeath.id) return;
     lastDeathIdRef.current = lastDeath.id;
@@ -806,7 +824,7 @@ export default function App() {
   useEffect(() => {
     if (!import.meta.hot) return undefined;
     const openWorldMapAfterHotUpdate = () => {
-      if (!gameSessionRef.current) return;
+      if (!gameSessionRef.current || gameSessionRef.current.editorTest) return;
       setRegionMapInitialId(WORLD_MAP.id);
       setRegionMapOpen(false);
       setMapOpen(false);
@@ -1401,13 +1419,70 @@ export default function App() {
       if (!isAreaEditorAvailable({ dev: import.meta.env.DEV, hostname: window.location.hostname })) return;
       setCitySettingsOpen(false);
       setAreaEditorComponent(() => module.default);
+      setAreaEditorPlaytestComponent(() => module.AreaEditorPlaytestOverlay);
     } finally {
       setAreaEditorLoading(false);
     }
   };
 
+  const startAreaEditorTest = async ({ playtest, resumeState }) => {
+    if (!areaEditorAvailable || !AreaEditorComponent || gameSession || !playtest) return false;
+    setAreaEditorResumeState(resumeState);
+    const ready = await preloadWildernessAssets("Area Editor playable test", playtest.regionConfig, playtest.assetInput);
+    if (!ready) return false;
+    setSnapshot(emptySnapshot);
+    setInventoryOpen(false);
+    setMapOpen(false);
+    setRegionMapOpen(false);
+    setHeroOpen(false);
+    setQuestOffer(null);
+    setQuestRewardModal(null);
+    setViewedQuest(null);
+    setQuestOverviewOpen(false);
+    setConfirmMapAbandonOpen(false);
+    setCityStorageOpen(false);
+    setCitySettingsOpen(false);
+    setRunSummary(null);
+    setCityOpen(false);
+    setGameSession({
+      sessionId: `area-editor-test-${Date.now()}`,
+      slot: {
+        id: "area-editor_test",
+        name: "Area Editor Test",
+        saveKey: "__valtoria_area_editor_test_no_save__",
+        cityStorageKey: "__valtoria_area_editor_test_no_city__",
+        regionCorruptionStorageKey: "__valtoria_area_editor_test_no_corruption__",
+        regionMapLastIdStorageKey: "__valtoria_area_editor_test_no_map__",
+        legacy: true,
+      },
+      newGame: true,
+      editorTest: playtest,
+    });
+    return true;
+  };
+
+  const exitAreaEditorTest = () => {
+    if (!gameSessionRef.current?.editorTest) return;
+    loadTokenRef.current += 1;
+    setGameSession(null);
+    setSnapshot(emptySnapshot);
+    setInventoryOpen(false);
+    setMapOpen(false);
+    setRegionMapOpen(false);
+    setHeroOpen(false);
+    setQuestOffer(null);
+    setQuestRewardModal(null);
+    setViewedQuest(null);
+    setQuestOverviewOpen(false);
+    setConfirmMapAbandonOpen(false);
+    setCityStorageOpen(false);
+    setRunSummary(null);
+    setCityOpen(false);
+    setAppLoading((current) => ({ ...current, active: false, error: "" }));
+  };
+
   if (AreaEditorComponent && areaEditorAvailable && !gameSession) {
-    return <AreaEditorComponent onClose={() => { setAreaEditorComponent(null); setCitySettingsOpen(true); }} />;
+    return <AreaEditorComponent resumeState={areaEditorResumeState} onTest={startAreaEditorTest} onClose={() => { setAreaEditorComponent(null); setAreaEditorPlaytestComponent(null); setAreaEditorResumeState(null); setCitySettingsOpen(true); }} />;
   }
 
   return (
@@ -1432,6 +1507,7 @@ export default function App() {
       )}
 
       {gameSession && <canvas ref={canvasRef} className="game-canvas" aria-label="Valtoria isometric game" />}
+      {gameSession?.editorTest && AreaEditorPlaytestComponent && <AreaEditorPlaytestComponent label={gameSession.editorTest.label} kind={gameSession.editorTest.kind} onExit={exitAreaEditorTest} />}
 
       <>
       {gameSession && (
@@ -2011,9 +2087,11 @@ export default function App() {
       {snapshot.exitPrompt && !cityOpen && (
         <div className="confirm-backdrop" role="presentation">
           <section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="region-exit-title">
-            <h2 id="region-exit-title">{snapshot.regionRun ? "Tilbage til byen?" : "Rejs videre?"}</h2>
+            <h2 id="region-exit-title">{gameSession?.editorTest ? "Afslut editor-test?" : snapshot.regionRun ? "Tilbage til byen?" : "Rejs videre?"}</h2>
             <p>
-              {snapshot.regionRun
+              {gameSession?.editorTest
+                ? `Du har nået blueprintets exit. Afslut testen og vend tilbage til Area Editor?`
+                : snapshot.regionRun
                 ? `Du har fundet udgangen fra ${snapshot.region.name}. Forlad regionen og vend tilbage til byen?`
                 : `Du har fundet udgangen fra ${snapshot.region.name}. Fortsaet til naeste region?`}
             </p>
@@ -2021,8 +2099,8 @@ export default function App() {
               <button type="button" onClick={() => engineRef.current?.dismissExitPrompt()}>
                 Bliv her
               </button>
-              <button type="button" onClick={() => engineRef.current?.travelToNextRegion()}>
-                {snapshot.regionRun ? "Til byen" : "Rejs videre"}
+              <button type="button" onClick={() => gameSession?.editorTest ? exitAreaEditorTest() : engineRef.current?.travelToNextRegion()}>
+                {gameSession?.editorTest ? "Tilbage til editor" : snapshot.regionRun ? "Til byen" : "Rejs videre"}
               </button>
             </div>
           </section>

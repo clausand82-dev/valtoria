@@ -113,6 +113,14 @@ function restoreKeptAbandonState(engine, currentState, config = MAP_ABANDON_RESE
 export const regionMethods = {
   updateRegionExit(dt) {
     this.exitPromptCooldown = Math.max(0, this.exitPromptCooldown - dt);
+    if (this.ignoreRegionExit) {
+      if (this.exitPromptOpen) {
+        this.exitPromptOpen = false;
+        this.markRenderDirty?.("exit-prompt");
+        this.publishSnapshot();
+      }
+      return;
+    }
     if (this.isInSubregion?.()) {
       if (this.exitPromptOpen) {
         this.exitPromptOpen = false;
@@ -160,7 +168,7 @@ export const regionMethods = {
     this.publishSnapshot();
   },
 
-  startMapRegion(areaMapId, regionConfig) {
+  startMapRegion(areaMapId, regionConfig, options = {}) {
     if (!areaMapId || !regionConfig?.id) return false;
     this.clearSubregionExpedition?.();
     const preparedRegionConfig = regionConfig.__worldStateResolved
@@ -180,7 +188,10 @@ export const regionMethods = {
     this.region = createRegion(this.regionIndex, seed, null, {
       ...preparedRegionConfig,
       areaMapId,
-    });
+    }, options.createRegionOptions);
+    if (options.sessionMetadata && typeof options.sessionMetadata === "object") {
+      Object.assign(this.activeMapRegion, options.sessionMetadata);
+    }
     const weatherId = String(preparedRegionConfig.weather?.id ?? "");
     const weatherAmbience = ["rain", "light_rain", "heavy_rain", "thunderstorm"].includes(weatherId) ? ["rain_ambience"] : [];
     audioManager.setRegionAudio({ ...(preparedRegionConfig.audio ?? {}), ambience: [...(preparedRegionConfig.audio?.ambience ?? []), ...weatherAmbience] });

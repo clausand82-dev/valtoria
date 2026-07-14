@@ -11,6 +11,14 @@ Små rettelse observeret igennem spil test:
 - spell nedtælling i ikon i expedition virker ikke korrekt
 
 
+DESIGNER:
+- normale region setting mangler i blueprint - alle de ting man normal kan sætte i et region (weather, spawnCounts, audio, ambient, critters)
+
+- mulighed for at teste random regions i test (ikke prioritet)
+
+- water felter er stadig grimme - tag screenshot og vis det - be om at få dem lavet ligesom de laves i runtime - kræver ikke ekstra anden visning
+
+
 - i bibliotek skal man kunne lave papir om til scrolls (hvis den mulighed ikke allerede findes)
 - scrolls skal kunen laves om til bøger (der ligesom frugt tønder) er en resource der kan doneres for at få faith eller culture eller knowledge
  - tre bøger (religiøse bøger der giver faith), roman der giver culture og fagbøger der giver knowledge

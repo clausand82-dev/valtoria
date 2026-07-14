@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocalization } from "../../i18n/index.js";
 import { PREFAB_CONTENT_LAYERS } from "../../game/world/prefabs/prefab-normalization.js";
-import { assetFrameStyle, buildAreaEditorAssetCatalog, filterAssetCatalog } from "./asset-catalog.js";
+import { buildAreaEditorAssetCatalog, filterAssetCatalog } from "./asset-catalog.js";
+import { AssetCatalog, buildCatalogPreviewIndex, EditorEntityPreview, GroundTilePreview, previewDepth, previewGeometry, previewImageState, resolveEntityPreviewAsset, SvgSpriteFrame, useEditorPreviewImages, WaterTilePreview } from "./editor-preview.jsx";
 import { deleteEditorBlueprint, deleteEditorPrefab, downloadEditorDocument, listEditorPrefabs, readEditorJsonFile, saveEditorBlueprint, saveEditorPrefab } from "./editor-api.js";
 import { createEditorHistory, commitEditorHistory, redoEditorHistory, undoEditorHistory } from "./editor-history.js";
 import { createBlueprintEditorDocument, createEditorDocument, cloneEditorValue, editorDocumentFingerprint, editorLayersForDocument, resizeEditorDocument, resizeImpact } from "./editor-document.js";
@@ -16,6 +18,7 @@ import { serializeAreaBlueprint } from "../../game/world/blueprints/blueprint-no
 import { MAP_REGION_SETS } from "../../game/config/map-region-config.js";
 import { worldEntryAllowed } from "../../game/world-state.js";
 import { buildRegionConditionPreview } from "./condition-preview.js";
+import { buildEditorPlaytest } from "./editor-playtest.js";
 import "./area-editor.css";
 
 const LAYER_LABELS = { playableMask: "Playable mask", ground: "Ground", water: "Water", start: "Start position", exits: "Exit positions", decals: "Decay / decals", foliage: "Foliage", objects: "Objects", monsters: "Monsters", npcs: "NPCs", chests: "Chests" };
@@ -40,14 +43,68 @@ function countLayer(document, layer) {
 }
 
 function fieldValue(value, field) {
-  if (field.type === "checkbox") return Boolean(value);
+  if (field.type === "checkbox") return value === undefined ? Boolean(field.defaultValue) : Boolean(value);
   return value ?? "";
 }
 
+function FieldLabel({ field }) {
+  const tooltipId = `area-editor-field-${useId().replace(/[^a-z0-9_-]/gi, "-")}`;
+  const tooltipRef = useRef(null);
+  const [anchor, setAnchor] = useState(null);
+  const [position, setPosition] = useState(null);
+  const openTooltip = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setAnchor({ centerX: rect.left + rect.width / 2, top: rect.top, bottom: rect.bottom });
+  };
+  const closeTooltip = () => { setAnchor(null); setPosition(null); };
+  useLayoutEffect(() => {
+    if (!anchor || !tooltipRef.current) return;
+    const rect = tooltipRef.current.getBoundingClientRect();
+    const gutter = 8;
+    const left = Math.max(gutter, Math.min(window.innerWidth - rect.width - gutter, anchor.centerX - rect.width / 2));
+    let top = anchor.top - rect.height - gutter;
+    if (top < gutter) top = anchor.bottom + gutter;
+    top = Math.max(gutter, Math.min(window.innerHeight - rect.height - gutter, top));
+    setPosition({ left, top });
+  }, [anchor, field.description]);
+  const tooltip = anchor && createPortal(<span
+    ref={tooltipRef}
+    id={tooltipId}
+    className="area-editor-field-tooltip"
+    role="tooltip"
+    style={position ?? { left: 8, top: 8, visibility: "hidden" }}
+  >{field.description}</span>, document.body);
+  return <span className="area-editor-field-label"><span>{field.label}</span><span
+    className="area-editor-field-help"
+    tabIndex="0"
+    aria-label={`Help for ${field.label}`}
+    aria-describedby={tooltipId}
+    onPointerEnter={openTooltip}
+    onPointerLeave={closeTooltip}
+    onFocus={openTooltip}
+    onBlur={closeTooltip}
+  >?</span>{tooltip}</span>;
+}
+
+function normalizedOptions(field, value) {
+  const options = (field.options ?? []).map((option) => typeof option === "object" ? option : { value: option, label: String(option) });
+  const hasValue = value !== undefined && value !== null && value !== "";
+  if (hasValue && !options.some((option) => String(option.value) === String(value))) options.unshift({ value, label: `${value} (current)` });
+  return options;
+}
+
 function PropertyField({ field, value, onChange }) {
-  if (field.type === "checkbox") return <label className="area-editor-check"><input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />{field.label}</label>;
-  if (field.type === "select") return <label>{field.label}<select value={value ?? ""} onChange={(event) => onChange(event.target.value)}>{field.options.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>;
-  return <label>{field.label}<input type={field.type} min={field.min} max={field.max} step={field.step} value={fieldValue(value, field)} onChange={(event) => onChange(field.type === "number" ? Number(event.target.value) : event.target.value)} /></label>;
+  if (field.type === "checkbox") return <label className="area-editor-check"><input type="checkbox" checked={fieldValue(value, field)} onChange={(event) => onChange(event.target.checked)} /><FieldLabel field={field} /></label>;
+  if (field.type === "multiselect") {
+    const selected = Array.isArray(value) ? value.map(String) : [];
+    const options = normalizedOptions(field, null);
+    return <div className="area-editor-multiselect"><FieldLabel field={field} /><details><summary>{selected.length ? `${selected.length} selected` : "None selected"}</summary><div>{options.map((option) => <label key={option.value}><input type="checkbox" checked={selected.includes(String(option.value))} onChange={(event) => onChange(event.target.checked ? [...new Set([...selected, String(option.value)])] : selected.filter((entry) => entry !== String(option.value)))} />{option.label}</label>)}</div></details></div>;
+  }
+  if (field.type === "select") {
+    const options = normalizedOptions(field, value);
+    return <label><FieldLabel field={field} /><select value={value ?? ""} onChange={(event) => onChange(event.target.value === "" ? undefined : field.valueType === "number" ? Number(event.target.value) : event.target.value)}>{field.optional && <option value="">Runtime default / none</option>}{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  }
+  return <label><FieldLabel field={field} /><input type={field.type} min={field.min} max={field.max} step={field.step} value={fieldValue(value, field)} onChange={(event) => onChange(field.type === "number" ? event.target.value === "" ? undefined : Number(event.target.value) : event.target.value)} /></label>;
 }
 
 function DocumentBrowser({ data, onNew, onNewBlueprint, onOpenGenerated, onOpenBlueprint, onPreviewHandwritten, onImport, onDuplicate, onDelete, onDeleteBlueprint, onImportJson, onClose, status }) {
@@ -77,7 +134,7 @@ function DocumentBrowser({ data, onNew, onNewBlueprint, onOpenGenerated, onOpenB
   </main>;
 }
 
-function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, onPanStart, onWheel, onStrokeStart, onStrokeMove, onStrokeEnd }) {
+function EditorCanvas({ document, ui, catalogByFile, previewIndex, onCell, onHover, hoverCell, onPanStart, onWheel, onStrokeStart, onStrokeMove, onStrokeEnd }) {
   const width = 1100;
   const height = 720;
   const originX = width / 2 + ui.panX;
@@ -97,7 +154,26 @@ function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, 
     const conversionView = ui.view === "topdown" ? { ...view, originX: 50 + ui.panX, originY: 50 + ui.panY } : view;
     callback(pointerToGrid(localX, localY, ui.view, conversionView), event);
   };
-  const entities = PREFAB_CONTENT_LAYERS.flatMap((layer) => ui.visibility[layer] === false ? [] : (document[layer] ?? []).map((entry, index) => ({ layer, entry, index }))).sort((a, b) => (Number(a.entry.x) + Number(a.entry.y)) - (Number(b.entry.x) + Number(b.entry.y)) || PREFAB_CONTENT_LAYERS.indexOf(a.layer) - PREFAB_CONTENT_LAYERS.indexOf(b.layer));
+  const rawEntities = PREFAB_CONTENT_LAYERS.flatMap((layer) => ui.visibility[layer] === false ? [] : (document[layer] ?? []).map((entry, index) => ({ layer, entry, index, asset: resolveEntityPreviewAsset(previewIndex, layer, entry) })));
+  const groundPreviewAssets = (document.ground?.palette ?? []).map((entry) => {
+    const asset = entry ? catalogByFile.get(`ground:${entry.fileName}:${Number(entry.variant) || 0}`) : null;
+    return asset ? { ...asset, ...entry, sourceVariant: Number(entry.variant) || 0 } : null;
+  });
+  const waterPreviewAssets = (document.water?.palette ?? []).map((entry) => {
+    const asset = entry ? catalogByFile.get(`water:${entry.fileName}:${Number(entry.variant) || 0}`) : null;
+    return asset ? { ...asset, ...entry, sourceVariant: Number(entry.variant) || 0 } : null;
+  });
+  const imageState = useEditorPreviewImages([...rawEntities.map(({ asset }) => asset), ...groundPreviewAssets, ...waterPreviewAssets]);
+  const entities = rawEntities.map((entity) => {
+    const pos = point(Number(entity.entry.x), Number(entity.entry.y));
+    const baseX = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x;
+    const baseY = ui.view === "topdown"
+      ? pos.y + tileH / 2
+      : pos.y + tileH * (entity.asset?.kind === "decal" ? 0.52 : 0.5);
+    const image = previewImageState(imageState, entity.asset);
+    const geometry = image?.status === "loaded" ? previewGeometry(entity.asset, image, tileW, tileH, entity.entry) : null;
+    return { ...entity, baseX, baseY, depth: previewDepth(entity.asset, entity.entry, baseY, geometry) };
+  }).sort((a, b) => a.depth.layer - b.depth.layer || a.depth.value - b.depth.value || PREFAB_CONTENT_LAYERS.indexOf(a.layer) - PREFAB_CONTENT_LAYERS.indexOf(b.layer) || a.index - b.index);
   return <svg className="area-editor-canvas" viewBox={`0 0 ${width} ${height}`} onPointerDown={(event) => handlePointer(event, (cell, original) => {
     if (original.button === 1 || ui.tool === "pan") onPanStart(original);
     else if (["paint", "erase"].includes(ui.tool)) { original.currentTarget.setPointerCapture?.(original.pointerId); onStrokeStart(cell); }
@@ -108,29 +184,27 @@ function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, 
       const pos = point(cell.x, cell.y);
       const overrideIndex = document.ground?.rows?.[cell.y]?.[cell.x];
       const playable = document.documentType !== "blueprint" || document.playableMask?.rows?.[cell.y]?.[cell.x] === true;
-      const water = document.documentType === "blueprint" && document.water?.rows?.[cell.y]?.[cell.x] !== null && document.water?.rows?.[cell.y]?.[cell.x] !== undefined;
+      const waterIndex = document.documentType === "blueprint" ? document.water?.rows?.[cell.y]?.[cell.x] : null;
+      const water = waterIndex !== null && waterIndex !== undefined;
       const groundEntry = document.ground?.palette?.[overrideIndex];
-      const groundAsset = groundEntry ? [...catalogByKey.values()].find((asset) => asset.layer === "ground" && asset.fileName === groundEntry.fileName && Number(asset.variant) === Number(groundEntry.variant)) : null;
+      const waterEntry = document.water?.palette?.[waterIndex];
+      const catalogGroundAsset = groundEntry ? catalogByFile.get(`ground:${groundEntry.fileName}:${Number(groundEntry.variant) || 0}`) : null;
+      const groundAsset = catalogGroundAsset ? { ...catalogGroundAsset, ...groundEntry, sourceVariant: Number(groundEntry.variant) || 0 } : null;
+      const catalogWaterAsset = waterEntry ? catalogByFile.get(`water:${waterEntry.fileName}:${Number(waterEntry.variant) || 0}`) : null;
+      const waterAsset = catalogWaterAsset ? { ...catalogWaterAsset, ...waterEntry, sourceVariant: Number(waterEntry.variant) || 0 } : null;
       const selected = ui.selectedCell?.x === cell.x && ui.selectedCell?.y === cell.y;
       const hovered = hoverCell?.x === cell.x && hoverCell?.y === cell.y;
-      const frame = groundAsset ? { col: groundAsset.variant % groundAsset.cols, row: Math.floor(groundAsset.variant / groundAsset.cols), cols: groundAsset.cols, rows: groundAsset.rows } : null;
-      if (ui.view === "topdown") return <g key={`${cell.x},${cell.y}`}><rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{frame && playable && <svg x={pos.x} y={pos.y} width={tileW} height={tileH} viewBox={`${frame.col} ${frame.row} 1 1`} preserveAspectRatio="none"><image href={groundAsset.previewUrl} x="0" y="0" width={frame.cols} height={frame.rows} preserveAspectRatio="none" /></svg>}{water && <rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="#247c9d" opacity="0.72" />}<rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
+      if (ui.view === "topdown") return <g key={`${cell.x},${cell.y}`}><rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{groundAsset && playable && <SvgSpriteFrame asset={groundAsset} x={pos.x} y={pos.y} width={tileW} height={tileH} />}{water && (waterAsset ? <SvgSpriteFrame asset={waterAsset} x={pos.x} y={pos.y} width={tileW} height={tileH} opacity={0.82} /> : <rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="#247c9d" opacity="0.72" />)}<rect x={pos.x} y={pos.y} width={tileW} height={tileH} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
       const points = `${pos.x},${pos.y} ${pos.x + tileW / 2},${pos.y + tileH / 2} ${pos.x},${pos.y + tileH} ${pos.x - tileW / 2},${pos.y + tileH / 2}`;
-      const clipId = `ground-${cell.x}-${cell.y}`;
-      return <g key={`${cell.x},${cell.y}`}><defs><clipPath id={clipId}><polygon points={points} /></clipPath></defs><polygon points={points} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{frame && playable && <svg x={pos.x - tileW / 2} y={pos.y} width={tileW} height={tileH} viewBox={`${frame.col} ${frame.row} 1 1`} preserveAspectRatio="none" clipPath={`url(#${clipId})`}><image href={groundAsset.previewUrl} x="0" y="0" width={frame.cols} height={frame.rows} preserveAspectRatio="none" /></svg>}{water && <polygon points={points} fill="#247c9d" opacity="0.72" />}<polygon points={points} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
+      const runtimeRatio = tileW / 104;
+      const groundBasePoints = `${pos.x},${pos.y - runtimeRatio} ${pos.x + tileW / 2 + runtimeRatio},${pos.y + tileH / 2} ${pos.x},${pos.y + tileH + runtimeRatio} ${pos.x - tileW / 2 - runtimeRatio},${pos.y + tileH / 2}`;
+      const waterClipId = `water-${cell.x}-${cell.y}`;
+      return <g key={`${cell.x},${cell.y}`}><polygon points={points} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{groundAsset && playable && <><polygon points={groundBasePoints} fill={groundAsset.baseColor ?? "#4f8f36"} opacity={Number.isFinite(Number(groundAsset.baseAlpha)) ? Number(groundAsset.baseAlpha) : 1} /><GroundTilePreview asset={groundAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} /></>}{water && <><polygon points={groundBasePoints} fill="#1f5f7f" opacity="1" />{waterAsset && <WaterTilePreview asset={waterAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} clipId={waterClipId} />}</>}<polygon points={points} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
     })}
-    {entities.map(({ layer, entry, index }) => {
-      const pos = point(Number(entry.x), Number(entry.y));
+    {entities.map(({ layer, entry, index, asset, baseX, baseY }) => {
       const selected = ui.selection?.layer === layer && ui.selection?.index === index;
-      const assetId = entry.id ?? entry.decayId ?? entry.type ?? entry.npcId;
-      const asset = [...catalogByKey.values()].find((candidate) => candidate.layer === layer && candidate.id === assetId);
-      const cx = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x;
-      const cy = ui.view === "topdown" ? pos.y + tileH / 2 : pos.y + tileH / 2;
-      return <g key={`${layer}:${index}`} pointerEvents="none">
-        <circle cx={cx} cy={cy} r={selected ? 16 : 12} fill={LAYER_COLORS[layer]} stroke={selected ? "#fff2a8" : "#0a0d0e"} strokeWidth={selected ? 4 : 2} />
-        {asset?.previewUrl && <image href={asset.previewUrl} x={cx - 12} y={cy - 24} width="24" height="24" preserveAspectRatio="xMidYMid meet" />}
-        <text x={cx} y={cy + 5} textAnchor="middle" fill="#fff" fontSize="9" fontWeight="800">{layer.slice(0, 1).toUpperCase()}</text>
-      </g>;
+      if (ui.view === "topdown") return <g key={`${layer}:${index}`} pointerEvents="none"><circle cx={baseX} cy={baseY} r={selected ? 16 : 12} fill={LAYER_COLORS[layer]} stroke={selected ? "#fff2a8" : "#0a0d0e"} strokeWidth={selected ? 4 : 2} /><text x={baseX} y={baseY + 5} textAnchor="middle" fill="#fff" fontSize="9" fontWeight="800">{layer.slice(0, 1).toUpperCase()}</text></g>;
+      return <EditorEntityPreview key={`${layer}:${index}`} asset={asset} entry={entry} layer={layer} baseX={baseX} baseY={baseY} tileW={tileW} tileH={tileH} selected={selected} imageState={imageState} previewKey={`${layer}-${index}`} />;
     })}
     {document.documentType === "blueprint" && document.start && (() => { const pos = point(document.start.x, document.start.y); const cx = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x; const cy = ui.view === "topdown" ? pos.y + tileH / 2 : pos.y + tileH / 2; return <g><circle cx={cx} cy={cy} r="15" fill="#4fd77d" stroke="#fff" strokeWidth="3" /><text x={cx} y={cy + 5} textAnchor="middle" fontWeight="800">S</text></g>; })()}
     {document.documentType === "blueprint" && (document.exits ?? []).map((exit, index) => { const pos = point(exit.x, exit.y); const cx = ui.view === "topdown" ? pos.x + tileW / 2 : pos.x; const cy = ui.view === "topdown" ? pos.y + tileH / 2 : pos.y + tileH / 2; return <g key={`exit:${index}`}><circle cx={cx} cy={cy} r="15" fill={exit.primary ? "#f2bd4a" : "#d58ae8"} stroke="#fff" strokeWidth="3" /><text x={cx} y={cy + 5} textAnchor="middle" fontWeight="800">E</text></g>; })}
@@ -138,26 +212,36 @@ function EditorCanvas({ document, ui, catalogByKey, onCell, onHover, hoverCell, 
   </svg>;
 }
 
-export default function AreaEditorPage({ onClose }) {
+export function AreaEditorPlaytestOverlay({ label, kind, onExit }) {
+  return <aside className="area-editor-playtest-toolbar" aria-label="Area Editor test mode">
+    <div><strong>Editor test</strong><span>{label} · {kind}</span></div>
+    <button type="button" data-testid="exit-area-editor-test" onClick={onExit}>Exit test</button>
+  </aside>;
+}
+
+export default function AreaEditorPage({ onClose, onTest, resumeState = null }) {
   const { t } = useLocalization();
   const [data, setData] = useState(null);
-  const [history, setHistory] = useState(null);
+  const [history, setHistory] = useState(() => cloneEditorValue(resumeState?.history) ?? null);
   const document = history?.present ?? null;
-  const [ui, setUi] = useState(null);
-  const [savedFingerprint, setSavedFingerprint] = useState(null);
-  const [originalId, setOriginalId] = useState(null);
-  const [readOnly, setReadOnly] = useState(false);
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("all");
+  const [ui, setUi] = useState(() => cloneEditorValue(resumeState?.ui) ?? null);
+  const [savedFingerprint, setSavedFingerprint] = useState(() => resumeState?.savedFingerprint ?? null);
+  const [originalId, setOriginalId] = useState(() => resumeState?.originalId ?? null);
+  const [readOnly, setReadOnly] = useState(() => Boolean(resumeState?.readOnly));
+  const [status, setStatus] = useState(() => resumeState ? "Returned from playable test." : "");
+  const [search, setSearch] = useState(() => resumeState?.search ?? "");
+  const [category, setCategory] = useState(() => resumeState?.category ?? "all");
   const [hoverCell, setHoverCell] = useState(null);
-  const [advancedText, setAdvancedText] = useState("{}");
-  const [conditionPreviewText, setConditionPreviewText] = useState("{\n  \"worldState\": { \"flags\": {}, \"values\": {}, \"counters\": {} },\n  \"cityStats\": {}\n}");
-  const [conditionPreviewCommon, setConditionPreviewCommon] = useState({ activeQuests: "", completedQuests: "", flags: "", corruption: "", cityThreat: "" });
+  const [advancedText, setAdvancedText] = useState(() => resumeState?.advancedText ?? "{}");
+  const [conditionPreviewText, setConditionPreviewText] = useState(() => resumeState?.conditionPreviewText ?? "{\n  \"worldState\": { \"flags\": {}, \"values\": {}, \"counters\": {} },\n  \"cityStats\": {}\n}");
+  const [conditionPreviewCommon, setConditionPreviewCommon] = useState(() => cloneEditorValue(resumeState?.conditionPreviewCommon) ?? { activeQuests: "", completedQuests: "", flags: "", corruption: "", cityThreat: "" });
+  const [testing, setTesting] = useState(false);
   const panRef = useRef(null);
   const strokeRef = useRef(null);
   const catalog = useMemo(buildAreaEditorAssetCatalog, []);
   const catalogByKey = useMemo(() => new Map(catalog.map((entry) => [entry.key, entry])), [catalog]);
+  const catalogByFile = useMemo(() => new Map(catalog.filter((entry) => entry.fileName).map((entry) => [`${entry.layer}:${entry.fileName}:${Number(entry.variant) || 0}`, entry])), [catalog]);
+  const previewIndex = useMemo(() => buildCatalogPreviewIndex(catalog), [catalog]);
   const dirty = Boolean(document && savedFingerprint !== editorDocumentFingerprint(persistEditorView(document, ui)));
   const allIds = useMemo(() => document?.documentType === "blueprint" ? (data?.blueprints ?? []).map((entry) => entry.id) : [...(data?.generated ?? []), ...(data?.handwritten ?? [])].map((entry) => entry.id), [data, document?.documentType]);
   const validation = useMemo(() => document ? validateEditorDocument(persistEditorView(document, ui), allIds, originalId) : { errors: [], warnings: [], canSave: false }, [document, ui, allIds, originalId]);
@@ -251,6 +335,38 @@ export default function AreaEditorPage({ onClose }) {
       await refresh();
     } catch (error) {
       setStatus(`${error.message} Use JSON download as a fallback.`);
+    }
+  };
+
+  const startPlayableTest = async () => {
+    if (!document || !ui || !onTest || testing) return;
+    const target = persistEditorView(document, ui);
+    const check = validateEditorDocument(target, allIds, originalId);
+    if (!check.canSave) {
+      setStatus(`Cannot test invalid document: ${check.errors.map((entry) => entry.message).join(" · ")}`);
+      return;
+    }
+    const editorState = {
+      history: cloneEditorValue(history),
+      ui: cloneEditorValue(ui),
+      savedFingerprint,
+      originalId,
+      readOnly,
+      search,
+      category,
+      advancedText,
+      conditionPreviewText,
+      conditionPreviewCommon: cloneEditorValue(conditionPreviewCommon),
+    };
+    setTesting(true);
+    setStatus("Preparing playable test...");
+    try {
+      const started = await onTest({ playtest: buildEditorPlaytest(target), resumeState: editorState });
+      if (started === false) setStatus("Playable test could not be started.");
+    } catch (error) {
+      setStatus(`Playable test failed: ${error.message}`);
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -363,7 +479,7 @@ export default function AreaEditorPage({ onClose }) {
   const updateSelected = (field, value) => { if (!readOnly) commit(updateEntity(document, ui.selection, { [field.key]: value })); };
 
   return <main className="area-editor-page" data-testid="area-editor-page">
-    <header className="area-editor-topbar"><div><button type="button" onClick={closeDocument}>← Documents</button><strong>{document.label || document.id}</strong><span>{document.documentType === "blueprint" ? "Full-area blueprint" : "Prefab"}</span>{dirty && <span className="area-editor-dirty">Modified</span>}{readOnly && <span>Read-only preview</span>}</div><div><button type="button" onClick={() => setHistory(undoEditorHistory)} disabled={!history.past.length || readOnly}>Undo</button><button type="button" onClick={() => setHistory(redoEditorHistory)} disabled={!history.future.length || readOnly}>Redo</button><button type="button" onClick={() => downloadEditorDocument(document.documentType === "blueprint" ? serializeAreaBlueprint(persistEditorView(document, ui)) : editorDocumentToRuntimePrefab(persistEditorView(document, ui)))}>Download JSON</button><button type="button" onClick={() => save(true)} disabled={readOnly}>Save as copy</button><button type="button" onClick={() => save(false)} disabled={readOnly || !validation.canSave}>Save</button></div></header>
+    <header className="area-editor-topbar"><div><button type="button" onClick={closeDocument}>← Documents</button><strong>{document.label || document.id}</strong><span>{document.documentType === "blueprint" ? "Full-area blueprint" : "Prefab"}</span>{dirty && <span className="area-editor-dirty">Modified</span>}{readOnly && <span>Read-only preview</span>}</div><div><button type="button" onClick={() => setHistory(undoEditorHistory)} disabled={!history.past.length || readOnly}>Undo</button><button type="button" onClick={() => setHistory(redoEditorHistory)} disabled={!history.future.length || readOnly}>Redo</button><button type="button" data-testid="test-area-editor-document" onClick={startPlayableTest} disabled={testing || !validation.canSave}>{testing ? "Preparing test..." : "Playable test"}</button><button type="button" onClick={() => downloadEditorDocument(document.documentType === "blueprint" ? serializeAreaBlueprint(persistEditorView(document, ui)) : editorDocumentToRuntimePrefab(persistEditorView(document, ui)))}>Download JSON</button><button type="button" onClick={() => save(true)} disabled={readOnly}>Save as copy</button><button type="button" onClick={() => save(false)} disabled={readOnly || !validation.canSave}>Save</button></div></header>
     <div className="area-editor-toolbar">
       {TOOLS.map((tool) => <button type="button" key={tool} className={ui.tool === tool ? "active" : ""} onClick={() => setUi((current) => ({ ...current, tool, rectangleStart: null }))}>{tool}</button>)}
       <span className="area-editor-separator" />
@@ -378,14 +494,14 @@ export default function AreaEditorPage({ onClose }) {
         <h2>{document.documentType === "blueprint" ? "Blueprint" : "Prefab"}</h2><div className="area-editor-form">{PREFAB_PROPERTY_SCHEMA.filter((field) => document.documentType !== "blueprint" || ["id", "label", "w", "h"].includes(field.key)).map((field) => <PropertyField key={field.key} field={field} value={document[field.key]} onChange={(value) => updateMetadata(field, value)} />)}</div>
       </aside>
       <section className="area-editor-stage">
-        <EditorCanvas document={document} ui={ui} catalogByKey={catalogByKey} hoverCell={hoverCell} onHover={(cell) => setHoverCell(cell && isCellInBounds(document, cell) ? cell : null)} onCell={handleCell} onStrokeStart={beginStroke} onStrokeMove={extendStroke} onStrokeEnd={endStroke} onWheel={(event) => { event.preventDefault(); setUi((current) => ({ ...current, zoom: Math.max(0.45, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))) })); }} onPanStart={(event) => { panRef.current = { x: event.clientX, y: event.clientY, panX: ui.panX, panY: ui.panY }; event.currentTarget.setPointerCapture?.(event.pointerId); const move = (moveEvent) => setUi((current) => ({ ...current, panX: panRef.current.panX + moveEvent.clientX - panRef.current.x, panY: panRef.current.panY + moveEvent.clientY - panRef.current.y })); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} />
+        <EditorCanvas document={document} ui={ui} catalogByFile={catalogByFile} previewIndex={previewIndex} hoverCell={hoverCell} onHover={(cell) => setHoverCell(cell && isCellInBounds(document, cell) ? cell : null)} onCell={handleCell} onStrokeStart={beginStroke} onStrokeMove={extendStroke} onStrokeEnd={endStroke} onWheel={(event) => { event.preventDefault(); setUi((current) => ({ ...current, zoom: Math.max(0.45, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))) })); }} onPanStart={(event) => { panRef.current = { x: event.clientX, y: event.clientY, panX: ui.panX, panY: ui.panY }; event.currentTarget.setPointerCapture?.(event.pointerId); const move = (moveEvent) => setUi((current) => ({ ...current, panX: panRef.current.panX + moveEvent.clientX - panRef.current.x, panY: panRef.current.panY + moveEvent.clientY - panRef.current.y })); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} />
         {ui.rectangleStart && <div className="area-editor-hint">Choose the opposite rectangle corner.</div>}
         {status && <div className="area-editor-statusbar">{status}</div>}
       </section>
       <aside className="area-editor-sidebar area-editor-inspector">
-        <h2>Asset catalog</h2><input type="search" placeholder="Search assets" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Asset category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">All categories</option>{availableCategories.map((value) => <option key={value} value={value}>{value}</option>)}</select><div className="area-editor-catalog">{filteredCatalog.slice(0, 240).map((asset) => <button type="button" key={asset.key} className={ui.catalogAsset === asset.key ? "active" : ""} onClick={() => setUi((current) => ({ ...current, catalogAsset: asset.key, tool: current.tool === "select" ? "paint" : current.tool }))}>{asset.previewUrl ? <span className="area-editor-frame-preview" style={assetFrameStyle(asset)} aria-label={`Variant ${asset.variant ?? 0}`} /> : <span>?</span>}<small>{asset.label}</small><em>{asset.variantCount} variant{asset.variantCount === 1 ? "" : "s"}</em></button>)}</div>
+        <h2>Asset catalog</h2><input type="search" placeholder="Search assets" value={search} onChange={(event) => setSearch(event.target.value)} /><select aria-label="Asset category" value={category} onChange={(event) => setCategory(event.target.value)}><option value="all">All categories</option>{availableCategories.map((value) => <option key={value} value={value}>{value}</option>)}</select><AssetCatalog assets={filteredCatalog.slice(0, 240)} selectedKey={ui.catalogAsset} onSelect={(asset) => setUi((current) => ({ ...current, catalogAsset: asset.key, tool: current.tool === "select" ? "paint" : current.tool }))} />
         <h2>Selection</h2>{ui.selectedCell && <p>Cell {ui.selectedCell.x}, {ui.selectedCell.y} · {cellCandidates.length} entities</p>}<div className="area-editor-cell-list">{cellCandidates.map((candidate) => <button type="button" key={`${candidate.layer}:${candidate.index}`} className={ui.selection?.layer === candidate.layer && ui.selection?.index === candidate.index ? "active" : ""} onClick={() => setUi((current) => ({ ...current, selection: candidate }))}>{candidate.layer}: {candidate.entry.id ?? candidate.entry.decayId ?? candidate.entry.type ?? candidate.entry.npcId}</button>)}</div>
-        {selectedEntry && <><div className="area-editor-selection-actions"><button type="button" onClick={duplicateSelection} disabled={readOnly}>Duplicate</button><button type="button" onClick={deleteSelection} disabled={readOnly}>Delete</button></div><div className="area-editor-form">{schemaForLayer(ui.selection.layer).map((field) => <PropertyField key={field.key} field={field} value={selectedEntry[field.key]} onChange={(value) => updateSelected(field, value)} />)}</div><label>Advanced properties JSON<textarea rows="10" value={advancedText} onChange={(event) => setAdvancedText(event.target.value)} /></label><button type="button" disabled={readOnly} onClick={() => { try { const parsed = JSON.parse(advancedText); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Advanced properties must be an object."); commit(updateEntity(document, ui.selection, parsed)); setStatus("Advanced properties applied."); } catch (error) { setStatus(`Invalid advanced properties: ${error.message}`); } }}>Apply advanced JSON</button></>}
+        {selectedEntry && <><div className="area-editor-selection-actions"><button type="button" onClick={duplicateSelection} disabled={readOnly}>Duplicate</button><button type="button" onClick={deleteSelection} disabled={readOnly}>Delete</button></div><div className="area-editor-form">{schemaForLayer(ui.selection.layer, { entry: selectedEntry, document, catalog }).map((field) => <PropertyField key={field.key} field={field} value={selectedEntry[field.key]} onChange={(value) => updateSelected(field, value)} />)}</div><label><FieldLabel field={{ key: "advanced-properties", label: "Advanced properties JSON", description: "Rå JSON til understøttede avancerede runtime-egenskaber, som ikke har et særskilt felt. Apply fletter objektet ind i den valgte entry." }} /><textarea rows="10" value={advancedText} onChange={(event) => setAdvancedText(event.target.value)} /></label><button type="button" disabled={readOnly} onClick={() => { try { const parsed = JSON.parse(advancedText); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Advanced properties must be an object."); commit(updateEntity(document, ui.selection, parsed)); setStatus("Advanced properties applied."); } catch (error) { setStatus(`Invalid advanced properties: ${error.message}`); } }}>Apply advanced JSON</button></>}
         <h2>Validation</h2><div className="area-editor-validation">{validation.errors.map((issue, index) => <button type="button" key={`e${index}`} className="error" onClick={() => issue.path?.layer && setUi((current) => ({ ...current, activeLayer: issue.path.layer, selection: { layer: issue.path.layer, index: issue.path.index }, selectedCell: document[issue.path.layer]?.[issue.path.index] ? { x: document[issue.path.layer][issue.path.index].x, y: document[issue.path.layer][issue.path.index].y } : current.selectedCell }))}>{issue.message}</button>)}{validation.warnings.map((issue, index) => <p key={`w${index}`} className="warning">{issue.message}</p>)}{validation.canSave && <p className="valid">Runtime-compatible and safe to save.</p>}</div>
         {document.documentType === "blueprint" && <section><h2>Region usage / assignment</h2><p>Candidate order is authoritative: the first matching entry wins. No match, missing data, or an invalid matched blueprint uses procedural generation.</p>{blueprintUsages.length ? blueprintUsages.map(({ region, index }) => <p key={`${region.id}:${index}`}><b>{region.id}</b> candidate {index + 1}</p>) : <p>No handwritten region references discovered.</p>}<button type="button" onClick={() => navigator.clipboard?.writeText(`blueprints: [\n  { id: "${document.id}", questCompleted: "quest_id" },\n],`)}>Copy assignment snippet</button><div className="area-editor-form"><label>Active quests (comma separated)<input value={conditionPreviewCommon.activeQuests} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, activeQuests: event.target.value }))} /></label><label>Completed quests<input value={conditionPreviewCommon.completedQuests} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, completedQuests: event.target.value }))} /></label><label>World flags<input value={conditionPreviewCommon.flags} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, flags: event.target.value }))} /></label><label>Corruption<input type="number" value={conditionPreviewCommon.corruption} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, corruption: event.target.value }))} /></label><label>City threat<input type="number" value={conditionPreviewCommon.cityThreat} onChange={(event) => setConditionPreviewCommon((current) => ({ ...current, cityThreat: event.target.value }))} /></label></div><label>Advanced context JSON (quest steps, inventory, player, factions, kills, region state)<textarea rows="7" value={conditionPreviewText} onChange={(event) => setConditionPreviewText(event.target.value)} /></label><button type="button" onClick={() => { try { const preview = JSON.parse(conditionPreviewText); const regionConfig = blueprintUsages[0]?.region ?? null; const { worldState, context } = buildRegionConditionPreview(preview, conditionPreviewCommon, regionConfig); const candidate = blueprintUsages[0]?.candidate ?? { id: document.id }; const matched = worldEntryAllowed(candidate, worldState, context); setStatus(matched ? "Condition preview: matched." : "Condition preview: not matched."); } catch (error) { setStatus(`Condition preview: invalid condition context (${error.message}).`); } }}>Preview first usage condition</button></section>}
       </aside>

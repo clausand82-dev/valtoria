@@ -265,6 +265,18 @@ function normalizeAssetLoaderInput(input) {
   return isRegionConfig(input) ? input : null;
 }
 
+function additionalAssetPrefabs(input) {
+  return Array.isArray(input?.additionalPrefabs) ? input.additionalPrefabs.filter(Boolean) : [];
+}
+
+function additionalFoliageSpecs(input) {
+  return Array.isArray(input?.additionalFoliageSpecs) ? input.additionalFoliageSpecs.filter((entry) => entry?.id && entry?.fileName) : [];
+}
+
+function additionalObjectSheetSpecs(input) {
+  return Array.isArray(input?.additionalObjectSheetSpecs) ? input.additionalObjectSheetSpecs.filter((entry) => entry?.type && entry?.config) : [];
+}
+
 function buildFullRegionAssetManifest() {
   const regionAssetOverrides = collectRegionAssetOverrides({
     ...MAP_REGION_SETS,
@@ -296,6 +308,9 @@ function buildFullRegionAssetManifest() {
 export function buildRegionAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return buildFullRegionAssetManifest();
+  const additionalPrefabs = additionalAssetPrefabs(input);
+  const editorFoliageSpecs = additionalFoliageSpecs(input);
+  const objectSheetOverrides = additionalObjectSheetSpecs(input);
 
   const groundSpecs = [];
   const normalizedTileset = normalizeRegionTileset(regionConfig.tileset);
@@ -304,10 +319,11 @@ export function buildRegionAssetManifest(input) {
   if (!groundSpecs.length && GROUND_SHEETS.mainland) groundSpecs.push(groundSpecFromConfig("mainland", GROUND_SHEETS.mainland));
 
   const blueprintDefs = blueprintsForRegionConfig(regionConfig);
+  const assetBlueprintDefs = [...blueprintDefs, ...additionalPrefabs];
   const waterSpecs = normalizeRegionWaterSets(regionConfig).map((entry) => ({
     sheetId: entry.sheetId,
     fileName: entry.fileName,
-  })).concat(blueprintDefs.flatMap((blueprint) => (blueprint.water?.palette ?? []).filter(Boolean).map((entry) => ({ sheetId: entry.sheetId ?? `water-custom:${entry.fileName}`, fileName: entry.fileName }))));
+  })).concat(assetBlueprintDefs.flatMap((blueprint) => (blueprint.water?.palette ?? []).filter(Boolean).map((entry) => ({ sheetId: entry.sheetId ?? `water-custom:${entry.fileName}`, fileName: entry.fileName }))));
 
   const foliageSets = normalizeRegionFoliageSets(regionConfig);
   const directFoliageSpecs = (regionConfig.foliage ?? [])
@@ -319,7 +335,7 @@ export function buildRegionAssetManifest(input) {
       rows: entry.rows,
       cols: entry.cols,
     }));
-  const prefabDefs = [...prefabsForRegionConfig(regionConfig), ...blueprintDefs];
+  const prefabDefs = [...prefabsForRegionConfig(regionConfig), ...assetBlueprintDefs];
   groundSpecs.push(...collectPrefabGroundSpecs(prefabDefs).map((entry) => customGroundSpec(entry.sheetId, entry.fileName, entry)));
   const prefabFoliageIds = new Set();
   const prefabFoliageSpecs = new Map();
@@ -346,6 +362,7 @@ export function buildRegionAssetManifest(input) {
       rows: entry.rows,
       cols: entry.cols,
     }))
+    .concat(editorFoliageSpecs)
     .concat([...prefabFoliageSpecs.values()])
     .concat(directFoliageSpecs)
     .concat([...prefabFoliageIds].map((id) => normalizeFoliageSheetSpec(id, FOLIAGE_SHEETS[id], 8)));
@@ -398,12 +415,14 @@ export function buildRegionAssetManifest(input) {
     foliageSpecs,
     decayIds,
     objectTypes,
+    objectSheetOverrides,
   };
 }
 
 export function buildAnimationAssetManifest(input) {
   const regionConfig = normalizeAssetLoaderInput(input);
   if (!regionConfig) return { monsterIds: new Set(MONSTER_SHEETS.map((cfg) => cfg.id)) };
+  const additionalPrefabs = additionalAssetPrefabs(input);
   const monsterIds = new Set();
   const mobs = regionConfig.mobs?.length ? regionConfig.mobs : [];
   for (const entry of mobs) {
@@ -413,7 +432,7 @@ export function buildAnimationAssetManifest(input) {
     const base = MONSTER_STATS[type];
     if (base?.sprite) monsterIds.add(base.sprite);
   }
-  for (const prefab of [...prefabsForRegionConfig(regionConfig), ...blueprintsForRegionConfig(regionConfig)]) {
+  for (const prefab of [...prefabsForRegionConfig(regionConfig), ...blueprintsForRegionConfig(regionConfig), ...additionalPrefabs]) {
     const content = normalizePrefabContent(prefab);
     for (const item of content.monsters ?? []) {
       const type = item?.type ?? item?.typeName;
@@ -778,6 +797,12 @@ function loadObjectSheets(manifest = buildFullRegionAssetManifest()) {
     ...OBJECT_SHEETS,
     ...REGION_OBJECT_SHEETS,
   };
+  for (const override of manifest.objectSheetOverrides ?? []) {
+    mergedObjectSheets[override.type] = {
+      ...(mergedObjectSheets[override.type] ?? {}),
+      [override.biomeId ?? "default"]: override.config,
+    };
+  }
   const entries = [];
   for (const [type, biomeSheets] of Object.entries(mergedObjectSheets)) {
     if (!manifest.objectTypes.has(type)) continue;

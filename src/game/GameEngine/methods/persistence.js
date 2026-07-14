@@ -437,6 +437,7 @@ export const persistenceMethods = {
   },
 
   loadProgress() {
+    if (this.persistenceDisabled) return false;
     const payload = this.readSavePayload();
     if (!payload) return;
 
@@ -576,6 +577,7 @@ export const persistenceMethods = {
   },
 
   saveProgress(options = {}) {
+    if (this.persistenceDisabled) return false;
     const saveStartedAt = performance.now();
     const saveTimings = {
       autosaveSnapshotBuildMs: 0,

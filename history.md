@@ -10,6 +10,7 @@ History over changes
 - moved help icon into menu
 - esc will now close open modals instead of open map
 - added sounds for monsters (villagers, boars and rats) - attack, aggro, hurt and death
+- added a editor for blueprint and prefab design - supplement for the two old systems
 
 *V. 1.12
 - fixed an error where hay wasn't destructable - only meant to been diabled when villager_help_collect_hay was active

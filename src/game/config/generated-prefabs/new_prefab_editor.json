@@ -2,6 +2,7 @@
   "id": "new_prefab_editor",
   "label": "New Prefab",
   "schemaVersion": 1,
+  "documentType": "prefab",
   "w": 12,
   "h": 10,
   "anchor": "room",
@@ -12,15 +13,37 @@
   "avoidExit": 0,
   "editor": {
     "lastView": "isometric",
-    "zoom": 1.5000000000000004,
-    "panX": 137.5999755859375,
-    "panY": 10.39996337890625,
+    "zoom": 1.4000000000000004,
+    "panX": 65.5999755859375,
+    "panY": 10.400054931640625,
     "hiddenLayers": [],
     "lockedLayers": [],
     "managed": true
   },
   "ground": {
     "palette": [
+      {
+        "fileName": "tileset/tileset_grass.png",
+        "variant": 3,
+        "sheetId": "ground-custom:tileset/tileset_grass.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_sand.png",
+        "variant": 9,
+        "sheetId": "ground-custom:tileset/tileset_sand.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
       {
         "fileName": "tileset/tileset_grass.png",
         "variant": 0,
@@ -33,9 +56,42 @@
         "baseAlpha": 0.18
       },
       {
-        "fileName": "tileset/tileset_grass.png",
-        "variant": 4,
-        "sheetId": "ground-custom:tileset/tileset_grass.png",
+        "fileName": "tileset/tileset_snow.png",
+        "variant": 0,
+        "sheetId": "ground-custom:tileset/tileset_snow.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_rock.png",
+        "variant": 7,
+        "sheetId": "ground-custom:tileset/tileset_rock.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_rock.png",
+        "variant": 10,
+        "sheetId": "ground-custom:tileset/tileset_rock.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_rock.png",
+        "variant": 11,
+        "sheetId": "ground-custom:tileset/tileset_rock.png",
         "variantCount": 16,
         "sourceInset": 0.025,
         "edgeFeather": 0.12,
@@ -53,294 +109,491 @@
         "textureAlpha": 1,
         "visualScale": 1.18,
         "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_field.png",
+        "variant": 8,
+        "sheetId": "ground-custom:tileset/tileset_field.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
+      },
+      {
+        "fileName": "tileset/tileset_bricktiles.png",
+        "variant": 15,
+        "sheetId": "ground-custom:tileset/tileset_bricktiles.png",
+        "variantCount": 16,
+        "sourceInset": 0.025,
+        "edgeFeather": 0.12,
+        "textureAlpha": 1,
+        "visualScale": 1.18,
+        "baseAlpha": 0.18
       }
     ],
     "rows": [
       [
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        8,
+        8,
+        8,
+        8,
+        8,
+        8,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        2,
-        2,
-        0,
-        0,
-        0,
-        1,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        8,
+        4,
+        9,
+        9,
+        9,
+        4,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        2,
-        2,
-        0,
-        0,
-        0,
-        1,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        7,
+        7,
+        9,
+        9,
+        9,
+        9,
+        8,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        2,
-        2,
-        1,
-        1,
-        1,
-        1,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        8,
+        8,
+        9,
+        9,
+        9,
+        9,
+        8,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        2,
-        2,
-        1,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        7,
+        7,
+        9,
+        9,
+        7,
+        9,
+        5,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        null,
-        2,
-        1,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        7,
+        7,
+        9,
+        9,
+        9,
+        5,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        null,
-        null,
-        2,
-        1,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        3,
+        3,
+        7,
+        9,
+        5,
+        5,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        null,
-        2,
-        null,
-        null,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        5,
+        3,
+        3,
+        3,
+        3
       ],
       [
-        null,
-        null,
-        null,
-        null,
-        2,
-        2,
-        2,
-        2,
-        2,
-        2,
-        null,
-        null
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3,
+        3
       ]
     ]
   },
-  "objects": [],
+  "objects": [
+    {
+      "id": "scarecrow",
+      "variant": 6,
+      "x": 1,
+      "y": 8,
+      "destructible": true,
+      "foregroundFade": false,
+      "flag": ""
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 2,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 3,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 4,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 5,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 6,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 11,
+      "x": 7,
+      "y": 6
+    },
+    {
+      "id": "scarecrow",
+      "variant": 0,
+      "x": 4,
+      "y": 7,
+      "blocking": false
+    }
+  ],
   "foliage": [
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 7,
-      "y": 6
-    },
-    {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 7,
-      "y": 6
-    },
-    {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 8,
+      "id": "mainland",
+      "variant": 0,
+      "x": 1,
       "y": 3
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 8,
+      "id": "mainland",
+      "variant": 0,
+      "x": 2,
       "y": 3
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 8,
-      "y": 4
+      "id": "mainland",
+      "variant": 0,
+      "x": 2,
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 8,
-      "y": 6
+      "id": "mainland",
+      "variant": 0,
+      "x": 3,
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 9,
-      "y": 6
+      "id": "mainland",
+      "variant": 0,
+      "x": 4,
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 10,
-      "y": 5
-    },
-    {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 10,
+      "id": "mainland",
+      "variant": 0,
+      "x": 4,
       "y": 3
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 9,
-      "y": 8
+      "id": "mainland",
+      "variant": 0,
+      "x": 5,
+      "y": 3
     },
     {
-      "fileName": "foilage/foilage_metalplates.png",
-      "rows": 4,
-      "cols": 4,
+      "id": "mainland",
+      "variant": 0,
       "x": 6,
-      "y": 8
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_smashed_smallanimals.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 7,
-      "y": 1
+      "id": "mainland",
+      "variant": 0,
+      "x": 6,
+      "y": 3
     },
     {
-      "fileName": "foilage/foilage_smashed_smallanimals.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 7,
-      "y": 1
+      "id": "mainland",
+      "variant": 10,
+      "x": 1,
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_smashed_smallanimals.png",
-      "rows": 4,
-      "cols": 4,
-      "x": 7,
-      "y": 1
+      "id": "mainland",
+      "variant": 10,
+      "x": 5,
+      "y": 2
     },
     {
-      "fileName": "foilage/foilage_smashed_smallanimals.png",
-      "rows": 4,
-      "cols": 4,
+      "id": "mainland",
+      "variant": 10,
       "x": 7,
-      "y": 1
+      "y": 3
     },
     {
-      "fileName": "foilage/foilage_smashed_smallanimals.png",
-      "rows": 4,
-      "cols": 4,
+      "id": "mainland",
+      "variant": 10,
+      "x": 8,
+      "y": 3
+    },
+    {
+      "id": "mainland",
+      "variant": 10,
       "x": 7,
-      "y": 1
+      "y": 2
     }
   ],
   "decals": [
     {
-      "decayId": "decay_blood",
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 2,
+      "y": 4
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
       "x": 3,
+      "y": 5
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 4,
+      "y": 5
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 5,
+      "y": 5
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 6,
       "y": 4
     },
     {
-      "decayId": "decay_blood",
-      "x": 4,
-      "y": 4
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 7,
+      "y": 3
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 7,
+      "y": 5
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 7,
+      "y": 6
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 8,
+      "y": 5
+    },
+    {
+      "decayId": "decay_spiderweb",
+      "variant": 4,
+      "x": 9,
+      "y": 5
     },
     {
       "decayId": "decay_blood",
-      "x": 4,
+      "variant": 2,
+      "x": 5,
       "y": 3
     },
     {
       "decayId": "decay_blood",
+      "variant": 2,
+      "x": 5,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
       "x": 6,
       "y": 4
     },
     {
       "decayId": "decay_blood",
+      "variant": 2,
+      "x": 6,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 5,
+      "y": 6
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 7,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 8,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 9,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 8,
+      "y": 4
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 8,
+      "y": 3
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 7,
+      "y": 3
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 5,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
       "x": 4,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 3,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 2,
+      "x": 2,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 7,
+      "x": 9,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 7,
+      "x": 10,
+      "y": 5
+    },
+    {
+      "decayId": "decay_blood",
+      "variant": 7,
+      "x": 10,
       "y": 6
     }
   ],
-  "monsters": [],
+  "monsters": [
+    {
+      "type": "Fallen",
+      "levelOffset": 0,
+      "x": 4,
+      "y": 4
+    }
+  ],
   "npcs": [],
   "chests": []
 }

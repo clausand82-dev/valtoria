@@ -69,7 +69,11 @@ export function placeEntity(document, layer, x, y, template) {
 export function updateEntity(document, selection, patch) {
   const next = cloneEditorValue(document);
   if (!next[selection?.layer]?.[selection?.index]) return document;
-  next[selection.layer][selection.index] = { ...next[selection.layer][selection.index], ...cloneEditorValue(patch) };
+  const entry = next[selection.layer][selection.index];
+  for (const [key, value] of Object.entries(patch ?? {})) {
+    if (value === undefined) delete entry[key];
+    else entry[key] = cloneEditorValue(value);
+  }
   return next;
 }
 
