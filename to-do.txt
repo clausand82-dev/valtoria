@@ -8,15 +8,17 @@ Små rettelse observeret igennem spil test:
 - i city map run er exit ofte næsten umulig at se
 - teste om questreward på hunters quests virker
 
-- spell nedtælling i ikon i expedition virker ikke korrekt
+- tilføje at iron plates og iron chain får mere betydning - måske de kan smeltes til jern?
+- tilføje at junk kan "sorteres" og man så får noget ud af det?
+måske 10 junk giver random (0-3 coal, 0-3 wood pieces, 0-3 iron pieces - måske forskellige chance på res individuelt)
+
+
 
 
 DESIGNER:
-- normale region setting mangler i blueprint - alle de ting man normal kan sætte i et region (weather, spawnCounts, audio, ambient, critters)
-
 - mulighed for at teste random regions i test (ikke prioritet)
 
-- water felter er stadig grimme - tag screenshot og vis det - be om at få dem lavet ligesom de laves i runtime - kræver ikke ekstra anden visning
+
 
 
 - i bibliotek skal man kunne lave papir om til scrolls (hvis den mulighed ikke allerede findes)

@@ -142,6 +142,14 @@ export const BEAST_EN = {
     habitatText: "Often seen in damp forests, cellars, ruins, and places where waste and decay gather."
   },
 
+  rabbit: {
+    title: "Rabbit",
+    text: "A small, quick animal that keeps to forests, fields, and gardens.",
+    strengths: ["Fast", "Good at evading predators"],
+    weaknesses: ["Low defense", "Vulnerable to predators"],
+    habitatText: "Found in forests, fields, and gardens."
+  },
+
   sick_rat: {
     title: "Sick Rat",
     text: "A disease-carrying rat with greenish fur and a bite that can weaken its victim over time. It is still small, but far more unpleasant than an ordinary rat.",

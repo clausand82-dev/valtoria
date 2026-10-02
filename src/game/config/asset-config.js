@@ -5,15 +5,16 @@
 // biome-config.js. Eksempel: Hvis "fireplace" ikke står i snow objects, loader
 // spillet stadig fireplace-assets, men snow vil ikke naturligt spawne dem.
 
-// Normal fireplace består af fire separate frames. Listen genbruges for alle
-// biodomes der bruger samme normal-fireplace animation, så filnavne kun skal
-// ændres ét sted.
-const FIREPLACE_NORMAL_FRAMES = [
-  "animated_object/fireplace_normal_01.png",
-  "animated_object/fireplace_normal_02.png",
-  "animated_object/fireplace_normal_03.png",
-  "animated_object/fireplace_normal_04.png",
-];
+// Campfire-animationen er et samlet sheet med otte frames.
+const CAMPFIRE_ANIMATED_SHEET = {
+  fileName: "animated_object/campfire_animated_sheet.png",
+  rows: 1,
+  cols: 8,
+  frameCount: 8,
+  animated: true,
+  // Frames are already aligned in the source sheet; keep their authored position.
+  normalizeAnimation: false,
+};
 
 export const GROUND_SHEETS = {
   // Ground sheets skæres op i 4x4 tiles i assets.js.
@@ -118,8 +119,8 @@ export const OBJECT_SHEETS = {
   fireplace: {
     // Normal fireplace bruges i mainland, jungle og rock.
     // Snow bruger firebeacon i stedet, og lava/desert spawner ingen af dem.
-    mainland: { frameFiles: FIREPLACE_NORMAL_FRAMES, animated: true },
-    jungle: { frameFiles: FIREPLACE_NORMAL_FRAMES, animated: true },
-    rock: { frameFiles: FIREPLACE_NORMAL_FRAMES, animated: true },
+    mainland: CAMPFIRE_ANIMATED_SHEET,
+    jungle: CAMPFIRE_ANIMATED_SHEET,
+    rock: CAMPFIRE_ANIMATED_SHEET,
   },
 };

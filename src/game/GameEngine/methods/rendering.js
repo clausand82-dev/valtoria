@@ -701,10 +701,10 @@ export const renderingMethods = {
     for (const projectile of this.projectiles) {
       const alpha = this.fogPointAlpha(projectile);
       if (alpha <= 0.02) continue;
-      const screen = worldToScreen(projectile.x, projectile.y, 0, this.camera);
+      const screen = worldToScreen(projectile.x, projectile.y, projectile.visualZ ?? 0, this.camera);
       if (visibleScreenPoint(screen, this.width, this.height, 130)) {
         const beamStartScreen = projectile.beam
-          ? worldToScreen(projectile.beamStartX ?? projectile.x, projectile.beamStartY ?? projectile.y, 0, this.camera)
+          ? worldToScreen(projectile.beamStartX ?? projectile.x, projectile.beamStartY ?? projectile.y, projectile.visualZ ?? 0, this.camera)
           : null;
         drawables.push({ type: "projectile", projectile, screen, beamStartScreen, alpha, layer: 1, depth: screen.y + 8 });
       }
@@ -789,8 +789,11 @@ export const renderingMethods = {
           gait: this.player.gait,
           moveSpeed: this.player.moveSpeed,
           time: this.time,
+          hp: this.player.hp,
+          deadTimer: this.player.deadTimer,
           attackAnim: this.player.attackAnim,
           castAnim: this.player.castAnim,
+          pickupAnim: this.player.pickupAnim,
           weaponMode: stats.mode,
           weaponColor: stats.mode === "magic" ? "#9de9ff" : stats.mode === "ranged" ? "#e4c27a" : "#d9d3ca",
         }, this.atlas, this.animationSheets);

@@ -476,9 +476,11 @@ export const persistenceMethods = {
     this.player.hurtCooldown = Math.max(0, Number(savedPlayer.hurtCooldown) || 0);
     this.player.attackAnim = Math.max(0, Number(savedPlayer.attackAnim) || 0);
     this.player.castAnim = Math.max(0, Number(savedPlayer.castAnim) || 0);
+    this.player.pickupAnim = 0;
     this.player.gait = Number(savedPlayer.gait) || 0;
     this.player.moveSpeed = Math.max(0, Number(savedPlayer.moveSpeed) || 0);
     this.player.deadTimer = Math.max(0, Number(savedPlayer.deadTimer) || 0);
+    this.player.deathStarted = this.player.hp <= 0;
     this.player.moving = false;
     this.player.target = null;
     this.player.attackTargetId = null;

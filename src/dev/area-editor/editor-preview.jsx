@@ -37,6 +37,7 @@ export function resolveEntityPreviewAsset(index, layer, entry) {
 export function previewImageKey(asset) {
   if (!asset?.previewUrl) return null;
   if (asset.kind === "ground") return `${asset.previewUrl}|ground:${Math.max(1, Number(asset.rows) || 4)}x${Math.max(1, Number(asset.cols) || 4)}:si${Number(asset.sourceInset) || 0}:ef${Number(asset.edgeFeather) || 0}:ta${Number.isFinite(Number(asset.textureAlpha)) ? Number(asset.textureAlpha) : 1}:vs${Number(asset.visualScale) || 1}`;
+  if (asset.kind === "water") return `${asset.previewUrl}|water:${Math.max(1, Number(asset.rows) || 4)}x${Math.max(1, Number(asset.cols) || 4)}`;
   return asset.kind === "foliage"
     ? `${asset.previewUrl}|foliage:${Math.max(1, Number(asset.rows) || 8)}x${Math.max(1, Number(asset.cols) || 8)}`
     : asset.previewUrl;
@@ -165,6 +166,44 @@ function groundFrames(image, asset) {
   return frames;
 }
 
+function waterFrames(image, asset) {
+  const source = document.createElement("canvas");
+  source.width = image.naturalWidth;
+  source.height = image.naturalHeight;
+  source.getContext("2d").drawImage(image, 0, 0);
+  const rows = Math.max(1, Number(asset.rows) || 4);
+  const cols = Math.max(1, Number(asset.cols) || 4);
+  // Runtime uses TILE_W/2 + 1 and TILE_H/2 + 1, giving a 106x54
+  // diamond around the canonical 104x52 tile anchor.
+  const width = GAME_TILE_W + 2;
+  const height = GAME_TILE_H + 2;
+  const frames = [];
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const sourceX = Math.round(col * source.width / cols);
+      const sourceY = Math.round(row * source.height / rows);
+      const right = Math.round((col + 1) * source.width / cols);
+      const bottom = Math.round((row + 1) * source.height / rows);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width, height / 2);
+      ctx.lineTo(width / 2, height);
+      ctx.lineTo(0, height / 2);
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(source, sourceX, sourceY, right - sourceX, bottom - sourceY, 0, 0, width, height);
+      ctx.restore();
+      frames.push({ url: canvas.toDataURL(), width, height, destW: width, destH: height });
+    }
+  }
+  return frames;
+}
+
 function foliageFrames(image, rows, cols) {
   const canvas = document.createElement("canvas");
   canvas.width = image.naturalWidth;
@@ -218,6 +257,7 @@ function ensurePreviewImage(asset, notify) {
     entry.height = image.naturalHeight;
     entry.url = image.src;
     if (asset.kind === "ground") entry.groundFrames = groundFrames(image, asset);
+    if (asset.kind === "water") entry.waterFrames = waterFrames(image, asset);
     if (asset.kind === "foliage") entry.frames = foliageFrames(image, Math.max(1, Number(asset.rows) || 8), Math.max(1, Number(asset.cols) || 8));
     for (const listener of entry.listeners) listener();
   };
@@ -276,20 +316,16 @@ export function GroundTilePreview({ asset, imageState, x, y, tileW, tileH }) {
   return <image className="area-editor-ground-preview" href={frame.url} x={x - width / 2} y={y + tileH / 2 - height / 2} width={width} height={height} preserveAspectRatio="none" pointerEvents="none" />;
 }
 
-export function WaterTilePreview({ asset, imageState, x, y, tileW, tileH, clipId }) {
+export function WaterTilePreview({ asset, imageState, x, y, tileW, tileH }) {
   const loaded = previewImageState(imageState, asset);
-  if (loaded?.status !== "loaded") return null;
-  const frame = previewSourceFrame(asset, loaded);
-  if (!frame) return null;
-  const points = `0,0 ${tileW / 2},${tileH / 2} 0,${tileH} ${-tileW / 2},${tileH / 2}`;
-  return <svg className="area-editor-water-preview" x={x} y={y} width={tileW} height={tileH} viewBox={`${-tileW / 2} 0 ${tileW} ${tileH}`} overflow="visible" pointerEvents="none">
-    <defs><clipPath id={clipId} clipPathUnits="userSpaceOnUse"><polygon points={points} /></clipPath></defs>
-    <g clipPath={`url(#${clipId})`}>
-      <svg x={-tileW / 2} y="0" width={tileW} height={tileH} viewBox={`${frame.x} ${frame.y} ${frame.w} ${frame.h}`} preserveAspectRatio="none" overflow="hidden">
-        <image href={loaded.url ?? asset.previewUrl} x="0" y="0" width={loaded.width} height={loaded.height} preserveAspectRatio="none" />
-      </svg>
-    </g>
-  </svg>;
+  const frames = loaded?.status === "loaded" ? loaded.waterFrames : null;
+  if (!frames?.length) return null;
+  const variant = Math.max(0, Math.floor(Number(asset.sourceVariant ?? asset.variant) || 0));
+  const frame = frames[variant % frames.length];
+  const runtimeRatio = tileW / GAME_TILE_W;
+  const width = frame.destW * runtimeRatio;
+  const height = frame.destH * runtimeRatio;
+  return <image className="area-editor-water-preview" href={frame.url} x={x - width / 2} y={y + tileH / 2 - height / 2} width={width} height={height} preserveAspectRatio="none" pointerEvents="none" />;
 }
 
 function positiveNumber(value, fallback) {

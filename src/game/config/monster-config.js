@@ -9,11 +9,16 @@ export const DEFAULT_MONSTER_WORLD_ENERGY = {
 
 export const DEFAULT_MONSTER_SEQUENCES_3X4 = [{ name: "idle", row: 0, frames: 4 }, { name: "walk", row: 1, frames: 4 }, { name: "attack", row: 2, frames: 4 }];
 
+export const DEFAULT_MONSTER_SEQUENCES_3X8 = [{ name: "idle", row: 0, frames: 8 }, { name: "walk", row: 1, frames: 8 }, { name: "attack", row: 2, frames: 8 }];
+
 const monsterSprite = (sprite) => ({
   ...sprite,
   rows: sprite.rows ?? 3,
   cols: sprite.cols ?? 4,
-  sequences: sprite.sequences ?? DEFAULT_MONSTER_SEQUENCES_3X4
+  sequences: sprite.sequences ?? DEFAULT_MONSTER_SEQUENCES_3X4,
+  // Authored 8-frame sheets are already aligned. Keep their cell placement
+  // unless a specific sprite explicitly opts back into stabilization.
+  normalizeAnimation: sprite.normalizeAnimation ?? sprite.cols !== 8,
 });
 
 const monsterAudioProfile = (def) => def.audioProfile
@@ -69,8 +74,8 @@ export const MONSTER_DEFS = {
   Spider: {
     audioProfile: "spider",
     sprite: monsterSprite({
-      id: "spider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      id: "spider", url: "/assets/generated/mobs/spider_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
       scale: 0.43, shadowW: 30, shadowH: 10, shadowAlpha: 0.34, shadowY: 17, yOffset: 38
     }),
     speciesId: "spider",
@@ -91,8 +96,8 @@ export const MONSTER_DEFS = {
   MiniSpider: {
     audioProfile: "spider",
     sprite: monsterSprite({
-      id: "minispider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      id: "minispider", url: "/assets/generated/mobs/spider_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
       scale: 0.1, shadowW: 7, shadowH: 2, shadowAlpha: 0.34, shadowY: 4, yOffset: 9
     }),
     speciesId: "spider",
@@ -106,8 +111,8 @@ export const MONSTER_DEFS = {
   MediumSpider: {
     audioProfile: "spider",
     sprite: monsterSprite({
-      id: "mediumspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      id: "mediumspider", url: "/assets/generated/mobs/spider_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
       scale: 0.2, shadowW: 14, shadowH: 5, shadowAlpha: 0.34, shadowY: 8, yOffset: 18
     }),
     speciesId: "spider",
@@ -120,8 +125,8 @@ export const MONSTER_DEFS = {
   LargeSpider: {
     audioProfile: "spider",
     sprite: monsterSprite({
-      id: "largespider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      id: "largespider", url: "/assets/generated/mobs/spider_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
       scale: 0.55, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
     }),
     speciesId: "spider",
@@ -134,8 +139,8 @@ export const MONSTER_DEFS = {
   MotherSpider: {
     audioProfile: "spider",
     sprite: monsterSprite({
-      id: "motherspider", url: "/assets/generated/mobs/spider_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
+      id: "motherspider", url: "/assets/generated/mobs/spider_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
       scale: 0.75, shadowW: 38, shadowH: 13, shadowAlpha: 0.34, shadowY: 22, yOffset: 49
     }),
     speciesId: "spider",
@@ -505,9 +510,9 @@ export const MONSTER_DEFS = {
   Knight: {
     audio: { hit: "sword_hit_iron" },
     sprite: monsterSprite({
-      id: "knight", url: "/assets/generated/mobs/knight_animated_sheet.png",
-      rows: 3, cols: 4, sequences: DEFAULT_MONSTER_SEQUENCES_3X4,
-      scale: 0.44, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
+      id: "knight", url: "/assets/generated/mobs/knight_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8,
+      scale: 0.5, shadowW: 34, shadowH: 11, shadowAlpha: 0.38, yOffset: 46
     }),
     speciesId: "human",
     tags: ["humanoid", "human", "medium"],
@@ -853,6 +858,28 @@ export const MONSTER_DEFS = {
     lootTables: ["gold_low", "material_bone", "material_animal_medium", "special_wolffenris_treasure"]
   },
   //#endregion: Monster: Bandit
+    //#region Monster: Rabbit
+  Rabbit: {
+    audioProfile: "rabbit",
+    sprite: monsterSprite({
+      id: "rabbit", url: "/assets/generated/mobs/rabbit_animated_sheet_8.png",
+      rows: 3, cols: 8, sequences: DEFAULT_MONSTER_SEQUENCES_3X8, normalizeAnimation: false,
+      scale: 0.28, shadowW: 16, shadowH: 5, shadowAlpha: 0.3, shadowY: 9, yOffset: 20
+    }),
+    speciesId: "rabbit",
+    tags: ["rabbit", "beast", "wildlife", "medium"],
+    stats: { hp: 58, damage: 12, speed: 1.5, range: 0.6, radius: 0.3, color: "#6d5b83", xp: 22},
+    popularity: { change: 0.85 },
+    library: {
+      title: "Kanin",
+      text: "En lille og hurtig gnaver, der findes i skove og marker.",
+      strengths: ["Hurtig", "God til at undvige rovdyr"],
+      weaknesses: ["Saarbar over for rovdyr", "Lavt forsvar"],
+      habitatText: "Findes i skove, marker og haver."
+    },
+    lootTables: ["gold_low", "material_bone"]
+  },
+  //#endregion: Monster: Rabbit
   //#endregion: Category: Other Monsters
 };
 const MONSTER_CATALOG_IDS = {
@@ -861,7 +888,7 @@ const MONSTER_CATALOG_IDS = {
   Raider: "raider", Ashbound: "ashbound", "Gate Warden": "gate_warden",
   "Bone Warden": "bone_warden", Knight: "knight", "Wild Boar": "wild_boar",
   "Blacksmiths Bane": "blacksmiths_bane", Bear: "bear", Icebear: "icebear",
-  Lion: "lion", Rat: "rat", SickRat: "sick_rat", Village01: "village_01",
+  Lion: "lion", Rat: "rat", Rabbit: "rabbit", SickRat: "sick_rat", Village01: "village_01",
   Village02: "village_02", Peasant: "peasant", Village03: "village_03",
   Village04: "village_04", Village05: "village_05", Village06: "village_06",
   Wizard: "wizard", "Spawn of Hydra": "spawn_of_hydra", Hellhound: "hellhound",

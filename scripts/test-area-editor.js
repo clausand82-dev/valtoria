@@ -6,7 +6,7 @@ import { createEditorHistory, commitEditorHistory, redoEditorHistory, undoEditor
 import { buildEditorPlaytest, firstPrefabTestCell } from "../src/dev/area-editor/editor-playtest.js";
 import { gridToIsometric, gridToTopDown, isometricToGrid, topDownToGrid } from "../src/dev/area-editor/editor-renderer.js";
 import { updateEntity } from "../src/dev/area-editor/editor-tools.js";
-import { PREFAB_PROPERTY_SCHEMA, schemaForLayer } from "../src/dev/area-editor/property-schemas.js";
+import { BLUEPRINT_REGION_PROPERTY_SCHEMA, PREFAB_PROPERTY_SCHEMA, schemaForLayer } from "../src/dev/area-editor/property-schemas.js";
 import { importPrefabAsCopy, openGeneratedPrefab } from "../src/dev/area-editor/prefab-document-adapter.js";
 import { assetFrameStyle, buildAreaEditorAssetCatalog } from "../src/dev/area-editor/asset-catalog.js";
 import { buildAnimationAssetManifest, buildRegionAssetManifest } from "../src/game/assets.js";
@@ -178,12 +178,17 @@ const blueprintTestSource = createBlueprintEditorDocument({
   h: 5,
   start: { x: 1, y: 3 },
   exits: [{ id: "primary", x: 4, y: 1, primary: true }],
+  regionSettings: { weather: { active: "rain" }, audio: { musicProfile: "forest", ambience: ["forest_ambience"] }, ambientCritters: [{ id: "ambient_rat", mobId: "Rat", count: { min: 1, max: 2 } }] },
 });
 const blueprintPlaytest = buildEditorPlaytest(blueprintTestSource);
 assert.equal(blueprintPlaytest.kind, "blueprint");
 assert.equal(blueprintPlaytest.ignoreRegionExit, false, "blueprints must retain the runtime exit rule");
 assert.deepEqual(blueprintPlaytest.blueprint.start, blueprintTestSource.start);
 assert.deepEqual(blueprintPlaytest.blueprint.exits, blueprintTestSource.exits);
+assert.equal(blueprintPlaytest.regionConfig.weather.active, "rain");
+assert.equal(blueprintPlaytest.regionConfig.audio.musicProfile, "forest");
+assert.deepEqual(blueprintPlaytest.regionConfig.ambientCritters, [{ id: "ambient_rat", mobId: "Rat", count: { min: 1, max: 2 } }]);
+assert.ok(buildAnimationAssetManifest(blueprintPlaytest.regionConfig).monsterIds.has("rat"), "ambient critter sheets must be preloaded");
 
 assert.equal(persistenceMethods.loadProgress.call({ persistenceDisabled: true }), false, "editor tests must not load a gameplay save");
 assert.equal(persistenceMethods.saveProgress.call({ persistenceDisabled: true }), false, "editor tests must not write a gameplay save");
@@ -200,6 +205,9 @@ assert.equal(ignoredExitEngine.exitPromptOpen, false);
 assert.equal(exitSnapshotPublished, true, "prefab tests must clear any stale runtime exit prompt");
 
 assert.ok(PREFAB_PROPERTY_SCHEMA.every((field) => field.description), "every prefab property must explain itself");
+assert.ok(BLUEPRINT_REGION_PROPERTY_SCHEMA.every((field) => field.description), "every blueprint region property must explain itself");
+assert.ok(BLUEPRINT_REGION_PROPERTY_SCHEMA.find((field) => field.key === "weather.active")?.options.some((option) => option.value === "rain"), "weather options must come from runtime presets");
+assert.ok(BLUEPRINT_REGION_PROPERTY_SCHEMA.find((field) => field.key === "audio.musicProfile")?.options.some((option) => option.value === "forest"), "music options must come from runtime profiles");
 for (const layer of ["objects", "foliage", "decals", "monsters", "npcs", "chests"]) {
   const entry = prefabTestSource[layer]?.[0] ?? {};
   const fields = schemaForLayer(layer, { entry, document: prefabTestSource, catalog });

@@ -189,14 +189,15 @@ export const regionMethods = {
       ...preparedRegionConfig,
       areaMapId,
     }, options.createRegionOptions);
+    const activeRegionConfig = this.region?.effectiveRegionConfig ?? preparedRegionConfig;
     if (options.sessionMetadata && typeof options.sessionMetadata === "object") {
       Object.assign(this.activeMapRegion, options.sessionMetadata);
     }
-    const weatherId = String(preparedRegionConfig.weather?.id ?? "");
+    const weatherId = String(this.region?.mapRegion?.weather?.id ?? activeRegionConfig.weather?.id ?? "");
     const weatherAmbience = ["rain", "light_rain", "heavy_rain", "thunderstorm"].includes(weatherId) ? ["rain_ambience"] : [];
-    audioManager.setRegionAudio({ ...(preparedRegionConfig.audio ?? {}), ambience: [...(preparedRegionConfig.audio?.ambience ?? []), ...weatherAmbience] });
+    audioManager.setRegionAudio({ ...(activeRegionConfig.audio ?? {}), ambience: [...(activeRegionConfig.audio?.ambience ?? []), ...weatherAmbience] });
     // Bounded to the entered region config; no world or live-monster scan is performed.
-    audioManager.preloadRegion(preparedRegionConfig);
+    audioManager.preloadRegion(activeRegionConfig);
     this.resetRegionRuntime();
     this.placePlayerAtRegionStart();
     this.ensureFullRegionGenerated();

@@ -52,6 +52,17 @@ const chunk = createChunk(0, 0, built); assert.equal(chunk.tiles.some((tile) => 
 
 const roundTrip = normalizeAreaBlueprint(JSON.parse(JSON.stringify(serializeAreaBlueprint(valid))));
 assert.deepEqual(roundTrip.start, valid.start); assert.deepEqual(roundTrip.exits, valid.exits); assert.equal(roundTrip.ground.rows[1][1], 0); assert.equal(roundTrip.water.rows[3][3], 0); assert.equal(roundTrip.objects[0].customFutureField.kept, true); assert.equal(roundTrip.editor.futureMetadata.survives, true);
+const configuredBlueprint = blueprint({ id: "configured_area", regionSettings: { weather: { active: "fog" }, audio: { musicProfile: "forest_dark", ambience: ["forest_ambience"] }, ambient: { particles: [{ type: "fireflies", density: 0.2 }] }, ambientCritterDefaults: { enabled: true, maxAlivePerRegion: 3 }, ambientCritters: [{ id: "ambient_rat", mobId: "Rat", count: { min: 1, max: 2 } }], antiDrops: { resources: ["magic_essence"] }, spawnCounts: { objects: 99 } } });
+assert.equal(configuredBlueprint.regionSettings.spawnCounts, undefined, "procedural spawnCounts must be removed from blueprints");
+assert.deepEqual(normalizeAreaBlueprint(JSON.parse(JSON.stringify(serializeAreaBlueprint(configuredBlueprint)))).regionSettings, configuredBlueprint.regionSettings);
+const configuredRuntime = createRegion(6, 13579, null, { id: "configured", blueprints: [{ id: "configured_area" }], weather: { active: "clear" }, audio: { musicProfile: "fields" }, spawnCounts: {} }, { blueprintRegistry: { configured_area: configuredBlueprint } });
+assert.equal(configuredRuntime.mapRegion.weather.id, "fog");
+assert.equal(configuredRuntime.mapRegion.audio.musicProfile, "forest_dark");
+assert.deepEqual(configuredRuntime.mapRegion.audio.ambience, ["forest_ambience"]);
+assert.equal(configuredRuntime.mapRegion.ambient.particles[0].type, "fireflies");
+assert.equal(configuredRuntime.mapRegion.ambientCritters[0].mobId, "Rat");
+assert.equal(configuredRuntime.mapRegion.spawnCounts.objects, 0);
+assert.deepEqual(createChunk(0, 0, configuredRuntime).objects.filter((entry) => entry.objectDefId).map((entry) => entry.objectDefId), ["scarecrow", "object_chests_ground"], "blueprint region settings must not re-enable procedural physical spawning");
 const unreachable = blueprint({ playableMask: { rows: Array.from({ length: 6 }, (_, y) => Array.from({ length: 8 }, (_, x) => (x < 2 && y > 3) || (x > 5 && y < 2))) } });
 assert.equal(blueprintConnectivity(unreachable).unreachableExits.length, 1); assert.equal(validateAreaBlueprint(unreachable).valid, false);
 
@@ -113,4 +124,4 @@ assert.equal(corruptionPreview.worldState.values["region.condition_preview_regio
 assert.equal(worldEntryAllowed({ corruption: { gte: 7 } }, corruptionPreview.worldState, corruptionPreview.context), true);
 assert.equal(worldEntryAllowed({ corruption: { gt: 7 } }, corruptionPreview.worldState, corruptionPreview.context), false);
 
-console.log("[area-blueprints] OK", { fallback: true, orderedConditions: true, builder: true, roundTrip: true, waterAwareConnectivity: true, authoritativeBlueprintWater: true, selectedSkipsProceduralPhysical: true, corruptionPreview: true, strokes: true, localApiGuard: true, runtimeSelection: true });
+console.log("[area-blueprints] OK", { fallback: true, orderedConditions: true, builder: true, roundTrip: true, regionSettings: true, waterAwareConnectivity: true, authoritativeBlueprintWater: true, selectedSkipsProceduralPhysical: true, corruptionPreview: true, strokes: true, localApiGuard: true, runtimeSelection: true });

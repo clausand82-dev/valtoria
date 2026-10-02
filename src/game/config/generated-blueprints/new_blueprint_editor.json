@@ -1454,9 +1454,9 @@
   ],
   "editor": {
     "lastView": "isometric",
-    "zoom": 1.5000000000000004,
-    "panX": 337.60003662109375,
-    "panY": -121.60015869140625,
+    "zoom": 1.2000000000000002,
+    "panX": -62.4000244140625,
+    "panY": -0.000091552734375,
     "hiddenLayers": [],
     "lockedLayers": [],
     "managed": true
@@ -1936,16 +1936,67 @@
       ]
     }
   ],
-  "decals": [
+  "decals": [],
+  "monsters": [],
+  "npcs": [
     {
-      "decayId": "decay_dust",
-      "variant": 0,
-      "x": 17,
-      "y": 3
+      "npcId": "soldier",
+      "facing": "south",
+      "x": 9,
+      "y": 13,
+      "actionId": "enter_cave01_lvl2"
     }
   ],
-  "monsters": [],
-  "npcs": [],
   "chests": [],
-  "prefabs": []
+  "prefabs": [],
+  "regionSettings": {
+    "ambient": {
+      "particles": [
+        {
+          "type": "burning_ground"
+        }
+      ]
+    },
+    "weather": {
+      "active": "thunderstorm"
+    },
+    "audio": {
+      "ambience": [
+        "campfire",
+        "thunder"
+      ],
+      "musicProfile": "village"
+    },
+    "ambientCritterDefaults": {
+      "enabled": true,
+      "maxPerType": 2,
+      "maxAlivePerRegion": 4
+    },
+    "ambientCritters": [
+      {
+        "id": "ambient_minispider",
+        "mobId": "MiniSpider",
+        "count": {
+          "min": 1,
+          "max": 2
+        }
+      },
+      {
+        "id": "ambient_infernus_minion",
+        "mobId": "Infernus Minion",
+        "count": {
+          "min": 1,
+          "max": 2
+        }
+      },
+      {
+        "id": "ambient_icebear",
+        "mobId": "Icebear",
+        "count": {
+          "min": 1,
+          "max": 2
+        }
+      }
+    ]
+  }
 }

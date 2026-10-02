@@ -97,10 +97,12 @@ export const lifecycleMethods = {
       hurtCooldown: 0,
       attackAnim: 0,
       castAnim: 0,
+      pickupAnim: 0,
       moving: false,
       gait: 0,
       moveSpeed: 0,
       deadTimer: 0,
+      deathStarted: false,
       inventory: empty ? devTestInventory : [makeItem(1, 0.82), makeItem(1, 0.18), ...devTestInventory],
       equipment: empty ? Object.fromEntries(EQUIPMENT_SLOTS.map((slot) => [slot.id, null])) : createEquipment(),
     };
@@ -531,6 +533,7 @@ export const lifecycleMethods = {
       this.player.hp = clamp(this.player.hp, 0, calculated.maxHp);
       if (this.player.hp > 0 && this.player.deadTimer > 0) {
         this.player.deadTimer = 0;
+        this.player.deathStarted = false;
         this.markRenderDirty("player-death-reset");
       }
       this.player.mana = clamp(this.player.mana + (4.8 + this.player.level * 0.15) * dt, 0, calculated.maxMana);
@@ -540,6 +543,7 @@ export const lifecycleMethods = {
       this.player.hurtCooldown = Math.max(0, this.player.hurtCooldown - dt);
       this.player.attackAnim = Math.max(0, this.player.attackAnim - dt);
       this.player.castAnim = Math.max(0, this.player.castAnim - dt);
+      this.player.pickupAnim = Math.max(0, this.player.pickupAnim - dt);
       return calculated;
     });
 
@@ -1125,6 +1129,7 @@ export const lifecycleMethods = {
     if (player?.moving) activeReasons.push("player-moving");
     if (player?.attackAnim > 0) activeReasons.push("player-attack");
     if (player?.castAnim > 0) activeReasons.push("player-cast");
+    if (player?.pickupAnim > 0) activeReasons.push("player-pickup");
     if (player?.hurtCooldown > 0) activeReasons.push("player-hurt");
     if (player?.hp <= 0 && player?.deadTimer > 0 && player.deadTimer < 2.05) activeReasons.push("player-death-animation");
     if (player?.hp <= 0 && activeReasons.includes("player-death-animation") === false) debugReasons.push("player-death-overlay-static");
@@ -1242,11 +1247,14 @@ export const lifecycleMethods = {
   },
 
   updateDeath(dt, stats) {
+
+    this.beginPlayerDeath?.();
     this.player.deadTimer += dt;
     this.player.target = null;
     this.player.attackTargetId = null;
     if (this.player.deadTimer > 2) {
       this.player.deadTimer = 0;
+      this.player.deathStarted = false;
       this.placePlayerAtRegionStart();
       this.player.hp = Math.floor(stats.maxHp * 0.72);
       this.player.mana = Math.floor(stats.maxMana * 0.7);

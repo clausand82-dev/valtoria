@@ -3,6 +3,9 @@ import { normalizePrefabGround } from "../prefabs/prefab-ground-overrides.js";
 
 export const BLUEPRINT_SCHEMA_VERSION = 1;
 export const BLUEPRINT_ENTITY_LAYERS = Object.freeze(["objects", "foliage", "decals", "monsters", "npcs", "chests"]);
+export const BLUEPRINT_REGION_SETTING_KEYS = Object.freeze([
+  "ambient", "weather", "audio", "ambientCritterDefaults", "ambientCritters", "antiDrops",
+]);
 
 const clone = (value) => value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 
@@ -26,6 +29,7 @@ export function normalizeAreaBlueprint(input = {}) {
     w,
     h,
     editor: { ...(clone(input.editor) ?? {}), managed: input.editor?.managed === true },
+    regionSettings: normalizeBlueprintRegionSettings(input.regionSettings),
     playableMask: { ...(clone(input.playableMask) ?? {}), rows: normalizeRows(maskRows, w, h, false).map((row) => row.map(Boolean)) },
     ground: { ...ground, palette: (ground.palette ?? []).map((entry) => entry ? { ...entry } : entry), rows: normalizeRows(ground.rows, w, h) },
     water: { ...clone(water), palette: (water.palette ?? []).map((entry) => entry ? { ...entry } : entry), rows: normalizeRows(water.rows, w, h) },
@@ -39,6 +43,20 @@ export function normalizeAreaBlueprint(input = {}) {
   delete normalized.legend;
   delete normalized.mask;
   return normalized;
+}
+
+export function normalizeBlueprintRegionSettings(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  return Object.fromEntries(BLUEPRINT_REGION_SETTING_KEYS
+    .filter((key) => input[key] !== undefined)
+    .map((key) => [key, clone(input[key])]));
+}
+
+export function mergeBlueprintRegionSettings(regionConfig, blueprint) {
+  const settings = normalizeBlueprintRegionSettings(blueprint?.regionSettings);
+  const merged = { ...(clone(regionConfig) ?? {}) };
+  for (const [key, value] of Object.entries(settings)) merged[key] = clone(value);
+  return merged;
 }
 
 export function serializeAreaBlueprint(input) {

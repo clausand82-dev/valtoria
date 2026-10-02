@@ -610,7 +610,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--cooldown-pct) * 1turn), transparent 0);
+  background: conic-gradient(rgba(0, 0, 0, 0.62) calc(var(--cooldown-percent) * 1%), transparent 0);
   pointer-events: none;
 }
 

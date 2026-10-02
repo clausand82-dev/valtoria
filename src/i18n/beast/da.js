@@ -142,6 +142,14 @@ export const BEAST_DA = {
     habitatText: "Ses ofte i fugtige skove, kældre, ruiner og steder hvor affald og forfald samler sig."
   },
 
+  rabbit: {
+    title: "Kanin",
+    text: "En lille og hurtig gnaver, der holder sig til skove, marker og haver.",
+    strengths: ["Hurtig", "God til at undvige rovdyr"],
+    weaknesses: ["Lavt forsvar", "Saarbar over for rovdyr"],
+    habitatText: "Findes i skove, marker og haver."
+  },
+
   sick_rat: {
     title: "Syg Rotte",
     text: "En sygdomsbærende rotte med grønlig pels og bid, der kan efterlade offeret svækket over tid. Den er stadig lille, men langt mere ubehagelig end en almindelig rotte.",

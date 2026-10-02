@@ -5,7 +5,7 @@ import { MONSTER_STATS } from "./config/monster-config.js";
 import { QUEST_NPCS } from "./config/npc-config.js";
 import { RARITIES, UNIQUE_RARITY } from "./config/rarity-config.js";
 import { OBJECT_SPAWN_TUNING, SPAWN_CONFIG } from "./config/spawn-config.js";
-import { worldEntryAllowed } from "./world-state.js";
+import { resolveMapRegionConfig, worldEntryAllowed } from "./world-state.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset, normalizeRegionWaterSets } from "./config/region-asset-config.js";
 import {
   getRegionObjectFamily,
@@ -42,6 +42,7 @@ import { resolvePrefabMonsterLevel } from "./world/prefabs/prefab-normalization.
 import { resolveAttachedObjectParticleConfigs } from "./objects/object-attached-effects.js";
 import { resolveRegionBlueprint } from "./world/blueprints/blueprint-resolver.js";
 import { applyBlueprintToRegion } from "./world/blueprints/blueprint-region-builder.js";
+import { mergeBlueprintRegionSettings, normalizeBlueprintRegionSettings } from "./world/blueprints/blueprint-normalization.js";
 
 let nextId = 1;
 const GROUND_VARIANT_COUNT = 16;
@@ -871,6 +872,9 @@ function createRegionBase(regionIndex, seed, regionConfig, generateProceduralPhy
       ambientCritters: Array.isArray(regionConfig.ambientCritters)
         ? regionConfig.ambientCritters.map((entry) => ({ ...entry, count: entry?.count ? { ...entry.count } : entry?.count }))
         : [],
+      audio: regionConfig.audio && typeof regionConfig.audio === "object"
+        ? { ...regionConfig.audio, ambience: [...(regionConfig.audio.ambience ?? [])] }
+        : {},
       rareMobs: Array.isArray(regionConfig.rareMobs)
         ? regionConfig.rareMobs.map((entry) => ({
           ...entry,
@@ -914,7 +918,14 @@ export function createRegion(regionIndex = 1, seed = Math.floor(Math.random() * 
     region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
     return region;
   }
-  const region = createRegionBase(regionIndex, seed, regionConfig, false);
+  const blueprintRegionSettings = resolveMapRegionConfig(
+    normalizeBlueprintRegionSettings(selection.blueprint.regionSettings),
+    conditionContext.worldState,
+    { ...conditionContext, areaMapId: regionConfig?.areaMapId, regionId: regionConfig?.id, regionConfig },
+  );
+  const effectiveRegionConfig = mergeBlueprintRegionSettings(regionConfig, { regionSettings: blueprintRegionSettings });
+  const region = createRegionBase(regionIndex, seed, effectiveRegionConfig, false);
+  region.effectiveRegionConfig = effectiveRegionConfig;
   region.blueprintSelection = { status: selection.status, index: selection.index ?? null, diagnostics: [...selection.diagnostics] };
   return applyBlueprintToRegion(region, selection.blueprint);
 }

@@ -639,6 +639,7 @@ export const lootMethods = {
     object.foliageLooted = true;
     object.resourceDrops = [];
     this.nearbyFoliageLoot = null;
+    this.player.pickupAnim = 0.48;
 
     const first = items[0];
     audioManager.playSound("foliage_pickup", { position: object, listener: this.player, maxDistance: 10 });

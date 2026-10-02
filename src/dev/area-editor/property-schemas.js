@@ -5,6 +5,10 @@ import { MONSTER_DEFS } from "../../game/config/monster-config.js";
 import { QUEST_NPCS } from "../../game/config/npc-config.js";
 import { QUEST_DEFS } from "../../game/config/quest-config.js";
 import { REGION_OBJECT_DEFS, resolveRegionObjectDestructibleDef, resolveRegionObjectVariantCount } from "../../game/config/region-object-config.js";
+import { WEATHER_PRESETS } from "../../game/config/weather-presets.js";
+import { MUSIC_PROFILES } from "../../game/config/music-config.js";
+import { SOUND_DEFS } from "../../game/config/sound-config.js";
+import { PARTICLE_PRESETS } from "../../game/particles/particlePresets.js";
 
 export const SHARED_CONDITION_FIELDS = Object.freeze([
   "flag", "notFlag", "all", "any", "blockedBy", "questActive", "questCompleted", "questStepActive", "questStepCompleted", "worldBalanceLydra", "worldBalanceNetdra",
@@ -24,6 +28,10 @@ const MONSTER_OPTIONS = optionEntries(MONSTER_DEFS);
 const NPC_OPTIONS = optionEntries(QUEST_NPCS, (id) => `${id} - ${QUEST_NPCS[id]?.name ?? id}`);
 const OBJECT_OPTIONS = optionEntries(REGION_OBJECT_DEFS);
 const QUEST_OPTIONS = optionEntries(QUEST_DEFS);
+const WEATHER_OPTIONS = optionEntries(WEATHER_PRESETS, (id) => `${id} - ${WEATHER_PRESETS[id]?.label ?? id}`);
+const MUSIC_PROFILE_OPTIONS = optionEntries(MUSIC_PROFILES);
+const AMBIENCE_OPTIONS = optionEntries(Object.fromEntries(Object.entries(SOUND_DEFS).filter(([, def]) => def?.bus === "ambience")));
+const PARTICLE_OPTIONS = optionEntries(PARTICLE_PRESETS);
 const FACING_OPTIONS = ["north", "east", "south", "west"];
 const DEPTH_OPTIONS = ["ground", "dynamic", "alwaysBehind", "alwaysFront"];
 const SPAWN_DAMAGE_OPTIONS = ["all", "damaged", "destroyed", "damaged_destroyed"];
@@ -41,6 +49,17 @@ export const PREFAB_PROPERTY_SCHEMA = Object.freeze([
   check("clearArea", "Clear area", "Udvider regionens playable mask til hele prefab-området og reserverer området til prefabben.", { defaultValue: true }),
   number("avoidStart", "Avoid start", "Mindste afstand i felter mellem prefabbens centrum og regionens start.", { min: 0, step: 0.5 }),
   number("avoidExit", "Avoid exit", "Mindste afstand i felter mellem prefabbens centrum og regionens exit.", { min: 0, step: 0.5 }),
+]);
+
+export const BLUEPRINT_REGION_PROPERTY_SCHEMA = Object.freeze([
+  select("weather.active", "Weather", "Fast vejr for blueprint-regionen. Værdierne kommer direkte fra runtime weather-presets.", WEATHER_OPTIONS, { optional: true }),
+  select("audio.musicProfile", "Music profile", "Runtime-musikprofilen, som aktiveres ved indgang i regionen.", MUSIC_PROFILE_OPTIONS, { optional: true }),
+  multi("audio.ambience", "Ambient audio", "Loopende ambience-lyde fra runtime sound-config. Flere kan afspilles samtidigt.", AMBIENCE_OPTIONS),
+  multi("ambient.particles", "Ambient particles", "Visuelle ambient-effekter. Editorvalget gemmes som runtime particle entries med den valgte type.", PARTICLE_OPTIONS),
+  check("ambientCritterDefaults.enabled", "Enable critters", "Slår regionens ambient critter-system til eller fra. Runtime-standard er slået til.", { defaultValue: true }),
+  number("ambientCritterDefaults.maxAlivePerRegion", "Max critters", "Maksimalt antal levende ambient critters i hele regionen. Runtime-standard er 20.", { min: 0, step: 1, defaultValue: 20 }),
+  number("ambientCritterDefaults.maxPerType", "Max per critter type", "Maksimalt antal levende critters af samme type. Runtime-standard er 10.", { min: 0, step: 1, defaultValue: 10 }),
+  multi("ambientCritters", "Critter types", "Tilladte ambient critter-typer fra runtime monster-config. De gemmes som mobId entries med 1-2 som standard count; detaljer kan ændres i JSON-feltet.", MONSTER_OPTIONS),
 ]);
 
 function objectDef(entry) {

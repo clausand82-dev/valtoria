@@ -213,10 +213,41 @@ function RegionDebugPanel({ engineRef, liveStats, onClose, onRefresh, stats }) {
   );
 }
 
-function CooldownClock({ progress }) {
-  const pct = Math.max(0, Math.min(1, Number(progress) || 0));
-  if (pct <= 0) return null;
-  return <span className="quickslot-cooldown" style={{ "--cooldown-pct": pct }} aria-hidden="true" />;
+function CooldownClock({ remainingSeconds, totalSeconds }) {
+  const clockRef = useRef(null);
+  const remaining = Math.max(0, Number(remainingSeconds) || 0);
+  const total = Math.max(0.001, Number(totalSeconds) || 0);
+
+  useEffect(() => {
+    const clock = clockRef.current;
+    if (!clock) return undefined;
+    const quickslot = clock.closest(".quickslot");
+    const startedAt = performance.now();
+    let animationFrame = 0;
+
+    const updateClock = (now) => {
+      const currentRemaining = Math.max(0, remaining - (now - startedAt) / 1000);
+      const percent = Math.max(0, Math.min(100, (currentRemaining / total) * 100));
+      clock.style.setProperty("--cooldown-percent", String(percent));
+      clock.hidden = percent <= 0;
+      quickslot?.classList.toggle("cooling", percent > 0);
+      if (percent > 0) animationFrame = requestAnimationFrame(updateClock);
+    };
+
+    clock.hidden = remaining <= 0;
+    updateClock(startedAt);
+    return () => cancelAnimationFrame(animationFrame);
+  });
+
+  return (
+    <span
+      ref={clockRef}
+      className="quickslot-cooldown"
+      style={{ "--cooldown-percent": Math.max(0, Math.min(100, (remaining / total) * 100)) }}
+      hidden={remaining <= 0}
+      aria-hidden="true"
+    />
+  );
 }
 
 function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker, onOpenPicker, onClosePicker }) {
@@ -290,7 +321,10 @@ function QuickSlot({ slotId, slot, quickActions, cityOpen, engineRef, openPicker
         {renderIcon(selected)}
         <span className="hotkey-badge">{slotId}</span>
         {isPotion && <b>{count}</b>}
-        <CooldownClock progress={isPotion ? potionCooldown : spellCooldown} />
+        <CooldownClock
+          remainingSeconds={isPotion ? quickActions.potionCooldown : selected?.cooldown ? quickActions.spellCooldown : 0}
+          totalSeconds={isPotion ? quickActions.potionCooldownMax : selected?.cooldown}
+        />
       </button>
       {isOpen && options.length > 0 && (
         <div className="quickslot-picker" role="menu" aria-label={t("hud.chooseSlot", { slot: slotId })} onPointerDown={(event) => event.stopPropagation()}>
@@ -711,23 +745,23 @@ export function GameHud({
             <span>{t("hud.messages")}</span>
             {toastLogCount > 0 && <b className="city-menu-badge">{Math.min(99, toastLogCount)}</b>}
           </button>
-          <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
-            <ImageIcon src="/assets/generated/item/item_book_lore.png" />
-            <span>{t("hud.settings")}</span>
-          </button>
           {getPlayerLevel(player) >= HELP_ACCESS_CONFIG.floatingButtonUnlockLevel && (
             <button type="button" className="city-menu-button" onClick={() => openHelpTopic("getting-started")}>
               <span className="city-menu-help-icon" aria-hidden="true">?</span>
               <span>{t("hud.help")}</span>
             </button>
           )}
-          <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
-            <ImageIcon src="/assets/generated/icon_map.png" />
-            <span>{t("hud.worldMap")}</span>
-          </button>
           <button type="button" className="city-menu-button" onClick={onReturnToStartMenu}>
             <ImageIcon src="/assets/generated/menu.png" />
             <span>{t("hud.returnToMainMenu")}</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={() => setCitySettingsOpen(true)}>
+            <ImageIcon src="/assets/generated/item/item_book_lore.png" />
+            <span>{t("hud.settings")}</span>
+          </button>
+          <button type="button" className="city-menu-button" onClick={openWorldMapFromCity}>
+            <ImageIcon src="/assets/generated/icon_map.png" />
+            <span>{t("hud.worldMap")}</span>
           </button>
 
         </section>

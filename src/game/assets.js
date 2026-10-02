@@ -54,19 +54,17 @@ export const ATLAS_FRAMES = {
   orb: { x: 724, y: 1076, w: 258, h: 116 },
 };
 
-const USE_HERO_BASE_SHEET_FOR_ALL_ACTIONS = true;
-const USE_HERO_MAIN_SHEET_FOR_CAST = true;
-
-const HERO_SHEET = {
-  url: USE_HERO_BASE_SHEET_FOR_ALL_ACTIONS
-    ? "/assets/generated/hero-animated-sheet_base.png"
-    : "/assets/generated/hero-animated-sheet.png",
-  rows: 4,
-  cols: 8,
+// Temporary test: use separate sheets for each hero action.
+const HERO_SHEETS = {
+  idle: "/assets/generated/hero_idle.png",
+  walk: "/assets/generated/hero_walk.png",
+  melee: "/assets/generated/hero_melee.png",
+  ranged: "/assets/generated/hero_ranged.png",
+  pickup: "/assets/generated/hero_pickup.png",
+  die: "/assets/generated/hero_die.png",
 };
 
-const HERO_CAST_SHEET = {
-  url: "/assets/generated/hero_cast_sheet.png",
+const HERO_SHEET_LAYOUT = {
   rows: 1,
   cols: 8,
 };
@@ -424,30 +422,42 @@ export function buildAnimationAssetManifest(input) {
   if (!regionConfig) return { monsterIds: new Set(MONSTER_SHEETS.map((cfg) => cfg.id)) };
   const additionalPrefabs = additionalAssetPrefabs(input);
   const monsterIds = new Set();
+  const addMonsterAsset = (typeOrSpriteId) => {
+    const requested = String(typeOrSpriteId ?? "").trim();
+    if (!requested) return;
+    const requestedKey = requested.toLowerCase().replace(/[\s_-]+/g, "");
+    const typeName = MONSTER_STATS[requested]
+      ? requested
+      : Object.keys(MONSTER_STATS).find((name) => {
+        const typeKey = name.toLowerCase().replace(/[\s_-]+/g, "");
+        const spriteKey = monsterSpriteId(name).toLowerCase().replace(/[\s_-]+/g, "");
+        return typeKey === requestedKey || spriteKey === requestedKey;
+      });
+    if (!typeName) return;
+    monsterIds.add(monsterSpriteId(typeName));
+    const base = MONSTER_STATS[typeName];
+    if (base?.sprite) monsterIds.add(base.sprite);
+  };
   const mobs = regionConfig.mobs?.length ? regionConfig.mobs : [];
   for (const entry of mobs) {
     const type = typeof entry === "string" ? entry : entry?.type;
-    if (!type) continue;
-    monsterIds.add(monsterSpriteId(type));
-    const base = MONSTER_STATS[type];
-    if (base?.sprite) monsterIds.add(base.sprite);
+    addMonsterAsset(type);
+  }
+  for (const entry of regionConfig.ambientCritters ?? []) {
+    addMonsterAsset(entry?.mobId ?? entry?.sourceMobId);
   }
   for (const prefab of [...prefabsForRegionConfig(regionConfig), ...blueprintsForRegionConfig(regionConfig), ...additionalPrefabs]) {
     const content = normalizePrefabContent(prefab);
     for (const item of content.monsters ?? []) {
       const type = item?.type ?? item?.typeName;
-      if (!type) continue;
-      monsterIds.add(monsterSpriteId(type));
-      const base = MONSTER_STATS[type];
-      if (base?.sprite) monsterIds.add(base.sprite);
+      addMonsterAsset(type);
     }
   }
   // Special encounters are selected independently of a region's regular mob
   // pool, so their sheets must be available in every region they can reach.
   for (const [type, base] of Object.entries(MONSTER_STATS)) {
     if (!base?.specialSpawn) continue;
-    monsterIds.add(monsterSpriteId(type));
-    if (base.sprite) monsterIds.add(base.sprite);
+    addMonsterAsset(type);
   }
   if (!monsterIds.size) monsterIds.add("wolf");
   return { monsterIds };
@@ -467,9 +477,12 @@ function blueprintsForRegionConfig(regionConfig) {
 function loadHeroAnimationSheet() {
   if (animationPartCache.hero) return Promise.resolve(animationPartCache.hero);
   if (!animationPartCache.heroPromise) {
-    animationPartCache.heroPromise = loadImageCanvas(HERO_SHEET.url)
-      .then((canvas) => {
-        animationPartCache.hero = makeAnimationSheet(canvas, HERO_SHEET.rows, HERO_SHEET.cols, "hero");
+    animationPartCache.heroPromise = Promise.all(Object.entries(HERO_SHEETS).map(async ([action, url]) => {
+      const canvas = await loadImageCanvas(url);
+      return [action, makeAnimationSheet(canvas, HERO_SHEET_LAYOUT.rows, HERO_SHEET_LAYOUT.cols, "hero")];
+    }))
+      .then((sheets) => {
+        animationPartCache.hero = Object.fromEntries(sheets);
         return animationPartCache.hero;
       })
       .catch((error) => {
@@ -481,20 +494,7 @@ function loadHeroAnimationSheet() {
 }
 
 function loadHeroCastAnimationSheet() {
-  if (USE_HERO_MAIN_SHEET_FOR_CAST) return Promise.resolve(null);
-  if (animationPartCache.heroCast) return Promise.resolve(animationPartCache.heroCast);
-  if (!animationPartCache.heroCastPromise) {
-    animationPartCache.heroCastPromise = loadImageCanvas(HERO_CAST_SHEET.url)
-      .then((canvas) => {
-        animationPartCache.heroCast = makeAnimationSheet(canvas, HERO_CAST_SHEET.rows, HERO_CAST_SHEET.cols, "hero");
-        return animationPartCache.heroCast;
-      })
-      .catch((error) => {
-        animationPartCache.heroCastPromise = null;
-        throw error;
-      });
-  }
-  return animationPartCache.heroCastPromise;
+  return Promise.resolve(null);
 }
 
 function loadMonsterAnimationSheets(manifest) {
@@ -504,7 +504,9 @@ function loadMonsterAnimationSheets(manifest) {
     if (!animationPartCache.monsterPromises.has(cfg.id)) {
       animationPartCache.monsterPromises.set(cfg.id, loadImageCanvas(cfg.url)
         .then((canvas) => [cfg.id, {
-          sheet: makeAnimationSheet(canvas, cfg.rows, cfg.cols, "monsters"),
+          sheet: makeAnimationSheet(canvas, cfg.rows, cfg.cols, "monsters", {
+            normalizeAnimation: cfg.normalizeAnimation,
+          }),
           cfg,
         }])
         .catch((error) => {
@@ -1448,7 +1450,7 @@ function drawSheetFrame(ctx, sheet, row, col, x, y, options = {}) {
   return true;
 }
 
-function makeAnimationSheet(canvas, rows, cols, mode) {
+function makeAnimationSheet(canvas, rows, cols, mode, options = {}) {
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const cells = [];
@@ -1469,6 +1471,21 @@ function makeAnimationSheet(canvas, rows, cols, mode) {
       // Hero and monster cells: x/y/w/h only at this stage.
       // Full sprite extraction and normalization is done per-row in the passes below.
     }
+  }
+
+  // Some sheets are authored with a fixed, shared origin in every cell. In
+  // that case, drawing the raw cells preserves the source alignment exactly.
+  if (mode === "monsters" && options.normalizeAnimation === false) {
+    return {
+      canvas,
+      rows,
+      cols,
+      cellW: canvas.width / cols,
+      cellH: canvas.height / rows,
+      cells,
+      anchors: cells.map(() => null),
+      sequenceAnchors: cells.map(() => []),
+    };
   }
 
   if (mode === "hero" && rows === 1) {

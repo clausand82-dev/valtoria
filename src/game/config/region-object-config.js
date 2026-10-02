@@ -388,7 +388,7 @@ export const REGION_OBJECT_DEFS = {
     spawnTypes: [{ type: "fireplace", weight: 1 }],
     defaultDestructible: false,
     renderBiomeId: "mainland",
-    graphicsRef: "fireplace_normal_01..04.png (animated)",
+    graphicsRef: "campfire_animated_sheet.png (8-frame animated sheet)",
     depthMode: "dynamic",
     sortAnchor: { x: 0.5, y: 0.9 },
     particles: [

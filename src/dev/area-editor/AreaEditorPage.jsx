@@ -11,10 +11,10 @@ import { createEditorUiState, persistEditorView } from "./editor-state.js";
 import { isCellInBounds, pointerToGrid, gridToIsometric, gridToTopDown, ISO_TILE_H, ISO_TILE_W, TOP_TILE_SIZE } from "./editor-renderer.js";
 import { entitiesAtCell, cycleCellSelection } from "./editor-selection.js";
 import { applyEditorBrushStroke, deleteEntity, duplicateEntity, eraseGroundCell, fillEditorLayer, fillGround, paintGroundCell, paintGroundRectangle, placeEntity, updateEntity } from "./editor-tools.js";
-import { PREFAB_PROPERTY_SCHEMA, schemaForLayer } from "./property-schemas.js";
+import { BLUEPRINT_REGION_PROPERTY_SCHEMA, PREFAB_PROPERTY_SCHEMA, schemaForLayer } from "./property-schemas.js";
 import { editorDocumentToRuntimePrefab, importPrefabAsCopy, openGeneratedPrefab } from "./prefab-document-adapter.js";
 import { validateEditorDocument } from "./editor-validation.js";
-import { serializeAreaBlueprint } from "../../game/world/blueprints/blueprint-normalization.js";
+import { normalizeBlueprintRegionSettings, serializeAreaBlueprint } from "../../game/world/blueprints/blueprint-normalization.js";
 import { MAP_REGION_SETS } from "../../game/config/map-region-config.js";
 import { worldEntryAllowed } from "../../game/world-state.js";
 import { buildRegionConditionPreview } from "./condition-preview.js";
@@ -44,7 +44,26 @@ function countLayer(document, layer) {
 
 function fieldValue(value, field) {
   if (field.type === "checkbox") return value === undefined ? Boolean(field.defaultValue) : Boolean(value);
-  return value ?? "";
+  return value ?? field.defaultValue ?? "";
+}
+
+function nestedValue(source, path) {
+  return String(path).split(".").reduce((value, key) => value?.[key], source);
+}
+
+function withNestedValue(source, path, value) {
+  const keys = String(path).split(".");
+  const root = cloneEditorValue(source ?? {});
+  let target = root;
+  keys.forEach((key, index) => {
+    if (index === keys.length - 1) {
+      if (value === undefined) delete target[key]; else target[key] = value;
+      return;
+    }
+    target[key] = target[key] && typeof target[key] === "object" && !Array.isArray(target[key]) ? target[key] : {};
+    target = target[key];
+  });
+  return root;
 }
 
 function FieldLabel({ field }) {
@@ -198,8 +217,7 @@ function EditorCanvas({ document, ui, catalogByFile, previewIndex, onCell, onHov
       const points = `${pos.x},${pos.y} ${pos.x + tileW / 2},${pos.y + tileH / 2} ${pos.x},${pos.y + tileH} ${pos.x - tileW / 2},${pos.y + tileH / 2}`;
       const runtimeRatio = tileW / 104;
       const groundBasePoints = `${pos.x},${pos.y - runtimeRatio} ${pos.x + tileW / 2 + runtimeRatio},${pos.y + tileH / 2} ${pos.x},${pos.y + tileH + runtimeRatio} ${pos.x - tileW / 2 - runtimeRatio},${pos.y + tileH / 2}`;
-      const waterClipId = `water-${cell.x}-${cell.y}`;
-      return <g key={`${cell.x},${cell.y}`}><polygon points={points} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{groundAsset && playable && <><polygon points={groundBasePoints} fill={groundAsset.baseColor ?? "#4f8f36"} opacity={Number.isFinite(Number(groundAsset.baseAlpha)) ? Number(groundAsset.baseAlpha) : 1} /><GroundTilePreview asset={groundAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} /></>}{water && <><polygon points={groundBasePoints} fill="#1f5f7f" opacity="1" />{waterAsset && <WaterTilePreview asset={waterAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} clipId={waterClipId} />}</>}<polygon points={points} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
+      return <g key={`${cell.x},${cell.y}`}><polygon points={points} fill={playable ? (overrideIndex === null || overrideIndex === undefined ? "#1c2927" : "#273b36") : "#090d0f"} />{groundAsset && playable && <><polygon points={groundBasePoints} fill={groundAsset.baseColor ?? "#4f8f36"} opacity={Number.isFinite(Number(groundAsset.baseAlpha)) ? Number(groundAsset.baseAlpha) : 1} /><GroundTilePreview asset={groundAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} /></>}{water && <><polygon points={groundBasePoints} fill="#1f5f7f" opacity="1" />{waterAsset && <WaterTilePreview asset={waterAsset} imageState={imageState} x={pos.x} y={pos.y} tileW={tileW} tileH={tileH} />}</>}<polygon points={points} fill="none" stroke={selected ? "#ffe08a" : hovered ? "#ffffff" : playable ? "#38504b" : "#7c3f48"} strokeWidth={selected || hovered ? 3 : 1} /></g>;
     })}
     {entities.map(({ layer, entry, index, asset, baseX, baseY }) => {
       const selected = ui.selection?.layer === layer && ui.selection?.index === index;
@@ -233,6 +251,7 @@ export default function AreaEditorPage({ onClose, onTest, resumeState = null }) 
   const [category, setCategory] = useState(() => resumeState?.category ?? "all");
   const [hoverCell, setHoverCell] = useState(null);
   const [advancedText, setAdvancedText] = useState(() => resumeState?.advancedText ?? "{}");
+  const [regionSettingsText, setRegionSettingsText] = useState(() => JSON.stringify(resumeState?.history?.present?.regionSettings ?? {}, null, 2));
   const [conditionPreviewText, setConditionPreviewText] = useState(() => resumeState?.conditionPreviewText ?? "{\n  \"worldState\": { \"flags\": {}, \"values\": {}, \"counters\": {} },\n  \"cityStats\": {}\n}");
   const [conditionPreviewCommon, setConditionPreviewCommon] = useState(() => cloneEditorValue(resumeState?.conditionPreviewCommon) ?? { activeQuests: "", completedQuests: "", flags: "", corruption: "", cityThreat: "" });
   const [testing, setTesting] = useState(false);
@@ -267,6 +286,7 @@ export default function AreaEditorPage({ onClose, onTest, resumeState = null }) 
     setReadOnly(Boolean(options.readOnly));
     setSavedFingerprint(options.dirty ? null : editorDocumentFingerprint(persistEditorView(next, uiState)));
     setStatus(options.message ?? "");
+    setRegionSettingsText(JSON.stringify(next.regionSettings ?? {}, null, 2));
   }, [canLeave]);
   const closeDocument = () => { if (canLeave()) { setHistory(null); setUi(null); setReadOnly(false); setOriginalId(null); refresh(); } };
   const commit = useCallback((next) => setHistory((current) => commitEditorHistory(current, typeof next === "function" ? next(current.present) : next)), []);
@@ -477,6 +497,21 @@ export default function AreaEditorPage({ onClose, onTest, resumeState = null }) 
     } else commit({ ...document, [field.key]: value });
   };
   const updateSelected = (field, value) => { if (!readOnly) commit(updateEntity(document, ui.selection, { [field.key]: value })); };
+  const updateRegionSetting = (field, value) => {
+    if (readOnly) return;
+    let runtimeValue = value;
+    if (field.key === "ambient.particles") runtimeValue = (value ?? []).map((type) => ({ type }));
+    if (field.key === "ambientCritters") runtimeValue = (value ?? []).map((type) => ({ id: `ambient_${String(type).toLowerCase().replace(/[^a-z0-9]+/g, "_")}`, mobId: type, count: { min: 1, max: 2 } }));
+    const regionSettings = withNestedValue(document.regionSettings, field.key, runtimeValue);
+    setRegionSettingsText(JSON.stringify(regionSettings, null, 2));
+    commit({ ...document, regionSettings });
+  };
+  const regionSettingValue = (field) => {
+    const value = nestedValue(document.regionSettings, field.key);
+    if (field.key === "ambient.particles") return (value ?? []).map((entry) => typeof entry === "string" ? entry : entry?.type).filter(Boolean);
+    if (field.key === "ambientCritters") return (value ?? []).map((entry) => typeof entry === "string" ? entry : entry?.mobId ?? entry?.sourceMobId).filter(Boolean);
+    return value;
+  };
 
   return <main className="area-editor-page" data-testid="area-editor-page">
     <header className="area-editor-topbar"><div><button type="button" onClick={closeDocument}>← Documents</button><strong>{document.label || document.id}</strong><span>{document.documentType === "blueprint" ? "Full-area blueprint" : "Prefab"}</span>{dirty && <span className="area-editor-dirty">Modified</span>}{readOnly && <span>Read-only preview</span>}</div><div><button type="button" onClick={() => setHistory(undoEditorHistory)} disabled={!history.past.length || readOnly}>Undo</button><button type="button" onClick={() => setHistory(redoEditorHistory)} disabled={!history.future.length || readOnly}>Redo</button><button type="button" data-testid="test-area-editor-document" onClick={startPlayableTest} disabled={testing || !validation.canSave}>{testing ? "Preparing test..." : "Playable test"}</button><button type="button" onClick={() => downloadEditorDocument(document.documentType === "blueprint" ? serializeAreaBlueprint(persistEditorView(document, ui)) : editorDocumentToRuntimePrefab(persistEditorView(document, ui)))}>Download JSON</button><button type="button" onClick={() => save(true)} disabled={readOnly}>Save as copy</button><button type="button" onClick={() => save(false)} disabled={readOnly || !validation.canSave}>Save</button></div></header>
@@ -492,6 +527,7 @@ export default function AreaEditorPage({ onClose, onTest, resumeState = null }) 
         <button type="button" onClick={() => setUi((current) => ({ ...current, visibility: Object.fromEntries(editorLayers.map((layer) => [layer, layer === current.activeLayer])) }))}>Show only active</button>
         <button type="button" className="danger-action" disabled={readOnly} onClick={() => { if (!window.confirm(`Clear ${LAYER_LABELS[ui.activeLayer]}?`)) return; const layer = ui.activeLayer; if (["ground", "water"].includes(layer)) commit({ ...document, [layer]: { ...document[layer], rows: document[layer].rows.map((row) => row.map(() => null)) } }); else if (layer === "playableMask") commit({ ...document, playableMask: { ...document.playableMask, rows: document.playableMask.rows.map((row) => row.map(() => false)) } }); else if (layer === "start") commit({ ...document, start: null }); else commit({ ...document, [layer]: [] }); }}>Clear layer</button>
         <h2>{document.documentType === "blueprint" ? "Blueprint" : "Prefab"}</h2><div className="area-editor-form">{PREFAB_PROPERTY_SCHEMA.filter((field) => document.documentType !== "blueprint" || ["id", "label", "w", "h"].includes(field.key)).map((field) => <PropertyField key={field.key} field={field} value={document[field.key]} onChange={(value) => updateMetadata(field, value)} />)}</div>
+        {document.documentType === "blueprint" && <section className="area-editor-region-settings"><h2>Region settings</h2><p>Atmosfære og lyd bruger samme værdiformater som runtime. Blueprintets placerede indhold er autoritativt, så procedurale spawn-indstillinger vises ikke.</p><div className="area-editor-form">{BLUEPRINT_REGION_PROPERTY_SCHEMA.map((field) => <PropertyField key={field.key} field={field} value={regionSettingValue(field)} onChange={(value) => updateRegionSetting(field, value)} />)}</div><label><FieldLabel field={{ key: "region-settings-json", label: "Advanced region settings JSON", description: "Avanceret adgang til de understøttede blueprint-regionfelter: ambient, weather, audio, ambientCritterDefaults, ambientCritters og antiDrops. SpawnCounts, mob-pools, mapSize og ukendte felter fjernes straks ved Apply." }} /><textarea rows="12" value={regionSettingsText} onChange={(event) => setRegionSettingsText(event.target.value)} /></label><button type="button" disabled={readOnly} onClick={() => { try { const parsed = JSON.parse(regionSettingsText); if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Region settings must be an object."); const normalized = normalizeBlueprintRegionSettings(parsed); setRegionSettingsText(JSON.stringify(normalized, null, 2)); commit({ ...document, regionSettings: normalized }); setStatus("Region settings applied."); } catch (error) { setStatus(`Invalid region settings: ${error.message}`); } }}>Apply region settings JSON</button></section>}
       </aside>
       <section className="area-editor-stage">
         <EditorCanvas document={document} ui={ui} catalogByFile={catalogByFile} previewIndex={previewIndex} hoverCell={hoverCell} onHover={(cell) => setHoverCell(cell && isCellInBounds(document, cell) ? cell : null)} onCell={handleCell} onStrokeStart={beginStroke} onStrokeMove={extendStroke} onStrokeEnd={endStroke} onWheel={(event) => { event.preventDefault(); setUi((current) => ({ ...current, zoom: Math.max(0.45, Math.min(2.5, current.zoom + (event.deltaY < 0 ? 0.1 : -0.1))) })); }} onPanStart={(event) => { panRef.current = { x: event.clientX, y: event.clientY, panX: ui.panX, panY: ui.panY }; event.currentTarget.setPointerCapture?.(event.pointerId); const move = (moveEvent) => setUi((current) => ({ ...current, panX: panRef.current.panX + moveEvent.clientX - panRef.current.x, panY: panRef.current.panY + moveEvent.clientY - panRef.current.y })); const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }; window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); }} />

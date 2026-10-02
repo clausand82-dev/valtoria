@@ -299,6 +299,13 @@ export function createVillageOutskirtsMapRegions(region) {
         },
       ],
       points: "66.99,87.14 35.89,85.02 35.89,68.01 56.22,74.39",
+      ambientCritterDefaults: {
+        maxAlivePerRegion: 14,
+        maxPerType: 14,
+      },
+      ambientCritters: [
+        { id: "ambient_rabbit", mobId: "rabbit", count: { min: 7, max: 14 }, scale: 0.5, behavior: "flee", fleeDistance: 120, hp: 1, canTakeAreaDamage: true },
+      ],
     }),
     //#endregion River Creek
     //#region Trail to Inner Elvindale

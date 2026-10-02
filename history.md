@@ -11,6 +11,16 @@ History over changes
 - esc will now close open modals instead of open map
 - added sounds for monsters (villagers, boars and rats) - attack, aggro, hurt and death
 - added a editor for blueprint and prefab design - supplement for the two old systems
+- cooldown on spells is now more "fluid"
+- added new hero animation for idle, walk, attack and ranged (spell)
+- added hero pickup animation too (from foliage)
+- added hero death animation and hero can now not attack when dead
+- hero spell now comes form hand instead of ground
+- added new campfire animation
+- added support for 8 frames mobs animation (8 frame mobs animation shall use normalizeAnimation: false)
+- added new 8 frame animation for spider and knight
+- added new mobs (only use as critter): rabbit
+-  
 
 *V. 1.12
 - fixed an error where hay wasn't destructable - only meant to been diabled when villager_help_collect_hay was active

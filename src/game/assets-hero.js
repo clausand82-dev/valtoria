@@ -1,61 +1,61 @@
 import { drawShadow } from "./assets-ground.js";
 
 export function drawHero(ctx, screen, hero, atlas, sheets) {
-	drawAnimatedHeroSheet(ctx, screen, hero, sheets?.hero, sheets?.heroCast);
+	drawAnimatedHeroSheet(ctx, screen, hero, sheets?.hero);
 }
 
-function drawAnimatedHeroSheet(ctx, screen, hero, sheet, castSheet) {
-	if (!sheet) return false;
+function drawAnimatedHeroSheet(ctx, screen, hero, sheets) {
+	if (!sheets?.idle) return false;
 	const view = visualDirection(hero.facingX, hero.facingY);
 	const flipX = view.x < -0.05;
+	const isDying = hero.hp <= 0;
+	const deathAnimationDuration = 0.96;
+	const deathFadeDuration = 1.04;
+	const deathTime = Math.max(0, Number(hero.deadTimer) || 0);
 	const speed = clamp01((hero.moveSpeed || 0) / 3.8);
 	const attackProgress = hero.attackAnim > 0 ? 1 - hero.attackAnim / 0.24 : 0;
 	const castProgress = hero.castAnim > 0 ? 1 - hero.castAnim / 0.38 : 0;
-	let row = 0;
+	const pickupProgress = hero.pickupAnim > 0 ? 1 - hero.pickupAnim / 0.48 : 0;
+	let sheet = sheets.idle;
 	let col = Math.floor(hero.time * 4.5) % 8;
 
-	if (hero.attackAnim > 0) {
-		row = 2;
+	if (isDying) {
+		sheet = sheets.die ?? sheets.idle;
+		col = Math.min(7, Math.floor((deathTime / deathAnimationDuration) * 8));
+	} else if (hero.attackAnim > 0) {
+		sheet = sheets.melee ?? sheets.idle;
 		col = Math.min(7, Math.floor(attackProgress * 8));
 	} else if (hero.castAnim > 0) {
-		row = 3;
+		sheet = sheets.ranged ?? sheets.idle;
 		col = Math.min(7, Math.floor(castProgress * 8));
+	} else if (hero.pickupAnim > 0) {
+		sheet = sheets.pickup ?? sheets.idle;
+		col = Math.min(7, Math.floor(pickupProgress * 8));
 	} else if (hero.moving) {
-		row = 1;
+		sheet = sheets.walk ?? sheets.idle;
 		col = Math.floor((hero.gait / (Math.PI * 2)) * 8) % 8;
 	}
 
-	const bob = row === 3
-		? 0
-		: (hero.moving ? -Math.abs(Math.sin(hero.gait)) * 3 : Math.sin(hero.time * 2.4) * 1.2);
+	// The test sheets already share a common ground line, so avoid adding a
+	// procedural vertical bob on top of their own animation.
+	const bob = 0;
 	const attack = hero.attackAnim > 0 ? Math.sin((hero.attackAnim / 0.24) * Math.PI) : 0;
 	const cast = hero.castAnim > 0 ? Math.sin((hero.castAnim / 0.38) * Math.PI) : 0;
-	const isCasting = row === 3;
-	const activeSheet = isCasting ? (castSheet ?? sheet) : sheet;
-	const activeRow = isCasting && castSheet ? 0 : row;
-	const heroAnchor = activeSheet.sequenceAnchors?.[activeRow]?.[0];
-	const idleAnchor = sheet.sequenceAnchors?.[0]?.[0];
-	const castCellSprite = isCasting ? activeSheet.cells?.[activeRow]?.[col]?.sprite : null;
+	const activeRow = 0;
 	const baseScale = 0.58;
-	const castScaleRatio = isCasting && castSheet ? sheet.cellH / castSheet.cellH : 1;
-	const finalScale = baseScale * castScaleRatio;
-	const drawAnchor = isCasting && castSheet && heroAnchor && idleAnchor
-		? {
-			x: (castCellSprite?.width ?? heroAnchor.x * 2) * 0.5,
-			y: idleAnchor.y / castScaleRatio,
-		}
-		: heroAnchor;
 
-	drawShadow(ctx, screen.x, screen.y + 17, 29 + speed * 7, 11 + speed * 2, 0.42, hero.shadow);
-	drawSheetFrame(ctx, activeSheet, activeRow, col, screen.x, screen.y + 30 + bob, {
-		scale: finalScale,
+	const deathFade = isDying
+		? Math.max(0, 1 - Math.max(0, deathTime - deathAnimationDuration) / deathFadeDuration)
+		: 1;
+	drawShadow(ctx, screen.x, screen.y + 17, 29 + speed * 7, 11 + speed * 2, 0.42 * deathFade, hero.shadow);
+	drawSheetFrame(ctx, sheet, activeRow, col, screen.x, screen.y + 30 + bob, {
+		scale: baseScale,
 		flipX,
-		stabilize: true,
+		alpha: deathFade,
 		rawCell: false,
-		anchor: drawAnchor,
 	});
-	if (attack > 0.2) drawSlashArc(ctx, screen.x + view.x * 34 + attack * view.x * 12, screen.y - 37 + view.y * 12, view.x || 1, view.y);
-	if (cast > 0.1) drawCastingRing(ctx, screen.x, screen.y - 35, cast);
+	if (!isDying && attack > 0.2) drawSlashArc(ctx, screen.x + view.x * 34 + attack * view.x * 12, screen.y - 37 + view.y * 12, view.x || 1, view.y);
+	if (!isDying && cast > 0.1) drawCastingRing(ctx, screen.x, screen.y - 35, cast);
 	return true;
 }
 

@@ -636,6 +636,7 @@ export const combatMethods = {
   },
 
   primaryAttack(target = null) {
+    if (this.player.hp <= 0) return false;
     const stats = this.calcStats();
     const weapon = this.player.equipment?.weapon;
     target = target || this.nearestMonster(stats.range + 0.5, weapon) || this.nearestDestructibleObject(DESTRUCTIBLE_OBJECT_ATTACK_RANGE + 0.5, weapon);
@@ -985,11 +986,13 @@ export const combatMethods = {
   },
 
   startHeldSpell(spellId = null, targetMode = "pointer") {
+    if (this.player.hp <= 0) return false;
     const selectedSpellId = spellId ?? this.player.activeSpellId ?? this.player.unlockedSpells?.[0];
     const spell = SPELL_DEFS[selectedSpellId];
     if (!spell?.channeled) {
       const target = targetMode === "nearest" ? this.nearestMonster(7, spell) : null;
-      this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY, selectedSpellId);
+      const cast = this.castSpellAt(target ? target.x : this.pointer.worldX, target ? target.y : this.pointer.worldY, selectedSpellId);
+      if (cast) this.publishSnapshot?.();
       return false;
     }
     this.heldSpell = {
@@ -997,7 +1000,8 @@ export const combatMethods = {
       targetMode,
       tick: 0,
     };
-    this.tickHeldSpell(0, true);
+    const cast = this.tickHeldSpell(0, true);
+    if (cast) this.publishSnapshot?.();
     return true;
   },
 
@@ -1106,6 +1110,9 @@ export const combatMethods = {
       casterTypeName: caster.typeName ?? null,
       x: caster.x + n.x * 0.5,
       y: caster.y + n.y * 0.5,
+      // Player spells launch from the hero's hand visually. This does not
+      // affect their world position, collision, or range.
+      visualZ: owner === "player" ? 24 : 0,
       beamStartX: caster.x + n.x * 0.18,
       beamStartY: caster.y + n.y * 0.18,
       vx: n.x * spell.speed,
@@ -1370,6 +1377,7 @@ export const combatMethods = {
       beam: true,
       beamStartX: projectile.beamStartX ?? projectile.x,
       beamStartY: projectile.beamStartY ?? projectile.y,
+      visualZ: projectile.visualZ ?? 0,
       beamWidth: projectile.beamWidth,
       beamStyle: projectile.beamStyle,
       beamJitter: projectile.beamJitter,
@@ -1716,7 +1724,7 @@ export const combatMethods = {
             entity.hurtCooldown = 0.2;
             this.player.stats.damageTaken += appliedDamage;
             this.addFloater(entity.x, entity.y, `-${appliedDamage}`, effect.color ?? "#87d65a");
-            if (entity.hp <= 0) this.player.stats.deaths += 1;
+            if (entity.hp <= 0) this.beginPlayerDeath({ typeName: effect.sourceId ?? "forbandelsen" });
           } else {
             this.damageMonster(entity, damage, "magic", false, { type: "dot", id: effect.sourceId ?? "dot", spellId: effect.sourceId ?? null });
           }
@@ -1787,18 +1795,36 @@ export const combatMethods = {
     this.addFloater(this.player.x, this.player.y, block.blocked ? `Block -${mitigated}` : critical ? `CRIT -${mitigated}` : `-${mitigated}`, "#ff7272");
     this.addParticles(this.player.x, this.player.y, "#cc3c3c", 9, 0.1);
     this.drainArmorDurability();
-    if (this.player.hp <= 0) {
-      audioManager.playSound("player_death", { position: this.player, listener: this.player });
-      this.player.stats.deaths += 1;
-      this.applyDeathDurabilityLoss();
-      this.addToast(`Faldt mod ${source.typeName}`);
+    if (this.player.hp <= 0) this.beginPlayerDeath(source);
+  },
+
+  beginPlayerDeath(source = null) {
+    if (this.player.hp > 0 || this.player.deathStarted) return false;
+    this.player.deathStarted = true;
+    this.player.deadTimer = 0;
+    this.player.moving = false;
+    this.player.moveSpeed = 0;
+    this.player.attackAnim = 0;
+    this.player.castAnim = 0;
+    this.player.pickupAnim = 0;
+    this.player.target = null;
+    this.player.attackTargetId = null;
+    this.player.attackObjectId = null;
+    this.heldSpell = null;
+    this.keys?.clear?.();
+    if (this.pointer) {
+      this.pointer.down = false;
+      this.pointer.rightDown = false;
     }
-      if (this.player.hp <= 0) {
-        const xp = Math.max(0, Number(this.player.xp) || 0);
-        const nextXp = Math.max(1, this.xpForNextLevel());
-        const xpPct = xp / nextXp;
-        this.lastDeath = { id: ++this.deathSerial, xpPct };
-      }
+    audioManager.playSound("player_death", { position: this.player, listener: this.player });
+    this.player.stats.deaths += 1;
+    this.applyDeathDurabilityLoss();
+    this.addToast(source?.typeName ? `Faldt mod ${source.typeName}` : "Faldt i kamp");
+    const xp = Math.max(0, Number(this.player.xp) || 0);
+    const nextXp = Math.max(1, this.xpForNextLevel());
+    this.lastDeath = { id: ++this.deathSerial, xpPct: xp / nextXp };
+    this.markRenderDirty?.("player-death");
+    return true;
   },
 
   playPlayerHurtAudio(context = "direct") {

@@ -135,6 +135,9 @@ export function buildEditorPlaytest(document) {
   if (!document) throw new Error("A document is required for editor playtest.");
   const kind = document.documentType === "blueprint" ? "blueprint" : "prefab";
   const blueprint = kind === "blueprint" ? blueprintForTest(document) : prefabAsTestBlueprint(document);
+  const regionSettings = kind === "blueprint" && blueprint.regionSettings && typeof blueprint.regionSettings === "object"
+    ? blueprint.regionSettings
+    : {};
   const regionConfig = {
     id: blueprint.id,
     label: `Editor test: ${document.label ?? document.id}`,
@@ -147,6 +150,7 @@ export function buildEditorPlaytest(document) {
     ambientCritters: [],
     rareMobs: [],
     audio: {},
+    ...regionSettings,
     __worldStateResolved: true,
     __conditionContext: { development: true, worldState: { flags: {}, values: {}, counters: {} } },
   };
