@@ -161,6 +161,8 @@ export const lifecycleMethods = {
       });
     }
     this.nextFrameTime = performance.now();
+    this.lastTime = this.nextFrameTime;
+    this.resetFrameDiagnostics(this.nextFrameTime);
     this.raf = requestAnimationFrame(this.loop);
   },
 
@@ -217,6 +219,16 @@ export const lifecycleMethods = {
 
   handleDocumentVisibilityChange() {
     if (document.hidden) this.saveProgress({ force: true, reason: "visibility-hidden" });
+    const now = performance.now();
+    this.resetFrameDiagnostics(now);
+    this.diagnosticsSuspended = document.hidden;
+    this.lastTime = now;
+    this.nextFrameTime = now;
+    if (!document.hidden && this.hiddenLoopTimer) {
+      clearTimeout(this.hiddenLoopTimer);
+      this.hiddenLoopTimer = null;
+      this.raf = requestAnimationFrame(this.loop);
+    }
   },
 
   handlePageHide() {
@@ -225,7 +237,16 @@ export const lifecycleMethods = {
 
   loop(now) {
     this.rafCallbackCount += 1;
-    this.renderStatsWindowRafs += 1;
+    const hidden = typeof document !== "undefined" && document.hidden;
+    if (hidden || this.diagnosticsSuspended) {
+      this.resetFrameDiagnostics(now);
+      this.diagnosticsSuspended = hidden;
+      this.lastTime = now;
+      this.nextFrameTime = now;
+    }
+    const elapsedSeconds = Math.max(0, (now - (this.diagnosticsLastTime ?? now)) / 1000);
+    this.diagnosticsLastTime = now;
+    this.renderStatsWindowRafs += hidden ? 0 : 1;
     if (typeof document !== "undefined" && document.hidden) {
       this.lastTime = now;
       if (!this.hiddenLoopTimer) {
@@ -246,27 +267,24 @@ export const lifecycleMethods = {
         this.renderFrameCount += 1;
         this.renderStatsWindowRenders += 1;
       }
+      this.updateRenderDiagnostics(elapsedSeconds);
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
     const minFrameMs = 1000 / (this.targetFps ?? 60);
     this.nextFrameTime ??= now;
     if (now + 0.5 < this.nextFrameTime) {
+      this.updateRenderDiagnostics(elapsedSeconds);
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
-    const dt = Math.min(0.034, (now - this.lastTime) / 1000);
+    const frameSeconds = Math.max(0, (now - this.lastTime) / 1000);
+    const dt = Math.min(0.034, frameSeconds);
     this.lastTime = now;
     this.nextFrameTime += minFrameMs;
     if (now - this.nextFrameTime > minFrameMs) this.nextFrameTime = now + minFrameMs;
-    this.lastFrameDt = dt;
-    this.fpsWindowTime = (this.fpsWindowTime ?? 0) + dt;
-    this.fpsWindowFrames = (this.fpsWindowFrames ?? 0) + 1;
-    if (this.fpsWindowTime >= 0.75) {
-      this.averageFps = Math.round(this.fpsWindowFrames / this.fpsWindowTime);
-      this.fpsWindowTime = 0;
-      this.fpsWindowFrames = 0;
-    }
+    this.lastFrameDt = frameSeconds;
+    this.lastSimulationDt = dt;
     this.frame += 1;
     this.updateFrameCount += 1;
     this.renderStatsWindowUpdates += 1;
@@ -280,7 +298,7 @@ export const lifecycleMethods = {
     } else {
       this.skippedRenderFrames += 1;
     }
-    this.updateRenderDiagnostics(dt);
+    this.updateRenderDiagnostics(elapsedSeconds);
     this.raf = requestAnimationFrame(this.loop);
   },
 
@@ -1232,12 +1250,23 @@ export const lifecycleMethods = {
     return now - this.lastRenderTime >= (this.maxIdleRenderIntervalMs ?? 1000);
   },
 
+  resetFrameDiagnostics(now) {
+    this.diagnosticsLastTime = now;
+    this.lastFrameDt = 0;
+    this.renderStatsWindowTime = 0;
+    this.renderStatsWindowUpdates = 0;
+    this.renderStatsWindowRenders = 0;
+    this.renderStatsWindowRafs = 0;
+    this.averageFps = this.updateFps = this.renderFps = this.rafCallbacksPerSecond = 0;
+  },
+
   updateRenderDiagnostics(dt) {
     this.warnPerformanceThreshold?.("minimapMs", this.renderTimings?.minimapMs, 4);
     this.renderStatsWindowTime = (this.renderStatsWindowTime ?? 0) + dt;
     if (this.renderStatsWindowTime < 0.75) return;
     const seconds = this.renderStatsWindowTime;
     this.updateFps = Math.round((this.renderStatsWindowUpdates ?? 0) / seconds);
+    this.averageFps = this.updateFps;
     this.renderFps = Math.round((this.renderStatsWindowRenders ?? 0) / seconds);
     this.rafCallbacksPerSecond = Math.round((this.renderStatsWindowRafs ?? 0) / seconds);
     this.renderStatsWindowTime = 0;

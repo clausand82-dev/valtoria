@@ -44,6 +44,23 @@ import {
 const DEFAULT_SORT_ANCHOR = { x: 0.5, y: 1 };
 const TILE_EDGE_WALL_SIDE_PRIORITY = new Map(TILE_EDGE_WALL_SIDE_ORDER.map((side, index) => [side, index]));
 
+function markerInTerrainChunk(chunk, point) {
+  return point && Math.floor(point.x) >= chunk.x && Math.floor(point.y) >= chunk.y
+    && Math.floor(point.x) < chunk.x + CHUNK_SIZE && Math.floor(point.y) < chunk.y + CHUNK_SIZE;
+}
+
+function fogOverlayUnchanged(overlay, engine, inputs) {
+  // Exploration stamps are append-only; resets replace the array and region.
+  const key = JSON.stringify([engine.currentMapInstanceId, engine.dpr, engine.camera?.zoom, engine.player.x, engine.player.y,
+    engine.fogExplorationRevision ?? 0, engine.fogExploredPoints?.length ?? 0, ...inputs]);
+  if (overlay.fogCacheKey === key && overlay.fogRegion === engine.region
+    && overlay.fogPoints === engine.fogExploredPoints) return true;
+  overlay.fogCacheKey = key;
+  overlay.fogRegion = engine.region;
+  overlay.fogPoints = engine.fogExploredPoints;
+  return false;
+}
+
 function getTerrainLayerLayout(wallImage) {
   const wallsEnabled = Boolean(TILE_EDGE_WALLS.enabled && wallImage);
   const wallHeight = wallsEnabled ? getTileEdgeWallRenderHeight(wallImage, TILE_EDGE_WALLS) : 0;
@@ -281,6 +298,7 @@ export const renderingMethods = {
     if (!this.fogExploredPointKeys?.has(stampKey)) {
       this.fogExploredPointKeys.add(stampKey);
       this.fogExploredPoints.push({ x: this.player.x, y: this.player.y, radius: revealRadius });
+      this.fogExplorationRevision = (this.fogExplorationRevision ?? 0) + 1;
       changed = true;
     }
     const minX = Math.floor(this.player.x - visibleRadius);
@@ -496,6 +514,7 @@ export const renderingMethods = {
         const y = origin.y - layout.originY;
         if (x > this.width + 160 || y > this.height + 160 || x + layout.width < -160 || y + layout.height < -160) continue;
         const layer = this.getTerrainLayer(chunk);
+        if (!layer) continue;
         layer.lastUsedFrame = this.frame;
         layer.lastUsedAt = performance.now();
         ctx.drawImage(layer.canvas, x, y);
@@ -507,7 +526,18 @@ export const renderingMethods = {
   getTerrainLayer(chunk) {
     const wallDebug = tileEdgeWallDebugEnabled(TILE_EDGE_WALLS);
     const wallCacheKey = tileEdgeWallCacheKey(this.tileEdgeWallImage, TILE_EDGE_WALLS, wallDebug);
-    if (chunk.terrainLayer?.tileEdgeWallCacheKey === wallCacheKey) return chunk.terrainLayer;
+    // O(1) metadata also sees content added after an earlier empty result.
+    const hasMarker = chunk.region && !this.isInSubregion?.()
+      && (markerInTerrainChunk(chunk, chunk.region.start) || markerInTerrainChunk(chunk, chunk.region.end));
+    // Region decals are clipped to tiles, so without tiles they draw nothing.
+    if (!chunk.tiles.length && !(chunk.decals?.length && !chunk.region) && !hasMarker) {
+      chunk.terrainLayer = null;
+      return null;
+    }
+    if (chunk.terrainLayer?.tileEdgeWallCacheKey === wallCacheKey
+      && chunk.terrainLayer.tilesSource === chunk.tiles && chunk.terrainLayer.tilesLength === chunk.tiles.length
+      && chunk.terrainLayer.decalsSource === chunk.decals && chunk.terrainLayer.decalsLength === chunk.decals.length
+      && chunk.terrainLayer.atlas === this.atlas && chunk.terrainLayer.hasMarker === Boolean(hasMarker)) return chunk.terrainLayer;
     chunk.terrainLayer = null;
 
     const buildStartedAt = performance.now();
@@ -519,10 +549,12 @@ export const renderingMethods = {
     const ctx = canvas.getContext("2d");
 
     let tiles = chunk.terrainDrawTiles;
-    if (!tiles) {
+    if (!tiles || chunk.terrainDrawTilesSource !== chunk.tiles || tiles.length !== chunk.tiles.length) {
       const orderStartedAt = performance.now();
       tiles = [...chunk.tiles].sort((a, b) => (a.x + a.y) - (b.x + b.y) || a.x - b.x);
       chunk.terrainDrawTiles = tiles;
+      chunk.terrainDrawTilesSource = chunk.tiles;
+      chunk.terrainWallEntries = null;
       diagnostics.tileOrderBuilds = (diagnostics.tileOrderBuilds ?? 0) + 1;
       diagnostics.tileOrderMs = (diagnostics.tileOrderMs ?? 0) + (performance.now() - orderStartedAt);
     }
@@ -611,7 +643,12 @@ export const renderingMethods = {
       ctx.restore();
     }
 
-    chunk.terrainLayer = { canvas, originX, originY, width, height, tileEdgeWallCacheKey: wallCacheKey };
+    chunk.terrainLayer = {
+      canvas, originX, originY, width, height, tileEdgeWallCacheKey: wallCacheKey,
+      tilesSource: chunk.tiles, tilesLength: chunk.tiles.length,
+      decalsSource: chunk.decals, decalsLength: chunk.decals.length,
+      atlas: this.atlas, hasMarker: Boolean(hasMarker),
+    };
     diagnostics.builds = (diagnostics.builds ?? 0) + 1;
     diagnostics.buildMs = (diagnostics.buildMs ?? 0) + (performance.now() - buildStartedAt);
     diagnostics.tilesDrawn = (diagnostics.tilesDrawn ?? 0) + tiles.length;
@@ -1048,6 +1085,13 @@ export const renderingMethods = {
     const overlayHeight = Math.ceil(this.height * renderScale);
     if (overlay.width !== overlayWidth) overlay.width = overlayWidth;
     if (overlay.height !== overlayHeight) overlay.height = overlayHeight;
+    if (fogOverlayUnchanged(overlay, this, [this.width, this.height, renderScale,
+      this.camera.offsetX, this.camera.offsetY, unexploredAlpha, fogEdgeFade, visibleRadius,
+      FOG_OF_WAR_CONFIG.revealRadiusTiles])) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(overlay, 0, 0, this.width, this.height);
+      return;
+    }
     const fogCtx = overlay.getContext("2d");
     fogCtx.setTransform(1, 0, 0, 1, 0, 0);
     fogCtx.clearRect(0, 0, overlay.width, overlay.height);
@@ -1360,6 +1404,11 @@ export const renderingMethods = {
     const overlay = this.fogMinimapOverlayCanvas ??= document.createElement("canvas");
     if (overlay.width !== ctx.canvas.width) overlay.width = ctx.canvas.width;
     if (overlay.height !== ctx.canvas.height) overlay.height = ctx.canvas.height;
+    if (fogOverlayUnchanged(overlay, this, [overlay.width, overlay.height, center, scale,
+      origin.x, origin.y, unexploredAlpha, fogEdgeFade, visibleRadius, FOG_OF_WAR_CONFIG.revealRadiusTiles])) {
+      ctx.drawImage(overlay, 0, 0);
+      return;
+    }
     const fogCtx = overlay.getContext("2d");
     fogCtx.clearRect(0, 0, overlay.width, overlay.height);
     fogCtx.globalCompositeOperation = "source-over";
@@ -1370,6 +1419,7 @@ export const renderingMethods = {
       const x = center + (point.x - origin.x) * scale;
       const y = center + (point.y - origin.y) * scale;
       const radius = Math.max(2, (point.radius ?? FOG_OF_WAR_CONFIG.revealRadiusTiles) * scale);
+      if (x + radius < 0 || y + radius < 0 || x - radius > overlay.width || y - radius > overlay.height) continue;
       this.drawMinimapRevealGradient(fogCtx, x, y, radius, exploredCutAlpha, fogEdgeFade);
     }
     this.drawMinimapRevealGradient(fogCtx, center, center, visibleRadius, visibleCutAlpha, fogEdgeFade);

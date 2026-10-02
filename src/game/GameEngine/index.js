@@ -52,8 +52,6 @@ export class GameEngine {
     this.targetFps = Math.max(30, Math.min(60, Number(options.targetFps) || performanceProfile.targetFps));
     this.fogRenderScale = Math.max(0.3, Math.min(1, Number(options.fogRenderScale) || performanceProfile.fogRenderScale));
     this.lastTime = performance.now();
-    this.fpsWindowTime = 0;
-    this.fpsWindowFrames = 0;
     this.averageFps = 0;
     this.updateFps = 0;
     this.renderFps = 0;

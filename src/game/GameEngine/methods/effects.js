@@ -9,6 +9,7 @@ import {
   worldToScreen,
 } from "../dependencies.js";
 import { audioManager } from "../../audio-manager.js";
+import { getBlockingObjects } from "../../blocking-object-index.js";
 import { REGION_OBJECT_DEFS } from "../../config/region-object-config.js";
 import { resolveAttachedObjectParticleConfigs } from "../../objects/object-attached-effects.js";
 
@@ -753,7 +754,7 @@ export const effectsMethods = {
     for (let yy = cy - 1; yy <= cy + 1; yy += 1) {
       for (let xx = cx - 1; xx <= cx + 1; xx += 1) {
         const chunk = this.getChunk(xx, yy);
-        for (const object of chunk.objects) {
+        for (const object of getBlockingObjects(chunk)) {
           if (object.blocking && Math.hypot(object.x - x, object.y - y) < object.radius + radius) return true;
         }
       }

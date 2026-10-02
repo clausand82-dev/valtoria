@@ -110,7 +110,10 @@ const originalDocument = globalThis.document;
 const criticalReasons = [];
 globalThis.document = { hidden: true };
 try {
-  const criticalSaveEngine = { saveProgress: (options) => criticalReasons.push(options) };
+  const criticalSaveEngine = {
+    saveProgress: (options) => criticalReasons.push(options),
+    resetFrameDiagnostics: lifecycleMethods.resetFrameDiagnostics,
+  };
   lifecycleMethods.handleDocumentVisibilityChange.call(criticalSaveEngine);
   lifecycleMethods.handlePageHide.call(criticalSaveEngine);
   assert.deepEqual(criticalReasons, [

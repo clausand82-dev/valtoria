@@ -2707,10 +2707,26 @@ function objectDamageRenderSheet(sheet, object) {
   return sheet;
 }
 
+const damageCompositeCache = new Map();
+const damageImageIds = new WeakMap();
+let nextDamageImageId = 1;
+let damageCacheBytes = 0;
+const MAX_DAMAGE_CACHE_BYTES = 16 * 1024 * 1024;
+const MAX_DAMAGE_CACHE_ENTRIES = 128;
+
+export function clearDamageRenderCache() {
+  damageCompositeCache.clear();
+  damageCacheBytes = 0;
+}
+
+function objectDamageStage(object) {
+  const missing = Math.max(0, Math.min(1, 1 - object.hp / object.maxHp));
+  return missing > 0.72 ? 3 : missing > 0.42 ? 2 : 1;
+}
+
 function drawDamageCracks(ctx, object, x, y, width, height) {
   if (!object?.maxHp || object.hp >= object.maxHp) return;
-  const missing = Math.max(0, Math.min(1, 1 - object.hp / object.maxHp));
-  const stage = missing > 0.72 ? 3 : missing > 0.42 ? 2 : 1;
+  const stage = objectDamageStage(object);
   const tree = getRegionObjectFamily(object?.type) === "tree";
   const region = tree
     ? { x: x + width * 0.36, y: y + height * 0.5, w: width * 0.28, h: height * 0.42 }
@@ -2748,18 +2764,47 @@ function drawDamageCracks(ctx, object, x, y, width, height) {
   ctx.restore();
 }
 
-function drawImageMaybeDamaged(ctx, image, sx, sy, sw, sh, dx, dy, dw, dh, object) {
+export function drawImageMaybeDamaged(ctx, image, sx, sy, sw, sh, dx, dy, dw, dh, object) {
   if (!object?.maxHp || object.hp >= object.maxHp) {
     ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
     return;
   }
 
-  const temp = document.createElement("canvas");
-  temp.width = Math.max(1, Math.ceil(dw));
-  temp.height = Math.max(1, Math.ceil(dh));
-  const tctx = temp.getContext("2d");
-  tctx.drawImage(image, sx, sy, sw, sh, 0, 0, temp.width, temp.height);
-  drawDamageCracks(tctx, object, 0, 0, temp.width, temp.height);
+  let imageId = damageImageIds.get(image);
+  if (!imageId) {
+    imageId = nextDamageImageId++;
+    damageImageIds.set(image, imageId);
+  }
+  const width = Math.max(1, Math.ceil(dw));
+  const height = Math.max(1, Math.ceil(dh));
+  // Source/frame and raster dimensions capture animation, size and render scale.
+  // Crack composition retains the original offscreen context's default smoothing.
+  const key = [imageId, image.width, image.height, sx, sy, sw, sh, width, height,
+    object.type, objectDamageStage(object)].join(":");
+  let temp = damageCompositeCache.get(key);
+  if (temp) {
+    damageCompositeCache.delete(key);
+    damageCompositeCache.set(key, temp);
+  } else {
+    temp = document.createElement("canvas");
+    temp.width = width;
+    temp.height = height;
+    const tctx = temp.getContext("2d");
+    tctx.drawImage(image, sx, sy, sw, sh, 0, 0, width, height);
+    drawDamageCracks(tctx, object, 0, 0, width, height);
+    const bytes = width * height * 4;
+    if (bytes <= MAX_DAMAGE_CACHE_BYTES) {
+      while (damageCompositeCache.size >= MAX_DAMAGE_CACHE_ENTRIES
+        || damageCacheBytes + bytes > MAX_DAMAGE_CACHE_BYTES) {
+        const oldestKey = damageCompositeCache.keys().next().value;
+        const oldest = damageCompositeCache.get(oldestKey);
+        damageCacheBytes -= oldest.width * oldest.height * 4;
+        damageCompositeCache.delete(oldestKey);
+      }
+      damageCompositeCache.set(key, temp);
+      damageCacheBytes += bytes;
+    }
+  }
   ctx.drawImage(temp, dx, dy, dw, dh);
 }
 

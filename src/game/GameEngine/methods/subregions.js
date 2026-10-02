@@ -10,7 +10,7 @@ import { SUBREGION_CONFIG } from "../../config/subregion-config.js";
 import { localize } from "../../../i18n/localization.js";
 import { normalizeLanguage, STORAGE_KEY } from "../../../i18n/language-config.js";
 import { normalizeRegionFoliageSets, normalizeRegionTileset } from "../../config/region-asset-config.js";
-import { loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
+import { clearDamageRenderCache, loadAnimationSheets, loadGeneratedAtlas } from "../../assets.js";
 import {
   incrementWorldCounter,
   resolveMapRegionConfig,
@@ -637,6 +637,7 @@ export const subregionMethods = {
       loadGeneratedAtlas(regionConfig),
       loadAnimationSheets(regionConfig),
     ]).then(([atlas, animationSheets]) => {
+      clearDamageRenderCache();
       this.atlas = atlas;
       this.animationSheets = animationSheets;
       for (const chunk of this.chunks?.values?.() ?? []) {

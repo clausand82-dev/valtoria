@@ -1,4 +1,5 @@
 import { CHUNK_SIZE, WORLD_SEED } from "./config/game-constants-config.js";
+import { getBlockingObjects } from "./blocking-object-index.js";
 import { ARMOR_BASES, EQUIPMENT_SLOTS, WEAPON_BASES } from "./config/equipment-config.js";
 import { NAMED_ITEM_TEMPLATES, PREFIXES, UNIQUE_ITEMS } from "./config/item-config.js";
 import { MONSTER_STATS } from "./config/monster-config.js";
@@ -1065,13 +1066,20 @@ export function createChunk(cx, cy, region = null) {
     }
   }
 
-  if (!chunk.tiles.length) return chunk;
+  if (!chunk.tiles.length) {
+    getBlockingObjects(chunk);
+    return chunk;
+  }
   addPrefabContent(chunk);
-  if (region?.blueprint) return chunk;
+  if (region?.blueprint) {
+    getBlockingObjects(chunk);
+    return chunk;
+  }
   addObjects(chunk, safeChunk);
   addFoliage(chunk, safeChunk);
   addDecals(chunk, safeChunk);
   addMonsters(chunk, safeChunk);
+  getBlockingObjects(chunk);
   return chunk;
 }
 

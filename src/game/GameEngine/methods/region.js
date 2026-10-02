@@ -12,6 +12,7 @@ import {
 import { actionTargetGroupsForQuest, rollEliteVariant, eliteVariantLevelPct } from "../helpers.js";
 import { MAP_ABANDON_RESET_CONFIG } from "../../config/map-abandon-reset-config.js";
 import { audioManager } from "../../audio-manager.js";
+import { clearDamageRenderCache } from "../../assets.js";
 import {
   mobWorldStateKey,
   normalizeWorldState,
@@ -447,6 +448,7 @@ export const regionMethods = {
   },
 
   resetRegionRuntime() {
+    clearDamageRenderCache();
     this.mapRuntimeDisposed = false;
     this.currentRegionStats = null;
     this.regionDecoratorPlans = new Map();
