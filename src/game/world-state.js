@@ -137,6 +137,33 @@ export function normalizeWorldState(worldState = EMPTY_WORLD_STATE) {
   };
 }
 
+const worldStateReadScopes = [];
+
+// A synchronous, read-only calculation can share one normalized copy. Never
+// retain it between calculations: callers may mutate world-state in place.
+export function withWorldStateReadScope(worldState, calculate) {
+  if (worldStateReadScopes.some((scope) => scope.source === worldState || scope.normalized === worldState)) {
+    return calculate();
+  }
+  worldStateReadScopes.push({ source: worldState, normalized: null });
+  try {
+    return calculate();
+  } finally {
+    worldStateReadScopes.pop();
+  }
+}
+
+function worldStateForConditionRead(worldState) {
+  for (let index = worldStateReadScopes.length - 1; index >= 0; index--) {
+    const scope = worldStateReadScopes[index];
+    if (scope.source === worldState || scope.normalized === worldState) {
+      scope.normalized ??= normalizeWorldState(worldState);
+      return scope.normalized;
+    }
+  }
+  return normalizeWorldState(worldState);
+}
+
 export function regionWorldStateKey(regionId, state) {
   return `region.${String(regionId ?? "").trim()}.${String(state ?? "").trim()}`;
 }
@@ -275,7 +302,7 @@ export function questWorldStateKey(questId, state) {
 }
 
 export function getWorldFlag(worldState, key) {
-  return Boolean(normalizeWorldState(worldState).flags[String(key ?? "")]);
+  return Boolean(worldStateForConditionRead(worldState).flags[String(key ?? "")]);
 }
 
 export function setWorldFlag(worldState, key, value = true) {
@@ -358,7 +385,7 @@ function regionKey(context = {}, state) {
 
 function readWorldScalar(worldState, key) {
   if (!key) return undefined;
-  const normalized = normalizeWorldState(worldState);
+  const normalized = worldStateForConditionRead(worldState);
   if (Object.prototype.hasOwnProperty.call(normalized.values, key)) return normalized.values[key];
   if (Object.prototype.hasOwnProperty.call(normalized.counters, key)) return normalized.counters[key];
   if (Object.prototype.hasOwnProperty.call(normalized.flags, key)) return normalized.flags[key];
@@ -378,7 +405,7 @@ function getRegionCorruptionLevel(worldState, context = {}) {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   const corruptedKey = regionKey(context, "corrupted");
-  if (corruptedKey && Object.prototype.hasOwnProperty.call(normalizeWorldState(worldState).flags, corruptedKey)) {
+  if (corruptedKey && Object.prototype.hasOwnProperty.call(worldStateForConditionRead(worldState).flags, corruptedKey)) {
     return getWorldFlag(worldState, corruptedKey) ? 10 : 0;
   }
   if (typeof context.regionConfig?.corrupted === "boolean") return context.regionConfig.corrupted ? 10 : 0;
@@ -583,7 +610,7 @@ function cityAreaLevelRequirementMet(expected, context) {
 }
 
 function shorthandConditionMet(key, expected, worldState, context) {
-  const normalized = normalizeWorldState(worldState);
+  const normalized = worldStateForConditionRead(worldState);
   switch (key) {
     case "worldBalanceLydra": {
       const state = getWorldEnergyState({ worldEnergy: context.worldEnergy });
@@ -696,7 +723,7 @@ export function worldConditionMet(condition, worldState = EMPTY_WORLD_STATE, con
   if (Array.isArray(condition)) return condition.every((entry) => worldConditionMet(entry, worldState, context));
   if (typeof condition !== "object") return Boolean(condition);
 
-  const normalized = normalizeWorldState(worldState);
+  const normalized = worldStateForConditionRead(worldState);
   if (Array.isArray(condition.all) && !condition.all.every((entry) => worldConditionMet(entry, normalized, context))) return false;
   if (Array.isArray(condition.any) && !condition.any.some((entry) => worldConditionMet(entry, normalized, context))) return false;
   if (condition.not !== undefined && worldConditionMet(condition.not, normalized, context)) return false;
@@ -759,7 +786,7 @@ function entryAllowed(entry, worldState, context) {
 }
 
 export function worldEntryAllowed(entry, worldState = EMPTY_WORLD_STATE, context = {}) {
-  return entryAllowed(entry, normalizeWorldState(worldState), context);
+  return entryAllowed(entry, worldStateForConditionRead(worldState), context);
 }
 
 export function stripWorldConditionFields(entry) {

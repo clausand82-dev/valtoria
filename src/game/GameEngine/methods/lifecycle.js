@@ -34,6 +34,11 @@ import { normalizeFactionRep } from "../../config/faction-config.js";
 import { createAutoLootRules } from "./loot.js";
 import { resolvePerformanceProfile } from "../../config/performance-config.js";
 import { audioManager } from "../../audio-manager.js";
+import { recordPerformanceFrame, resetPerformanceFrameWindow } from "../../performance-frame-window.js";
+import { startBrowserTimingObservation, stopBrowserTimingObservation, resetBrowserTimingWindow } from "../../performance-browser-timing.js";
+
+const MAX_SIMULATION_STEP_SECONDS = 0.034;
+const MAX_SIMULATION_STEPS = 4;
 
 function playerFootstepSurface(engine) {
   const tileX = Math.floor(Number(engine.player?.x) || 0);
@@ -109,6 +114,7 @@ export const lifecycleMethods = {
   },
 
   start() {
+    startBrowserTimingObservation(this);
     this.resize();
     this.ensureWorldAroundPlayer();
     this.updateFogOfWar(true);
@@ -167,6 +173,8 @@ export const lifecycleMethods = {
   },
 
   stop() {
+    if (this.performanceRecording?.active) this.stopPerformanceRecording?.();
+    stopBrowserTimingObservation(this);
     audioManager.stopAll();
     if (this.pendingAutosaveTimer) {
       clearTimeout(this.pendingAutosaveTimer);
@@ -204,12 +212,29 @@ export const lifecycleMethods = {
   },
 
   resize() {
-    this.dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, this.maxDpr ?? 1.5));
-    this.width = Math.max(360, window.innerWidth);
-    this.height = Math.max(360, window.innerHeight);
-    this.canvas.width = Math.floor(this.width * this.dpr);
-    this.canvas.height = Math.floor(this.height * this.dpr);
+    const dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, this.maxDpr ?? 1.5));
+    const width = Math.max(360, window.innerWidth);
+    const height = Math.max(360, window.innerHeight);
+    const pixelWidth = Math.floor(width * dpr);
+    const pixelHeight = Math.floor(height * dpr);
+    if (this.dpr === dpr && this.width === width && this.height === height
+      && this.canvas.width === pixelWidth && this.canvas.height === pixelHeight) return;
+    // Quality changes can resize after the frame was drawn. Keep that frame
+    // visible until the next render instead of presenting the cleared bitmap.
+    let previousFrame = null;
+    if (this.renderFrameCount > 0 && this.canvas.width && this.canvas.height) {
+      previousFrame = document.createElement("canvas");
+      previousFrame.width = this.canvas.width;
+      previousFrame.height = this.canvas.height;
+      previousFrame.getContext("2d").drawImage(this.canvas, 0, 0);
+    }
+    this.dpr = dpr;
+    this.width = width;
+    this.height = height;
+    if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
+    if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    if (previousFrame) this.ctx.drawImage(previousFrame, 0, 0, this.width, this.height);
     this.backdropCanvas = null;
     this.vignetteCanvas = null;
     this.fogOverlayCanvas = null;
@@ -236,6 +261,8 @@ export const lifecycleMethods = {
   },
 
   loop(now) {
+    const callbackStartedAt = performance.now();
+    this.performanceFrameInProgress = true;
     this.rafCallbackCount += 1;
     const hidden = typeof document !== "undefined" && document.hidden;
     if (hidden || this.diagnosticsSuspended) {
@@ -248,6 +275,7 @@ export const lifecycleMethods = {
     this.diagnosticsLastTime = now;
     this.renderStatsWindowRafs += hidden ? 0 : 1;
     if (typeof document !== "undefined" && document.hidden) {
+      this.performanceFrameInProgress = false;
       this.lastTime = now;
       if (!this.hiddenLoopTimer) {
         this.hiddenLoopTimer = setTimeout(() => {
@@ -258,16 +286,22 @@ export const lifecycleMethods = {
       return;
     }
     if (this.paused) {
+      let renderMs = null;
       this.lastTime = now;
       this.nextFrameTime = now;
       if (this.shouldRenderFrame(now)) {
+        const renderStartedAt = performance.now();
         this.render();
+        renderMs = performance.now() - renderStartedAt;
         this.clearRenderDirty();
         this.lastRenderTime = now;
         this.renderFrameCount += 1;
         this.renderStatsWindowRenders += 1;
       }
       this.updateRenderDiagnostics(elapsedSeconds);
+      recordPerformanceFrame(this, now, elapsedSeconds * 1000, callbackStartedAt, null, renderMs);
+      this.performanceFrameInProgress = false;
+      this.updatePerformanceHistory?.();
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
@@ -275,22 +309,52 @@ export const lifecycleMethods = {
     this.nextFrameTime ??= now;
     if (now + 0.5 < this.nextFrameTime) {
       this.updateRenderDiagnostics(elapsedSeconds);
+      recordPerformanceFrame(this, now, elapsedSeconds * 1000, callbackStartedAt);
+      this.performanceFrameInProgress = false;
+      this.updatePerformanceHistory?.();
       this.raf = requestAnimationFrame(this.loop);
       return;
     }
     const frameSeconds = Math.max(0, (now - this.lastTime) / 1000);
-    const dt = Math.min(0.034, frameSeconds);
+    const simulationSeconds = Math.min(MAX_SIMULATION_STEP_SECONDS * MAX_SIMULATION_STEPS, frameSeconds);
+    const stepCount = Math.max(1, Math.ceil(simulationSeconds / MAX_SIMULATION_STEP_SECONDS));
+    const dt = simulationSeconds / stepCount;
     this.lastTime = now;
     this.nextFrameTime += minFrameMs;
     if (now - this.nextFrameTime > minFrameMs) this.nextFrameTime = now + minFrameMs;
     this.lastFrameDt = frameSeconds;
-    this.lastSimulationDt = dt;
-    this.frame += 1;
+    this.lastSimulationDt = 0;
+    this.lastSimulationStepCount = 0;
     this.updateFrameCount += 1;
     this.renderStatsWindowUpdates += 1;
-    this.update(dt);
+    const updateStartedAt = performance.now();
+    const simulationRegion = this.region;
+    const updateTotals = {};
+    let chunksCreated = 0;
+    for (let step = 0; step < stepCount; step++) {
+      this.frame += 1; // Invalidate frame-local effect/visibility caches per step.
+      this.update(dt);
+      this.lastSimulationDt += dt;
+      this.lastSimulationStepCount++;
+      for (const [key, value] of Object.entries(this.updateTimings ?? {})) {
+        if (typeof value === "number" && key !== "worstCategoryMs") updateTotals[key] = (updateTotals[key] ?? 0) + value;
+      }
+      chunksCreated += this.chunkFrameMetrics?.chunksCreatedThisFrame ?? 0;
+      // A transition or pause ends catch-up in the old world immediately.
+      if (this.paused || this.mapRuntimeDisposed || this.region !== simulationRegion) break;
+    }
+    if (this.lastSimulationStepCount > 1) {
+      const categories = Object.entries(updateTotals).filter(([key]) => key !== "totalMs");
+      const [worstCategory, worstCategoryMs] = categories.sort((a, b) => b[1] - a[1])[0] ?? ["none", 0];
+      this.updateTimings = { ...updateTotals, worstCategory, worstCategoryMs };
+    }
+    this.lastSimulationChunksCreated = chunksCreated;
+    const updateMs = performance.now() - updateStartedAt;
+    let renderMs = null;
     if (this.shouldRenderFrame(now)) {
+      const renderStartedAt = performance.now();
       this.render();
+      renderMs = performance.now() - renderStartedAt;
       this.clearRenderDirty();
       this.lastRenderTime = now;
       this.renderFrameCount += 1;
@@ -299,6 +363,9 @@ export const lifecycleMethods = {
       this.skippedRenderFrames += 1;
     }
     this.updateRenderDiagnostics(elapsedSeconds);
+    recordPerformanceFrame(this, now, elapsedSeconds * 1000, callbackStartedAt, updateMs, renderMs);
+    this.performanceFrameInProgress = false;
+    this.updatePerformanceHistory?.();
     this.raf = requestAnimationFrame(this.loop);
   },
 
@@ -696,7 +763,6 @@ export const lifecycleMethods = {
       ...(this.performanceSpikeContext?.() ?? {}),
       monsterDeath: this.monsterDeathTimings ? { ...this.monsterDeathTimings } : null,
     });
-    this.updatePerformanceHistory?.();
   },
 
   updateInteractionTargets(dt = 0) {
@@ -1251,6 +1317,8 @@ export const lifecycleMethods = {
   },
 
   resetFrameDiagnostics(now) {
+    resetPerformanceFrameWindow(this, now, true);
+    resetBrowserTimingWindow(this, now);
     this.diagnosticsLastTime = now;
     this.lastFrameDt = 0;
     this.renderStatsWindowTime = 0;

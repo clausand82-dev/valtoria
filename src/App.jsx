@@ -1016,9 +1016,11 @@ export default function App() {
   const hpPct = Math.max(0, Math.min(100, (player.hp / player.maxHp) * 100));
   const manaPct = Math.max(0, Math.min(100, (player.mana / player.maxMana) * 100));
   const xpPct = Math.max(0, Math.min(100, (player.xp / player.nextXp) * 100));
+  // A hover-only publication retains the full snapshot token and city inputs.
+  const cityCalculationSnapshot = useMemo(() => snapshot, [snapshot.snapshotContentToken ?? snapshot]);
   const derivedCityStats = useMemo(
-    () => calculateCityStats(cityProgressHud, snapshot, regionCorruption),
-    [cityProgressHud, snapshot, regionCorruption],
+    () => calculateCityStats(cityProgressHud, cityCalculationSnapshot, regionCorruption),
+    [cityProgressHud, cityCalculationSnapshot, regionCorruption],
   );
   const effectivePopularity = Math.max(0, Math.min(100, Number(derivedCityStats.popularity) || 0));
   const popularityPct = effectivePopularity;
@@ -1033,8 +1035,8 @@ export default function App() {
         : "city_low_threat");
   }, [cityOpen, cityThreatLevel]);
   const cityStatBreakdown = useMemo(
-    () => calculateCityStatBreakdown(cityProgressHud, snapshot, regionCorruption),
-    [cityProgressHud, snapshot, regionCorruption],
+    () => calculateCityStatBreakdown(cityProgressHud, cityCalculationSnapshot, regionCorruption),
+    [cityProgressHud, cityCalculationSnapshot, regionCorruption],
   );
   const cityHudStats = useMemo(() => CITY_STAT_DEFS.filter((stat) => stat.id !== "popularity").map((stat) => {
     const value = Math.max(0, Math.floor(Number(derivedCityStats[stat.id]) || 0));
@@ -1042,7 +1044,7 @@ export default function App() {
     const ratio = derivedCityStats.ratios?.[stat.id] ?? null;
     const status = derivedCityStats.statuses?.[stat.id] ?? null;
     const configuredMax = CITY_STATS_RULES.displayMax?.[stat.id] ?? 500;
-    const max = Math.max(1, Math.floor(Number(need || (typeof stat.max === "function" ? stat.max(snapshot) : stat.max ?? configuredMax)) || 1));
+    const max = Math.max(1, Math.floor(Number(need || (typeof stat.max === "function" ? stat.max(cityCalculationSnapshot) : stat.max ?? configuredMax)) || 1));
     const pct = Math.max(0, Math.min(100, (value / max) * 100));
     const statLabel = localize(stat, "label");
     const statusLabels = localize(CITY_STATS_RULES.balance, "statusLabels") || CITY_STATS_RULES.balance?.statusLabels;
@@ -1062,7 +1064,7 @@ export default function App() {
       classId: stat.classId ?? stat.id,
       breakdown: cityStatBreakdown[stat.id] ?? [],
     };
-  }), [cityStatBreakdown, derivedCityStats, localize, snapshot]);
+  }), [cityStatBreakdown, derivedCityStats, localize, cityCalculationSnapshot]);
   const selectedCityStat = useMemo(
     () => cityHudStats.find((stat) => stat.id === selectedCityStatId) ?? null,
     [cityHudStats, selectedCityStatId],

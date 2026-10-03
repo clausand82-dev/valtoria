@@ -2,6 +2,7 @@ History over changes
 
 *V. 1.14
 - optimized something udner the hood
+- optimized debug system
 
 *V. 1.13
 - run some code and performance optimizing

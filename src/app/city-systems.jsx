@@ -3,7 +3,7 @@ import { MAX_INVENTORY, RARITIES, TILE_H, TILE_W } from "../game/data.js";
 import { drawGroundTile, drawShadow } from "../game/assets-ground.js";
 import { GameEngine } from "../game/GameEngine.js";
 import { makeItem, itemValue } from "../game/world.js";
-import { worldEntryAllowed } from "../game/world-state.js";
+import { worldEntryAllowed, withWorldStateReadScope } from "../game/world-state.js";
 import { makeResourceItem } from "../game/GameEngine/helpers.js";
 import { ATLAS_FRAMES } from "../game/assets.js";
 import { screenToWorld, worldToIso, worldToScreen } from "../game/iso.js";
@@ -1992,6 +1992,10 @@ function syncCityAchievementState(progress = {}, snapshot = emptySnapshot, cityS
 }
 
 function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
+  return withWorldStateReadScope(snapshot?.worldState, () => calculateCityStatsInReadScope(progress, snapshot, regionCorruption));
+}
+
+function calculateCityStatsInReadScope(progress, snapshot, regionCorruption) {
   const applyNonPopularityEffects = (target, effects) => {
     const filtered = {};
     for (const [rawId, rawAmount] of Object.entries(effects ?? {})) {
@@ -2056,6 +2060,10 @@ function calculateCityStats(progress = {}, snapshot = emptySnapshot, regionCorru
 }
 
 function calculateCityStatBreakdown(progress = {}, snapshot = emptySnapshot, regionCorruption = {}) {
+  return withWorldStateReadScope(snapshot?.worldState, () => calculateCityStatBreakdownInReadScope(progress, snapshot, regionCorruption));
+}
+
+function calculateCityStatBreakdownInReadScope(progress, snapshot, regionCorruption) {
   const breakdown = {};
   const addEntry = (statId, label, amount, detail = "") => {
     const normalized = normalizeCityStatId(statId);

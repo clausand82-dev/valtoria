@@ -1,9 +1,106 @@
 # Gameplay performance verification — 2026-10-02
 
+## Recording frame spikes
+
+### Follow-up: click stalls and brief blank frames
+
+The `17-05-53-004Z` recording contains only 29.4 ms of discarded simulation
+time over approximately 60.9 seconds. Catch-up therefore addresses the earlier
+slowdown, but RAF delivery still stalls up to 152.8 ms. Browser LoAF entries
+attribute 65–76 ms to `CANVAS.onpointerdown` / `handlePointerDown`, followed by
+approximately 62–64 ms of React work. The maximum measured synchronous game-loop
+callback is 15.4 ms; its update/render timings alone do not explain these stalls.
+
+Hover changes now publish only the hovered monster, retaining the last complete
+snapshot's inventory, quest and player references. A fresh per-publication object
+token lets React retain city calculations for hover-only changes, including
+across engine/session replacement. Full snapshots still refresh all data.
+Pointer-down reuses its pointer-move monster hit test and discovery call.
+
+Full snapshots (including spell-cast snapshots) and city stat calculations share
+one normalized world-state copy within each synchronous read-only calculation.
+Nested condition checks previously cloned that state repeatedly. The regression
+fixture reduces 100 nested condition queries from 450 copies to one with equal
+results. The scope ends in `finally`, retains nothing between calculations, and
+does not alter normalization used by write helpers. Tests verify subsequent
+in-place changes, nested scopes, writes and exception cleanup. This is an
+operation-count result, not a measured browser FPS improvement.
+
+Adaptive quality changes call `resize()` after rendering. Previously even an
+unchanged size reassigned canvas dimensions, clearing the displayed bitmap.
+Unchanged sizes now return without clearing. Actual viewport/DPR changes retain
+a temporary copy of the completed frame, restore it at the new size synchronously,
+and mark rendering dirty. This fixes that identified blank-frame path; the user's
+reported blink still requires visual confirmation in the browser. Regression
+tests cover unchanged sizes, DPR changes, frame restoration and invalidation.
+
+The recording format now includes `metadata.performanceSchemaVersion: 3` and
+`samples[].frameWindow`. Each window measures every completed visible RAF
+callback, including capped/paused callbacks, and records count, mean, P95,
+maximum and counts at/above 50/100 ms for RAF/update/render intervals and actual
+update/render/callback CPU work. Skipped work contributes no stale timing.
+`simulationDroppedMs` measures time omitted beyond the bounded catch-up budget;
+`simulationAdvancedMs` and `simulationSubsteps` report how much was simulated.
+
+Each window retains its five slowest RAF intervals and five slowest callbacks,
+with update/render categories, activity, region, chunk creation and preceding
+callback timings. `summary.frameWindows` reports window maxima and the ten
+slowest events of each kind. Summary P95 fields explicitly mean the maximum
+window P95, not a percentile of the entire recording. `worstSample` now considers
+window spikes. Existing category samples remain latest-frame readings.
+
+Sampling runs after completed callbacks. Starting a recording clears earlier
+observations; stopping retains the partial final window. Hidden-tab resets
+exclude background gaps. Stored percentile observations are capped at 4096 per
+metric/window, with an explicit truncation flag; maxima/counts still include all
+observations. Callback CPU excludes recording aggregation, GPU execution and
+other event-loop tasks; those can still cause RAF delays without high measured
+update/render CPU.
+
+The regression suite simulates an 80 ms update plus 40 ms render between normal
+one-second samples: the exported maximum preserves both costs and the following
+140 ms RAF interval, even though the latest update snapshot is only 2 ms. It
+also checks P95, bounded storage, partial stop, restart and automatic stop.
+
+## Bounded simulation catch-up and browser diagnostics
+
+Simulation now advances the elapsed time using at most four equal substeps of
+at most 34 ms each. A 50 ms frame runs two 25 ms updates, so stable 20 FPS advances
+one full simulation second per wall second. Catch-up is capped at 136 ms per
+callback; excess time after severe stalls is intentionally discarded and
+reported. No accumulated backlog is carried into future frames. Pauses, hidden
+tabs and region transitions do not trigger an unbounded catch-up. Rendering and
+update-FPS counters remain per callback; simulation-step counts are separate.
+Frame-local caches are invalidated per substep, and update category totals are
+summed for callbacks containing multiple updates.
+
+Regression tests compare real collision movement at 20 FPS/two 25 ms substeps
+with 40 FPS/one 25 ms step, verify blocking objects are not crossed, and verify
+cooldowns advance a full second. Tests cover 40/80/125 ms frames, a five-second
+stall (four steps, 136 ms advanced), and stopping catch-up on map transitions.
+
+`samples[].browserTiming` and `summary.browserTiming` now record feature-detected
+Long Tasks and Long Animation Frames using PerformanceObserver. Bounded lists
+include performance-timeline timestamps, script source/function/invoker,
+blocking duration, render-phase duration and forced style/layout costs. The
+observer queue is drained before snapshots, late delivery keeps its original
+timestamps, and recording/visibility boundaries exclude old events. Unsupported
+APIs and registration errors are explicitly reported. Observers disconnect at
+engine shutdown. The debug panel shows 60-second lost simulation time, maximum
+RAF interval and browser-event counts. API behavior is documented by
+[Chrome's Long Animation Frames guide](https://developer.chrome.com/docs/web-platform/long-animation-frames)
+and the [Long Tasks specification](https://www.w3.org/TR/longtasks-1/).
+
+These are browser-reported main-thread/rendering observations, not direct GPU
+or GC profiling. The session still exposes no browser for visual validation;
+browser-observer behavior is tested with mocked asynchronous reports, queued
+records, bounded event retention and unsupported APIs. New gameplay recordings
+are required to verify the perceived improvement and identify remaining pauses.
+
 Baseline: commit `7ad72d9` in `clausand82-dev/valtoria`. Measurements compare that
 checkout with the working changes using `scripts/measure-gameplay-performance.js`.
 
-## Changes
+## Initial optimization changes (before bounded catch-up)
 
 - FPS windows use elapsed RAF time and separate update/render/RAF counters. Skipped
   and paused callbacks contribute real time; hidden intervals reset the window.

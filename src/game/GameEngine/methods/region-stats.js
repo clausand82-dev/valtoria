@@ -1,4 +1,6 @@
 import { buildRegionStats } from "../../region-stats.js";
+import { performanceFrameWindowSnapshot, resetPerformanceFrameWindow } from "../../performance-frame-window.js";
+import { browserTimingSnapshot, resetBrowserTimingWindow, startBrowserTimingObservation } from "../../performance-browser-timing.js";
 
 const PERFORMANCE_HISTORY_MAX_SAMPLES = 120;
 const PERFORMANCE_SAMPLE_INTERVAL_MS = 1000;
@@ -84,12 +86,42 @@ function summarizeSamples(samples) {
   const last = samples[samples.length - 1];
   const durationSeconds = round(Math.max(0, (last.elapsedMs - first.elapsedMs) / 1000), 1);
   const profileIds = [...new Set(samples.map((sample) => sample.profileId ?? "unknown"))];
+  const samplePeak = (sample) => Math.max(
+    Number(sample.frameWindow?.rafIntervalMs?.maxMs) || 0, Number(sample.frameWindow?.callbackMs?.maxMs) || 0,
+    Number(sample.render?.totalMs) || 0, Number(sample.update?.totalMs) || 0,
+  );
   const worstSample = [...samples].sort((a, b) => (
-    Math.max(Number(b.render?.totalMs) || 0, Number(b.update?.totalMs) || 0) - Math.max(Number(a.render?.totalMs) || 0, Number(a.update?.totalMs) || 0)
+    samplePeak(b) - samplePeak(a)
     || (Number(a.renderFps) || 0) - (Number(b.renderFps) || 0)
   ))[0];
   return {
     profileId: profileIds.length === 1 ? profileIds[0] : "mixed",
+    browserTiming: {
+      supported: last.browserTiming?.supported ?? null,
+      longTaskCount: samples.reduce((sum, sample) => sum + (sample.browserTiming?.longTasks.count ?? 0), 0),
+      maxLongTaskMs: maxValue(samples, (sample) => sample.browserTiming?.longTasks.maxDurationMs),
+      longAnimationFrameCount: samples.reduce((sum, sample) => sum + (sample.browserTiming?.longAnimationFrames.count ?? 0), 0),
+      maxLongAnimationFrameMs: maxValue(samples, (sample) => sample.browserTiming?.longAnimationFrames.maxDurationMs),
+      longestTasks: samples.flatMap((sample) => sample.browserTiming?.longTasks.longest ?? []).sort((a, b) => b.durationMs - a.durationMs).slice(0, 10),
+      longestAnimationFrames: samples.flatMap((sample) => sample.browserTiming?.longAnimationFrames.longest ?? []).sort((a, b) => b.durationMs - a.durationMs).slice(0, 10),
+    },
+    frameWindows: {
+      recordedCallbacks: samples.reduce((sum, sample) => sum + (sample.frameWindow?.rafCount ?? 0), 0),
+      maxRafIntervalMs: maxValue(samples, (sample) => sample.frameWindow?.rafIntervalMs?.maxMs),
+      maxWindowP95RafIntervalMs: maxValue(samples, (sample) => sample.frameWindow?.rafIntervalMs?.p95Ms),
+      maxUpdateMs: maxValue(samples, (sample) => sample.frameWindow?.updateMs?.maxMs),
+      maxWindowP95UpdateMs: maxValue(samples, (sample) => sample.frameWindow?.updateMs?.p95Ms),
+      maxRenderMs: maxValue(samples, (sample) => sample.frameWindow?.renderMs?.maxMs),
+      maxWindowP95RenderMs: maxValue(samples, (sample) => sample.frameWindow?.renderMs?.p95Ms),
+      maxCallbackMs: maxValue(samples, (sample) => sample.frameWindow?.callbackMs?.maxMs),
+      rafIntervalsOver50Ms: samples.reduce((sum, sample) => sum + (sample.frameWindow?.rafIntervalMs?.over50Ms ?? 0), 0),
+      rafIntervalsOver100Ms: samples.reduce((sum, sample) => sum + (sample.frameWindow?.rafIntervalMs?.over100Ms ?? 0), 0),
+      simulationDroppedMs: round(samples.reduce((sum, sample) => sum + (sample.frameWindow?.simulationDroppedMs ?? 0), 0), 2),
+      simulationAdvancedMs: round(samples.reduce((sum, sample) => sum + (sample.frameWindow?.simulationAdvancedMs ?? 0), 0), 2),
+      simulationSubsteps: samples.reduce((sum, sample) => sum + (sample.frameWindow?.simulationSubsteps ?? 0), 0),
+      slowRafFrames: samples.flatMap((sample) => sample.frameWindow?.slowRafFrames ?? []).sort((a, b) => b.scoreMs - a.scoreMs).slice(0, 10),
+      slowWorkFrames: samples.flatMap((sample) => sample.frameWindow?.slowWorkFrames ?? []).sort((a, b) => b.scoreMs - a.scoreMs).slice(0, 10),
+    },
     profileIds,
     durationSeconds,
     sampleCount: samples.length,
@@ -187,6 +219,7 @@ function summarizeSamples(samples) {
     topVisualDebugReasons: summarizeReasonCounts(samples, "visualDebugReasons"),
     topDirtyReasons: summarizeReasonCounts(samples, "dirtyReasons"),
     worstSample: worstSample ? {
+      frameWindow: worstSample.frameWindow ?? null,
       timestamp: worstSample.timestamp,
       elapsedMs: worstSample.elapsedMs,
       updateTotalMs: worstSample.update?.totalMs ?? null,
@@ -266,6 +299,8 @@ export const regionStatsMethods = {
     return {
       timestamp: new Date().toISOString(),
       elapsedMs: Math.round(now - (this.performanceStartTime ?? this.lastTime ?? now)),
+      frameWindow: performanceFrameWindowSnapshot(this, now),
+      browserTiming: browserTimingSnapshot(this),
       profileId: this.performanceMode ?? "balanced",
       isCustomProfile: Boolean(this.isCustomPerformanceProfile),
       settings: this.performanceResolvedSettings(),
@@ -540,11 +575,14 @@ export const regionStatsMethods = {
     };
   },
 
-  updatePerformanceHistory(now = performance.now()) {
+  updatePerformanceHistory(now = performance.now(), force = false) {
+    if (this.performanceFrameInProgress) return;
     this.performanceStartTime ??= now;
-    if (now - (this.lastPerformanceSampleTime ?? 0) < (this.performanceSampleIntervalMs ?? PERFORMANCE_SAMPLE_INTERVAL_MS)) return;
+    if (!force && now - (this.lastPerformanceSampleTime ?? 0) < (this.performanceSampleIntervalMs ?? PERFORMANCE_SAMPLE_INTERVAL_MS)) return;
     this.lastPerformanceSampleTime = now;
     const sample = this.createPerformanceSample(now);
+    resetPerformanceFrameWindow(this, now);
+    resetBrowserTimingWindow(this, now, false);
     this.lastPerformanceSampleSnapshotBuiltAt = this.lastSnapshotInfo?.builtAt ?? null;
     this.performanceHistory ??= [];
     this.performanceHistory.push(sample);
@@ -558,6 +596,7 @@ export const regionStatsMethods = {
       this.performanceRecording.remainingSeconds = Math.max(0, this.performanceRecording.durationSeconds - elapsedSeconds);
       if (elapsedSeconds >= this.performanceRecording.durationSeconds) this.stopPerformanceRecording();
     }
+    return sample;
   },
 
   updateAdaptivePerformance(sample) {
@@ -628,6 +667,8 @@ export const regionStatsMethods = {
     const allowed = [30, 60, 120];
     const duration = allowed.includes(Number(durationSeconds)) ? Number(durationSeconds) : 60;
     const now = performance.now();
+    resetPerformanceFrameWindow(this, now, true);
+    startBrowserTimingObservation(this);
     this.performanceRecording = {
       active: true,
       durationSeconds: duration,
@@ -645,7 +686,15 @@ export const regionStatsMethods = {
 
   stopPerformanceRecording() {
     if (!this.performanceRecording) return this.performanceRecordingStatus();
+    const wasActive = this.performanceRecording.active;
     this.performanceRecording.active = false;
+    // Preserve the last partial second without recursively triggering auto-stop.
+    const browserTiming = browserTimingSnapshot(this);
+    if (wasActive && (this.performanceFrameWindow?.rafCount > 0
+      || browserTiming.longTasks.count > 0 || browserTiming.longAnimationFrames.count > 0)) {
+      const sample = this.updatePerformanceHistory(performance.now(), true);
+      if (sample) this.performanceRecording.samples.push(sample);
+    }
     this.performanceRecording.endedAt = new Date().toISOString();
     this.performanceRecording.remainingSeconds = 0;
     this.lastPerformanceRecordingSummary = this.getPerformanceRecordingSummary();
@@ -678,6 +727,17 @@ export const regionStatsMethods = {
     } : {};
     return {
       appName: APP_NAME,
+      performanceSchemaVersion: 3,
+      simulationSettings: { maxStepMs: 34, maxSubstepsPerCallback: 4, maxCatchUpMs: 136 },
+      timingNotes: {
+        frameWindow: "All visible RAF callbacks; update/render timings only for work executed in the window.",
+        intervals: "RAF interval measures callback delivery; update/render intervals also include intentional frame caps, idle throttling and pauses.",
+        callbackMs: "Synchronous game-loop CPU, excluding recording aggregation; not GPU or other event-loop tasks.",
+        p95: "Per-window nearest-rank percentile, capped at 4096 observations per metric; truncation is flagged.",
+        summaryP95: "Maximum of window P95 values, not a recording-wide percentile.",
+        legacyTimings: "Update/render fields describe the latest callback; update category totals sum substeps, nested details describe the last substep.",
+        browserTiming: "Feature-detected Long Tasks/Long Animation Frames, delivered asynchronously; timestamps share the RAF time origin. Rendering phases are not direct GPU timings.",
+      },
       appVersion: APP_VERSION,
       createdAt: new Date().toISOString(),
       userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
@@ -758,6 +818,8 @@ export const regionStatsMethods = {
       renderFrameCount: Math.max(0, Math.floor(Number(this.renderFrameCount) || 0)),
       rafCallbackCount: Math.max(0, Math.floor(Number(this.rafCallbackCount) || 0)),
       frameMs: this.lastFrameDt > 0 ? Math.round(this.lastFrameDt * 10000) / 10 : 0,
+      simulationStepCount: this.lastSimulationStepCount ?? 0,
+      browserTiming: browserTimingSnapshot(this),
       targetFps: Math.max(0, Math.round(Number(this.targetFps) || 0)),
       performanceMode: this.performanceMode ?? "balanced",
       adaptive: {

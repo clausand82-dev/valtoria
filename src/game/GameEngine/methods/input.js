@@ -33,8 +33,9 @@ export const inputMethods = {
     if (hoverMonsterId !== this.hoverMonsterId) {
       this.hoverMonsterId = hoverMonsterId;
       this.markRenderDirty?.("hover-monster");
-      this.publishSnapshot();
+      this.publishHoverSnapshot();
     }
+    return hovered;
   },
 
   handlePointerLeave() {
@@ -42,12 +43,12 @@ export const inputMethods = {
     if (!this.hoverMonsterId) return;
     this.hoverMonsterId = null;
     this.markRenderDirty?.("pointer-leave");
-    this.publishSnapshot();
+    this.publishHoverSnapshot();
   },
 
   handlePointerDown(event) {
     if (this.inputLocked) return;
-    this.handlePointerMove(event);
+    const monster = this.handlePointerMove(event);
     if (event.button === 2) {
       event.preventDefault();
       this.pointer.rightDown = true;
@@ -56,9 +57,7 @@ export const inputMethods = {
       return;
     }
     this.pointer.down = true;
-    const monster = this.monsterAtScreen(this.pointer.x, this.pointer.y);
     if (monster) {
-      this.markMobSeen?.(monster.typeName);
       this.player.attackTargetId = monster.id;
       this.player.attackObjectId = null;
       const stats = this.calcStats();

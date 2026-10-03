@@ -29,7 +29,7 @@ import {
 import { normalizeSkillTree, skillTreeAvailablePoints } from "../../config/skill-tree-config.js";
 import { classPointsAvailable, getClassConfig, normalizeClassId, normalizeClassNodes } from "../../config/class-config.js";
 import { normalizeAutoLootRules } from "./loot.js";
-import { normalizeWorldState } from "../../world-state.js";
+import { normalizeWorldState, withWorldStateReadScope } from "../../world-state.js";
 import { getWorldEnergyState } from "../../world-energy.js";
 import { normalizeFactionRep } from "../../config/faction-config.js";
 
@@ -159,10 +159,36 @@ function statusEffectSnapshot(effect = {}) {
 }
 
 export const snapshotMethods = {
+  hoverMonsterSnapshot() {
+    const monster = this.hoverMonsterId ? this.monsters.get(this.hoverMonsterId) : null;
+    return monster && !monster.dead ? {
+      id: monster.id,
+      name: monster.elite
+        ? `${monster.elite.label} ${monster.displayName ?? monster.typeName}`
+        : (monster.displayName ?? monster.typeName),
+      level: monster.level,
+      hp: Math.max(0, Math.ceil(monster.hp)),
+      maxHp: monster.maxHp,
+    } : null;
+  },
+
+  publishHoverSnapshot() {
+    if (!this.lastPublishedSnapshot) return this.publishSnapshot();
+    // Hover changes do not require rebuilding inventory, quests and city offers.
+    this.lastPublishedSnapshot = {
+      ...this.lastPublishedSnapshot,
+      hoverMonster: this.hoverMonsterSnapshot(),
+    };
+    this.onSnapshot(this.lastPublishedSnapshot);
+  },
+
   publishSnapshot() {
+    return withWorldStateReadScope(this.worldState, () => this.buildSnapshot());
+  },
+
+  buildSnapshot() {
     const stats = this.calcStats();
     const chunk = this.currentChunk();
-    const hoverMonster = this.hoverMonsterId ? this.monsters.get(this.hoverMonsterId) : null;
     const potionCounts = Object.fromEntries(POTION_IDS.map((potionId) => [
       potionId,
       (this.player.inventory ?? []).reduce((sum, item) => (
@@ -172,7 +198,8 @@ export const snapshotMethods = {
       ), 0),
     ]));
     const quickSlots = normalizeQuickSlots(this.player.quickSlots);
-    this.onSnapshot({
+    const snapshot = {
+      snapshotContentToken: {},
       player: {
         level: this.player.level,
         hp: Math.ceil(this.player.hp),
@@ -329,15 +356,7 @@ export const snapshotMethods = {
         };
       }),
       autoLoot: normalizeAutoLootRules(this.player.autoLoot),
-      hoverMonster: hoverMonster && !hoverMonster.dead ? {
-        id: hoverMonster.id,
-        name: hoverMonster.elite
-          ? `${hoverMonster.elite.label} ${hoverMonster.displayName ?? hoverMonster.typeName}`
-          : (hoverMonster.displayName ?? hoverMonster.typeName),
-        level: hoverMonster.level,
-        hp: Math.max(0, Math.ceil(hoverMonster.hp)),
-        maxHp: hoverMonster.maxHp,
-      } : null,
+      hoverMonster: this.hoverMonsterSnapshot(),
       quickActions: {
         healthPotions: potionCounts.small_health ?? 0,
         manaPotions: potionCounts.mana ?? 0,
@@ -420,7 +439,9 @@ export const snapshotMethods = {
         important: Boolean(toast.important),
         createdAt: toast.createdAt ?? null,
       })),
-    });
+    };
+    this.lastPublishedSnapshot = snapshot;
+    this.onSnapshot(snapshot);
   },
 
   monsterCounterSnapshot() {
